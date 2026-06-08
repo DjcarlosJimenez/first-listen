@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint . --max-warnings=0",
+    "bootstrap:admins": "node scripts/bootstrap-admins.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

@@ -18,7 +18,6 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
-  Users,
 } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { LanguageSelector } from "@/components/language-selector";

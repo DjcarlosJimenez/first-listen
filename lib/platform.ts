@@ -78,6 +78,21 @@ export function detectMusicPlatform(rawUrl: string): PlatformDetection {
       };
     }
 
+    if (host === "music.apple.com") {
+      const parts = path.split("/").filter(Boolean);
+      const valid =
+        parts.length >= 3 &&
+        ["album", "song"].includes(parts[1]) &&
+        (Boolean(url.searchParams.get("i")) || parts[1] === "song");
+      return {
+        platform: "Apple Music",
+        valid,
+        message: valid
+          ? "Apple Music track detected."
+          : "Use a direct Apple Music song link.",
+      };
+    }
+
     return {
       platform: null,
       valid: false,

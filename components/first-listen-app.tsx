@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BadgeCheck,
   BarChart3,
+  Bookmark,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -12,6 +13,7 @@ import {
   Cloud,
   Disc3,
   ExternalLink,
+  Flag,
   Gauge,
   Globe2,
   Headphones,
@@ -34,16 +36,18 @@ import {
   ThumbsDown,
   ThumbsUp,
   UserRound,
+  UserPlus,
+  Radio,
   X,
   Youtube,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { LanguageSelector } from "@/components/language-selector";
 import { Logo } from "@/components/logo";
 import {
-  defaultGenrePreferences,
-  defaultListenerLanguages,
   feedbackFocusOptions,
   genreOptions,
   songLanguageOptions,
@@ -53,15 +57,21 @@ import {
   type ListenerLanguage,
   type SongLanguage,
 } from "@/lib/catalog";
-import { demoReviews, reviewQueue, userSong } from "@/lib/demo-data";
 import { getCopy, optionLabel } from "@/lib/i18n";
+import { getDiscoveryLinks } from "@/lib/discovery";
 import { describeMatch, prioritizeReviewQueue } from "@/lib/matching";
 import { detectMusicPlatform } from "@/lib/platform";
 import { evaluateReviewQuality } from "@/lib/review-quality";
 import { createClient } from "@/lib/supabase/client";
-import type { Platform, Song } from "@/lib/types";
+import type {
+  AccountSummary,
+  Platform,
+  Review,
+  Song,
+  SongDashboardSummary,
+} from "@/lib/types";
 
-type View = "review" | "dashboard" | "submit";
+export type View = "review" | "dashboard" | "submit";
 type BinaryAnswer = boolean | null;
 type Copy = ReturnType<typeof getCopy>;
 
@@ -77,6 +87,7 @@ type ReviewForm = {
 type ReviewSubmissionResult = {
   accepted: boolean;
   qualityScore: number;
+  creditsBalance?: number;
   warning?: string;
 };
 
@@ -90,6 +101,7 @@ type SongSubmission = {
   language: SongLanguage;
   feedbackFocus: FeedbackFocus[];
   country: string;
+  explicitContent: boolean;
 };
 
 const databasePlatform: Record<Platform, string> = {
@@ -97,6 +109,7 @@ const databasePlatform: Record<Platform, string> = {
   YouTube: "youtube",
   "YouTube Music": "youtube_music",
   SoundCloud: "soundcloud",
+  "Apple Music": "apple_music",
 };
 
 const displayPlatform: Record<string, Platform> = {
@@ -104,7 +117,27 @@ const displayPlatform: Record<string, Platform> = {
   youtube: "YouTube",
   youtube_music: "YouTube Music",
   soundcloud: "SoundCloud",
+  apple_music: "Apple Music",
 };
+
+function mapQueueRows(data: Array<Record<string, unknown>>): Song[] {
+  return data.map((row) => ({
+    id: String(row.song_id),
+    artistId: String(row.artist_id),
+    title: String(row.title),
+    artist: String(row.artist_name),
+    coverUrl: String(row.cover_image_url),
+    link: String(row.music_url),
+    platform: displayPlatform[String(row.platform)] ?? "Spotify",
+    genre: String(row.genre) as Genre,
+    language: String(row.song_language) as SongLanguage,
+    feedbackFocus: (row.feedback_focus ?? []) as FeedbackFocus[],
+    explicitContent: Boolean(row.explicit_content),
+    country: String(row.country),
+    submittedAt: String(row.submitted_at),
+    accent: "#c8ff4f",
+  }));
+}
 
 const emptyReview: ReviewForm = {
   listenFull: null,
@@ -169,6 +202,9 @@ function PlatformIcon({
   if (platform === "Spotify") {
     return <Disc3 size={size} />;
   }
+  if (platform === "Apple Music") {
+    return <Radio size={size} />;
+  }
   return <Music2 size={size} />;
 }
 
@@ -220,34 +256,35 @@ function ReviewProgress({
   count,
   founderFree = false,
   copy,
+  unlimited = false,
 }: {
   count: number;
   founderFree?: boolean;
   copy: Copy;
+  unlimited?: boolean;
 }) {
-  const safeCount = Math.min(count, 5);
-  const remaining = Math.max(0, 5 - safeCount);
-
   return (
     <div className="review-progress">
       <div>
         <span className="eyebrow">
           <Sparkles size={13} />
-          {copy.app.review.submissionCredit}
+          Submission credits
         </span>
         <strong>
-          {safeCount}<span>/5</span>
+          {unlimited ? "∞" : count}<span>{unlimited ? "" : " available"}</span>
         </strong>
       </div>
-      <div className="progress-track" aria-label={`${safeCount} of 5 reviews completed`}>
-        <i style={{ width: `${safeCount * 20}%` }} />
+      <div className="progress-track" aria-label={`${unlimited ? "Unlimited" : count} submission credits`}>
+        <i style={{ width: `${unlimited ? 100 : Math.min(count, 10) * 10}%` }} />
       </div>
       <p>
         {founderFree
           ? copy.app.review.founderReady
-          : safeCount >= 5
-            ? copy.app.review.unlocked
-            : `${remaining} ${copy.app.review.toUnlock}`}
+          : unlimited
+            ? "Super Admin accounts can submit without spending credits."
+            : count >= 1
+              ? "One credit submits one validated song."
+              : "Complete review milestones to earn more credits."}
       </p>
     </div>
   );
@@ -259,16 +296,24 @@ function Sidebar({
   reviewCount,
   founder,
   founderFree,
-  onLogout,
+  account,
+  onProfile,
   copy,
+  unlimitedCredits,
+  adminAccess,
+  onAdmin,
 }: {
   view: View;
   setView: (view: View) => void;
   reviewCount: number;
   founder: boolean;
   founderFree: boolean;
-  onLogout: () => void;
+  account: AccountSummary;
+  onProfile: () => void;
   copy: Copy;
+  unlimitedCredits: boolean;
+  adminAccess: boolean;
+  onAdmin: () => void;
 }) {
   return (
     <aside className="sidebar">
@@ -285,13 +330,19 @@ function Sidebar({
             >
               <Icon size={19} />
               <span>{item.label}</span>
-              {item.id === "review" && <em>{Math.min(reviewCount, 5)}/5</em>}
-              {item.id === "submit" && reviewCount < 5 && !founderFree && (
+              {item.id === "review" && <em>{unlimitedCredits ? "\u221e" : reviewCount}</em>}
+              {item.id === "submit" && reviewCount < 1 && !founderFree && !unlimitedCredits && (
                 <LockKeyhole className="nav-lock" size={14} />
               )}
             </button>
           );
         })}
+        {adminAccess && (
+          <button onClick={onAdmin}>
+            <ShieldCheck size={19} />
+            <span>Administration</span>
+          </button>
+        )}
       </nav>
 
       <div className="sidebar-bottom">
@@ -312,11 +363,11 @@ function Sidebar({
             {copy.app.sidebar.reviewSong} <ArrowRight size={14} />
           </button>
         </div>
-        <button className="profile-row" onClick={onLogout}>
-          <span className="avatar">CJ</span>
+        <button className="profile-row" onClick={onProfile}>
+          <span className="avatar">{account.initials}</span>
           <span>
-            <strong>Carlos J.</strong>
-            <small>{copy.common.signOut}</small>
+            <strong>{account.displayName}</strong>
+            <small>{account.email || "Profile"}</small>
           </span>
           <ChevronDown size={15} />
         </button>
@@ -329,6 +380,7 @@ function Topbar({
   view,
   onMenu,
   onLogout,
+  onHelp,
   darkMode,
   onToggleTheme,
   copy,
@@ -338,6 +390,7 @@ function Topbar({
   view: View;
   onMenu: () => void;
   onLogout: () => void;
+  onHelp: () => void;
   darkMode: boolean;
   onToggleTheme: () => void;
   copy: Copy;
@@ -380,13 +433,93 @@ function Topbar({
         >
           {darkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <button className="help-button" aria-label="Help"><CircleHelp size={19} /></button>
-        <button className="google-button" onClick={onLogout} title={copy.common.signOut}>
-          <span>G</span>
-          <b>Connected</b>
+        <button className="help-button" onClick={onHelp} aria-label="Help Center">
+          <CircleHelp size={19} />
+        </button>
+        <button className="session-button" onClick={onLogout} title={copy.common.signOut}>
+          <LogOut size={15} />
+          <b>{copy.common.signOut}</b>
         </button>
       </div>
     </header>
+  );
+}
+
+function PostReviewDiscovery({
+  song,
+  notify,
+}: {
+  song: Song;
+  notify: (message: string) => void;
+}) {
+  const links = getDiscoveryLinks(song);
+  const [following, setFollowing] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const followArtist = async () => {
+    const supabase = createClient();
+    if (!supabase || !song.artistId) {
+      notify("Log in again to follow this artist.");
+      return;
+    }
+    const { error } = await supabase.rpc("follow_artist", {
+      target_artist_id: song.artistId,
+    });
+    if (error) {
+      notify(error.message);
+      return;
+    }
+    setFollowing(true);
+    notify(`You are now following ${song.artist}.`);
+  };
+
+  const saveForLater = async () => {
+    const supabase = createClient();
+    if (!supabase) {
+      notify("Log in again to save this song.");
+      return;
+    }
+    const { error } = await supabase.rpc("save_song_for_later", {
+      target_song_id: song.id,
+    });
+    if (error) {
+      notify(error.message);
+      return;
+    }
+    setSaved(true);
+    notify(`${song.title} was saved for later.`);
+  };
+
+  return (
+    <div className="discovery-card">
+      <span className="eyebrow"><Sparkles size={13} /> Review complete</span>
+      <h3>Keep listening</h3>
+      <p>Your next review is ready. First Listen stays open when you visit a music platform.</p>
+      <div className="discovery-links">
+        <a href={links.spotify} rel="noreferrer" target="_blank">
+          <Disc3 size={15} /> Listen Full Song on Spotify
+        </a>
+        <a href={links.youtube} rel="noreferrer" target="_blank">
+          <Youtube size={15} /> Listen Full Song on YouTube
+        </a>
+        <a href={links.apple} rel="noreferrer" target="_blank">
+          <Radio size={15} /> Listen Full Song on Apple Music
+        </a>
+      </div>
+      <div className="discovery-actions">
+        <button disabled={following || !song.artistId} onClick={followArtist} type="button">
+          <UserPlus size={14} /> {following ? "Following" : "Follow Artist"}
+        </button>
+        <button disabled={saved} onClick={saveForLater} type="button">
+          <Bookmark size={14} /> {saved ? "Saved" : "Save For Later"}
+        </button>
+      </div>
+      {song.artistId && (
+        <Link href={`/artists/${song.artistId}`}>
+          View {song.artist}&apos;s profile <ArrowRight size={13} />
+        </Link>
+      )}
+    </div>
   );
 }
 
@@ -403,6 +536,7 @@ function ReviewView({
   genrePreferences,
   activityScore,
   queueSongs,
+  unlimitedCredits,
 }: {
   reviewCount: number;
   onReviewed: (
@@ -421,6 +555,7 @@ function ReviewView({
   genrePreferences: Genre[];
   activityScore: number;
   queueSongs: Song[];
+  unlimitedCredits: boolean;
 }) {
   const reviewerProfile = useMemo(
     () => ({ languages: listenerLanguages, genrePreferences, activityScore }),
@@ -437,6 +572,8 @@ function ReviewView({
   const [isPlaying, setIsPlaying] = useState(false);
   const [pastedWithoutEditing, setPastedWithoutEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [reportReason, setReportReason] = useState("spam");
+  const [lastReviewedSong, setLastReviewedSong] = useState<Song | null>(null);
 
   useEffect(() => {
     setForm(emptyReview);
@@ -474,42 +611,30 @@ function ReviewView({
       notify(result.warning || copy.app.review.warning);
       return;
     }
-    notify(locale === "es" ? "Review de calidad enviada. Ganaste un credito." : "Quality review submitted. One review credit earned.");
+    setLastReviewedSong(song);
+    notify(
+      locale === "es"
+        ? "Review enviada. La siguiente cancion ya esta lista."
+        : "Review submitted. The next song is ready.",
+    );
   };
 
-  if (reviewCount >= 5) {
-    return (
-      <main className="content review-complete-wrap">
-        <section className="review-complete-card">
-          <div className="success-orbit"><Check size={36} strokeWidth={2.4} /></div>
-          <span className="eyebrow">{copy.app.review.fiveForOne}</span>
-          <h2>{copy.app.review.unlockedTitle}</h2>
-          <p>{copy.app.review.unlockedBody}</p>
-          <button className="primary-button" onClick={() => setView("submit")}>
-            {copy.app.review.submitSong} <ArrowRight size={17} />
-          </button>
-          <button
-            className="text-button"
-            onClick={() =>
-              notify(locale === "es" ? "Las reviews extra cuentan para tu proximo envio." : "Extra reviews will count toward your next submission.")
-            }
-          >
-            {locale === "es" ? "Seguir revisando" : "Keep reviewing"}
-          </button>
-        </section>
-        <aside className="review-side">
-          <ReviewProgress count={reviewCount} copy={copy} founderFree={founderFree} />
-          <div className="side-note">
-            <MessageSquareText size={20} />
-            <div>
-              <strong>{locale === "es" ? "Buen feedback es especifico" : "Good feedback is specific"}</strong>
-              <p>{locale === "es" ? "Comenta el momento que gano o perdio tu atencion." : "Comment on the moment that won or lost your attention."}</p>
-            </div>
-          </div>
-        </aside>
-      </main>
+  const reportSong = async () => {
+    const supabase = createClient();
+    if (!supabase || !song) return;
+    const { error } = await supabase.rpc("report_song", {
+      reported_song_id: song.id,
+      report_reason: reportReason,
+      report_details: null,
+    });
+    notify(
+      error
+        ? error.message
+        : locale === "es"
+          ? "Reporte enviado para moderacion."
+          : "Report sent to moderation.",
     );
-  }
+  };
 
   if (!song) {
     return (
@@ -528,7 +653,7 @@ function ReviewView({
           </button>
         </section>
         <aside className="review-side">
-          <ReviewProgress count={reviewCount} copy={copy} founderFree={founderFree} />
+          <ReviewProgress count={reviewCount} copy={copy} founderFree={founderFree} unlimited={unlimitedCredits} />
         </aside>
       </main>
     );
@@ -588,6 +713,20 @@ function ReviewView({
             <a href={song.link} target="_blank" rel="noreferrer">
               Open on {song.platform} <ExternalLink size={14} />
             </a>
+            <div className="report-control">
+              <select
+                aria-label="Report reason"
+                onChange={(event) => setReportReason(event.target.value)}
+                value={reportReason}
+              >
+                <option value="spam">Spam</option>
+                <option value="broken_link">Broken Link</option>
+                <option value="not_music">Not Music</option>
+                <option value="illegal_content">Illegal Content</option>
+                <option value="offensive_content">Offensive Content</option>
+              </select>
+              <button onClick={reportSong} type="button"><Flag size={13} /> Report Song</button>
+            </div>
           </div>
         </div>
 
@@ -685,7 +824,10 @@ function ReviewView({
       </section>
 
       <aside className="review-side">
-        <ReviewProgress count={reviewCount} copy={copy} founderFree={founderFree} />
+        {lastReviewedSong && (
+          <PostReviewDiscovery notify={notify} song={lastReviewedSong} />
+        )}
+        <ReviewProgress count={reviewCount} copy={copy} founderFree={founderFree} unlimited={unlimitedCredits} />
         <div className="side-note">
           <MessageSquareText size={20} />
           <div>
@@ -745,6 +887,9 @@ function DashboardView({
   reviewQualityScore,
   copy,
   locale,
+  song,
+  songSummaries,
+  songReviews,
 }: {
   setView: (view: View) => void;
   founder: boolean;
@@ -753,18 +898,40 @@ function DashboardView({
   reviewQualityScore: number;
   copy: Copy;
   locale: InterfaceLocale;
+  song: Song | null;
+  songSummaries: SongDashboardSummary[];
+  songReviews: Review[];
 }) {
-  const reviews = demoReviews;
-  const average = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
+  const reviews = songReviews;
+  if (!song) {
+    return (
+      <main className="content submit-success">
+        <section>
+          <div className="success-orbit"><Music2 size={34} /></div>
+          <span className="eyebrow">{copy.app.dashboard.latest}</span>
+          <h2>No songs submitted yet.</h2>
+          <p>Submit a validated music link to begin collecting private feedback.</p>
+          <button className="primary-button" onClick={() => setView("submit")}>
+            <Plus size={16} /> {copy.app.dashboard.newSubmission}
+          </button>
+        </section>
+      </main>
+    );
+  }
+  const average = reviews.length
+    ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
+    : 0;
   const percentage = (
     key: "listenFull" | "addPlaylist" | "grabbedAttention" | "shareWithFriend",
-  ) => Math.round((reviews.filter((review) => review[key]).length / reviews.length) * 100);
+  ) => reviews.length
+    ? Math.round((reviews.filter((review) => review[key]).length / reviews.length) * 100)
+    : 0;
 
   const ratingCounts = Array.from({ length: 10 }, (_, index) => {
     const rating = index + 1;
     return reviews.filter((review) => review.rating === rating).length;
   });
-  const maxCount = Math.max(...ratingCounts);
+  const maxCount = Math.max(1, ...ratingCounts);
   const hookScore = Math.round(
     (
       percentage("listenFull") +
@@ -788,19 +955,22 @@ function DashboardView({
         </div>
 
         <div className="active-song">
-          <Image src={userSong.coverUrl} alt={`${userSong.title} cover`} width={90} height={90} />
+          <Image src={song.coverUrl} alt={`${song.title} cover`} unoptimized width={90} height={90} />
           <div className="active-song-copy">
             <div>
               <span className="live-dot">{copy.app.dashboard.collecting}</span>
-              <span className="platform-label">{userSong.platform}</span>
+              <span className="platform-label">{song.platform}</span>
               {founder && <span className="song-founder-badge"><BadgeCheck size={12} /> {copy.app.dashboard.founder}</span>}
             </div>
-            <h3>{userSong.title}</h3>
+            <h3>{song.title}</h3>
             <p>
-              {userSong.artist} / {optionLabel(locale, userSong.genre)} / {optionLabel(locale, userSong.language)}
+              {song.artistId ? (
+                <Link href={`/artists/${song.artistId}`}>{song.artist}</Link>
+              ) : song.artist}
+              {" / "}{optionLabel(locale, song.genre)} / {optionLabel(locale, song.language)}
             </p>
             <div className="active-song-tags">
-              {userSong.feedbackFocus.map((focus) => <span key={focus}>{optionLabel(locale, focus)}</span>)}
+              {song.feedbackFocus.map((focus) => <span key={focus}>{optionLabel(locale, focus)}</span>)}
             </div>
           </div>
           <div className="hook-score-card" title={copy.app.dashboard.hookTooltip}>
@@ -865,6 +1035,36 @@ function DashboardView({
             icon={ShieldCheck}
           />
         </div>
+
+        <section className="panel song-performance-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">Song performance</span>
+              <h3>Every submitted song</h3>
+            </div>
+            <span>{songSummaries.length} total</span>
+          </div>
+          <div className="song-performance-list">
+            {songSummaries.map((summary) => (
+              <article key={summary.id}>
+                <div className="song-performance-title">
+                  <strong>{summary.title}</strong>
+                  <small>
+                    {summary.platform} / Submitted{" "}
+                    {new Date(summary.submittedAt).toLocaleDateString(locale, { timeZone: "UTC" })}
+                  </small>
+                </div>
+                <div><strong>{summary.reviewsReceived}</strong><span>Reviews received</span></div>
+                <div><strong>{summary.averageRating.toFixed(1)}</strong><span>Average rating</span></div>
+                <div><strong>{summary.hookScore}</strong><span>Hook score</span></div>
+                <div><strong>{summary.reportCount}</strong><span>Reports</span></div>
+                <Link href={`/dashboard/comments?song=${summary.id}`}>
+                  Comments <ArrowRight size={13} />
+                </Link>
+              </article>
+            ))}
+          </div>
+        </section>
 
         <div className="insights-grid">
           <div className="panel ratings-panel">
@@ -937,9 +1137,9 @@ function DashboardView({
               </article>
             ))}
         </div>
-        <button className="all-comments-button">
+        <Link className="all-comments-button" href={`/dashboard/comments?song=${song.id}`}>
           {locale === "es" ? "Ver todos los comentarios" : "View all comments"} <ArrowRight size={15} />
-        </button>
+        </Link>
       </aside>
     </main>
   );
@@ -958,6 +1158,7 @@ function SubmitView({
   founderFree,
   copy,
   locale,
+  unlimitedCredits,
 }: {
   reviewCount: number;
   notify: (message: string) => void;
@@ -968,13 +1169,15 @@ function SubmitView({
   founderFree: boolean;
   copy: Copy;
   locale: InterfaceLocale;
+  unlimitedCredits: boolean;
 }) {
-  const unlocked = reviewCount >= 5 || founderFree;
+  const unlocked = reviewCount >= 1 || founderFree || unlimitedCredits;
   const [submitted, setSubmitted] = useState(false);
   const [musicLink, setMusicLink] = useState("");
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [songLanguage, setSongLanguage] = useState<SongLanguage | "">("");
   const [feedbackFocus, setFeedbackFocus] = useState<FeedbackFocus[]>(["Hook Strength"]);
+  const [explicitContent, setExplicitContent] = useState(false);
   const [saving, setSaving] = useState(false);
   const platformDetection = detectMusicPlatform(musicLink);
   const platformMessage = translatedPlatformMessage(
@@ -989,7 +1192,7 @@ function SubmitView({
     event.preventDefault();
     if (!unlocked) return;
     if (!platformDetection.valid || !platformDetection.platform) {
-      notify(locale === "es" ? "Pega un enlace valido de Spotify, YouTube, YouTube Music o SoundCloud." : "Paste a valid Spotify, YouTube, YouTube Music, or SoundCloud song link.");
+      notify(locale === "es" ? "Pega un enlace valido de Spotify, YouTube, YouTube Music, SoundCloud o Apple Music." : "Paste a valid Spotify, YouTube, YouTube Music, SoundCloud, or Apple Music song link.");
       return;
     }
     if (!songLanguage || feedbackFocus.length === 0) {
@@ -1007,6 +1210,7 @@ function SubmitView({
       language: songLanguage,
       feedbackFocus,
       country: String(formData.get("country") ?? ""),
+      explicitContent,
     };
 
     setSaving(true);
@@ -1061,8 +1265,8 @@ function SubmitView({
           <div className="locked-banner">
             <LockKeyhole size={19} />
             <div>
-              <strong>{copy.app.submit.completeReviews}</strong>
-              <p>{locale === "es" ? "Cada envio empieza aportando feedback util." : "Every submission starts with giving useful feedback first."}</p>
+              <strong>{locale === "es" ? "Necesitas 1 credito para enviar" : "One credit is required to submit"}</strong>
+              <p>{locale === "es" ? "Completa hitos de reviews para ganar creditos." : "Complete review milestones to earn credits."}</p>
             </div>
           </div>
         )}
@@ -1195,10 +1399,34 @@ function SubmitView({
             </div>
           </div>
 
+          <fieldset className="explicit-field" disabled={!unlocked}>
+            <legend>Explicit Content</legend>
+            <label>
+              <input
+                checked={!explicitContent}
+                name="explicitContent"
+                onChange={() => setExplicitContent(false)}
+                type="radio"
+                value="no"
+              />
+              No
+            </label>
+            <label>
+              <input
+                checked={explicitContent}
+                name="explicitContent"
+                onChange={() => setExplicitContent(true)}
+                type="radio"
+                value="yes"
+              />
+              Yes
+            </label>
+          </fieldset>
+
           <div className="platform-picker">
             <label>{copy.app.submit.detectedPlatform}</label>
             <div>
-              {(["Spotify", "YouTube", "YouTube Music", "SoundCloud"] as Platform[]).map((item) => (
+              {(["Spotify", "YouTube", "YouTube Music", "SoundCloud", "Apple Music"] as Platform[]).map((item) => (
                 <button className={platform === item ? "active" : ""} disabled key={item} type="button">
                   {platform === item ? <Check size={14} /> : <PlatformIcon platform={item} size={14} />}
                   {item}
@@ -1233,7 +1461,7 @@ function SubmitView({
       </section>
 
       <aside className="submission-side">
-        <ReviewProgress count={reviewCount} copy={copy} founderFree={founderFree} />
+        <ReviewProgress count={reviewCount} copy={copy} founderFree={founderFree} unlimited={unlimitedCredits} />
         <div className="expect-card">
           <span className="eyebrow">{locale === "es" ? "Que sigue" : "What happens next"}</span>
           {[
@@ -1251,19 +1479,27 @@ function SubmitView({
 
 type FirstListenAppProps = {
   onLogout: () => void;
+  account: AccountSummary;
+  initialView?: View;
   locale: InterfaceLocale;
   onLocaleChange: (locale: InterfaceLocale) => void;
-  listenerLanguages?: ListenerLanguage[];
-  genrePreferences?: Genre[];
-  initialFounder?: boolean;
-  initialFounderFree?: boolean;
-  initialReviewCredits?: number;
-  initialTotalCreditsEarned?: number;
-  initialReviewQualityScore?: number;
+  listenerLanguages: ListenerLanguage[];
+  genrePreferences: Genre[];
+  initialFounder: boolean;
+  initialFounderFree: boolean;
+  initialReviewCredits: number;
+  initialTotalCreditsEarned: number;
+  initialReviewQualityScore: number;
+  role: "super_admin" | "admin" | "moderator" | "user";
+  initialUserSong: Song | null;
+  initialSongSummaries: SongDashboardSummary[];
+  initialSongReviews: Review[];
 };
 
 export function FirstListenApp({
   onLogout,
+  account,
+  initialView = "review",
   locale,
   onLocaleChange,
   listenerLanguages,
@@ -1273,27 +1509,28 @@ export function FirstListenApp({
   initialReviewCredits,
   initialTotalCreditsEarned,
   initialReviewQualityScore,
+  role,
+  initialUserSong,
+  initialSongSummaries,
+  initialSongReviews,
 }: FirstListenAppProps) {
+  const router = useRouter();
   const copy = getCopy(locale);
-  const [view, setView] = useState<View>("review");
-  const [reviewCount, setReviewCount] = useState(initialReviewCredits ?? 3);
-  const [totalCreditsEarned, setTotalCreditsEarned] = useState(initialTotalCreditsEarned ?? 3);
-  const [reviewQualityScores, setReviewQualityScores] = useState<number[]>(
-    initialReviewQualityScore ? [initialReviewQualityScore] : [92, 88, 94],
-  );
+  const [view, setView] = useState<View>(initialView);
+  const [reviewCount, setReviewCount] = useState(initialReviewCredits);
+  const [totalCreditsEarned, setTotalCreditsEarned] = useState(initialTotalCreditsEarned);
+  const [reviewQualityScores, setReviewQualityScores] = useState<number[]>([
+    initialReviewQualityScore,
+  ]);
   const [priorComments, setPriorComments] = useState<string[]>([]);
-  const [founder, setFounder] = useState(initialFounder ?? false);
-  const [founderFree, setFounderFree] = useState(initialFounderFree ?? false);
+  const founder = initialFounder;
+  const founderFree = initialFounderFree;
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [darkMode, setDarkMode] = useState(false);
-  const [languages, setLanguages] = useState<ListenerLanguage[]>(
-    listenerLanguages?.length ? listenerLanguages : defaultListenerLanguages,
-  );
-  const [genres, setGenres] = useState<Genre[]>(
-    genrePreferences?.length ? genrePreferences : defaultGenrePreferences,
-  );
-  const [queueSongs, setQueueSongs] = useState<Song[]>(reviewQueue);
+  const [languages] = useState<ListenerLanguage[]>(listenerLanguages);
+  const [genres] = useState<Genre[]>(genrePreferences);
+  const [queueSongs, setQueueSongs] = useState<Song[]>([]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -1301,44 +1538,10 @@ export function FirstListenApp({
   }, [locale]);
 
   useEffect(() => {
-    if (initialReviewCredits === undefined) {
-      const stored = window.localStorage.getItem("first-listen-review-count");
-      if (stored) setReviewCount(Number(stored));
-    }
-    if (initialTotalCreditsEarned === undefined) {
-      const storedTotalCredits = window.localStorage.getItem("first-listen-total-credits");
-      if (storedTotalCredits) setTotalCreditsEarned(Number(storedTotalCredits));
-    }
-    if (initialReviewQualityScore === undefined) {
-      const storedQualityScores = window.localStorage.getItem("first-listen-quality-scores");
-      if (storedQualityScores) setReviewQualityScores(JSON.parse(storedQualityScores));
-    }
     const storedComments = window.localStorage.getItem("first-listen-prior-comments");
     if (storedComments) setPriorComments(JSON.parse(storedComments));
-    if (initialFounder === undefined) {
-      setFounder(window.localStorage.getItem("first-listen-founder") === "true");
-    }
-    if (initialFounderFree === undefined) {
-      setFounderFree(window.localStorage.getItem("first-listen-founder-free") === "true");
-    }
-    if (!listenerLanguages?.length) {
-      const storedLanguages = window.localStorage.getItem("first-listen-listener-languages");
-      if (storedLanguages) setLanguages(JSON.parse(storedLanguages));
-    }
-    if (!genrePreferences?.length) {
-      const storedGenres = window.localStorage.getItem("first-listen-genre-preferences");
-      if (storedGenres) setGenres(JSON.parse(storedGenres));
-    }
     setDarkMode(window.localStorage.getItem("first-listen-theme") === "dark");
-  }, [
-    genrePreferences,
-    initialFounder,
-    initialFounderFree,
-    initialReviewCredits,
-    initialReviewQualityScore,
-    initialTotalCreditsEarned,
-    listenerLanguages,
-  ]);
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -1347,22 +1550,7 @@ export function FirstListenApp({
     let active = true;
     supabase.rpc("get_smart_review_queue", { queue_limit: 20 }).then(({ data, error }) => {
       if (!active || error || !data) return;
-      setQueueSongs(
-        data.map((row: Record<string, unknown>) => ({
-          id: String(row.song_id),
-          title: String(row.title),
-          artist: String(row.artist_name),
-          coverUrl: String(row.cover_image_url),
-          link: String(row.music_url),
-          platform: displayPlatform[String(row.platform)] ?? "Spotify",
-          genre: String(row.genre) as Genre,
-          language: String(row.song_language) as SongLanguage,
-          feedbackFocus: (row.feedback_focus ?? []) as FeedbackFocus[],
-          country: String(row.country),
-          submittedAt: String(row.submitted_at),
-          accent: "#c8ff4f",
-        })),
-      );
+      setQueueSongs(mapQueueRows(data));
     });
 
     return () => {
@@ -1390,84 +1578,88 @@ export function FirstListenApp({
     const supabase = createClient();
     const isDatabaseSong = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(songId);
 
-    if (supabase && isDatabaseSong) {
-      const { data, error } = await supabase.rpc("submit_review", {
-        reviewed_song_id: songId,
-        review_listen_full: form.listenFull,
-        review_add_to_playlist: form.addPlaylist,
-        review_grabbed_attention: form.grabbedAttention,
-        review_share_with_friend: form.shareWithFriend,
-        review_rating: form.rating,
-        review_comment: form.comment.trim(),
-        review_pasted_comment_detected: pastedWithoutEditing,
-      });
-      const result = Array.isArray(data) ? data[0] : data;
-      if (error || !result?.accepted) {
-        return {
-          accepted: false,
-          qualityScore: Number(result?.quality_score ?? 0),
-          warning: result?.warning || error?.message,
-        };
-      }
-      qualityScore = Number(result.quality_score);
+    if (!supabase || !isDatabaseSong) {
+      return {
+        accepted: false,
+        qualityScore: 0,
+        warning: "Review service is unavailable. Please refresh and try again.",
+      };
     }
 
-    setReviewCount((current) => {
-      const next = current + 1;
-      window.localStorage.setItem("first-listen-review-count", String(next));
-      return next;
+    const { data, error } = await supabase.rpc("submit_review", {
+      reviewed_song_id: songId,
+      review_listen_full: form.listenFull,
+      review_add_to_playlist: form.addPlaylist,
+      review_grabbed_attention: form.grabbedAttention,
+      review_share_with_friend: form.shareWithFriend,
+      review_rating: form.rating,
+      review_comment: form.comment.trim(),
+      review_pasted_comment_detected: pastedWithoutEditing,
     });
-    setTotalCreditsEarned((current) => {
-      const next = current + 1;
-      window.localStorage.setItem("first-listen-total-credits", String(next));
-      return next;
-    });
+    const result = Array.isArray(data) ? data[0] : data;
+    if (error || !result?.accepted) {
+      return {
+        accepted: false,
+        qualityScore: Number(result?.quality_score ?? 0),
+        warning: result?.warning || error?.message,
+      };
+    }
+    qualityScore = Number(result.quality_score);
+    const { data: currentProfile } = await supabase
+      .from("profiles")
+      .select("credits, total_review_credits_earned")
+      .eq("id", (await supabase.auth.getUser()).data.user?.id ?? "")
+      .maybeSingle();
+    if (currentProfile) {
+      setReviewCount(Number(currentProfile.credits));
+      setTotalCreditsEarned(Number(currentProfile.total_review_credits_earned));
+    }
+
     setReviewQualityScores((current) => {
-      const next = [...current, qualityScore];
-      window.localStorage.setItem("first-listen-quality-scores", JSON.stringify(next));
-      return next;
+      return [...current, qualityScore];
     });
     setPriorComments((current) => {
       const next = [...current, form.comment.trim()].slice(-20);
       window.localStorage.setItem("first-listen-prior-comments", JSON.stringify(next));
       return next;
     });
+    const needsRefill = queueSongs.length <= 1;
     setQueueSongs((current) => current.filter((song) => song.id !== songId));
+    if (supabase && needsRefill) {
+      const { data } = await supabase.rpc("get_smart_review_queue", { queue_limit: 20 });
+      if (data) setQueueSongs(mapQueueRows(data));
+    }
     return { accepted: true, qualityScore };
   };
 
   const handleSongSubmitted = async (
-    usedFounderFree: boolean,
+    _usedFounderFree: boolean,
     submission: SongSubmission,
   ) => {
     const supabase = createClient();
-    if (supabase) {
-      const { error } = await supabase.rpc("submit_song", {
-        song_title: submission.title,
-        song_artist_name: submission.artistName,
-        song_cover_image_url: submission.coverImageUrl,
-        song_music_url: submission.musicUrl,
-        song_platform: databasePlatform[submission.platform],
-        song_genre: submission.genre,
-        song_language: submission.language,
-        song_feedback_focus: submission.feedbackFocus,
-        song_country: submission.country,
-      });
-      if (error) {
-        notify(error.message);
-        return false;
-      }
+    if (!supabase) {
+      notify("Submission service is unavailable. Please refresh and try again.");
+      return false;
     }
-
-    if (usedFounderFree) {
-      setFounderFree(false);
-      window.localStorage.setItem("first-listen-founder-free", "false");
-      return true;
+    const { error } = await supabase.rpc("submit_song", {
+      song_title: submission.title,
+      song_artist_name: submission.artistName,
+      song_cover_image_url: submission.coverImageUrl,
+      song_music_url: submission.musicUrl,
+      song_platform: databasePlatform[submission.platform],
+      song_genre: submission.genre,
+      song_language: submission.language,
+      song_feedback_focus: submission.feedbackFocus,
+      song_country: submission.country,
+      song_explicit_content: submission.explicitContent,
+    });
+    if (error) {
+      notify(error.message);
+      return false;
     }
 
     setReviewCount((current) => {
-      const next = Math.max(0, current - 5);
-      window.localStorage.setItem("first-listen-review-count", String(next));
+      const next = role === "super_admin" ? current : Math.max(0, current - 1);
       return next;
     });
     return true;
@@ -1484,10 +1676,10 @@ export function FirstListenApp({
   const changeView = (nextView: View) => {
     setView(nextView);
     setMenuOpen(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    router.push(`/${nextView}`);
   };
 
-  const viewContent = useMemo(() => {
+  const viewContent = (() => {
     if (view === "dashboard") {
       return (
         <DashboardView
@@ -1497,6 +1689,9 @@ export function FirstListenApp({
           reviewCredits={reviewCount}
           reviewQualityScore={averageReviewQuality}
           setView={changeView}
+          song={initialUserSong}
+          songSummaries={initialSongSummaries}
+          songReviews={initialSongReviews}
           totalCreditsEarned={totalCreditsEarned}
         />
       );
@@ -1510,6 +1705,7 @@ export function FirstListenApp({
           notify={notify}
           onSubmitted={handleSongSubmitted}
           reviewCount={reviewCount}
+          unlimitedCredits={role === "super_admin"}
         />
       );
     }
@@ -1527,33 +1723,24 @@ export function FirstListenApp({
         queueSongs={queueSongs}
         reviewCount={reviewCount}
         setView={changeView}
+        unlimitedCredits={role === "super_admin"}
       />
     );
-  }, [
-    activityScore,
-    averageReviewQuality,
-    copy,
-    founder,
-    founderFree,
-    genres,
-    languages,
-    locale,
-    priorComments,
-    queueSongs,
-    reviewCount,
-    totalCreditsEarned,
-    view,
-  ]);
+  })();
 
   return (
     <div className={darkMode ? "app-shell theme-dark" : "app-shell"}>
       <Sidebar
+        account={account}
         copy={copy}
         founder={founder}
         founderFree={founderFree}
-        onLogout={onLogout}
+        onProfile={() => router.push("/profile")}
         reviewCount={reviewCount}
         setView={changeView}
+        unlimitedCredits={role === "super_admin"}
+        adminAccess={role !== "user"}
+        onAdmin={() => router.push("/admin")}
         view={view}
       />
       <div className="app-main">
@@ -1563,6 +1750,7 @@ export function FirstListenApp({
           locale={locale}
           onLocaleChange={onLocaleChange}
           onLogout={onLogout}
+          onHelp={() => router.push("/help")}
           onMenu={() => setMenuOpen(true)}
           onToggleTheme={toggleTheme}
           view={view}
@@ -1591,6 +1779,20 @@ export function FirstListenApp({
                 </button>
               );
             })}
+            {role !== "user" && (
+              <button onClick={() => router.push("/admin")}>
+                <ShieldCheck size={19} />
+                Administration
+              </button>
+            )}
+            <button onClick={() => router.push("/help")}>
+              <CircleHelp size={19} />
+              Help Center
+            </button>
+            <button onClick={() => router.push("/profile")}>
+              <UserRound size={19} />
+              {account.displayName}
+            </button>
           </nav>
           <button className="drawer-signout" onClick={onLogout}>
             <LogOut size={17} />
@@ -1610,7 +1812,7 @@ export function FirstListenApp({
             >
               <Icon size={20} />
               <span>{shortMobileLabel(locale, item.id, copy)}</span>
-              {item.id === "submit" && reviewCount < 5 && !founderFree && <i />}
+              {item.id === "submit" && reviewCount < 1 && !founderFree && role !== "super_admin" && <i />}
             </button>
           );
         })}
