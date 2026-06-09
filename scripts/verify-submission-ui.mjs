@@ -350,7 +350,7 @@ try {
       .every((filter) =>
         adminSongState.filters.map((label) => label.toLowerCase()).includes(filter),
       ) ||
-    !adminSongState.total.includes("Total Songs")
+    !adminSongState.total.toLowerCase().includes("total songs")
   ) {
     throw new Error(`Admin song search and filters are incomplete: ${JSON.stringify(adminSongState)}`);
   }
