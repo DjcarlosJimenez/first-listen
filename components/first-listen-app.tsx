@@ -25,7 +25,6 @@ import {
   MessageSquareText,
   Moon,
   Music2,
-  Play,
   Plus,
   Send,
   Share2,
@@ -47,6 +46,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { LanguageSelector } from "@/components/language-selector";
 import { Logo } from "@/components/logo";
+import { ProviderPlayer } from "@/components/provider-player";
 import {
   feedbackFocusOptions,
   genreOptions,
@@ -61,6 +61,7 @@ import { getCopy, optionLabel } from "@/lib/i18n";
 import { getDiscoveryLinks } from "@/lib/discovery";
 import { describeMatch, prioritizeReviewQueue } from "@/lib/matching";
 import { detectMusicPlatform } from "@/lib/platform";
+import { getProviderEmbed } from "@/lib/player";
 import { evaluateReviewQuality } from "@/lib/review-quality";
 import { createClient } from "@/lib/supabase/client";
 import type {
@@ -148,13 +149,6 @@ const emptyReview: ReviewForm = {
   comment: "",
 };
 
-const waveform = [
-  18, 34, 24, 51, 36, 72, 44, 60, 29, 82, 54, 39, 66, 92, 48, 74, 31, 58,
-  86, 43, 64, 78, 36, 55, 89, 47, 68, 32, 61, 76, 42, 57, 83, 35, 71, 51,
-  65, 28, 80, 46, 59, 73, 38, 63, 87, 49, 70, 30, 56, 81, 41, 67, 52, 75,
-  33, 62, 84, 45, 69, 37, 58, 79, 43, 64, 50, 72, 31, 60, 85, 46, 66, 39,
-];
-
 function navItems(copy: Copy): Array<{ id: View; label: string; icon: typeof Headphones }> {
   return [
     { id: "review", label: copy.app.nav.review, icon: Headphones },
@@ -235,19 +229,6 @@ function BinaryChoice({
         <ThumbsDown size={16} />
         {copy.common.no}
       </button>
-    </div>
-  );
-}
-
-function MiniWaveform() {
-  return (
-    <div className="waveform" aria-label="Decorative audio waveform">
-      {waveform.map((height, index) => (
-        <i
-          key={`${height}-${index}`}
-          style={{ height: `${height}%`, opacity: index < 26 ? 1 : 0.28 }}
-        />
-      ))}
     </div>
   );
 }
@@ -340,7 +321,7 @@ function Sidebar({
         {adminAccess && (
           <button onClick={onAdmin}>
             <ShieldCheck size={19} />
-            <span>Administration</span>
+            <span>Admin Panel</span>
           </button>
         )}
       </nav>
@@ -569,7 +550,6 @@ function ReviewView({
   const song = matchedQueue[queueIndex];
   const matchReason = song ? describeMatch(song, reviewerProfile) : "";
   const [form, setForm] = useState<ReviewForm>(emptyReview);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [pastedWithoutEditing, setPastedWithoutEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [reportReason, setReportReason] = useState("spam");
@@ -577,7 +557,6 @@ function ReviewView({
 
   useEffect(() => {
     setForm(emptyReview);
-    setIsPlaying(false);
     setPastedWithoutEditing(false);
   }, [song?.id]);
 
@@ -664,22 +643,17 @@ function ReviewView({
       <section className="review-card">
         <div className="song-hero">
           <div className="cover-wrap">
-            <Image
-              alt={`${song.title} cover`}
-              src={song.coverUrl}
-              unoptimized
-              width={520}
-              height={520}
-              priority
+            <ProviderPlayer
+              artist={song.artist}
+              coverUrl={song.coverUrl}
+              link={song.link}
+              locale={locale}
+              platform={song.platform}
+              title={song.title}
             />
-            <button
-              className={isPlaying ? "play-button playing" : "play-button"}
-              onClick={() => setIsPlaying((current) => !current)}
-              aria-label={isPlaying ? "Pause preview timer" : "Start preview timer"}
-            >
-              {isPlaying ? <span className="pause-icon" /> : <Play fill="currentColor" size={26} />}
-            </button>
-            <span className="listen-badge"><Clock3 size={13} /> First 30 sec</span>
+            <span className="listen-badge">
+              <Clock3 size={13} /> {locale === "es" ? "Reproductor oficial" : "Provider player"}
+            </span>
           </div>
           <div className="song-copy">
             <div className="song-meta-row">
@@ -704,12 +678,11 @@ function ReviewView({
                 <span key={focus}>{optionLabel(locale, focus)}</span>
               ))}
             </div>
-            <MiniWaveform />
-            <div className="player-row">
-              <span>{isPlaying ? "0:18" : "0:00"}</span>
-              <div className="player-track"><i className={isPlaying ? "animating" : ""} /></div>
-              <span>0:30</span>
-            </div>
+            <p className="provider-player-note">
+              {locale === "es"
+                ? `${song.platform} controla la reproducción, el progreso, el volumen y la duración.`
+                : `Playback, progress, volume, and duration are controlled by ${song.platform}.`}
+            </p>
             <a href={song.link} target="_blank" rel="noreferrer">
               Open on {song.platform} <ExternalLink size={14} />
             </a>
@@ -1175,11 +1148,23 @@ function SubmitView({
   const [submitted, setSubmitted] = useState(false);
   const [musicLink, setMusicLink] = useState("");
   const [platform, setPlatform] = useState<Platform | null>(null);
+  const [songTitle, setSongTitle] = useState("");
+  const [artistName, setArtistName] = useState("");
+  const [genre, setGenre] = useState<Genre | "">("");
   const [songLanguage, setSongLanguage] = useState<SongLanguage | "">("");
+  const [country, setCountry] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
   const [feedbackFocus, setFeedbackFocus] = useState<FeedbackFocus[]>(["Hook Strength"]);
   const [explicitContent, setExplicitContent] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [metadataLoading, setMetadataLoading] = useState(false);
+  const [debugEnabled, setDebugEnabled] = useState(false);
+  const [browserOrigin, setBrowserOrigin] = useState<string>();
   const platformDetection = detectMusicPlatform(musicLink);
+  const providerEmbed =
+    platformDetection.platform && platformDetection.valid
+      ? getProviderEmbed(musicLink, platformDetection.platform, browserOrigin)
+      : null;
   const platformMessage = translatedPlatformMessage(
     locale,
     musicLink,
@@ -1187,29 +1172,154 @@ function SubmitView({
     platformDetection.valid,
     platformDetection.message,
   );
+  const validationFailures = useMemo(() => {
+    const failures: string[] = [];
+    if (!unlocked) {
+      failures.push(
+        locale === "es"
+          ? "Necesitas al menos un credito para enviar una cancion."
+          : "At least one credit is required to submit a song.",
+      );
+    }
+    if (!platformDetection.valid || !platformDetection.platform) {
+      failures.push(
+        locale === "es"
+          ? "Usa un enlace valido de una plataforma compatible."
+          : "Use a valid link from a supported platform.",
+      );
+    }
+    if (!songTitle.trim()) {
+      failures.push(locale === "es" ? "Escribe el titulo de la cancion." : "Enter the song title.");
+    }
+    if (!artistName.trim()) {
+      failures.push(locale === "es" ? "Escribe el nombre del artista." : "Enter the artist name.");
+    }
+    if (!genre) {
+      failures.push(locale === "es" ? "Selecciona un genero." : "Select a genre.");
+    }
+    if (!songLanguage) {
+      failures.push(locale === "es" ? "Selecciona el idioma de la cancion." : "Select the song language.");
+    }
+    if (!country) {
+      failures.push(locale === "es" ? "Selecciona un pais." : "Select a country.");
+    }
+    if (feedbackFocus.length === 0) {
+      failures.push(
+        locale === "es"
+          ? "Selecciona al menos un enfoque de feedback."
+          : "Select at least one feedback focus.",
+      );
+    }
+    if (coverImageUrl && !/^https:\/\//i.test(coverImageUrl.trim())) {
+      failures.push(
+        locale === "es"
+          ? "La portada opcional debe usar una URL https://."
+          : "The optional cover image must use an https:// URL.",
+      );
+    }
+    return failures;
+  }, [
+    artistName,
+    country,
+    coverImageUrl,
+    feedbackFocus.length,
+    genre,
+    locale,
+    platformDetection.platform,
+    platformDetection.valid,
+    songLanguage,
+    songTitle,
+    unlocked,
+  ]);
+  const submitDisabled = saving || validationFailures.length > 0;
+
+  useEffect(() => {
+    setBrowserOrigin(window.location.origin);
+    setDebugEnabled(new URLSearchParams(window.location.search).get("debug") === "1");
+  }, []);
+
+  useEffect(() => {
+    if (!platformDetection.valid || !platformDetection.parsedUrl) {
+      setMetadataLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setMetadataLoading(true);
+      try {
+        const response = await fetch(
+          `/api/music-metadata?url=${encodeURIComponent(platformDetection.parsedUrl ?? "")}`,
+          { signal: controller.signal },
+        );
+        if (!response.ok) return;
+        const metadata = (await response.json()) as {
+          artistName?: string;
+          coverImageUrl?: string;
+          title?: string;
+        };
+        setSongTitle((current) => current || metadata.title?.trim() || "");
+        setArtistName((current) => current || metadata.artistName?.trim() || "");
+        setCoverImageUrl((current) => current || metadata.coverImageUrl?.trim() || "");
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          console.warn("[First Listen submission] Metadata lookup failed", error);
+        }
+      } finally {
+        setMetadataLoading(false);
+      }
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [platformDetection.parsedUrl, platformDetection.valid]);
+
+  useEffect(() => {
+    console.info("[First Listen submission] Validation state", {
+      detectedPlatform: platformDetection.platform,
+      embedUrl: providerEmbed?.src ?? null,
+      parsedUrl: platformDetection.parsedUrl,
+      resourceId: platformDetection.resourceId,
+      resourceType: platformDetection.resourceType,
+      submitDisabled,
+      validationFailures,
+    });
+  }, [
+    platformDetection.parsedUrl,
+    platformDetection.platform,
+    platformDetection.resourceId,
+    platformDetection.resourceType,
+    providerEmbed?.src,
+    submitDisabled,
+    validationFailures,
+  ]);
 
   const submitSong = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!unlocked) return;
-    if (!platformDetection.valid || !platformDetection.platform) {
-      notify(locale === "es" ? "Pega un enlace valido de Spotify, YouTube, YouTube Music, SoundCloud o Apple Music." : "Paste a valid Spotify, YouTube, YouTube Music, SoundCloud, or Apple Music song link.");
+    if (validationFailures.length > 0 || !platformDetection.platform || !songLanguage || !genre) {
+      console.warn("[First Listen submission] Submission blocked", {
+        validationFailures,
+      });
+      notify(
+        locale === "es"
+          ? "Corrige los campos marcados antes de enviar."
+          : "Fix the listed validation issues before submitting.",
+      );
       return;
     }
-    if (!songLanguage || feedbackFocus.length === 0) {
-      notify(locale === "es" ? "Selecciona idioma y foco de feedback." : "Select song language and feedback focus.");
-      return;
-    }
-    const formData = new FormData(event.currentTarget);
     const submission: SongSubmission = {
-      title: String(formData.get("songTitle") ?? ""),
-      artistName: String(formData.get("artistName") ?? ""),
-      coverImageUrl: String(formData.get("coverImageUrl") ?? ""),
+      title: songTitle.trim(),
+      artistName: artistName.trim(),
+      coverImageUrl:
+        coverImageUrl.trim() || "https://www.firstlisten.net/covers/default-song.svg",
       musicUrl: musicLink,
       platform: platformDetection.platform,
-      genre: String(formData.get("genre") ?? "") as Genre,
+      genre,
       language: songLanguage,
       feedbackFocus,
-      country: String(formData.get("country") ?? ""),
+      country,
       explicitContent,
     };
 
@@ -1280,7 +1390,7 @@ function SubmitView({
           </div>
         )}
 
-        <form onSubmit={submitSong}>
+        <form noValidate onSubmit={submitSong}>
           <div className="field full">
             <label htmlFor="music-link">{copy.app.submit.musicLink}</label>
             <div className="input-with-icon">
@@ -1311,8 +1421,10 @@ function SubmitView({
                 disabled={!unlocked}
                 id="song-title"
                 name="songTitle"
+                onChange={(event) => setSongTitle(event.target.value)}
                 placeholder={locale === "es" ? "ej. Neon Weather" : "e.g. Neon Weather"}
                 required
+                value={songTitle}
               />
             </div>
             <div className="field">
@@ -1321,13 +1433,22 @@ function SubmitView({
                 disabled={!unlocked}
                 id="artist-name"
                 name="artistName"
+                onChange={(event) => setArtistName(event.target.value)}
                 placeholder={locale === "es" ? "Tu nombre artistico" : "Your artist name"}
                 required
+                value={artistName}
               />
             </div>
             <div className="field">
               <label htmlFor="genre">{copy.app.submit.genre}</label>
-              <select disabled={!unlocked} id="genre" name="genre" required defaultValue="">
+              <select
+                disabled={!unlocked}
+                id="genre"
+                name="genre"
+                onChange={(event) => setGenre(event.target.value as Genre)}
+                required
+                value={genre}
+              >
                 <option disabled value="">
                   {locale === "es" ? "Selecciona un genero" : "Select a genre"}
                 </option>
@@ -1356,7 +1477,14 @@ function SubmitView({
             </div>
             <div className="field">
               <label htmlFor="country">{copy.app.submit.country}</label>
-              <select disabled={!unlocked} id="country" name="country" required defaultValue="">
+              <select
+                disabled={!unlocked}
+                id="country"
+                name="country"
+                onChange={(event) => setCountry(event.target.value)}
+                required
+                value={country}
+              >
                 <option disabled value="">
                   {locale === "es" ? "Selecciona un pais" : "Select a country"}
                 </option>
@@ -1369,15 +1497,27 @@ function SubmitView({
               </select>
             </div>
             <div className="field">
-              <label htmlFor="cover-url">{copy.app.submit.cover}</label>
+              <label htmlFor="cover-url">
+                {copy.app.submit.cover} ({locale === "es" ? "opcional" : "optional"})
+              </label>
               <input
                 disabled={!unlocked}
                 id="cover-url"
                 name="coverImageUrl"
+                onChange={(event) => setCoverImageUrl(event.target.value)}
                 placeholder="https://..."
-                required
                 type="url"
+                value={coverImageUrl}
               />
+              <small>
+                {metadataLoading
+                  ? locale === "es"
+                    ? "Buscando portada y metadatos..."
+                    : "Looking up cover art and metadata..."
+                  : locale === "es"
+                    ? "Se completa automaticamente cuando el proveedor lo permite."
+                    : "Filled automatically when the provider exposes it."}
+              </small>
             </div>
           </div>
 
@@ -1443,9 +1583,31 @@ function SubmitView({
             </span>
           </div>
 
+          {validationFailures.length > 0 && (
+            <div className="submission-validation" role="alert">
+              <strong>
+                {locale === "es" ? "Antes de enviar:" : "Before you can submit:"}
+              </strong>
+              <ul>
+                {validationFailures.map((failure) => <li key={failure}>{failure}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {debugEnabled && (
+            <dl className="submission-debug" data-testid="submission-debug">
+              <div><dt>Detected platform</dt><dd>{platformDetection.platform ?? "none"}</dd></div>
+              <div><dt>Parsed URL</dt><dd>{platformDetection.parsedUrl ?? "invalid"}</dd></div>
+              <div><dt>Resource</dt><dd>{platformDetection.resourceType ?? "none"} / {platformDetection.resourceId ?? "none"}</dd></div>
+              <div><dt>Embed URL</dt><dd>{providerEmbed?.src ?? "unavailable"}</dd></div>
+              <div><dt>Validation</dt><dd>{validationFailures.length === 0 ? "valid" : "invalid"}</dd></div>
+              <div><dt>Submit</dt><dd>{submitDisabled ? `disabled: ${validationFailures.join(" | ") || "saving"}` : "enabled"}</dd></div>
+            </dl>
+          )}
+
           <button
             className="primary-button wide"
-            disabled={!unlocked || !platformDetection.valid || !songLanguage || feedbackFocus.length === 0 || saving}
+            disabled={submitDisabled}
             type="submit"
           >
             {saving
@@ -1739,7 +1901,7 @@ export function FirstListenApp({
         reviewCount={reviewCount}
         setView={changeView}
         unlimitedCredits={role === "super_admin"}
-        adminAccess={role !== "user"}
+        adminAccess={role === "super_admin" || role === "admin"}
         onAdmin={() => router.push("/admin")}
         view={view}
       />
@@ -1779,10 +1941,10 @@ export function FirstListenApp({
                 </button>
               );
             })}
-            {role !== "user" && (
+            {(role === "super_admin" || role === "admin") && (
               <button onClick={() => router.push("/admin")}>
                 <ShieldCheck size={19} />
-                Administration
+                Admin Panel
               </button>
             )}
             <button onClick={() => router.push("/help")}>

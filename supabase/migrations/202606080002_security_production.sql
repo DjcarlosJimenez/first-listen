@@ -49,8 +49,29 @@ alter table public.songs
   add column if not exists removed_by uuid references public.profiles(id),
   add column if not exists updated_at timestamptz not null default now();
 
-create unique index if not exists songs_unique_music_url_idx
-  on public.songs (lower(trim(music_url)));
+with duplicate_songs as (
+  select
+    id,
+    row_number() over (
+      partition by lower(trim(music_url))
+      order by created_at, id
+    ) as duplicate_rank
+  from public.songs
+  where removed_at is null
+)
+update public.songs
+set
+  is_active = false,
+  removed_at = coalesce(removed_at, now()),
+  updated_at = now()
+where id in (
+  select id from duplicate_songs where duplicate_rank > 1
+);
+
+drop index if exists public.songs_unique_music_url_idx;
+create unique index songs_unique_music_url_idx
+  on public.songs (lower(trim(music_url)))
+  where removed_at is null;
 
 create table if not exists public.founder_claims (
   user_id uuid primary key references public.profiles(id) on delete cascade,
@@ -119,7 +140,12 @@ security definer
 set search_path = public
 as $$
   select coalesce(
-    (select role from public.profiles where id = auth.uid()),
+    (
+      select role
+      from public.profiles
+      where id = auth.uid()
+        and account_status = 'active'
+    ),
     'user'::public.app_role
   );
 $$;
@@ -139,11 +165,13 @@ revoke all on function public.is_staff() from public;
 grant execute on function public.current_user_role() to authenticated;
 grant execute on function public.is_staff() to authenticated;
 
+drop policy if exists "users read own profile or staff reads profiles" on public.profiles;
 create policy "users read own profile or staff reads profiles"
   on public.profiles for select
   to authenticated
   using (id = auth.uid() or public.current_user_role() = 'super_admin');
 
+drop policy if exists "authenticated users read eligible songs" on public.songs;
 create policy "authenticated users read eligible songs"
   on public.songs for select
   to authenticated
@@ -163,26 +191,31 @@ create policy "authenticated users read eligible songs"
     )
   );
 
+drop policy if exists "users read own founder claim or super admin reads claims" on public.founder_claims;
 create policy "users read own founder claim or super admin reads claims"
   on public.founder_claims for select
   to authenticated
   using (user_id = auth.uid() or public.current_user_role() = 'super_admin');
 
+drop policy if exists "users read own credit history or staff reads all" on public.credit_transactions;
 create policy "users read own credit history or staff reads all"
   on public.credit_transactions for select
   to authenticated
   using (user_id = auth.uid() or public.current_user_role() = 'super_admin');
 
+drop policy if exists "users read own rewards or staff reads all" on public.review_reward_awards;
 create policy "users read own rewards or staff reads all"
   on public.review_reward_awards for select
   to authenticated
   using (user_id = auth.uid() or public.current_user_role() = 'super_admin');
 
+drop policy if exists "users read own reports or staff reads reports" on public.song_reports;
 create policy "users read own reports or staff reads reports"
   on public.song_reports for select
   to authenticated
   using (reporter_id = auth.uid() or public.is_staff());
 
+drop policy if exists "users report eligible songs" on public.song_reports;
 create policy "users report eligible songs"
   on public.song_reports for insert
   to authenticated
@@ -261,7 +294,13 @@ begin
   )
   values (
     new.id,
-    trim(coalesce(new.raw_user_meta_data ->> 'full_name', 'New artist')),
+    left(
+      coalesce(
+        nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''),
+        'New artist'
+      ),
+      120
+    ),
     new.raw_user_meta_data ->> 'avatar_url',
     founder_spot,
     false,
@@ -360,10 +399,19 @@ begin
   if char_length(trim(song_title)) not between 1 and 120
     or char_length(trim(song_artist_name)) not between 1 and 120
     or char_length(trim(song_country)) not between 2 and 120
+    or trim(song_cover_image_url) !~* '^https://'
     or char_length(trim(song_cover_image_url)) > 2000
     or char_length(trim(song_music_url)) > 2000
   then
     raise exception 'Required song metadata is invalid';
+  end if;
+
+  if song_genre not in (
+    'Pop', 'Rock', 'Hip Hop', 'EDM', 'Country', 'Reggaeton',
+    'Regional Mexican', 'Cumbia', 'Salsa', 'Bachata', 'Indie',
+    'Alternative', 'Jazz', 'Classical', 'Instrumental', 'Other'
+  ) then
+    raise exception 'Unsupported genre';
   end if;
 
   if not public.music_url_matches_platform(song_music_url, song_platform) then
@@ -459,7 +507,7 @@ declare
   new_quality_score numeric;
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
-  if char_length(trim(coalesce(review_comment, ''))) < 30 then
+  if char_length(trim(coalesce(review_comment, ''))) not between 30 and 1000 then
     return query select false, 0::smallint, false, 'Please provide useful feedback.'::text;
     return;
   end if;
@@ -658,17 +706,29 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare balance integer;
+declare
+  balance integer;
+  current_balance integer;
 begin
   if public.current_user_role() <> 'super_admin' then raise exception 'Forbidden'; end if;
   if credit_delta = 0 or char_length(trim(adjustment_reason)) < 2 then
     raise exception 'Invalid credit adjustment';
   end if;
+
+  select credits
+  into current_balance
+  from public.profiles
+  where id = target_user_id
+  for update;
+  if not found then raise exception 'User not found'; end if;
+  if current_balance + credit_delta < 0 then
+    raise exception 'Credit balance cannot become negative';
+  end if;
+
   update public.profiles
-  set credits = greatest(0, credits + credit_delta), updated_at = now()
+  set credits = credits + credit_delta, updated_at = now()
   where id = target_user_id
   returning credits into balance;
-  if not found then raise exception 'User not found'; end if;
   insert into public.credit_transactions (user_id, amount, reason, created_by)
   values (target_user_id, credit_delta, trim(adjustment_reason), auth.uid());
   return balance;
@@ -690,6 +750,7 @@ begin
     raise exception 'Super Admin cannot demote the active account';
   end if;
   update public.profiles set role = new_role, updated_at = now() where id = target_user_id;
+  if not found then raise exception 'User not found'; end if;
 end;
 $$;
 
@@ -709,6 +770,7 @@ begin
   end if;
   update public.profiles set account_status = new_status, updated_at = now()
   where id = target_user_id;
+  if not found then raise exception 'User not found'; end if;
 end;
 $$;
 
@@ -737,6 +799,7 @@ begin
     removed_by = case when active then null else auth.uid() end,
     updated_at = now()
   where id = target_song_id;
+  if not found then raise exception 'Song not found'; end if;
 end;
 $$;
 
@@ -754,6 +817,7 @@ begin
   update public.song_reports
   set status = new_status, reviewed_by = auth.uid(), reviewed_at = now()
   where id = target_report_id;
+  if not found then raise exception 'Report not found'; end if;
 end;
 $$;
 
@@ -799,6 +863,8 @@ begin
     where pubname = 'supabase_realtime'
       and schemaname = 'public'
       and tablename = 'founder_program'
+  ) and exists (
+    select 1 from pg_publication where pubname = 'supabase_realtime'
   ) then
     alter publication supabase_realtime add table public.founder_program;
   end if;

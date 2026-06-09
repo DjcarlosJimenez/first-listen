@@ -1,4 +1,3 @@
-import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -23,20 +22,39 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  const temporaryPassword = `${randomBytes(12).toString("base64url")}Aa1!`;
   const admin = createAdminClient();
-  const { error } = await admin.auth.admin.updateUserById(id, {
-    password: temporaryPassword,
-  });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
-  const { error: profileError } = await admin
-    .from("profiles")
-    .update({ force_password_change: true, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 400 });
+  const { data: targetData, error: targetError } =
+    await admin.auth.admin.getUserById(id);
+  if (targetError || !targetData.user?.email) {
+    return NextResponse.json(
+      { error: targetError?.message ?? "User email is unavailable." },
+      { status: 400 },
+    );
   }
 
-  return NextResponse.json({ temporaryPassword });
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+    "https://www.firstlisten.net";
+  const { error: recoveryError } = await admin.auth.resetPasswordForEmail(
+    targetData.user.email,
+    {
+      redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
+    },
+  );
+  if (recoveryError) {
+    return NextResponse.json({ error: recoveryError.message }, { status: 400 });
+  }
+
+  const { error: auditError } = await admin.from("admin_audit_log").insert({
+    actor_id: user.id,
+    action: "send_password_recovery",
+    target_type: "profile",
+    target_id: id,
+    details: { delivery: "email" },
+  });
+  if (auditError) {
+    return NextResponse.json({ error: auditError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ sent: true });
 }

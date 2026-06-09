@@ -4,6 +4,9 @@ export type PlatformDetection = {
   platform: Platform | null;
   valid: boolean;
   message: string;
+  parsedUrl: string | null;
+  resourceId: string | null;
+  resourceType: "track" | "video" | "playlist" | null;
 };
 
 export function detectMusicPlatform(rawUrl: string): PlatformDetection {
@@ -12,46 +15,81 @@ export function detectMusicPlatform(rawUrl: string): PlatformDetection {
       platform: null,
       valid: false,
       message: "Paste a public song link to detect its platform.",
+      parsedUrl: null,
+      resourceId: null,
+      resourceType: null,
     };
   }
 
   try {
     const url = new URL(rawUrl.trim());
+    if (url.protocol !== "https:") {
+      return {
+        platform: null,
+        valid: false,
+        message: "Use a secure URL beginning with https://.",
+        parsedUrl: null,
+        resourceId: null,
+        resourceType: null,
+      };
+    }
     const host = url.hostname.toLowerCase().replace(/^www\./, "");
-    const path = url.pathname.toLowerCase();
+    const path = url.pathname;
+    const normalizedPath = path.toLowerCase();
 
     if (host === "open.spotify.com") {
-      const valid = /^\/(?:intl-[a-z-]+\/)?track\/[a-z0-9]+/i.test(path);
+      const valid = /^\/(?:intl-[a-z-]+\/)?track\/[a-z0-9]+/i.test(normalizedPath);
       return {
         platform: "Spotify",
         valid,
         message: valid
           ? "Spotify track detected."
           : "Use a direct Spotify track link.",
+        parsedUrl: valid ? url.toString() : null,
+        resourceId: valid ? path.split("/").filter(Boolean).at(-1) ?? null : null,
+        resourceType: valid ? "track" : null,
       };
     }
 
     if (host === "music.youtube.com") {
-      const valid = path === "/watch" && Boolean(url.searchParams.get("v"));
+      const videoId = normalizedPath === "/watch" ? url.searchParams.get("v") : null;
+      const playlistId = url.searchParams.get("list");
+      const valid = Boolean(videoId);
       return {
         platform: "YouTube Music",
         valid,
-        message: valid
+        message: videoId
           ? "YouTube Music track detected."
-          : "Use a YouTube Music watch link.",
+          : playlistId
+            ? "Playlist links cannot identify one reviewable song. Open the song and copy its watch?v= track link."
+            : "Use a direct YouTube Music track link containing watch?v=.",
+        parsedUrl: videoId || playlistId ? url.toString() : null,
+        resourceId: videoId ?? playlistId,
+        resourceType: videoId ? "track" : playlistId ? "playlist" : null,
       };
     }
 
     if (host === "youtube.com" || host === "m.youtube.com") {
-      const valid =
-        (path === "/watch" && Boolean(url.searchParams.get("v"))) ||
-        path.startsWith("/shorts/");
+      const videoId =
+        normalizedPath === "/watch"
+          ? url.searchParams.get("v")
+          : normalizedPath.startsWith("/shorts/")
+            ? path.split("/").filter(Boolean)[1] ?? null
+            : null;
+      const playlistId =
+        normalizedPath === "/playlist" ? url.searchParams.get("list") : null;
+      const valid = Boolean(videoId);
       return {
         platform: "YouTube",
         valid,
-        message: valid
+        message: videoId
           ? "YouTube video detected."
-          : "Use a direct YouTube video link.",
+          : playlistId
+            ? "Playlist links cannot identify one reviewable song. Open the song and copy its video link."
+            : "Use a direct YouTube video link.",
+        parsedUrl: videoId || playlistId ? url.toString() : null,
+        resourceId: videoId ?? playlistId,
+        resourceType: videoId ? "video" : playlistId ? "playlist" : null,
       };
     }
 
@@ -63,18 +101,26 @@ export function detectMusicPlatform(rawUrl: string): PlatformDetection {
         message: valid
           ? "YouTube video detected."
           : "Use a direct youtu.be link.",
+        parsedUrl: valid ? url.toString() : null,
+        resourceId: valid ? path.split("/").filter(Boolean)[0] ?? null : null,
+        resourceType: valid ? "video" : null,
       };
     }
 
     if (host === "soundcloud.com") {
       const parts = path.split("/").filter(Boolean);
-      const valid = parts.length >= 2 && !["discover", "stream", "you"].includes(parts[0]);
+      const valid =
+        parts.length >= 2 &&
+        !["discover", "stream", "you"].includes(parts[0].toLowerCase());
       return {
         platform: "SoundCloud",
         valid,
         message: valid
           ? "SoundCloud track detected."
           : "Use a public SoundCloud track link.",
+        parsedUrl: valid ? url.toString() : null,
+        resourceId: valid ? parts.slice(0, 2).join("/") : null,
+        resourceType: valid ? "track" : null,
       };
     }
 
@@ -82,14 +128,19 @@ export function detectMusicPlatform(rawUrl: string): PlatformDetection {
       const parts = path.split("/").filter(Boolean);
       const valid =
         parts.length >= 3 &&
-        ["album", "song"].includes(parts[1]) &&
-        (Boolean(url.searchParams.get("i")) || parts[1] === "song");
+        ["album", "song"].includes(parts[1].toLowerCase()) &&
+        (Boolean(url.searchParams.get("i")) || parts[1].toLowerCase() === "song");
       return {
         platform: "Apple Music",
         valid,
         message: valid
           ? "Apple Music track detected."
           : "Use a direct Apple Music song link.",
+        parsedUrl: valid ? url.toString() : null,
+        resourceId: valid
+          ? url.searchParams.get("i") ?? parts.at(-1) ?? null
+          : null,
+        resourceType: valid ? "track" : null,
       };
     }
 
@@ -97,12 +148,18 @@ export function detectMusicPlatform(rawUrl: string): PlatformDetection {
       platform: null,
       valid: false,
       message: "This link is not from a supported music platform.",
+      parsedUrl: null,
+      resourceId: null,
+      resourceType: null,
     };
   } catch {
     return {
       platform: null,
       valid: false,
       message: "Enter a complete URL beginning with https://.",
+      parsedUrl: null,
+      resourceId: null,
+      resourceType: null,
     };
   }
 }

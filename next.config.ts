@@ -19,11 +19,12 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
+              `script-src 'self' 'unsafe-inline' https://www.youtube.com https://www.youtube-nocookie.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https:",
               `connect-src 'self' https://*.supabase.co wss://*.supabase.co${isDevelopment ? " ws:" : ""}`,
               "font-src 'self' data:",
+              "frame-src https://www.youtube-nocookie.com https://www.youtube.com https://open.spotify.com https://w.soundcloud.com https://embed.music.apple.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",

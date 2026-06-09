@@ -12,16 +12,18 @@ import {
 } from "@/lib/password-policy";
 import { createClient } from "@/lib/supabase/client";
 
-export function ChangePasswordForm() {
+export function ResetPasswordForm() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setError("");
     const formData = new FormData(event.currentTarget);
     const password = String(formData.get("password") ?? "");
     const confirm = String(formData.get("confirm") ?? "");
+
     if (!isValidPassword(password)) {
       setError(PASSWORD_REQUIREMENTS);
       return;
@@ -32,21 +34,22 @@ export function ChangePasswordForm() {
     }
 
     const supabase = createClient();
-    if (!supabase) return;
+    if (!supabase) {
+      setError("Password recovery is unavailable. Request a new recovery link.");
+      return;
+    }
+
     setLoading(true);
     const { error: passwordError } = await supabase.auth.updateUser({ password });
-    if (!passwordError) {
-      const { error: profileError } = await supabase.rpc("complete_forced_password_change");
-      if (!profileError) {
-        router.replace("/dashboard");
-        router.refresh();
-        return;
-      }
-      setError(profileError.message);
-    } else {
+    if (passwordError) {
       setError(passwordError.message);
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    await supabase.auth.signOut();
+    router.replace("/login?message=password-reset");
+    router.refresh();
   };
 
   return (
@@ -55,8 +58,8 @@ export function ChangePasswordForm() {
         <Logo />
         <div className="auth-heading">
           <span className="auth-icon"><LockKeyhole size={22} /></span>
-          <h1>Set a permanent password</h1>
-          <p>Your temporary password cannot be used beyond this first session.</p>
+          <h1>Choose a new password</h1>
+          <p>{PASSWORD_REQUIREMENTS}</p>
         </div>
         <form onSubmit={submit}>
           <label className="auth-field">
@@ -85,7 +88,7 @@ export function ChangePasswordForm() {
           </label>
           {error && <div className="auth-error" role="alert">{error}</div>}
           <button className="auth-submit" disabled={loading} type="submit">
-            {loading ? "Saving..." : "Save password"}
+            {loading ? "Saving..." : "Save new password"}
           </button>
         </form>
       </section>

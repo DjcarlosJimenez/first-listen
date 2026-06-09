@@ -5,6 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/logo";
+import {
+  isValidPassword,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_PATTERN,
+  PASSWORD_REQUIREMENTS,
+} from "@/lib/password-policy";
 import { createClient } from "@/lib/supabase/client";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
@@ -14,8 +20,13 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState("");
   const isSignup = mode === "signup";
   const nextPath = useMemo(() => searchParams.get("next") || "/dashboard", [searchParams]);
+  const resetMessage =
+    searchParams.get("message") === "password-reset"
+      ? "Password updated. Log in with your new password."
+      : "";
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -34,6 +45,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
     if (!email || !password || (isSignup && !name)) {
       setError("Please complete all required fields.");
+      return;
+    }
+    if (isSignup && !isValidPassword(password)) {
+      setError(PASSWORD_REQUIREMENTS);
       return;
     }
     if (isSignup && !accepted) {
@@ -59,12 +74,17 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     setLoading(false);
 
     if (result.error) {
+      if (!isSignup && result.error.message.toLowerCase().includes("email not confirmed")) {
+        window.sessionStorage.setItem("first-listen-pending-email", email);
+        setUnconfirmedEmail(email);
+      }
       setError(result.error.message);
       return;
     }
 
     if (isSignup && !result.data.session) {
-      setMessage("Account created. Check your email to confirm your address, then log in.");
+      window.sessionStorage.setItem("first-listen-pending-email", email);
+      router.replace("/verify-email");
       return;
     }
 
@@ -101,12 +121,19 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             <span>Password</span>
             <input
               autoComplete={isSignup ? "new-password" : "current-password"}
-              minLength={8}
+              minLength={PASSWORD_MIN_LENGTH}
               name="password"
+              pattern={isSignup ? PASSWORD_PATTERN : undefined}
               required
+              title={isSignup ? PASSWORD_REQUIREMENTS : undefined}
               type="password"
             />
           </label>
+          {!isSignup && (
+            <div className="auth-inline-link">
+              <Link href="/forgot-password">Forgot password?</Link>
+            </div>
+          )}
 
           {isSignup && (
             <label className="legal-check">
@@ -128,7 +155,14 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           )}
 
           {error && <div className="auth-error" role="alert">{error}</div>}
-          {message && <div className="form-message" role="status">{message}</div>}
+          {unconfirmedEmail && (
+            <div className="form-message" role="status">
+              Need another confirmation email? <Link href="/verify-email">Resend it</Link>.
+            </div>
+          )}
+          {(message || resetMessage) && (
+            <div className="form-message" role="status">{message || resetMessage}</div>
+          )}
 
           <button className="auth-submit" disabled={loading} type="submit">
             {loading ? "Please wait..." : isSignup ? "Create account" : "Log in"}

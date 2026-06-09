@@ -1,7 +1,14 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const privatePaths = ["/dashboard", "/review", "/submit", "/profile", "/admin"];
+const privatePaths = [
+  "/dashboard",
+  "/review",
+  "/submit",
+  "/profile",
+  "/admin",
+  "/reset-password",
+];
 const authPaths = ["/login", "/signup"];
 
 export async function middleware(request: NextRequest) {
@@ -69,11 +76,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/change-password", request.url));
     }
 
-    if (
-      path.startsWith("/admin") &&
-      !["super_admin", "admin", "moderator"].includes(profile?.role ?? "")
-    ) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    if (path.startsWith("/admin")) {
+      const role = profile?.role ?? "";
+      const isModerationPath = path.startsWith("/admin/reports");
+      const allowed = isModerationPath
+        ? ["super_admin", "admin", "moderator"].includes(role)
+        : ["super_admin", "admin"].includes(role);
+      if (!allowed) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
     }
 
     if (authPaths.includes(path) && !profile?.force_password_change) {
@@ -92,6 +103,7 @@ export const config = {
     "/profile/:path*",
     "/admin/:path*",
     "/change-password",
+    "/reset-password",
     "/login",
     "/signup",
   ],

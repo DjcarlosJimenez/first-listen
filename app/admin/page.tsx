@@ -6,8 +6,10 @@ export const dynamic = "force-dynamic";
 
 export async function AdminPageContent({
   initialSection = "users",
+  allowModerator = false,
 }: {
   initialSection?: "users" | "songs" | "reports" | "credits" | "statistics";
+  allowModerator?: boolean;
 }) {
   const supabase = await createClient();
   const {
@@ -20,7 +22,10 @@ export async function AdminPageContent({
     .select("role")
     .eq("id", user.id)
     .single();
-  if (!profile || !["super_admin", "admin", "moderator"].includes(profile.role)) {
+  const allowedRoles = allowModerator
+    ? ["super_admin", "admin", "moderator"]
+    : ["super_admin", "admin"];
+  if (!profile || !allowedRoles.includes(profile.role)) {
     redirect("/dashboard");
   }
   const effectiveInitialSection =
@@ -30,9 +35,7 @@ export async function AdminPageContent({
         ? ["songs", "reports", "statistics"].includes(initialSection)
           ? initialSection
           : "songs"
-        : ["songs", "reports"].includes(initialSection)
-          ? initialSection
-          : "reports";
+        : "reports";
 
   const [{ data: users }, { data: songs }, { data: reports }, { data: statistics }] = await Promise.all([
     supabase

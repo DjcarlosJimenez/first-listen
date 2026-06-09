@@ -24,12 +24,14 @@ create index if not exists saved_songs_user_idx
 alter table public.artist_follows enable row level security;
 alter table public.saved_songs enable row level security;
 
+drop policy if exists "users manage own follows" on public.artist_follows;
 create policy "users manage own follows"
   on public.artist_follows for all
   to authenticated
   using (follower_id = auth.uid())
   with check (follower_id = auth.uid());
 
+drop policy if exists "users manage own saved songs" on public.saved_songs;
 create policy "users manage own saved songs"
   on public.saved_songs for all
   to authenticated
@@ -204,6 +206,16 @@ as $$
   where songs.user_id = target_artist_id
     and songs.is_active
     and songs.removed_at is null
+    and (
+      not songs.explicit_content
+      or exists (
+        select 1
+        from public.profiles as viewer
+        where viewer.id = auth.uid()
+          and viewer.account_status = 'active'
+          and viewer.show_explicit_content
+      )
+    )
     and exists (
       select 1 from public.profiles
       where profiles.id = target_artist_id
@@ -259,6 +271,11 @@ as $$
     where song_reports.song_id = songs.id
   ) report_counts on true
   where songs.user_id = auth.uid()
+    and exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid()
+        and profiles.account_status = 'active'
+    )
   order by songs.created_at desc;
 $$;
 
@@ -288,6 +305,11 @@ as $$
   from public.reviews
   join public.songs on songs.id = reviews.song_id
   where songs.user_id = auth.uid()
+    and exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid()
+        and profiles.account_status = 'active'
+    )
     and (target_song_id is null or songs.id = target_song_id)
     and nullif(trim(reviews.comment), '') is not null
   order by reviews.created_at desc;
@@ -326,6 +348,11 @@ as $$
   join public.songs on songs.id = saved_songs.song_id
   where saved_songs.user_id = auth.uid()
     and songs.removed_at is null
+    and exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid()
+        and profiles.account_status = 'active'
+    )
   order by saved_songs.created_at desc;
 $$;
 

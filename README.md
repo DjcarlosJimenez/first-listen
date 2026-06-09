@@ -36,13 +36,46 @@ routes. The production application does not provide a demo-auth bypass.
 
 ## Supabase setup
 
-1. Create a Supabase project.
-2. Run `supabase/schema.sql` in the SQL editor.
-3. Run the SQL files in `supabase/migrations` in filename order.
-4. Enable Email/Password authentication.
-5. Add `http://localhost:3000/auth/callback` and the production callback URL
-   to Authentication > URL Configuration.
-6. Copy `.env.example` to `.env.local` and fill every required value.
+1. Link this repository to the existing Supabase project:
+
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref YOUR_PROJECT_REF
+   ```
+
+2. Inspect migration history and preview the recovery:
+
+   ```bash
+   npx supabase migration list
+   npx supabase db push --dry-run
+   ```
+
+3. Apply every pending migration:
+
+   ```bash
+   npx supabase db push
+   ```
+
+   The `202606080000_base_schema.sql` migration repairs the previously missing
+   baseline. `202606080004_recovery_hardening.sql` backfills profiles for
+   existing Auth users, reconciles Founder claims and review rewards, hardens
+   privileges, and installs a service-role-only database health report.
+
+4. Put the project URL and keys in `.env.local`, then verify the live database:
+
+   ```bash
+   npm run db:verify
+   ```
+
+5. Enable Email/Password authentication.
+6. Set the Auth Site URL to `https://www.firstlisten.net`. Add
+   `https://www.firstlisten.net/auth/callback` and
+   `http://localhost:3000/auth/callback` to Authentication > URL Configuration.
+7. Copy `.env.example` to `.env.local` and fill every required value.
+
+`supabase/schema.sql` is generated from the ordered migrations. After changing
+a migration, run `npm run db:schema:sync`; CI or release checks can use
+`npm run db:schema:check`.
 
 Song creation uses `submit_song`, so URL validation, duplicate detection, and
 one-credit consumption happen atomically in PostgreSQL. Review creation uses
@@ -69,6 +102,19 @@ its temporary password at first login.
 
 Never expose `SUPABASE_SERVICE_ROLE_KEY` with a `NEXT_PUBLIC_` prefix.
 
+## Production authentication email
+
+First Listen uses Supabase Auth with Resend SMTP. Verify `firstlisten.net` in
+Resend, add the generated SPF, DKIM, and MX records, then set `RESEND_API_KEY`
+in a secure local environment and run:
+
+```bash
+npm run auth:configure
+```
+
+The complete DNS and SMTP procedure is documented in
+`outputs/phase-a-resend-setup.md`. Never commit the Resend API key.
+
 ## Deploy to Vercel
 
 Import the repository into Vercel and add:
@@ -77,7 +123,7 @@ Import the repository into Vercel and add:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
 
-Set the Supabase Site URL to the Vercel production domain and add the production
-`/auth/callback` redirect URL. Deploy only after the schema and every migration
-have completed in filename order.
+Use `https://www.firstlisten.net` as the canonical production URL. Keep the
+Vercel domain as a deployment alias, not the public Site URL. Deploy only after
+the schema and every migration have completed in filename order.
 No audio storage or paid media infrastructure is required.

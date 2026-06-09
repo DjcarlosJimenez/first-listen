@@ -7,7 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
-    "bootstrap:admins": "node scripts/bootstrap-admins.mjs"
+    "bootstrap:admins": "node scripts/bootstrap-admins.mjs",
+    "auth:configure": "node scripts/configure-production-auth.mjs",
+    "auth:promote-founder-one": "node scripts/promote-founder-one.mjs",
+    "auth:verify-phase-a": "node scripts/verify-phase-a.mjs",
+    "db:schema:sync": "node scripts/sync-schema.mjs",
+    "db:schema:check": "node scripts/sync-schema.mjs --check",
+    "db:verify": "node scripts/verify-database.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

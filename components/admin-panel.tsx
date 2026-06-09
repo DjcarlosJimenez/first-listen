@@ -73,7 +73,7 @@ export function AdminPanel({
     const data = await response.json();
     setNotice(
       response.ok
-        ? `Temporary password (shown once): ${data.temporaryPassword}`
+        ? "Password recovery email requested."
         : data.error,
     );
   };
@@ -88,7 +88,7 @@ export function AdminPanel({
   const sections = allSections.filter(([id]) => {
     if (role === "super_admin") return true;
     if (role === "admin") return !["users", "credits"].includes(id);
-    return ["songs", "reports"].includes(id);
+    return id === "reports";
   });
 
   return (
@@ -140,7 +140,7 @@ export function AdminPanel({
                         })}>
                           {user.account_status === "active" ? "Suspend" : "Activate"}
                         </button>
-                        <button onClick={() => void resetPassword(user.id)}>Reset password</button>
+                        <button onClick={() => void resetPassword(user.id)}>Send password reset</button>
                       </div>
                     )}
                   </article>
