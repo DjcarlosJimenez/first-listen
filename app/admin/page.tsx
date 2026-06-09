@@ -1,9 +1,24 @@
 import { redirect } from "next/navigation";
 import { AdminPanel } from "@/components/admin-panel";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+type AdminDirectoryUser = {
+  id: string;
+  display_name: string;
+  email: string;
+  username: string;
+  role: "super_admin" | "admin" | "moderator" | "user";
+  account_status: "active" | "suspended";
+  creator_activity_status: "active" | "paused" | "archived";
+  founder_number: number | null;
+  banned_at: string | null;
+  warning_count: number;
+  credits: number;
+  completed_reviews: number;
+  created_at: string;
+};
 
 export async function AdminPageContent({
   initialSection = "users",
@@ -51,11 +66,7 @@ export async function AdminPageContent({
     { data: spotlightSlots },
     { data: boosts },
   ] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, display_name, role, account_status, creator_activity_status, founder_number, banned_at, warning_count, credits, completed_reviews, created_at")
-      .order("created_at", { ascending: false })
-      .limit(1000),
+    supabase.rpc("admin_list_users", { result_limit: 1000 }),
     supabase
       .from("songs")
       .select("id, user_id, title, artist_name, platform, is_active, featured, content_kind, content_duration_seconds, queue_tier, approval_status, created_at")
@@ -94,24 +105,11 @@ export async function AdminPageContent({
       .limit(100),
   ]);
 
-  let authUsers: Array<{
-    id: string;
-    email?: string;
-    user_metadata?: Record<string, unknown>;
-  }> = [];
-  try {
-    const adminClient = createAdminClient();
-    const { data } = await adminClient.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
-    authUsers = data.users;
-  } catch {
-    authUsers = [];
-  }
-  const authById = new Map(authUsers.map((authUser) => [authUser.id, authUser]));
   const profileById = new Map(
-    (users ?? []).map((listedProfile) => [listedProfile.id, listedProfile]),
+    ((users ?? []) as AdminDirectoryUser[]).map((listedProfile) => [
+      listedProfile.id,
+      listedProfile,
+    ]),
   );
   const reportCountBySong = new Map<string, number>();
   for (const report of reports ?? []) {
@@ -120,19 +118,6 @@ export async function AdminPageContent({
       (reportCountBySong.get(report.song_id) ?? 0) + 1,
     );
   }
-  const enrichedUsers = (users ?? []).map((listedProfile) => {
-    const authUser = authById.get(listedProfile.id);
-    const email = authUser?.email ?? "";
-    const metadataUsername =
-      typeof authUser?.user_metadata?.username === "string"
-        ? authUser.user_metadata.username
-        : "";
-    return {
-      ...listedProfile,
-      email,
-      username: metadataUsername || email.split("@")[0] || "",
-    };
-  });
   const enrichedSongs = (songs ?? []).map((song) => {
     const owner = profileById.get(song.user_id);
     return {
@@ -166,7 +151,7 @@ export async function AdminPageContent({
         reviews: number;
         listening_minutes?: number;
       } | null) ?? null}
-      users={enrichedUsers}
+      users={users ?? []}
     />
   );
 }

@@ -121,6 +121,7 @@ try {
       genre_preferences: ["Pop"],
       languages_understood: ["English"],
       onboarding_completed: true,
+      role: "super_admin",
     })
     .eq("id", userId);
   if (profileError) throw profileError;
@@ -279,6 +280,79 @@ try {
   );
   if (!loggedInUrl.includes("/dashboard")) {
     throw new Error(`UI login did not reach the dashboard: ${loggedInUrl}`);
+  }
+
+  await navigate(`${baseUrl}/admin`);
+  const adminState = await waitFor(
+    `(() => ({
+      heading: document.querySelector(".admin-nav h1")?.innerText ?? "",
+      songSearch: document.querySelector('input[placeholder*="title, artist"]')?.getAttribute("placeholder") ?? "",
+      text: document.querySelector(".admin-content")?.innerText ?? "",
+      userFilters: [...document.querySelectorAll(".admin-filter-row button")].map((button) => button.innerText),
+      userSearch: document.querySelector('input[placeholder*="name, email"]')?.getAttribute("placeholder") ?? ""
+    }))()`,
+    (value) => value.heading === "Administration" && Boolean(value.userSearch),
+  );
+  const expectedUserFilters = [
+    "all users",
+    "active",
+    "paused",
+    "archived",
+    "founder",
+    "admin",
+    "moderator",
+    "banned",
+  ];
+  if (
+    adminState.heading !== "Administration" ||
+    !adminState.userSearch.includes("email") ||
+    !expectedUserFilters.every((filter) =>
+      adminState.userFilters.map((label) => label.toLowerCase()).includes(filter),
+    )
+  ) {
+    throw new Error(`Admin user search and filters are incomplete: ${JSON.stringify(adminState)}`);
+  }
+  await evaluate(`(() => {
+    const input = document.querySelector('input[placeholder*="name, email"]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(
+      input,
+      ${JSON.stringify(email)}
+    );
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  })()`);
+  const filteredAdminUsers = await waitFor(
+    `(() => ({
+      count: document.querySelectorAll(".admin-table article").length,
+      text: document.querySelector(".admin-table")?.innerText ?? ""
+    }))()`,
+    (value) => value.count === 1 && value.text.includes(email),
+  );
+  if (filteredAdminUsers.count !== 1) {
+    throw new Error(`Admin live user search did not isolate the account: ${JSON.stringify(filteredAdminUsers)}`);
+  }
+  await evaluate(`(() => {
+    const songsButton = [...document.querySelectorAll(".admin-nav button")]
+      .find((button) => button.innerText.includes("Songs"));
+    songsButton?.click();
+  })()`);
+  const adminSongState = await waitFor(
+    `(() => ({
+      filters: [...document.querySelectorAll(".admin-filter-row button")].map((button) => button.innerText),
+      search: document.querySelector('input[placeholder*="title, artist"]')?.getAttribute("placeholder") ?? "",
+      total: document.querySelector(".admin-section-heading span")?.innerText ?? ""
+    }))()`,
+    (value) => Boolean(value.search),
+  );
+  if (
+    !adminSongState.search.includes("platform") ||
+    !["all songs", "active", "paused", "archived", "spotlight", "founder", "reported"]
+      .every((filter) =>
+        adminSongState.filters.map((label) => label.toLowerCase()).includes(filter),
+      ) ||
+    !adminSongState.total.includes("Total Songs")
+  ) {
+    throw new Error(`Admin song search and filters are incomplete: ${JSON.stringify(adminSongState)}`);
   }
 
   await navigate(`${baseUrl}/submit?debug=1`);
@@ -652,6 +726,8 @@ try {
     JSON.stringify(
       {
         cover_url_optional: true,
+        admin_song_search: adminSongState,
+        admin_user_search: adminState,
         direct_track_submit_enabled: true,
         playlist_error_visible: playlistState.linkMessage,
         playlist_submit_disabled: true,
