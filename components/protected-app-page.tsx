@@ -6,6 +6,8 @@ import { getInitials, platformLabels } from "@/lib/discovery";
 import { safeCoverUrl } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import type {
+  CommunityNotification,
+  CommunityNotificationSummary,
   CommunityProgram,
   DailyMissionStatus,
   DiscoverySong,
@@ -123,12 +125,37 @@ type FollowedArtistRow = {
 
 type TodaySupportRow = {
   songs_reviewed_today: number;
+  songs_supported_today: number;
   creators_supported: number;
   listening_seconds_today: number;
   community_rank: string;
   valid_listens_today: number;
   complete_listens_today: number;
   average_completion_rate: number;
+};
+
+type CommunityNotificationRow = {
+  notification_id: string;
+  event_type: CommunityNotification["type"];
+  actor_id: string | null;
+  actor_name: string;
+  song_id: string | null;
+  song_title: string | null;
+  is_read: boolean;
+  created_at: string;
+};
+
+type CommunityNotificationSummaryRow = {
+  unread_count: number;
+  supporters_count: number;
+  followers_count: number;
+  reviews_count: number;
+  valid_listens_count: number;
+  most_supported_song_id: string | null;
+  most_supported_song_title: string | null;
+  most_supported_song_valid_listens: number;
+  top_supporter_id: string | null;
+  top_supporter_name: string | null;
 };
 
 function mapDiscoveryRow(row: DiscoveryRow): DiscoverySong {
@@ -171,7 +198,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "display_name, founder_number, founder_free_submissions_remaining, credits, total_review_credits_earned, review_quality_score, languages_understood, genre_preferences, interface_language, onboarding_completed, role",
+      "display_name, founder_number, founder_free_submissions_remaining, credits, total_review_credits_earned, review_quality_score, languages_understood, genre_preferences, interface_language, onboarding_completed, role, community_visibility, autoplay_next_song",
     )
     .eq("id", user.id)
     .single();
@@ -189,6 +216,8 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     { data: followedArtistRows },
     { data: previouslySupportedRows },
     { data: todaySupportRows },
+    { data: notificationRows },
+    { data: notificationSummaryRows },
   ] = await Promise.all([
     supabase
       .from("songs")
@@ -208,6 +237,10 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     supabase.rpc("get_followed_artists", { queue_limit: 8 }),
     supabase.rpc("get_previously_supported_songs", { queue_limit: 8 }),
     supabase.rpc("get_today_support_summary"),
+    supabase.rpc("get_my_community_notifications", {
+      notification_limit: 20,
+    }),
+    supabase.rpc("get_my_community_notification_summary"),
   ]);
 
   const { data: reviewRows } = latestSong
@@ -337,6 +370,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
   ) as TodaySupportRow | null;
   const todaySupport: TodaySupportSummary = {
     songsReviewed: Number(todaySupportRow?.songs_reviewed_today ?? 0),
+    songsSupported: Number(todaySupportRow?.songs_supported_today ?? 0),
     creatorsSupported: Number(todaySupportRow?.creators_supported ?? 0),
     listeningSeconds: Number(todaySupportRow?.listening_seconds_today ?? 0),
     communityRank: todaySupportRow?.community_rank ?? "New Member",
@@ -345,6 +379,44 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     averageCompletionRate: Number(
       todaySupportRow?.average_completion_rate ?? 0,
     ),
+  };
+
+  const notifications: CommunityNotification[] = (
+    (notificationRows ?? []) as CommunityNotificationRow[]
+  ).map((notification) => ({
+    id: notification.notification_id,
+    type: notification.event_type,
+    actorId: notification.actor_id ?? undefined,
+    actorName: notification.actor_name,
+    songId: notification.song_id ?? undefined,
+    songTitle: notification.song_title ?? undefined,
+    read: Boolean(notification.is_read),
+    createdAt: notification.created_at,
+  }));
+
+  const notificationSummaryRow = (
+    Array.isArray(notificationSummaryRows)
+      ? notificationSummaryRows[0]
+      : notificationSummaryRows
+  ) as CommunityNotificationSummaryRow | null;
+  const notificationSummary: CommunityNotificationSummary = {
+    unreadCount: Number(notificationSummaryRow?.unread_count ?? 0),
+    supportersCount: Number(notificationSummaryRow?.supporters_count ?? 0),
+    followersCount: Number(notificationSummaryRow?.followers_count ?? 0),
+    reviewsCount: Number(notificationSummaryRow?.reviews_count ?? 0),
+    validListensCount: Number(
+      notificationSummaryRow?.valid_listens_count ?? 0,
+    ),
+    mostSupportedSongId:
+      notificationSummaryRow?.most_supported_song_id ?? undefined,
+    mostSupportedSongTitle:
+      notificationSummaryRow?.most_supported_song_title ?? undefined,
+    mostSupportedSongValidListens: Number(
+      notificationSummaryRow?.most_supported_song_valid_listens ?? 0,
+    ),
+    topSupporterId: notificationSummaryRow?.top_supporter_id ?? undefined,
+    topSupporterName:
+      notificationSummaryRow?.top_supporter_name ?? undefined,
   };
 
   const missionRow = (
@@ -403,6 +475,9 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
         locale: (profile.interface_language === "es" ? "es" : "en") as InterfaceLocale,
         onboardingCompleted: Boolean(profile.onboarding_completed),
         role: profile.role,
+        communityVisibility:
+          profile.community_visibility === "anonymous" ? "anonymous" : "public",
+        autoplayNextSong: Boolean(profile.autoplay_next_song),
         song,
         songSummaries,
         reviews,
@@ -418,6 +493,8 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
           (previouslySupportedRows ?? []) as DiscoveryRow[]
         ).map(mapDiscoveryRow),
         todaySupport,
+        notifications,
+        notificationSummary,
         dailyMission,
         communityPrograms,
       }}

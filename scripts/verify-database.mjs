@@ -67,11 +67,16 @@ const { data: alphaData, error: alphaError } = await supabase.rpc(
   "master_alpha_health_report",
 );
 if (alphaError) throw alphaError;
+const { data: networkData, error: networkError } = await supabase.rpc(
+  "community_network_health_report",
+);
+if (networkError) throw networkError;
 
 const report = data ?? {};
 const listeningReport = listeningData ?? {};
 const discoveryReport = discoveryData ?? {};
 const alphaReport = alphaData ?? {};
+const networkReport = networkData ?? {};
 const requiredPlatforms = [
   "youtube",
   "spotify",
@@ -232,6 +237,41 @@ const checks = [
     passed: Number(alphaReport.invalid_active_long_form ?? -1) === 0,
     details: alphaReport.invalid_active_long_form,
   },
+  {
+    name: "Community network tables exist",
+    passed: Object.values(networkReport.tables ?? {}).every(Boolean),
+    details: networkReport.tables,
+  },
+  {
+    name: "Community network functions exist",
+    passed: Object.values(networkReport.functions ?? {}).every(Boolean),
+    details: networkReport.functions,
+  },
+  {
+    name: "Community network RLS is enabled",
+    passed: Object.values(networkReport.rls ?? {}).every(Boolean),
+    details: networkReport.rls,
+  },
+  {
+    name: "Community visibility values are valid",
+    passed: Number(networkReport.invalid_visibility_profiles ?? -1) === 0,
+    details: networkReport.invalid_visibility_profiles,
+  },
+  {
+    name: "Community events and notifications are linked",
+    passed:
+      Number(networkReport.orphan_support_events ?? -1) === 0 &&
+      Number(networkReport.orphan_notifications ?? -1) === 0,
+    details: {
+      supportEvents: networkReport.orphan_support_events,
+      notifications: networkReport.orphan_notifications,
+    },
+  },
+  {
+    name: "Community notifications are realtime-enabled",
+    passed: networkReport.realtime_enabled === true,
+    details: networkReport.realtime_enabled,
+  },
 ];
 
 const passed = checks.filter((check) => check.passed).length;
@@ -242,6 +282,7 @@ const result = {
   alphaReport,
   checks,
   discoveryReport,
+  networkReport,
   report,
   listeningReport,
 };

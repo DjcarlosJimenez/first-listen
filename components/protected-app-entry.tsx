@@ -8,6 +8,8 @@ import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/client";
 import type {
   AccountSummary,
+  CommunityNotification,
+  CommunityNotificationSummary,
   CommunityProgram,
   DailyMissionStatus,
   DiscoverySong,
@@ -31,6 +33,8 @@ type ProfileSeed = {
   locale: InterfaceLocale;
   onboardingCompleted: boolean;
   role: "super_admin" | "admin" | "moderator" | "user";
+  communityVisibility: "public" | "anonymous";
+  autoplayNextSong: boolean;
   song: Song | null;
   songSummaries: SongDashboardSummary[];
   reviews: Review[];
@@ -40,6 +44,8 @@ type ProfileSeed = {
   followedArtists: FollowedArtist[];
   previouslySupportedSongs: DiscoverySong[];
   todaySupport: TodaySupportSummary;
+  notifications: CommunityNotification[];
+  notificationSummary: CommunityNotificationSummary;
   dailyMission: DailyMissionStatus | null;
   communityPrograms: CommunityProgram[];
 };
@@ -118,6 +124,10 @@ export function ProtectedAppEntry({
       initialFollowedArtists={profile.followedArtists}
       initialPreviouslySupportedSongs={profile.previouslySupportedSongs}
       initialTodaySupport={profile.todaySupport}
+      initialNotifications={profile.notifications}
+      initialNotificationSummary={profile.notificationSummary}
+      initialCommunityVisibility={profile.communityVisibility}
+      initialAutoplayNextSong={profile.autoplayNextSong}
       initialDailyMission={profile.dailyMission}
       initialCommunityPrograms={profile.communityPrograms}
       initialView={initialView}

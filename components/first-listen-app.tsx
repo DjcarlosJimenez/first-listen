@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BadgeCheck,
   BarChart3,
+  Bell,
   Bookmark,
   CalendarDays,
   Check,
@@ -27,11 +28,13 @@ import {
   Moon,
   Music2,
   Plus,
+  Pause,
   Play,
   Rocket,
   Send,
   Share2,
   ShieldCheck,
+  SkipForward,
   Sparkles,
   Star,
   Sun,
@@ -83,6 +86,8 @@ import { evaluateReviewQuality } from "@/lib/review-quality";
 import { createClient } from "@/lib/supabase/client";
 import type {
   AccountSummary,
+  CommunityNotification,
+  CommunityNotificationSummary,
   CommunityProgram,
   DailyMissionStatus,
   DiscoverySong,
@@ -122,6 +127,7 @@ type ListeningSessionUi = {
   sessionId: string | null;
   earningEligible: boolean | null;
   verifiedSeconds: number;
+  liveSeconds: number;
   dailySecondsRemaining: number;
   heartbeatIntervalSeconds: number;
   interactionGraceSeconds: number;
@@ -188,6 +194,21 @@ function mapQueueRows(data: Array<Record<string, unknown>>): Song[] {
   }));
 }
 
+function mapNotificationRows(
+  data: Array<Record<string, unknown>>,
+): CommunityNotification[] {
+  return data.map((row) => ({
+    id: String(row.notification_id),
+    type: String(row.event_type) as CommunityNotification["type"],
+    actorId: row.actor_id ? String(row.actor_id) : undefined,
+    actorName: String(row.actor_name ?? "Anonymous Listener"),
+    songId: row.song_id ? String(row.song_id) : undefined,
+    songTitle: row.song_title ? String(row.song_title) : undefined,
+    read: Boolean(row.is_read),
+    createdAt: String(row.created_at),
+  }));
+}
+
 const emptyReview: ReviewForm = {
   listenFull: null,
   addPlaylist: null,
@@ -217,6 +238,11 @@ function formatClock(seconds: number) {
   const minutes = Math.floor(safeSeconds / 60);
   const remainder = safeSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
+function formatMinutesSeconds(seconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(safeSeconds / 60)}m ${safeSeconds % 60}s`;
 }
 
 function secondsToNextReward(bankSeconds: number, exchangeSeconds: number) {
@@ -509,6 +535,8 @@ function PostReviewDiscovery({
   onContinueListening,
   onNextSong,
   validListenRecorded,
+  todaySupport,
+  listeningBank,
 }: {
   song: Song;
   notify: (message: string) => void;
@@ -516,11 +544,19 @@ function PostReviewDiscovery({
   onContinueListening: () => void;
   onNextSong: () => void;
   validListenRecorded: boolean;
+  todaySupport: TodaySupportSummary;
+  listeningBank: ListeningBankStatus;
 }) {
   const links = getDiscoveryLinks(song);
   const [following, setFollowing] = useState(false);
   const [saved, setSaved] = useState(false);
   const spanish = locale === "es";
+  const exchangeSeconds = Math.max(60, listeningBank.minutesPerCredit * 60);
+  const tokenProgressSeconds = listeningBank.bankSeconds % exchangeSeconds;
+  const tokenProgress = Math.min(
+    100,
+    (tokenProgressSeconds / exchangeSeconds) * 100,
+  );
 
   const followArtist = async () => {
     const supabase = createClient();
@@ -597,6 +633,46 @@ function PostReviewDiscovery({
           {spanish ? "Escucha válida registrada" : "Valid Listen Recorded"}
         </strong>
       )}
+      <section className="post-review-impact" aria-label="Your impact today">
+        <div className="post-review-impact-heading">
+          <span>
+            <Headphones size={15} />
+            {spanish ? "Tu impacto hoy" : "Your Impact Today"}
+          </span>
+          <strong>{todaySupport.communityRank}</strong>
+        </div>
+        <div className="post-review-impact-stats">
+          <div>
+            <strong>{todaySupport.songsSupported}</strong>
+            <span>{spanish ? "Canciones apoyadas" : "Songs Supported"}</span>
+          </div>
+          <div>
+            <strong>{formatMinutesSeconds(todaySupport.listeningSeconds)}</strong>
+            <span>{spanish ? "Minutos escuchados" : "Minutes Listened"}</span>
+          </div>
+          <div>
+            <strong>{todaySupport.creatorsSupported}</strong>
+            <span>{spanish ? "Artistas apoyados" : "Artists Supported"}</span>
+          </div>
+        </div>
+        <div className="next-token-progress">
+          <span>
+            <Target size={14} />
+            {spanish ? "Siguiente token" : "Next Token"}
+          </span>
+          <strong>
+            {Math.floor(tokenProgressSeconds / 60)}m /{" "}
+            {listeningBank.minutesPerCredit}m
+          </strong>
+          <div className="progress-track">
+            <i style={{ width: `${tokenProgress}%` }} />
+          </div>
+          <small>
+            {Math.ceil(listeningBank.secondsToNextCredit / 60)}m{" "}
+            {spanish ? "restantes" : "remaining"}
+          </small>
+        </div>
+      </section>
       <div className="discovery-links">
         <a href={links.spotify} rel="noreferrer" target="_blank">
           <Disc3 size={15} />{" "}
@@ -640,6 +716,137 @@ function PostReviewDiscovery({
         </Link>
       )}
     </div>
+  );
+}
+
+function notificationText(
+  notification: CommunityNotification,
+  locale: InterfaceLocale,
+) {
+  const spanish = locale === "es";
+  if (notification.type === "follow") {
+    return spanish
+      ? `${notification.actorName} ahora te sigue`
+      : `${notification.actorName} followed you`;
+  }
+  if (notification.type === "review") {
+    return spanish
+      ? `Nueva review recibida para ${notification.songTitle ?? "tu canciÃ³n"}`
+      : `New review received for ${notification.songTitle ?? "your song"}`;
+  }
+  if (notification.type === "complete_listen") {
+    return spanish
+      ? `${notification.actorName} completÃ³ ${notification.songTitle ?? "tu canciÃ³n"}`
+      : `${notification.actorName} completed ${notification.songTitle ?? "your song"}`;
+  }
+  return spanish
+    ? `${notification.actorName} apoyÃ³ ${notification.songTitle ?? "tu canciÃ³n"}`
+    : `${notification.actorName} supported ${notification.songTitle ?? "your song"}`;
+}
+
+function FloatingCommunityNotifications({
+  notifications,
+  locale,
+  onFollow,
+}: {
+  notifications: CommunityNotification[];
+  locale: InterfaceLocale;
+  onFollow: (artistId: string) => void;
+}) {
+  if (!notifications.length) return null;
+  return (
+    <aside className="community-live-stack" aria-live="polite">
+      {notifications.slice(0, 3).map((notification) => (
+        <article key={notification.id}>
+          <span className="community-live-icon">
+            {notification.type === "follow" ? (
+              <UserPlus size={16} />
+            ) : notification.type === "review" ? (
+              <Star size={16} />
+            ) : (
+              <Headphones size={16} />
+            )}
+          </span>
+          <div>
+            <small>{locale === "es" ? "Actividad en vivo" : "Live activity"}</small>
+            <strong>{notificationText(notification, locale)}</strong>
+            {notification.actorId && (
+              <span>
+                <Link href={`/artists/${notification.actorId}`}>
+                  {locale === "es" ? "Ver perfil" : "View profile"}
+                </Link>
+                <button
+                  onClick={() => onFollow(notification.actorId as string)}
+                  type="button"
+                >
+                  {locale === "es" ? "Seguir" : "Follow"}
+                </button>
+              </span>
+            )}
+          </div>
+        </article>
+      ))}
+    </aside>
+  );
+}
+
+function OfflineCommunitySummary({
+  summary,
+  notifications,
+  locale,
+  onDismiss,
+  onViewActivity,
+}: {
+  summary: CommunityNotificationSummary;
+  notifications: CommunityNotification[];
+  locale: InterfaceLocale;
+  onDismiss: () => void;
+  onViewActivity: () => void;
+}) {
+  if (summary.unreadCount < 1) return null;
+  const spanish = locale === "es";
+  return (
+    <section className="offline-community-summary">
+      <div className="offline-community-heading">
+        <span>
+          <Bell size={17} />
+          <strong>{spanish ? "Mientras no estabas" : "While You Were Away"}</strong>
+        </span>
+        <button aria-label="Dismiss activity summary" onClick={onDismiss}>
+          <X size={16} />
+        </button>
+      </div>
+      <div className="offline-community-counts">
+        <span><strong>{summary.supportersCount}</strong> {spanish ? "personas apoyaron tu contenido" : "people supported your content"}</span>
+        <span><strong>{summary.followersCount}</strong> {spanish ? "seguidores nuevos" : "new followers"}</span>
+        <span><strong>{summary.reviewsCount}</strong> {spanish ? "reviews nuevas" : "new reviews"}</span>
+        <span><strong>{summary.validListensCount}</strong> {spanish ? "escuchas vÃ¡lidas" : "valid listens"}</span>
+      </div>
+      <div className="offline-community-details">
+        {summary.mostSupportedSongTitle && (
+          <div>
+            <small>{spanish ? "CanciÃ³n mÃ¡s apoyada" : "Most Supported Song"}</small>
+            <strong>{summary.mostSupportedSongTitle}</strong>
+            <span>{summary.mostSupportedSongValidListens} {spanish ? "escuchas" : "listens"}</span>
+          </div>
+        )}
+        {summary.topSupporterName && (
+          <div>
+            <small>{spanish ? "Mayor colaborador" : "Top Supporter"}</small>
+            <strong>{summary.topSupporterName}</strong>
+            <span>{spanish ? "Colaborador pÃºblico" : "Public supporter"}</span>
+          </div>
+        )}
+      </div>
+      <div className="offline-community-events">
+        {notifications.filter((item) => !item.read).slice(0, 3).map((item) => (
+          <span key={item.id}>{notificationText(item, locale)}</span>
+        ))}
+      </div>
+      <button className="offline-community-action" onClick={onViewActivity}>
+        {spanish ? "Ver actividad" : "View Activity"} <ArrowRight size={14} />
+      </button>
+    </section>
   );
 }
 
@@ -801,6 +1008,9 @@ function ReviewView({
   followedArtists,
   previouslySupportedSongs,
   todaySupport,
+  listeningBank,
+  autoPlayNextSong,
+  onAutoPlayChange,
 }: {
   reviewCount: number;
   onReviewed: (
@@ -835,6 +1045,9 @@ function ReviewView({
   followedArtists: FollowedArtist[];
   previouslySupportedSongs: DiscoverySong[];
   todaySupport: TodaySupportSummary;
+  listeningBank: ListeningBankStatus;
+  autoPlayNextSong: boolean;
+  onAutoPlayChange: (enabled: boolean) => void;
 }) {
   const reviewerProfile = useMemo(
     () => ({ languages: listenerLanguages, genrePreferences, activityScore }),
@@ -857,11 +1070,15 @@ function ReviewView({
   const [reportReason, setReportReason] = useState("spam");
   const [lastReviewedSong, setLastReviewedSong] = useState<Song | null>(null);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [autoAdvanceCountdown, setAutoAdvanceCountdown] =
+    useState<number | null>(null);
+  const [autoPlayCurrentSong, setAutoPlayCurrentSong] = useState(false);
   const [listeningSession, setListeningSession] =
     useState<ListeningSessionUi>({
       sessionId: null,
       earningEligible: null,
       verifiedSeconds: 0,
+      liveSeconds: 0,
       dailySecondsRemaining: 180 * 60,
       heartbeatIntervalSeconds: 15,
       interactionGraceSeconds: 300,
@@ -878,6 +1095,11 @@ function ReviewView({
   const heartbeatIntervalRef = useRef(15);
   const interactionGraceRef = useRef(300);
   const latestTelemetryRef = useRef<ProviderTelemetrySnapshot | null>(null);
+  const lastLiveSampleRef = useRef<{ at: number; position: number } | null>(
+    null,
+  );
+  const currentLiveSecondsRef = useRef(0);
+  const autoAdvanceStartedRef = useRef(false);
   const validListenRef = useRef(false);
   const completeListenRef = useRef(false);
 
@@ -895,10 +1117,15 @@ function ReviewView({
     latestTelemetryRef.current = null;
     validListenRef.current = false;
     completeListenRef.current = false;
+    lastLiveSampleRef.current = null;
+    currentLiveSecondsRef.current = 0;
+    autoAdvanceStartedRef.current = false;
+    setAutoAdvanceCountdown(null);
     setListeningSession({
       sessionId: null,
       earningEligible: null,
       verifiedSeconds: 0,
+      liveSeconds: 0,
       dailySecondsRemaining: 180 * 60,
       heartbeatIntervalSeconds: 15,
       interactionGraceSeconds: 300,
@@ -914,6 +1141,59 @@ function ReviewView({
     async (snapshot: ProviderTelemetrySnapshot, force = false) => {
       latestTelemetryRef.current = snapshot;
       if (!song) return;
+      const sampleAt = Date.now();
+      const liveEligible =
+        snapshot.supported &&
+        snapshot.pageVisible &&
+        snapshot.pageFocused &&
+        snapshot.muted === false &&
+        (snapshot.volume ?? 0) > 0;
+      const previousLiveSample = lastLiveSampleRef.current;
+      if (
+        liveEligible &&
+        (snapshot.playbackState === "playing" ||
+          snapshot.playbackState === "ended") &&
+        previousLiveSample &&
+        snapshot.currentTime >= previousLiveSample.position
+      ) {
+        const wallDelta = Math.max(
+          0,
+          (sampleAt - previousLiveSample.at) / 1000,
+        );
+        const positionDelta = Math.max(
+          0,
+          snapshot.currentTime - previousLiveSample.position,
+        );
+        const liveDelta = Math.min(positionDelta, wallDelta + 1);
+        if (liveDelta > 0 && liveDelta <= 5) {
+          currentLiveSecondsRef.current += liveDelta;
+          setListeningSession((current) => ({
+            ...current,
+            liveSeconds: currentLiveSecondsRef.current,
+          }));
+        }
+      }
+      lastLiveSampleRef.current =
+        liveEligible && snapshot.playbackState === "playing"
+          ? { at: sampleAt, position: snapshot.currentTime }
+          : null;
+
+      const playbackEnded = snapshot.playbackState === "ended";
+      if (
+        snapshot.playbackState === "playing" &&
+        autoAdvanceStartedRef.current
+      ) {
+        autoAdvanceStartedRef.current = false;
+        setAutoAdvanceCountdown(null);
+      }
+      if (
+        playbackEnded &&
+        autoPlayNextSong &&
+        !autoAdvanceStartedRef.current
+      ) {
+        autoAdvanceStartedRef.current = true;
+        setAutoAdvanceCountdown(3);
+      }
       const calculatedRequirement =
         snapshot.duration > 0
           ? Math.min(120, Math.max(30, Math.ceil(snapshot.duration * 0.25)))
@@ -940,11 +1220,12 @@ function ReviewView({
         }));
         return;
       }
-      if (snapshot.playbackState !== "playing") return;
+      if (snapshot.playbackState !== "playing" && !playbackEnded) return;
 
       const supabase = createClient();
       if (!supabase) return;
 
+      if (playbackEnded && !listeningSessionRef.current) return;
       if (!listeningSessionRef.current && !startingSessionRef.current) {
         startingSessionRef.current = true;
         const { data, error } = await supabase.rpc("start_listening_session", {
@@ -970,6 +1251,7 @@ function ReviewView({
           sessionId: result.session_id,
           earningEligible: Boolean(result.earning_eligible),
           verifiedSeconds: 0,
+          liveSeconds: currentLiveSecondsRef.current,
           dailySecondsRemaining: Number(result.daily_cap_seconds ?? 10800),
           heartbeatIntervalSeconds: heartbeatIntervalRef.current,
           interactionGraceSeconds: interactionGraceRef.current,
@@ -989,6 +1271,7 @@ function ReviewView({
       const intervalMilliseconds = heartbeatIntervalRef.current * 1000;
       if (
         !force &&
+        !playbackEnded &&
         lastHeartbeatAtRef.current &&
         now - lastHeartbeatAtRef.current < intervalMilliseconds
       ) {
@@ -1003,7 +1286,7 @@ function ReviewView({
           target_session_id: sessionId,
           playback_position_seconds: snapshot.currentTime,
           playback_duration_seconds: snapshot.duration,
-          playback_state: snapshot.playbackState,
+          playback_state: playbackEnded ? "playing" : snapshot.playbackState,
           playback_muted: snapshot.muted,
           playback_volume: snapshot.volume,
           page_visible: snapshot.pageVisible,
@@ -1033,9 +1316,18 @@ function ReviewView({
       validListenRef.current = validListenRecorded;
       completeListenRef.current = completeListenRecorded;
       const secondsCounted = Number(result.seconds_counted ?? 0);
+      currentLiveSecondsRef.current = Math.max(
+        currentLiveSecondsRef.current,
+        Number(result.session_verified_seconds ?? 0),
+      );
       setListeningSession((current) => ({
         ...current,
         verifiedSeconds: Number(result.session_verified_seconds ?? 0),
+        liveSeconds: Math.max(
+          current.liveSeconds,
+          currentLiveSecondsRef.current,
+          Number(result.session_verified_seconds ?? 0),
+        ),
         dailySecondsRemaining: Number(result.daily_seconds_remaining ?? 0),
         validListenRecorded,
         completeListenRecorded,
@@ -1059,17 +1351,17 @@ function ReviewView({
         );
       }
     },
-    [locale, onListeningCredited, song],
+    [autoPlayNextSong, locale, onListeningCredited, song],
   );
 
-  const flushListeningTelemetry = async () => {
+  const flushListeningTelemetry = useCallback(async () => {
     const snapshot = latestTelemetryRef.current;
     if (!snapshot || snapshot.playbackState !== "playing") return;
     for (let attempt = 0; attempt < 10 && heartbeatInFlightRef.current; attempt += 1) {
       await new Promise((resolve) => window.setTimeout(resolve, 100));
     }
     await handleListeningTelemetry(snapshot, true);
-  };
+  }, [handleListeningTelemetry]);
 
   const requiredAnswersComplete =
     form.listenFull !== null &&
@@ -1117,8 +1409,10 @@ function ReviewView({
     );
   };
 
-  const advanceToNextSong = async () => {
+  const advanceToNextSong = useCallback(async (continuePlayback = false) => {
     if (!song) return;
+    setAutoAdvanceCountdown(null);
+    autoAdvanceStartedRef.current = false;
     await flushListeningTelemetry();
     const sessionId = listeningSessionRef.current;
     if (sessionId) {
@@ -1134,8 +1428,30 @@ function ReviewView({
       }
     }
     setLastReviewedSong(null);
+    setAutoPlayCurrentSong(continuePlayback);
     await onAdvanceSong(song.id);
-  };
+  }, [flushListeningTelemetry, notify, onAdvanceSong, song]);
+
+  useEffect(() => {
+    if (autoAdvanceCountdown === null) return;
+    const timeout = window.setTimeout(() => {
+      if (autoAdvanceCountdown === 1) {
+        setAutoAdvanceCountdown(null);
+        void advanceToNextSong(true);
+        return;
+      }
+      setAutoAdvanceCountdown((current) =>
+        current === null ? null : current - 1,
+      );
+    }, 1000);
+    return () => window.clearTimeout(timeout);
+  }, [advanceToNextSong, autoAdvanceCountdown]);
+
+  useEffect(() => {
+    if (autoPlayNextSong) return;
+    autoAdvanceStartedRef.current = false;
+    setAutoAdvanceCountdown(null);
+  }, [autoPlayNextSong]);
 
   const reportSong = async () => {
     const supabase = createClient();
@@ -1188,6 +1504,7 @@ function ReviewView({
             <div className="cover-wrap">
               <ProviderPlayer
                 artist={song.artist}
+                autoPlay={autoPlayCurrentSong}
                 coverUrl={song.coverUrl}
                 link={song.link}
                 locale={locale}
@@ -1196,6 +1513,30 @@ function ReviewView({
                 title={song.title}
                 onTelemetry={handleListeningTelemetry}
               />
+              {autoAdvanceCountdown !== null && (
+                <div className="auto-advance-overlay" role="status">
+                  <strong>
+                    {locale === "es" ? "CanciÃ³n terminada" : "Song Finished"}
+                  </strong>
+                  <span>
+                    {locale === "es"
+                      ? "La siguiente canciÃ³n comienza en"
+                      : "Starting next song in"}
+                  </span>
+                  <b>{autoAdvanceCountdown}</b>
+                  <button
+                    onClick={() => {
+                      autoAdvanceStartedRef.current = false;
+                      setAutoAdvanceCountdown(null);
+                      onAutoPlayChange(false);
+                    }}
+                    type="button"
+                  >
+                    <Pause size={14} />
+                    {locale === "es" ? "Pausar auto play" : "Pause Auto Play"}
+                  </button>
+                </div>
+              )}
               <span className="listen-badge">
                 <Clock3 size={13} /> {locale === "es" ? "Reproductor oficial" : "Provider player"}
               </span>
@@ -1203,11 +1544,18 @@ function ReviewView({
             <div className="listen-tracking-panel" aria-live="polite">
               <div>
                 <span><Headphones size={13} /> {locale === "es" ? "Tiempo escuchado" : "Listening Time"}</span>
-                <strong>{formatClock(listeningSession.verifiedSeconds)}</strong>
+                <strong>{formatClock(listeningSession.liveSeconds)}</strong>
               </div>
               <div>
                 <span><Target size={13} /> {locale === "es" ? "Escucha válida" : "Valid Listen Requirement"}</span>
-                <strong>{formatClock(listeningSession.validRequirementSeconds)}</strong>
+                <strong>
+                  {formatClock(listeningSession.validRequirementSeconds)}
+                  {listeningSession.validListenRecorded
+                    ? locale === "es"
+                      ? " Completada"
+                      : " Completed"
+                    : ""}
+                </strong>
               </div>
               <div className="listen-tracking-progress">
                 <span>
@@ -1244,12 +1592,38 @@ function ReviewView({
                       ? "Gracias por apoyar a este artista"
                       : "Valid Listen Recorded"}
                   </strong>
-                  <button onClick={() => void advanceToNextSong()} type="button">
+                  <button
+                    onClick={() => void advanceToNextSong(autoPlayNextSong)}
+                    type="button"
+                  >
                     {locale === "es" ? "Siguiente canción" : "Next Song"}{" "}
                     <ArrowRight size={13} />
                   </button>
                 </div>
               )}
+            </div>
+            <div className="continuous-listening-controls">
+              <button
+                onClick={() => void advanceToNextSong(autoPlayNextSong)}
+                type="button"
+              >
+                <SkipForward size={15} />
+                {locale === "es" ? "Siguiente canciÃ³n" : "Next Song"}
+              </button>
+              <button
+                className={autoPlayNextSong ? "active" : ""}
+                onClick={() => onAutoPlayChange(!autoPlayNextSong)}
+                type="button"
+              >
+                {autoPlayNextSong ? <Pause size={15} /> : <Play size={15} />}
+                {autoPlayNextSong
+                  ? locale === "es"
+                    ? "Pausar auto play"
+                    : "Pause Auto Play"
+                  : locale === "es"
+                    ? "Reanudar auto play"
+                    : "Resume Auto Play"}
+              </button>
             </div>
           </div>
           <div className="song-copy">
@@ -1427,7 +1801,7 @@ function ReviewView({
           <div className="listening-validation-totals">
             <div>
               <span>{locale === "es" ? "Sesión verificada" : "Verified Session"}</span>
-              <strong>{formatClock(listeningSession.verifiedSeconds)}</strong>
+              <strong>{formatClock(listeningSession.liveSeconds)}</strong>
             </div>
             <div>
               <span>{locale === "es" ? "Banco aprobado" : "Approved Bank"}</span>
@@ -1471,8 +1845,10 @@ function ReviewView({
                   : "Keep listening. Your verified time is still counting.",
               );
             }}
-            onNextSong={() => void advanceToNextSong()}
+            onNextSong={() => void advanceToNextSong(autoPlayNextSong)}
+            listeningBank={listeningBank}
             song={lastReviewedSong}
+            todaySupport={todaySupport}
             validListenRecorded={listeningSession.validListenRecorded}
           />
         )}
@@ -3037,6 +3413,10 @@ type FirstListenAppProps = {
   initialFollowedArtists: FollowedArtist[];
   initialPreviouslySupportedSongs: DiscoverySong[];
   initialTodaySupport: TodaySupportSummary;
+  initialNotifications: CommunityNotification[];
+  initialNotificationSummary: CommunityNotificationSummary;
+  initialCommunityVisibility: "public" | "anonymous";
+  initialAutoplayNextSong: boolean;
   initialDailyMission: DailyMissionStatus | null;
   initialCommunityPrograms: CommunityProgram[];
   role: "super_admin" | "admin" | "moderator" | "user";
@@ -3064,6 +3444,10 @@ export function FirstListenApp({
   initialFollowedArtists,
   initialPreviouslySupportedSongs,
   initialTodaySupport,
+  initialNotifications,
+  initialNotificationSummary,
+  initialCommunityVisibility,
+  initialAutoplayNextSong,
   initialDailyMission,
   initialCommunityPrograms,
   role,
@@ -3083,6 +3467,17 @@ export function FirstListenApp({
     useState<ListeningBankStatus>(initialListeningBank);
   const [todaySupport, setTodaySupport] =
     useState<TodaySupportSummary>(initialTodaySupport);
+  const [notifications, setNotifications] =
+    useState<CommunityNotification[]>(initialNotifications);
+  const [notificationSummary, setNotificationSummary] =
+    useState<CommunityNotificationSummary>(initialNotificationSummary);
+  const [liveNotifications, setLiveNotifications] = useState<
+    CommunityNotification[]
+  >([]);
+  const [communityVisibility] = useState(initialCommunityVisibility);
+  const [autoPlayNextSong, setAutoPlayNextSong] = useState(
+    initialAutoplayNextSong,
+  );
   const [claimingReward, setClaimingReward] = useState(false);
   const [claimingMission, setClaimingMission] = useState(false);
   const [dailyMission, setDailyMission] =
@@ -3134,9 +3529,101 @@ export function FirstListenApp({
     };
   }, []);
 
+  useEffect(() => {
+    const supabase = createClient();
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel(`community-notifications:${account.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "community_notifications",
+          filter: `recipient_id=eq.${account.id}`,
+        },
+        async () => {
+          const { data: rows } = await supabase.rpc(
+            "get_my_community_notifications",
+            { notification_limit: 20 },
+          );
+          const mapped = mapNotificationRows(
+            (rows ?? []) as Array<Record<string, unknown>>,
+          );
+          setNotifications(mapped);
+          const newest = mapped[0];
+          if (newest) {
+            setLiveNotifications((current) => [
+              newest,
+              ...current.filter((item) => item.id !== newest.id),
+            ].slice(0, 3));
+            window.setTimeout(() => {
+              setLiveNotifications((current) =>
+                current.filter((item) => item.id !== newest.id),
+              );
+            }, 6500);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [account.id]);
+
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 3200);
+  };
+
+  const changeAutoPlayNextSong = async (enabled: boolean) => {
+    setAutoPlayNextSong(enabled);
+    const supabase = createClient();
+    if (!supabase) return;
+    const { error } = await supabase.rpc("update_community_preferences", {
+      profile_community_visibility: communityVisibility,
+      profile_autoplay_next_song: enabled,
+    });
+    if (error) {
+      setAutoPlayNextSong((current) => !current);
+      notify(error.message);
+      return;
+    }
+    notify(
+      enabled
+        ? locale === "es"
+          ? "Auto play activado."
+          : "Auto play enabled."
+        : locale === "es"
+          ? "Auto play pausado."
+          : "Auto play paused.",
+    );
+  };
+
+  const followFromNotification = async (artistId: string) => {
+    const supabase = createClient();
+    if (!supabase) return;
+    const { error } = await supabase.rpc("follow_artist", {
+      target_artist_id: artistId,
+    });
+    notify(
+      error
+        ? error.message
+        : locale === "es"
+          ? "Artista seguido."
+          : "Artist followed.",
+    );
+  };
+
+  const dismissCommunitySummary = async () => {
+    setNotificationSummary((current) => ({ ...current, unreadCount: 0 }));
+    setNotifications((current) =>
+      current.map((notification) => ({ ...notification, read: true })),
+    );
+    const supabase = createClient();
+    if (supabase) await supabase.rpc("mark_community_notifications_read");
   };
 
   const averageReviewQuality = Math.round(
@@ -3253,6 +3740,7 @@ export function FirstListenApp({
     if (support) {
       setTodaySupport({
         songsReviewed: Number(support.songs_reviewed_today ?? 0),
+        songsSupported: Number(support.songs_supported_today ?? 0),
         creatorsSupported: Number(support.creators_supported ?? 0),
         listeningSeconds: Number(support.listening_seconds_today ?? 0),
         communityRank: String(support.community_rank ?? "New Member"),
@@ -3358,6 +3846,8 @@ export function FirstListenApp({
       setTodaySupport((current) => ({
         ...current,
         listeningSeconds: current.listeningSeconds + Math.max(0, seconds),
+        songsSupported:
+          current.songsSupported + (becameValid ? 1 : 0),
         validListens: current.validListens + (becameValid ? 1 : 0),
         completeListens:
           current.completeListens + (becameComplete ? 1 : 0),
@@ -3609,6 +4099,9 @@ export function FirstListenApp({
         followedArtists={initialFollowedArtists}
         previouslySupportedSongs={initialPreviouslySupportedSongs}
         todaySupport={todaySupport}
+        listeningBank={listeningBank}
+        autoPlayNextSong={autoPlayNextSong}
+        onAutoPlayChange={(enabled) => void changeAutoPlayNextSong(enabled)}
       />
     );
   })();
@@ -3639,6 +4132,13 @@ export function FirstListenApp({
           onMenu={() => setMenuOpen(true)}
           onToggleTheme={toggleTheme}
           view={view}
+        />
+        <OfflineCommunitySummary
+          locale={locale}
+          notifications={notifications}
+          onDismiss={() => void dismissCommunitySummary()}
+          onViewActivity={() => router.push("/profile#community-activity")}
+          summary={notificationSummary}
         />
         {viewContent}
       </div>
@@ -3707,6 +4207,11 @@ export function FirstListenApp({
         <CheckCircle2 size={18} />
         {toast}
       </div>
+      <FloatingCommunityNotifications
+        locale={locale}
+        notifications={liveNotifications}
+        onFollow={(artistId) => void followFromNotification(artistId)}
+      />
     </div>
   );
 }

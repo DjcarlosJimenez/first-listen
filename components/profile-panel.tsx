@@ -7,16 +7,20 @@ import {
   BadgeCheck,
   CalendarDays,
   ExternalLink,
+  Eye,
+  EyeOff,
   Gauge,
   Headphones,
   MessageSquareText,
   Music2,
+  Play,
   Save,
   ShieldCheck,
   Users,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { createClient } from "@/lib/supabase/client";
+import type { CommunityActivity, CommunityNetwork } from "@/lib/types";
 
 type ProfileSong = {
   id: string;
@@ -55,6 +59,8 @@ export function ProfilePanel({
   songs,
   savedSongs,
   impact,
+  network,
+  activity,
 }: {
   profile: {
     id: string;
@@ -65,6 +71,8 @@ export function ProfilePanel({
     credits: number;
     founderSubmissionsRemaining: number;
     showExplicitContent: boolean;
+    communityVisibility: "public" | "anonymous";
+    autoplayNextSong: boolean;
   };
   songs: ProfileSong[];
   savedSongs: SavedSong[];
@@ -78,20 +86,35 @@ export function ProfilePanel({
     community_points: number;
     community_rank: string;
   } | null;
+  network: CommunityNetwork;
+  activity: CommunityActivity[];
 }) {
   const [name, setName] = useState(profile.displayName);
   const [showExplicit, setShowExplicit] = useState(profile.showExplicitContent);
+  const [visibility, setVisibility] = useState(profile.communityVisibility);
+  const [autoplayNextSong, setAutoplayNextSong] = useState(
+    profile.autoplayNextSong,
+  );
   const [message, setMessage] = useState("");
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
     const supabase = createClient();
     if (!supabase) return;
-    const { error } = await supabase.rpc("update_profile_preferences", {
-      profile_display_name: name,
-      profile_show_explicit_content: showExplicit,
-    });
-    setMessage(error ? error.message : "Profile saved.");
+    const [{ error: profileError }, { error: communityError }] =
+      await Promise.all([
+        supabase.rpc("update_profile_preferences", {
+          profile_display_name: name,
+          profile_show_explicit_content: showExplicit,
+        }),
+        supabase.rpc("update_community_preferences", {
+          profile_community_visibility: visibility,
+          profile_autoplay_next_song: autoplayNextSong,
+        }),
+      ]);
+    setMessage(
+      profileError?.message ?? communityError?.message ?? "Profile saved.",
+    );
   };
 
   return (
@@ -153,6 +176,13 @@ export function ProfilePanel({
               <small>{impact?.community_points ?? 0} Community Points</small>
             </span>
           </div>
+          <div className="community-network-grid">
+            <div><strong>{network.followers}</strong><span>Followers</span></div>
+            <div><strong>{network.following}</strong><span>Following</span></div>
+            <div><strong>{network.artistsSupported}</strong><span>Artists Supported</span></div>
+            <div><strong>{network.visibleSupports}</strong><span>Visible Supports</span></div>
+            <div><strong>{network.anonymousSupports}</strong><span>Anonymous Supports</span></div>
+          </div>
           <Link className="public-profile-link" href={`/artists/${profile.id}`}>
             View public artist profile <ExternalLink size={14} />
           </Link>
@@ -176,14 +206,98 @@ export function ProfilePanel({
                 Hide explicit songs from your review queue when disabled.
               </span>
             </label>
+            <fieldset className="community-visibility-card">
+              <legend>Community Visibility</legend>
+              <label>
+                <input
+                  checked={visibility === "public"}
+                  name="community-visibility"
+                  onChange={() => setVisibility("public")}
+                  type="radio"
+                />
+                <Eye size={16} />
+                <span>
+                  <strong>Public Supporter (Recommended)</strong>
+                  Artists can see when you support their music. This can lead to
+                  more profile visits, followers, and creator connections.
+                </span>
+              </label>
+              <label>
+                <input
+                  checked={visibility === "anonymous"}
+                  name="community-visibility"
+                  onChange={() => setVisibility("anonymous")}
+                  type="radio"
+                />
+                <EyeOff size={16} />
+                <span>
+                  <strong>Anonymous Supporter</strong>
+                  Your support remains valid, but artists see Anonymous Listener
+                  instead of your name.
+                </span>
+              </label>
+            </fieldset>
+            <label className="setting-toggle">
+              <input
+                checked={autoplayNextSong}
+                onChange={(event) => setAutoplayNextSong(event.target.checked)}
+                type="checkbox"
+              />
+              <Play size={16} />
+              <span>
+                <strong>Auto Play Next Song</strong>
+                Load and play the next queued song after the current song ends.
+              </span>
+            </label>
             {message && <p className="form-message" role="status">{message}</p>}
             <button className="auth-submit" type="submit"><Save size={15} /> Save profile</button>
           </form>
         </section>
 
-        <section className="account-card my-songs">
-          <span className="eyebrow">My Songs</span>
-          <h2>Submitted songs</h2>
+        <section className="account-card my-songs" id="community-activity">
+          <span className="eyebrow">Recent Community Activity</span>
+          <h2>Your creator connections</h2>
+          <div className="profile-activity-list">
+            {activity.map((item) => (
+              <article key={item.id}>
+                <span>
+                  {item.type === "follow" ? (
+                    <Users size={15} />
+                  ) : item.type === "review" ? (
+                    <MessageSquareText size={15} />
+                  ) : (
+                    <Headphones size={15} />
+                  )}
+                </span>
+                <div>
+                  <strong>
+                    {item.type === "follow"
+                      ? `You followed ${item.artistName}`
+                      : item.type === "review"
+                        ? `You reviewed ${item.songTitle ?? "a song"}`
+                        : `You supported ${item.songTitle ?? "a song"}`}
+                  </strong>
+                  <small>
+                    {item.visibility === "public"
+                      ? "Visible support"
+                      : "Anonymous support"}
+                  </small>
+                </div>
+                <Link href={`/artists/${item.artistId}`}>Artist</Link>
+              </article>
+            ))}
+            {!activity.length && (
+              <div className="empty-state">
+                <p>Your listens, reviews, and follows will appear here.</p>
+                <Link href="/review">Support a creator</Link>
+              </div>
+            )}
+          </div>
+
+          <div className="saved-song-heading">
+            <span className="eyebrow">My Songs</span>
+            <h2>Submitted songs</h2>
+          </div>
           {songs.length === 0 ? (
             <div className="empty-state">
               <p>No songs submitted yet.</p>

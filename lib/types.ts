@@ -138,12 +138,76 @@ export type FollowedArtist = {
 
 export type TodaySupportSummary = {
   songsReviewed: number;
+  songsSupported: number;
   creatorsSupported: number;
   listeningSeconds: number;
   communityRank: string;
   validListens: number;
   completeListens: number;
   averageCompletionRate: number;
+};
+
+export type CommunityNetwork = {
+  followers: number;
+  following: number;
+  artistsSupported: number;
+  visibleSupports: number;
+  anonymousSupports: number;
+  visibility: "public" | "anonymous";
+  autoplayNextSong: boolean;
+};
+
+export type CommunityActivity = {
+  id: string;
+  type: "valid_listen" | "complete_listen" | "review" | "follow";
+  artistId: string;
+  artistName: string;
+  songId?: string;
+  songTitle?: string;
+  visibility: "public" | "anonymous";
+  createdAt: string;
+};
+
+export type CommunityNotification = {
+  id: string;
+  type: "valid_listen" | "complete_listen" | "review" | "follow";
+  actorId?: string;
+  actorName: string;
+  songId?: string;
+  songTitle?: string;
+  read: boolean;
+  createdAt: string;
+};
+
+export type CommunityNotificationSummary = {
+  unreadCount: number;
+  supportersCount: number;
+  followersCount: number;
+  reviewsCount: number;
+  validListensCount: number;
+  mostSupportedSongId?: string;
+  mostSupportedSongTitle?: string;
+  mostSupportedSongValidListens: number;
+  topSupporterId?: string;
+  topSupporterName?: string;
+};
+
+export type ArtistTopSupporter = {
+  id: string;
+  name: string;
+  supportsGiven: number;
+  songsSupported: number;
+  mutualFollowing: boolean;
+};
+
+export type ArtistCommunityActivity = {
+  id: string;
+  type: "valid_listen" | "complete_listen" | "review" | "follow";
+  actorId?: string;
+  actorName: string;
+  songId?: string;
+  songTitle?: string;
+  createdAt: string;
 };
 
 export type DailyMissionStatus = {

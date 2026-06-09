@@ -3,7 +3,11 @@ import { PublicArtistProfile } from "@/components/public-artist-profile";
 import { platformLabels } from "@/lib/discovery";
 import { safeCoverUrl } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
-import type { Platform } from "@/lib/types";
+import type {
+  ArtistCommunityActivity,
+  ArtistTopSupporter,
+  Platform,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -45,9 +49,22 @@ export default async function ArtistPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const [{ data: artistRows }, { data: songRows }] = await Promise.all([
+  const [
+    { data: artistRows },
+    { data: songRows },
+    { data: supporterRows },
+    { data: activityRows },
+  ] = await Promise.all([
     supabase.rpc("get_public_artist_profile", { target_artist_id: id }),
     supabase.rpc("get_public_artist_songs", { target_artist_id: id }),
+    supabase.rpc("get_artist_top_supporters", {
+      target_artist_id: id,
+      supporter_limit: 8,
+    }),
+    supabase.rpc("get_public_artist_activity", {
+      target_artist_id: id,
+      activity_limit: 12,
+    }),
   ]);
 
   const artist = (
@@ -93,6 +110,26 @@ export default async function ArtistPage({
         averageRating: Number(song.average_rating ?? 0),
         hookScore: Number(song.hook_score ?? 0),
       }))}
+      topSupporters={(
+        (supporterRows ?? []) as Array<Record<string, unknown>>
+      ).map((row) => ({
+        id: String(row.supporter_id),
+        name: String(row.supporter_name),
+        supportsGiven: Number(row.supports_given ?? 0),
+        songsSupported: Number(row.songs_supported ?? 0),
+        mutualFollowing: Boolean(row.mutual_following),
+      })) satisfies ArtistTopSupporter[]}
+      activity={(
+        (activityRows ?? []) as Array<Record<string, unknown>>
+      ).map((row) => ({
+        id: String(row.event_id),
+        type: String(row.event_type) as ArtistCommunityActivity["type"],
+        actorId: row.actor_id ? String(row.actor_id) : undefined,
+        actorName: String(row.actor_name ?? "Anonymous Listener"),
+        songId: row.song_id ? String(row.song_id) : undefined,
+        songTitle: row.song_title ? String(row.song_title) : undefined,
+        createdAt: String(row.created_at),
+      })) satisfies ArtistCommunityActivity[]}
     />
   );
 }

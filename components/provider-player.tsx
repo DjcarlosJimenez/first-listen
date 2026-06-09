@@ -36,6 +36,7 @@ type YouTubePlayer = {
   getPlayerState: () => number;
   getVolume: () => number;
   isMuted: () => boolean;
+  playVideo: () => void;
 };
 
 type YouTubePlayerEvent = {
@@ -59,6 +60,7 @@ type YouTubeApi = {
 type SoundCloudWidget = {
   bind: (event: string, listener: () => void) => void;
   unbind: (event: string) => void;
+  play: () => void;
   getDuration: (callback: (duration: number) => void) => void;
   getPosition: (callback: (position: number) => void) => void;
   getVolume: (callback: (volume: number) => void) => void;
@@ -77,19 +79,48 @@ type SoundCloudApi = {
   };
 };
 
+type SpotifyPlaybackEvent = {
+  data: {
+    isPaused: boolean;
+    isBuffering: boolean;
+    duration: number;
+    position: number;
+  };
+};
+
+type SpotifyController = {
+  addListener: (
+    event: "ready" | "playback_started" | "playback_update",
+    listener: (event: SpotifyPlaybackEvent) => void,
+  ) => void;
+  destroy: () => void;
+  play: () => void;
+};
+
+type SpotifyIframeApi = {
+  createController: (
+    element: HTMLElement,
+    options: { uri: string; width: string; height: string },
+    callback: (controller: SpotifyController) => void,
+  ) => void;
+};
+
 declare global {
   interface Window {
     YT?: YouTubeApi;
     onYouTubeIframeAPIReady?: () => void;
     SC?: SoundCloudApi;
+    onSpotifyIframeApiReady?: (api: SpotifyIframeApi) => void;
   }
 }
 
 const YOUTUBE_API_SRC = "https://www.youtube.com/iframe_api";
 const SOUNDCLOUD_API_SRC = "https://w.soundcloud.com/player/api.js";
+const SPOTIFY_API_SRC = "https://open.spotify.com/embed/iframe-api/v1";
 const MAX_INITIALIZATION_ATTEMPTS = 3;
 let youtubeApiPromise: Promise<YouTubeApi> | null = null;
 let soundCloudApiPromise: Promise<SoundCloudApi> | null = null;
+let spotifyApiPromise: Promise<SpotifyIframeApi> | null = null;
 
 function loadYouTubeApi() {
   if (window.YT?.Player) return Promise.resolve(window.YT);
@@ -190,6 +221,62 @@ function loadSoundCloudApi() {
   return soundCloudApiPromise;
 }
 
+function loadSpotifyApi() {
+  if (spotifyApiPromise) return spotifyApiPromise;
+
+  spotifyApiPromise = new Promise<SpotifyIframeApi>((resolve, reject) => {
+    let settled = false;
+    const finish = (api: SpotifyIframeApi) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      resolve(api);
+    };
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      reject(new Error("Spotify IFrame API did not become ready."));
+    };
+    const previousReady = window.onSpotifyIframeApiReady;
+    window.onSpotifyIframeApiReady = (api) => {
+      try {
+        previousReady?.(api);
+      } catch (error) {
+        console.warn("[First Listen player] Previous Spotify callback failed", error);
+      }
+      finish(api);
+    };
+    const timeout = window.setTimeout(fail, 15000);
+    let script = document.querySelector<HTMLScriptElement>(
+      `script[src="${SPOTIFY_API_SRC}"]`,
+    );
+    if (!script) {
+      script = document.createElement("script");
+      script.async = true;
+      script.src = SPOTIFY_API_SRC;
+      document.body.append(script);
+    }
+    script.addEventListener("error", fail, { once: true });
+  }).catch((error) => {
+    spotifyApiPromise = null;
+    throw error;
+  });
+
+  return spotifyApiPromise;
+}
+
+function spotifyTrackUri(rawUrl: string) {
+  try {
+    const parts = new URL(rawUrl).pathname.split("/").filter(Boolean);
+    const trackIndex = parts.findIndex((part) => part === "track");
+    const trackId = trackIndex >= 0 ? parts[trackIndex + 1] : null;
+    return trackId ? `spotify:track:${trackId}` : null;
+  } catch {
+    return null;
+  }
+}
+
 function mapYouTubeState(state: number): PlaybackState {
   if (state === -1) return "unstarted";
   if (state === 0) return "ended";
@@ -213,6 +300,7 @@ export function ProviderPlayer({
   songLoadedAt,
   title,
   onTelemetry,
+  autoPlay = false,
 }: {
   artist: string;
   coverUrl: string;
@@ -222,17 +310,19 @@ export function ProviderPlayer({
   songLoadedAt: string | null;
   title: string;
   onTelemetry?: (snapshot: ProviderTelemetrySnapshot) => void;
+  autoPlay?: boolean;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const spotifyContainerRef = useRef<HTMLDivElement>(null);
   const [clientOrigin, setClientOrigin] = useState<string | null>(null);
   const [playerMountedAt, setPlayerMountedAt] = useState<string | null>(null);
   const embedResult = useMemo(() => {
     if (!clientOrigin) return { embed: null, generatedAt: null };
     return {
-      embed: getProviderEmbed(link, platform, clientOrigin),
+      embed: getProviderEmbed(link, platform, clientOrigin, autoPlay),
       generatedAt: timestamp(),
     };
-  }, [clientOrigin, link, platform]);
+  }, [autoPlay, clientOrigin, link, platform]);
   const embed = embedResult.embed;
   const [loadedEmbedSrc, setLoadedEmbedSrc] = useState<string | null>(null);
   const [iframeLoadedAt, setIframeLoadedAt] = useState<string | null>(null);
@@ -375,6 +465,110 @@ export function ProviderPlayer({
   ]);
 
   useEffect(() => {
+    if (
+      !embed ||
+      embed.telemetry !== "spotify_iframe_api" ||
+      !spotifyContainerRef.current
+    ) {
+      return;
+    }
+
+    const uri = spotifyTrackUri(link);
+    if (!uri) {
+      setStatus("error");
+      return;
+    }
+
+    let disposed = false;
+    let controller: SpotifyController | null = null;
+
+    loadSpotifyApi()
+      .then((api) => {
+        if (disposed || !spotifyContainerRef.current) return;
+        api.createController(
+          spotifyContainerRef.current,
+          { uri, width: "100%", height: "352" },
+          (nextController) => {
+            if (disposed) {
+              nextController.destroy();
+              return;
+            }
+            controller = nextController;
+            nextController.addListener("ready", () => {
+              if (disposed) return;
+              const readyAt = timestamp();
+              setLoadedEmbedSrc(embed.src);
+              setIframeLoadedAt(readyAt);
+              setProviderReadyAt(readyAt);
+              setStatus("ready");
+              emitTelemetry("cued", 0, 0, null, null, false);
+              if (autoPlay) {
+                try {
+                  nextController.play();
+                } catch (error) {
+                  console.info(
+                    "[First Listen player] Browser deferred Spotify autoplay",
+                    error,
+                  );
+                }
+              }
+            });
+            nextController.addListener("playback_started", () => {
+              lastInteractionAtRef.current = Date.now();
+            });
+            nextController.addListener("playback_update", (event) => {
+              if (disposed) return;
+              const nextDuration = Math.max(0, event.data.duration / 1000);
+              const nextPosition = Math.max(0, event.data.position / 1000);
+              const ended =
+                nextDuration > 0 &&
+                nextPosition >= Math.max(0, nextDuration - 0.75) &&
+                event.data.isPaused;
+              const nextState: PlaybackState = ended
+                ? "ended"
+                : event.data.isBuffering
+                  ? "buffering"
+                  : event.data.isPaused
+                    ? "paused"
+                    : "playing";
+              setPlaybackState(nextState);
+              setDuration(nextDuration);
+              setCurrentTime(nextPosition);
+              setMuted(null);
+              setVolume(null);
+              emitTelemetry(
+                nextState,
+                nextPosition,
+                nextDuration,
+                null,
+                null,
+                false,
+              );
+            });
+          },
+        );
+      })
+      .catch((error) => {
+        if (disposed) return;
+        console.error("[First Listen player] Spotify telemetry unavailable", {
+          error,
+          link,
+          title,
+        });
+        setStatus("error");
+      });
+
+    return () => {
+      disposed = true;
+      try {
+        controller?.destroy();
+      } catch {
+        // Spotify may remove its iframe before React cleanup completes.
+      }
+    };
+  }, [autoPlay, embed, emitTelemetry, link, title]);
+
+  useEffect(() => {
     if (!embed || status !== "loading") return;
     const timeout = window.setTimeout(() => {
       if (initializationAttempt < MAX_INITIALIZATION_ATTEMPTS) {
@@ -487,6 +681,16 @@ export function ProviderPlayer({
               setProviderReadyAt(readyAt);
               setStatus("ready");
               refreshTelemetry(event.target);
+              if (autoPlay) {
+                try {
+                  event.target.playVideo();
+                } catch (error) {
+                  console.info(
+                    "[First Listen player] Browser deferred autoplay",
+                    error,
+                  );
+                }
+              }
               console.info("[First Listen player] Provider ready", {
                 embedGeneratedAt: embedResult.generatedAt,
                 embedUrl: embed.src,
@@ -535,6 +739,7 @@ export function ProviderPlayer({
       }
     };
   }, [
+    autoPlay,
     embed,
     embedResult.generatedAt,
     emitTelemetry,
@@ -600,6 +805,7 @@ export function ProviderPlayer({
           setProviderReadyAt(readyAt);
           setStatus("ready");
           refreshTelemetry();
+          if (autoPlay) widget?.play();
           telemetryInterval = window.setInterval(refreshTelemetry, 1000);
         };
         const playing = () => {
@@ -611,8 +817,26 @@ export function ProviderPlayer({
           refreshTelemetry();
         };
         const finished = () => {
-          setPlaybackState("ended");
-          refreshTelemetry();
+          widget?.getDuration((durationMs) => {
+            widget?.getVolume((nextVolume) => {
+              if (disposed) return;
+              const nextDuration = Math.max(0, durationMs / 1000);
+              const nextMuted = nextVolume <= 0;
+              setPlaybackState("ended");
+              setDuration(nextDuration);
+              setCurrentTime(nextDuration);
+              setMuted(nextMuted);
+              setVolume(nextVolume);
+              emitTelemetry(
+                "ended",
+                nextDuration,
+                nextDuration,
+                nextMuted,
+                nextVolume,
+                true,
+              );
+            });
+          });
         };
         const failed = () => setStatus("error");
 
@@ -642,7 +866,7 @@ export function ProviderPlayer({
         );
       }
     };
-  }, [embed, emitTelemetry, loadedEmbedSrc, platform, title]);
+  }, [autoPlay, embed, emitTelemetry, loadedEmbedSrc, platform, title]);
 
   const playerLoaded = () => {
     if (!embed) return;
@@ -704,7 +928,15 @@ export function ProviderPlayer({
         />
       )}
 
-      {embed && (
+      {embed?.telemetry === "spotify_iframe_api" && (
+        <div
+          className={status === "ready" ? "spotify-controller ready" : "spotify-controller"}
+        >
+          <div ref={spotifyContainerRef} />
+        </div>
+      )}
+
+      {embed && embed.telemetry !== "spotify_iframe_api" && (
         <iframe
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           className={status === "ready" ? "ready" : ""}

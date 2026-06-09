@@ -35,6 +35,7 @@ export function getProviderEmbed(
   rawUrl: string,
   platform: Platform,
   origin?: string,
+  autoPlay = false,
 ): ProviderEmbed | null {
   try {
     const url = new URL(rawUrl);
@@ -57,6 +58,7 @@ export function getProviderEmbed(
         playsinline: "1",
         rel: "0",
         modestbranding: "1",
+        autoplay: autoPlay ? "1" : "0",
       });
       if (origin) params.set("origin", origin);
       if (playlistId) {
@@ -76,7 +78,7 @@ export function getProviderEmbed(
       const trackId = spotifyTrackId(url);
       if (!trackId || !/^[A-Za-z0-9]+$/.test(trackId)) return null;
       return {
-        src: `https://open.spotify.com/embed/track/${encodeURIComponent(trackId)}?utm_source=generator&theme=0`,
+        src: `https://open.spotify.com/embed/track/${encodeURIComponent(trackId)}?utm_source=generator&theme=0${autoPlay ? "&autoplay=1" : ""}`,
         title: "Spotify player",
         telemetry: "spotify_iframe_api",
       };
@@ -86,7 +88,7 @@ export function getProviderEmbed(
       const params = new URLSearchParams({
         url: url.toString(),
         color: "#c8ff4f",
-        auto_play: "false",
+        auto_play: autoPlay ? "true" : "false",
         hide_related: "true",
         show_comments: "false",
         show_user: "true",

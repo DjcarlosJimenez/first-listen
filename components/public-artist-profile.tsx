@@ -23,7 +23,12 @@ import {
 import { Logo } from "@/components/logo";
 import { getDiscoveryLinks } from "@/lib/discovery";
 import { createClient } from "@/lib/supabase/client";
-import type { Platform, Song } from "@/lib/types";
+import type {
+  ArtistCommunityActivity,
+  ArtistTopSupporter,
+  Platform,
+  Song,
+} from "@/lib/types";
 
 type PublicArtist = {
   id: string;
@@ -60,9 +65,13 @@ type PublicSong = {
 export function PublicArtistProfile({
   artist,
   songs,
+  topSupporters,
+  activity,
 }: {
   artist: PublicArtist;
   songs: PublicSong[];
+  topSupporters: ArtistTopSupporter[];
+  activity: ArtistCommunityActivity[];
 }) {
   const router = useRouter();
   const [following, setFollowing] = useState(artist.isFollowing);
@@ -154,6 +163,76 @@ export function PublicArtistProfile({
       </section>
 
       {message && <div className="artist-profile-notice" role="status">{message}</div>}
+
+      <section className="artist-community-grid">
+        <div className="artist-community-panel">
+          <span className="eyebrow"><Users size={13} /> Top Supporters</span>
+          <h2>Creator relationships</h2>
+          <div className="top-supporter-list">
+            {topSupporters.map((supporter) => (
+              <Link href={`/artists/${supporter.id}`} key={supporter.id}>
+                <span className="retention-avatar">
+                  {supporter.name.slice(0, 2).toUpperCase()}
+                </span>
+                <span>
+                  <strong>{supporter.name}</strong>
+                  <small>
+                    {supporter.supportsGiven} supports /{" "}
+                    {supporter.songsSupported} songs supported
+                  </small>
+                  {supporter.mutualFollowing && (
+                    <em><UserPlus size={11} /> Following each other</em>
+                  )}
+                </span>
+                <ArrowRight size={14} />
+              </Link>
+            ))}
+            {!topSupporters.length && (
+              <p className="discovery-empty">
+                Public supporters will appear here after supporting this artist.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="artist-community-panel">
+          <span className="eyebrow"><Radio size={13} /> Recent Activity</span>
+          <h2>Community activity</h2>
+          <div className="artist-activity-list">
+            {activity.map((item) => (
+              <article key={item.id}>
+                <span>
+                  {item.type === "follow" ? (
+                    <UserPlus size={14} />
+                  ) : item.type === "review" ? (
+                    <Star size={14} />
+                  ) : (
+                    <Headphones size={14} />
+                  )}
+                </span>
+                <div>
+                  <strong>
+                    {item.type === "follow"
+                      ? `${item.actorName} followed this artist`
+                      : item.type === "review"
+                        ? `${item.actorName} reviewed ${item.songTitle ?? "a song"}`
+                        : `${item.actorName} listened to ${item.songTitle ?? "a song"}`}
+                  </strong>
+                  <small>{new Date(item.createdAt).toLocaleDateString()}</small>
+                </div>
+                {item.actorId && (
+                  <Link href={`/artists/${item.actorId}`}>Profile</Link>
+                )}
+              </article>
+            ))}
+            {!activity.length && (
+              <p className="discovery-empty">
+                Listening, reviews, and follows will appear here.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
 
       <section className="artist-song-grid">
         {songs.map((song) => {
