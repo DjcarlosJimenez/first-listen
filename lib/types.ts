@@ -31,6 +31,35 @@ export type AccountSummary = {
   initials: string;
 };
 
+export type ConnectedPlatform =
+  | "spotify"
+  | "apple_music"
+  | "youtube"
+  | "soundcloud"
+  | "tiktok";
+
+export type ConnectedPlatformAccount = {
+  platform: ConnectedPlatform;
+  connectionStatus:
+    | "not_connected"
+    | "pending"
+    | "connected"
+    | "needs_reauth"
+    | "revoked";
+  username?: string;
+  displayName?: string;
+  profileUrl?: string;
+  avatarUrl?: string;
+  creatorAccount: boolean;
+  providerVerified: boolean;
+  followerCount?: number;
+  followingCount?: number;
+  contentCount?: number;
+  likesCount?: number;
+  connectedAt?: string;
+  lastSyncedAt?: string;
+};
+
 export type SongDashboardSummary = {
   id: string;
   artistId: string;

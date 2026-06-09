@@ -3,9 +3,13 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import {
+  Apple,
   ArrowLeft,
   BadgeCheck,
   CalendarDays,
+  Clapperboard,
+  Cloud,
+  Construction,
   ExternalLink,
   Eye,
   EyeOff,
@@ -17,10 +21,16 @@ import {
   Save,
   ShieldCheck,
   Users,
+  Youtube,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { createClient } from "@/lib/supabase/client";
-import type { CommunityActivity, CommunityNetwork } from "@/lib/types";
+import type {
+  CommunityActivity,
+  CommunityNetwork,
+  ConnectedPlatform,
+  ConnectedPlatformAccount,
+} from "@/lib/types";
 
 type ProfileSong = {
   id: string;
@@ -45,6 +55,26 @@ type SavedSong = {
   saved_at: string;
 };
 
+const platformDefinitions: Array<{
+  id: ConnectedPlatform;
+  label: string;
+  icon: typeof Music2;
+}> = [
+  { id: "spotify", label: "Spotify", icon: Music2 },
+  { id: "apple_music", label: "Apple Music", icon: Apple },
+  { id: "youtube", label: "YouTube", icon: Youtube },
+  { id: "soundcloud", label: "SoundCloud", icon: Cloud },
+  { id: "tiktok", label: "TikTok", icon: Clapperboard },
+];
+
+function platformStatus(status?: ConnectedPlatformAccount["connectionStatus"]) {
+  if (status === "connected") return "Connected";
+  if (status === "pending") return "Pending";
+  if (status === "needs_reauth") return "Reconnect Required";
+  if (status === "revoked") return "Disconnected";
+  return "Not Connected";
+}
+
 function formatImpactDuration(seconds: number) {
   const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
   const hours = Math.floor(safeSeconds / 3600);
@@ -61,6 +91,7 @@ export function ProfilePanel({
   impact,
   network,
   activity,
+  connectedPlatforms,
 }: {
   profile: {
     id: string;
@@ -88,6 +119,7 @@ export function ProfilePanel({
   } | null;
   network: CommunityNetwork;
   activity: CommunityActivity[];
+  connectedPlatforms: ConnectedPlatformAccount[];
 }) {
   const [name, setName] = useState(profile.displayName);
   const [showExplicit, setShowExplicit] = useState(profile.showExplicitContent);
@@ -186,6 +218,53 @@ export function ProfilePanel({
           <Link className="public-profile-link" href={`/artists/${profile.id}`}>
             View public artist profile <ExternalLink size={14} />
           </Link>
+          <section
+            aria-labelledby="connected-platforms-heading"
+            className="connected-platforms-card"
+          >
+            <div className="connected-platforms-heading">
+              <span>
+                <strong id="connected-platforms-heading">
+                  Connected Platforms
+                </strong>
+                <small>Future creator account connections</small>
+              </span>
+              <span className="coming-soon-badge">
+                <Construction size={13} /> Coming Soon
+              </span>
+            </div>
+            <div className="connected-platforms-list">
+              {platformDefinitions.map((platform) => {
+                const account = connectedPlatforms.find(
+                  (item) => item.platform === platform.id,
+                );
+                const PlatformIcon = platform.icon;
+                const status = platformStatus(account?.connectionStatus);
+                return (
+                  <div key={platform.id}>
+                    <span className="connected-platform-icon" aria-hidden="true">
+                      <PlatformIcon size={17} />
+                    </span>
+                    <strong>{platform.label}</strong>
+                    <span
+                      className={
+                        status === "Connected"
+                          ? "platform-status connected"
+                          : "platform-status"
+                      }
+                    >
+                      {status}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <p>
+              Future account linking and creator verification will support
+              verified profiles, public links, and provider statistics where
+              official APIs permit them.
+            </p>
+          </section>
           <form onSubmit={save}>
             <label className="auth-field">
               <span>Name</span>

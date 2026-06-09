@@ -4394,6 +4394,100 @@ button {
   text-transform: uppercase;
 }
 
+.connected-platforms-card {
+  background: #f8f9f5;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  margin: 18px 0;
+  padding: 15px;
+}
+
+.connected-platforms-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.connected-platforms-heading > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.connected-platforms-heading strong {
+  color: var(--dark);
+  font-size: 13px;
+}
+
+.connected-platforms-heading small,
+.connected-platforms-card > p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.coming-soon-badge {
+  align-items: center;
+  background: #fff1cc;
+  border-radius: 20px;
+  color: #765812;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 5px;
+  padding: 7px 9px;
+  text-transform: uppercase;
+}
+
+.connected-platforms-list {
+  display: grid;
+  gap: 7px;
+  margin: 13px 0;
+}
+
+.connected-platforms-list > div {
+  align-items: center;
+  background: white;
+  border: 1px solid #e4e8e0;
+  border-radius: 9px;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 29px minmax(0, 1fr) auto;
+  min-height: 43px;
+  padding: 7px 10px;
+}
+
+.connected-platform-icon {
+  align-items: center;
+  background: #eef1ea;
+  border-radius: 8px;
+  color: #525d4d;
+  display: inline-flex;
+  height: 29px;
+  justify-content: center;
+  width: 29px;
+}
+
+.connected-platforms-list strong {
+  font-size: 11px;
+}
+
+.platform-status {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.platform-status.connected {
+  color: #587315;
+}
+
+.connected-platforms-card > p {
+  margin: 0;
+}
+
 .status-removed {
   background: #fff0ee;
   color: #983329;
@@ -7281,6 +7375,8 @@ button {
 .theme-dark .continuous-listening-controls button,
 .theme-dark .community-network-grid > div,
 .theme-dark .community-visibility-card label,
+.theme-dark .connected-platforms-card,
+.theme-dark .connected-platforms-list > div,
 .theme-dark .profile-activity-list article,
 .theme-dark .artist-activity-list article,
 .theme-dark .top-supporter-list > a,
@@ -7291,8 +7387,21 @@ button {
 }
 
 .theme-dark .community-network-grid strong,
-.theme-dark .community-visibility-card label strong {
+.theme-dark .community-visibility-card label strong,
+.theme-dark .connected-platforms-heading strong {
   color: #eef2eb;
+}
+
+.theme-dark .connected-platform-icon {
+  background: #303831;
+  color: #dce4d8;
+}
+
+@media (max-width: 420px) {
+  .connected-platforms-heading {
+    align-items: flex-start;
+    display: grid;
+  }
 }
 
 @media (max-width: 900px) {

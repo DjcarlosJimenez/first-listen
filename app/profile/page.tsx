@@ -1,7 +1,12 @@
 import { redirect } from "next/navigation";
 import { ProfilePanel } from "@/components/profile-panel";
 import { createClient } from "@/lib/supabase/server";
-import type { CommunityActivity, CommunityNetwork } from "@/lib/types";
+import type {
+  CommunityActivity,
+  CommunityNetwork,
+  ConnectedPlatform,
+  ConnectedPlatformAccount,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +24,7 @@ export default async function ProfilePage() {
     { data: impactRows },
     { data: networkRows },
     { data: activityRows },
+    { data: connectedPlatformRows },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -36,6 +42,12 @@ export default async function ProfilePage() {
     supabase.rpc("get_my_recent_community_activity", {
       activity_limit: 12,
     }),
+    supabase
+      .from("connected_platform_accounts")
+      .select(
+        "platform, connection_status, provider_username, display_name, profile_url, avatar_url, creator_account, provider_verified, follower_count, following_count, content_count, likes_count, connected_at, last_synced_at",
+      )
+      .eq("user_id", user.id),
   ]);
   if (!profile) redirect("/login?error=profile");
   const networkRow = (
@@ -87,6 +99,43 @@ export default async function ProfilePage() {
           visibility:
             row.visibility === "anonymous" ? "anonymous" : "public",
           createdAt: String(row.created_at),
+        }),
+      )}
+      connectedPlatforms={(
+        (connectedPlatformRows ?? []) as Array<Record<string, unknown>>
+      ).map(
+        (row): ConnectedPlatformAccount => ({
+          platform: String(row.platform) as ConnectedPlatform,
+          connectionStatus:
+            String(
+              row.connection_status ?? "not_connected",
+            ) as ConnectedPlatformAccount["connectionStatus"],
+          username: row.provider_username
+            ? String(row.provider_username)
+            : undefined,
+          displayName: row.display_name ? String(row.display_name) : undefined,
+          profileUrl: row.profile_url ? String(row.profile_url) : undefined,
+          avatarUrl: row.avatar_url ? String(row.avatar_url) : undefined,
+          creatorAccount: Boolean(row.creator_account),
+          providerVerified: Boolean(row.provider_verified),
+          followerCount:
+            row.follower_count === null
+              ? undefined
+              : Number(row.follower_count),
+          followingCount:
+            row.following_count === null
+              ? undefined
+              : Number(row.following_count),
+          contentCount:
+            row.content_count === null ? undefined : Number(row.content_count),
+          likesCount:
+            row.likes_count === null ? undefined : Number(row.likes_count),
+          connectedAt: row.connected_at
+            ? String(row.connected_at)
+            : undefined,
+          lastSyncedAt: row.last_synced_at
+            ? String(row.last_synced_at)
+            : undefined,
         }),
       )}
     />

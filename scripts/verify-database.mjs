@@ -75,6 +75,10 @@ const { data: guestData, error: guestError } = await supabase.rpc(
   "guest_experience_health_report",
 );
 if (guestError) throw guestError;
+const { data: connectedData, error: connectedError } = await supabase.rpc(
+  "connected_platforms_health_report",
+);
+if (connectedError) throw connectedError;
 
 const report = data ?? {};
 const listeningReport = listeningData ?? {};
@@ -82,6 +86,7 @@ const discoveryReport = discoveryData ?? {};
 const alphaReport = alphaData ?? {};
 const networkReport = networkData ?? {};
 const guestReport = guestData ?? {};
+const connectedReport = connectedData ?? {};
 const requiredPlatforms = [
   "youtube",
   "spotify",
@@ -292,6 +297,37 @@ const checks = [
     passed: Number(guestReport.orphan_listens ?? -1) === 0,
     details: guestReport.orphan_listens,
   },
+  {
+    name: "Connected platform account storage exists",
+    passed: connectedReport.table_exists === true,
+    details: connectedReport.table_exists,
+  },
+  {
+    name: "Connected platform accounts are owner-readable only",
+    passed:
+      connectedReport.rls_enabled === true &&
+      connectedReport.owner_read_policy === true &&
+      connectedReport.authenticated_select_only === true,
+    details: {
+      rls: connectedReport.rls_enabled,
+      ownerPolicy: connectedReport.owner_read_policy,
+      authenticatedSelectOnly: connectedReport.authenticated_select_only,
+    },
+  },
+  {
+    name: "Connected platform account data is valid",
+    passed:
+      Number(connectedReport.invalid_platforms ?? -1) === 0 &&
+      Number(connectedReport.invalid_statuses ?? -1) === 0 &&
+      Number(connectedReport.duplicate_accounts ?? -1) === 0 &&
+      Number(connectedReport.orphan_accounts ?? -1) === 0,
+    details: {
+      invalidPlatforms: connectedReport.invalid_platforms,
+      invalidStatuses: connectedReport.invalid_statuses,
+      duplicates: connectedReport.duplicate_accounts,
+      orphans: connectedReport.orphan_accounts,
+    },
+  },
 ];
 
 const passed = checks.filter((check) => check.passed).length;
@@ -301,6 +337,7 @@ const result = {
   status: score === 100 ? "healthy" : score >= 80 ? "needs_attention" : "unhealthy",
   alphaReport,
   checks,
+  connectedReport,
   discoveryReport,
   guestReport,
   networkReport,
