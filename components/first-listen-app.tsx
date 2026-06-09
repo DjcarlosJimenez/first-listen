@@ -2018,17 +2018,244 @@ function DiscoverySongCard({
   song,
   active,
   onPlay,
+  onListeningCredited,
   locale,
   topTen,
 }: {
   song: DiscoverySong;
   active: boolean;
   onPlay: () => void;
+  onListeningCredited: (
+    seconds: number,
+    becameValid: boolean,
+    becameComplete: boolean,
+    completionRate: number,
+  ) => void;
   locale: InterfaceLocale;
   topTen?: boolean;
 }) {
   const [details, setDetails] = useState<"reviews" | "statistics" | null>(null);
+  const [listenState, setListenState] = useState({
+    liveSeconds: 0,
+    verifiedSeconds: 0,
+    validRequirementSeconds: 30,
+    validListenRecorded: false,
+    warning: "",
+  });
+  const playerRef = useRef<HTMLDivElement>(null);
+  const listeningSessionRef = useRef<string | null>(null);
+  const startingSessionRef = useRef(false);
+  const heartbeatInFlightRef = useRef(false);
+  const lastHeartbeatAtRef = useRef(0);
+  const lastLiveSampleRef = useRef<{ at: number; position: number } | null>(
+    null,
+  );
+  const liveSecondsRef = useRef(0);
+  const validListenRef = useRef(false);
+  const completeListenRef = useRef(false);
+  const scrolledForPlaybackRef = useRef(false);
   const spanish = locale === "es";
+
+  const scrollPlayerIntoView = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    const root = document.documentElement;
+    const previousScrollBehavior = root.style.scrollBehavior;
+    root.style.scrollBehavior = "auto";
+    const top = window.scrollY + player.getBoundingClientRect().top - 92;
+    window.scrollTo(0, Math.max(0, top));
+    window.requestAnimationFrame(() => {
+      root.style.scrollBehavior = previousScrollBehavior;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!active) return;
+    const frame = window.requestAnimationFrame(scrollPlayerIntoView);
+    const settle = window.setTimeout(scrollPlayerIntoView, 700);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(settle);
+    };
+  }, [active, scrollPlayerIntoView]);
+
+  useEffect(() => {
+    if (active) return;
+    scrolledForPlaybackRef.current = false;
+    listeningSessionRef.current = null;
+    startingSessionRef.current = false;
+    heartbeatInFlightRef.current = false;
+    lastHeartbeatAtRef.current = 0;
+    lastLiveSampleRef.current = null;
+    liveSecondsRef.current = 0;
+    validListenRef.current = false;
+    completeListenRef.current = false;
+    setListenState({
+      liveSeconds: 0,
+      verifiedSeconds: 0,
+      validRequirementSeconds: 30,
+      validListenRecorded: false,
+      warning: "",
+    });
+  }, [active]);
+
+  const handleDiscoveryTelemetry = useCallback(
+    async (snapshot: ProviderTelemetrySnapshot) => {
+      if (!active) return;
+      if (
+        snapshot.playbackState === "playing" &&
+        !scrolledForPlaybackRef.current
+      ) {
+        scrolledForPlaybackRef.current = true;
+        window.requestAnimationFrame(scrollPlayerIntoView);
+      }
+      const sampleAt = Date.now();
+      const liveEligible =
+        snapshot.supported &&
+        snapshot.pageVisible &&
+        snapshot.pageFocused &&
+        snapshot.muted === false &&
+        (snapshot.volume ?? 0) > 0;
+      const previous = lastLiveSampleRef.current;
+      if (
+        liveEligible &&
+        snapshot.playbackState === "playing" &&
+        previous &&
+        snapshot.currentTime >= previous.position
+      ) {
+        const wallDelta = Math.max(0, (sampleAt - previous.at) / 1000);
+        const positionDelta = Math.max(
+          0,
+          snapshot.currentTime - previous.position,
+        );
+        const delta = Math.min(positionDelta, wallDelta + 1);
+        if (delta > 0 && delta <= 5) {
+          liveSecondsRef.current += delta;
+          setListenState((current) => ({
+            ...current,
+            liveSeconds: liveSecondsRef.current,
+          }));
+        }
+      }
+      lastLiveSampleRef.current =
+        liveEligible && snapshot.playbackState === "playing"
+          ? { at: sampleAt, position: snapshot.currentTime }
+          : null;
+
+      if (
+        !snapshot.supported ||
+        !["playing", "ended"].includes(snapshot.playbackState)
+      ) {
+        if (!snapshot.supported) {
+          setListenState((current) => ({
+            ...current,
+            warning: spanish
+              ? "Este proveedor no ofrece verificacion de escucha."
+              : "This provider does not expose verified listening.",
+          }));
+        }
+        return;
+      }
+
+      const supabase = createClient();
+      if (!supabase) return;
+      if (!listeningSessionRef.current && !startingSessionRef.current) {
+        startingSessionRef.current = true;
+        const { data, error } = await supabase.rpc("start_listening_session", {
+          target_song_id: song.id,
+        });
+        startingSessionRef.current = false;
+        const row = Array.isArray(data) ? data[0] : data;
+        if (error || !row?.session_id) {
+          setListenState((current) => ({
+            ...current,
+            warning:
+              error?.message ??
+              (spanish
+                ? "Esta cancion no es elegible para otra escucha verificada."
+                : "This song is not eligible for another verified listen."),
+          }));
+          return;
+        }
+        listeningSessionRef.current = String(row.session_id);
+      }
+
+      const sessionId = listeningSessionRef.current;
+      if (!sessionId || heartbeatInFlightRef.current) return;
+      const heartbeatDue =
+        snapshot.playbackState === "ended" ||
+        Date.now() - lastHeartbeatAtRef.current >= 15000;
+      if (!heartbeatDue) return;
+
+      heartbeatInFlightRef.current = true;
+      lastHeartbeatAtRef.current = Date.now();
+      const { data, error } = await supabase.rpc(
+        "record_listening_heartbeat",
+        {
+          target_session_id: sessionId,
+          playback_position_seconds: snapshot.currentTime,
+          playback_duration_seconds: snapshot.duration,
+          playback_state:
+            snapshot.playbackState === "ended"
+              ? "playing"
+              : snapshot.playbackState,
+          playback_muted: snapshot.muted,
+          playback_volume: snapshot.volume,
+          page_visible: snapshot.pageVisible,
+          page_focused: snapshot.pageFocused,
+          interaction_recent:
+            Date.now() - snapshot.lastInteractionAt <= 5 * 60 * 1000,
+        },
+      );
+      heartbeatInFlightRef.current = false;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (error || !row) {
+        setListenState((current) => ({
+          ...current,
+          warning: error?.message ?? "Listening progress could not be verified.",
+        }));
+        return;
+      }
+      const valid = Boolean(row.valid_listen_recorded);
+      const complete = Boolean(row.complete_listen_recorded);
+      const becameValid = valid && !validListenRef.current;
+      const becameComplete = complete && !completeListenRef.current;
+      validListenRef.current = valid;
+      completeListenRef.current = complete;
+      const seconds = Number(row.seconds_counted ?? 0);
+      setListenState((current) => ({
+        ...current,
+        verifiedSeconds: Number(row.session_verified_seconds ?? 0),
+        validRequirementSeconds: Number(
+          row.valid_requirement_seconds ?? current.validRequirementSeconds,
+        ),
+        validListenRecorded: valid,
+        warning: String(row.warning ?? ""),
+      }));
+      onListeningCredited(
+        seconds,
+        becameValid,
+        becameComplete,
+        snapshot.duration > 0
+          ? Math.min(100, (snapshot.currentTime / snapshot.duration) * 100)
+          : 0,
+      );
+    },
+    [active, onListeningCredited, scrollPlayerIntoView, song.id, spanish],
+  );
+
+  const togglePlayer = async () => {
+    if (active && listeningSessionRef.current) {
+      const supabase = createClient();
+      if (supabase) {
+        await supabase.rpc("finish_listening_session", {
+          target_session_id: listeningSessionRef.current,
+        });
+      }
+    }
+    if (!active) setDetails(null);
+    onPlay();
+  };
 
   return (
     <article className="discovery-song-card">
@@ -2065,7 +2292,7 @@ function DiscoverySongCard({
         </small>
       </div>
       <div className="discovery-song-actions">
-        <button className="primary-button" onClick={onPlay} type="button">
+        <button className="primary-button" onClick={() => void togglePlayer()} type="button">
           <Play size={14} fill="currentColor" />
           {active
             ? spanish
@@ -2103,16 +2330,35 @@ function DiscoverySongCard({
         </button>
       </div>
       {active && (
-        <div className="discovery-inline-player">
+        <div className="discovery-inline-player" ref={playerRef}>
           <ProviderPlayer
             artist={song.artist}
+            autoPlay
             coverUrl={song.coverUrl}
             link={song.link}
             locale={locale}
+            onReady={scrollPlayerIntoView}
+            onTelemetry={handleDiscoveryTelemetry}
             platform={song.platform}
             songLoadedAt={null}
             title={song.title}
           />
+          <div className="discovery-listen-progress" aria-live="polite">
+            <span>
+              <Headphones size={13} />
+              {spanish ? "Tiempo en vivo" : "Live"}{" "}
+              <strong>{formatClock(listenState.liveSeconds)}</strong>
+            </span>
+            <span>
+              <CheckCircle2 size={13} />
+              {listenState.validListenRecorded
+                ? spanish ? "Escucha valida" : "Valid Listen"
+                : `${formatClock(listenState.verifiedSeconds)} / ${formatClock(
+                    listenState.validRequirementSeconds,
+                  )}`}
+            </span>
+            {listenState.warning && <small>{listenState.warning}</small>}
+          </div>
         </div>
       )}
       {details && (
@@ -2160,10 +2406,17 @@ function DiscoverySections({
   spotlightSongs,
   topTenSongs,
   locale,
+  onListeningCredited,
 }: {
   spotlightSongs: DiscoverySong[];
   topTenSongs: DiscoverySong[];
   locale: InterfaceLocale;
+  onListeningCredited: (
+    seconds: number,
+    becameValid: boolean,
+    becameComplete: boolean,
+    completionRate: number,
+  ) => void;
 }) {
   const [activeSongId, setActiveSongId] = useState<string | null>(null);
   const spanish = locale === "es";
@@ -2195,6 +2448,7 @@ function DiscoverySections({
                 active={activeSongId === song.id}
                 key={`spotlight-${song.id}`}
                 locale={locale}
+                onListeningCredited={onListeningCredited}
                 onPlay={() =>
                   setActiveSongId((current) =>
                     current === song.id ? null : song.id,
@@ -2236,6 +2490,7 @@ function DiscoverySections({
                 active={activeSongId === song.id}
                 key={`top-${song.id}`}
                 locale={locale}
+                onListeningCredited={onListeningCredited}
                 onPlay={() =>
                   setActiveSongId((current) =>
                     current === song.id ? null : song.id,
@@ -2392,6 +2647,7 @@ function DashboardView({
   onClaimMission,
   communityPrograms,
   onBoostSong,
+  onListeningCredited,
 }: {
   setView: (view: View) => void;
   founder: boolean;
@@ -2413,6 +2669,12 @@ function DashboardView({
   onClaimMission: () => void;
   communityPrograms: CommunityProgram[];
   onBoostSong: (songId: string) => void;
+  onListeningCredited: (
+    seconds: number,
+    becameValid: boolean,
+    becameComplete: boolean,
+    completionRate: number,
+  ) => void;
 }) {
   const reviews = songReviews;
   if (!song) {
@@ -2433,6 +2695,7 @@ function DashboardView({
         />
         <DiscoverySections
           locale={locale}
+          onListeningCredited={onListeningCredited}
           spotlightSongs={spotlightSongs}
           topTenSongs={topTenSongs}
         />
@@ -2502,6 +2765,7 @@ function DashboardView({
         />
         <DiscoverySections
           locale={locale}
+          onListeningCredited={onListeningCredited}
           spotlightSongs={spotlightSongs}
           topTenSongs={topTenSongs}
         />
@@ -4059,6 +4323,7 @@ export function FirstListenApp({
           onClaimMission={() => void claimDailyMission()}
           communityPrograms={initialCommunityPrograms}
           onBoostSong={(songId) => void requestSongBoost(songId)}
+          onListeningCredited={handleListeningCredited}
         />
       );
     }

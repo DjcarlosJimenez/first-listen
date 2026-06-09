@@ -63,6 +63,7 @@ export function PublicEntry({ initialFounderRemaining }: { initialFounderRemaini
       founderRemaining={founderRemaining}
       locale={locale}
       onJoinWaitlist={joinWaitlist}
+      onGuest={() => router.push("/guest")}
       onLocaleChange={changeLocale}
       onLogin={() => router.push("/login")}
       onSignUp={() => router.push("/signup")}

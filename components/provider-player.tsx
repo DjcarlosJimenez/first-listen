@@ -300,6 +300,7 @@ export function ProviderPlayer({
   songLoadedAt,
   title,
   onTelemetry,
+  onReady,
   autoPlay = false,
 }: {
   artist: string;
@@ -310,10 +311,14 @@ export function ProviderPlayer({
   songLoadedAt: string | null;
   title: string;
   onTelemetry?: (snapshot: ProviderTelemetrySnapshot) => void;
+  onReady?: () => void;
   autoPlay?: boolean;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const spotifyContainerRef = useRef<HTMLDivElement>(null);
+  const youtubePlayerRef = useRef<YouTubePlayer | null>(null);
+  const spotifyControllerRef = useRef<SpotifyController | null>(null);
+  const soundCloudWidgetRef = useRef<SoundCloudWidget | null>(null);
   const [clientOrigin, setClientOrigin] = useState<string | null>(null);
   const [playerMountedAt, setPlayerMountedAt] = useState<string | null>(null);
   const embedResult = useMemo(() => {
@@ -335,7 +340,9 @@ export function ProviderPlayer({
   const [muted, setMuted] = useState<boolean | null>(null);
   const [volume, setVolume] = useState<number | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(false);
+  const [showAutoplayFallback, setShowAutoplayFallback] = useState(false);
   const onTelemetryRef = useRef(onTelemetry);
+  const onReadyRef = useRef(onReady);
   const lastInteractionAtRef = useRef(Date.now());
   const previousPlaybackStateRef = useRef<PlaybackState>("unknown");
   const spanish = locale === "es";
@@ -343,6 +350,10 @@ export function ProviderPlayer({
   useEffect(() => {
     onTelemetryRef.current = onTelemetry;
   }, [onTelemetry]);
+
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
 
   useEffect(() => {
     const markInteraction = () => {
@@ -426,7 +437,38 @@ export function ProviderPlayer({
     setIframeLoadedAt(null);
     setProviderReadyAt(null);
     setInitializationAttempt(1);
+    setShowAutoplayFallback(false);
   }, [link, platform]);
+
+  useEffect(() => {
+    if (!autoPlay || status !== "ready" || playbackState === "playing") {
+      setShowAutoplayFallback(false);
+      return;
+    }
+    if (
+      embed?.telemetry !== "youtube_iframe_api" &&
+      embed?.telemetry !== "spotify_iframe_api" &&
+      embed?.telemetry !== "soundcloud_widget_api"
+    ) {
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setShowAutoplayFallback(true);
+    }, 2500);
+    return () => window.clearTimeout(timeout);
+  }, [autoPlay, embed?.telemetry, playbackState, status]);
+
+  const requestPlayback = useCallback(() => {
+    setShowAutoplayFallback(false);
+    lastInteractionAtRef.current = Date.now();
+    try {
+      youtubePlayerRef.current?.playVideo();
+      spotifyControllerRef.current?.play();
+      soundCloudWidgetRef.current?.play();
+    } catch (error) {
+      console.info("[First Listen player] Playback request was deferred", error);
+    }
+  }, []);
 
   useEffect(() => {
     if (!clientOrigin) return;
@@ -494,6 +536,7 @@ export function ProviderPlayer({
               return;
             }
             controller = nextController;
+            spotifyControllerRef.current = nextController;
             nextController.addListener("ready", () => {
               if (disposed) return;
               const readyAt = timestamp();
@@ -501,6 +544,7 @@ export function ProviderPlayer({
               setIframeLoadedAt(readyAt);
               setProviderReadyAt(readyAt);
               setStatus("ready");
+              onReadyRef.current?.();
               emitTelemetry("cued", 0, 0, null, null, false);
               if (autoPlay) {
                 try {
@@ -560,6 +604,7 @@ export function ProviderPlayer({
 
     return () => {
       disposed = true;
+      spotifyControllerRef.current = null;
       try {
         controller?.destroy();
       } catch {
@@ -677,9 +722,11 @@ export function ProviderPlayer({
             },
             onReady: (event) => {
               if (disposed) return;
+              youtubePlayerRef.current = event.target;
               const readyAt = timestamp();
               setProviderReadyAt(readyAt);
               setStatus("ready");
+              onReadyRef.current?.();
               refreshTelemetry(event.target);
               if (autoPlay) {
                 try {
@@ -731,6 +778,7 @@ export function ProviderPlayer({
 
     return () => {
       disposed = true;
+      youtubePlayerRef.current = null;
       if (telemetryInterval !== null) window.clearInterval(telemetryInterval);
       try {
         player?.destroy();
@@ -771,6 +819,7 @@ export function ProviderPlayer({
       .then((api) => {
         if (disposed || !iframeRef.current) return;
         widget = api.Widget(iframeRef.current);
+        soundCloudWidgetRef.current = widget;
         const refreshTelemetry = () => {
           widget?.getDuration((durationMs) => {
             widget?.getPosition((positionMs) => {
@@ -804,6 +853,7 @@ export function ProviderPlayer({
           const readyAt = timestamp();
           setProviderReadyAt(readyAt);
           setStatus("ready");
+          onReadyRef.current?.();
           refreshTelemetry();
           if (autoPlay) widget?.play();
           telemetryInterval = window.setInterval(refreshTelemetry, 1000);
@@ -859,6 +909,7 @@ export function ProviderPlayer({
 
     return () => {
       disposed = true;
+      soundCloudWidgetRef.current = null;
       if (telemetryInterval !== null) window.clearInterval(telemetryInterval);
       if (widget && window.SC?.Widget.Events) {
         Object.values(window.SC.Widget.Events).forEach((event) =>
@@ -886,6 +937,7 @@ export function ProviderPlayer({
     ) {
       setProviderReadyAt(loadedAt);
       setStatus("ready");
+      onReadyRef.current?.();
       emitTelemetry(
         "unknown",
         0,
@@ -971,6 +1023,17 @@ export function ProviderPlayer({
           <a href={link} rel="noreferrer" target="_blank">
             {spanish ? `Abrir en ${platform}` : `Open on ${platform}`} <ExternalLink size={13} />
           </a>
+        </div>
+      )}
+
+      {showAutoplayFallback && (
+        <div className="provider-autoplay-fallback" role="status">
+          <strong>
+            {spanish ? "La reproduccion necesita un toque" : "Playback needs one tap"}
+          </strong>
+          <button onClick={requestPlayback} type="button">
+            {spanish ? "Toca para iniciar" : "Tap To Start Playback"}
+          </button>
         </div>
       )}
 

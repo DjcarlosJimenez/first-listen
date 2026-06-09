@@ -71,12 +71,17 @@ const { data: networkData, error: networkError } = await supabase.rpc(
   "community_network_health_report",
 );
 if (networkError) throw networkError;
+const { data: guestData, error: guestError } = await supabase.rpc(
+  "guest_experience_health_report",
+);
+if (guestError) throw guestError;
 
 const report = data ?? {};
 const listeningReport = listeningData ?? {};
 const discoveryReport = discoveryData ?? {};
 const alphaReport = alphaData ?? {};
 const networkReport = networkData ?? {};
+const guestReport = guestData ?? {};
 const requiredPlatforms = [
   "youtube",
   "spotify",
@@ -272,6 +277,21 @@ const checks = [
     passed: networkReport.realtime_enabled === true,
     details: networkReport.realtime_enabled,
   },
+  {
+    name: "Guest experience tables exist",
+    passed: Object.values(guestReport.tables ?? {}).every(Boolean),
+    details: guestReport.tables,
+  },
+  {
+    name: "Guest experience RLS is enabled",
+    passed: Object.values(guestReport.rls ?? {}).every(Boolean),
+    details: guestReport.rls,
+  },
+  {
+    name: "Guest listening has no orphan records",
+    passed: Number(guestReport.orphan_listens ?? -1) === 0,
+    details: guestReport.orphan_listens,
+  },
 ];
 
 const passed = checks.filter((check) => check.passed).length;
@@ -282,6 +302,7 @@ const result = {
   alphaReport,
   checks,
   discoveryReport,
+  guestReport,
   networkReport,
   report,
   listeningReport,

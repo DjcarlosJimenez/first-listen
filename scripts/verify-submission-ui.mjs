@@ -161,6 +161,7 @@ try {
       "--headless=new",
       `--remote-debugging-port=${browserPort}`,
       `--user-data-dir=${profileDirectory}`,
+      "--autoplay-policy=no-user-gesture-required",
       "--disable-background-networking",
       "--disable-default-apps",
       "--disable-extensions",
@@ -561,6 +562,45 @@ try {
     Boolean,
   );
   if (!inlinePlayerVisible) throw new Error("Spotlight inline player did not open.");
+  const oneClickPlayback = await waitFor(
+    `(() => {
+      const player = document.querySelector(".discovery-inline-player");
+      const card = player?.closest(".discovery-song-card");
+      const diagnostics = Object.fromEntries(
+        [...(card?.querySelectorAll(".provider-player-debug > div") ?? [])].map((row) => [
+          row.querySelector("dt")?.textContent ?? "",
+          row.querySelector("dd")?.textContent ?? ""
+        ])
+      );
+      const rect = player?.getBoundingClientRect();
+      return {
+        diagnostics,
+        progressVisible: Boolean(card?.querySelector(".discovery-listen-progress")),
+        playerRect: rect
+          ? { bottom: rect.bottom, height: rect.height, top: rect.top }
+          : null,
+        playerVisible: Boolean(rect && rect.top < window.innerHeight && rect.bottom > 0),
+        scrollY: window.scrollY,
+        viewportHeight: window.innerHeight
+      };
+    })()`,
+    (value) =>
+      value.progressVisible &&
+      value.playerVisible &&
+      value.diagnostics["Provider ready"] !== "pending" &&
+      value.diagnostics["Embed URL"]?.includes("autoplay=1") &&
+      value.diagnostics["Play state"] === "playing",
+    30000,
+  );
+  if (
+    oneClickPlayback.diagnostics["Play state"] !== "playing" ||
+    !oneClickPlayback.playerVisible ||
+    !oneClickPlayback.progressVisible
+  ) {
+    throw new Error(
+      `Spotlight one-click playback did not start: ${JSON.stringify(oneClickPlayback)}`,
+    );
+  }
   await evaluate(
     `document.querySelector(".discovery-song-card .discovery-song-actions button:first-child")?.click()`,
   );
@@ -738,6 +778,7 @@ try {
         mobile_dashboard_state: mobileDashboardState,
         post_review_spanish: spanishPostReview,
         spotlight_card_state: spotlightCardState,
+        spotlight_one_click_playback: oneClickPlayback,
         submit_another_reset: resetState,
         status: "passed",
         target: production ? "production" : "local",

@@ -15,6 +15,7 @@
     "listen:verify": "node scripts/verify-listen-to-earn.mjs",
     "discovery:verify": "node scripts/verify-discovery-community.mjs",
     "community:verify": "node scripts/verify-community-retention.mjs",
+    "guest:verify": "node scripts/verify-guest-experience.mjs",
     "db:schema:sync": "node scripts/sync-schema.mjs",
     "db:schema:check": "node scripts/sync-schema.mjs --check",
     "db:verify": "node scripts/verify-database.mjs"

@@ -30,6 +30,7 @@ type PublicLandingProps = {
   founderRemaining: number;
   locale: InterfaceLocale;
   onLocaleChange: (locale: InterfaceLocale) => void;
+  onGuest: () => void;
   onLogin: () => void;
   onSignUp: () => void;
   onJoinWaitlist: (email: string) => Promise<boolean>;
@@ -42,6 +43,7 @@ export function PublicLanding({
   founderRemaining,
   locale,
   onLocaleChange,
+  onGuest,
   onLogin,
   onSignUp,
   onJoinWaitlist,
@@ -149,6 +151,46 @@ export function PublicLanding({
                 : copy.landing.founder.closed}
             </p>
           </div>
+        </section>
+
+        <section className="landing-paths-section" aria-label="Choose how to begin">
+          <article className="landing-path-card guest-path-card">
+            <span className="eyebrow"><Headphones size={14} /> {locale === "es" ? "Explora First Listen" : "Explore First Listen"}</span>
+            <h2>{locale === "es" ? "Prueba la comunidad primero." : "Try the community first."}</h2>
+            <p>
+              {locale === "es"
+                ? "Escucha musica real, apoya creadores y explora perfiles durante 24 horas. No necesitas una cuenta."
+                : "Listen to real music, support creators, and explore profiles for 24 hours. No account required."}
+            </p>
+            <ul>
+              <li><Check size={14} /> {locale === "es" ? "Escucha sin registro" : "Listen without registering"}</li>
+              <li><Check size={14} /> {locale === "es" ? "Apoyo anonimo verificado" : "Verified anonymous support"}</li>
+              <li><Check size={14} /> {locale === "es" ? "Sin tokens ni ranking" : "No tokens or ranking"}</li>
+            </ul>
+            <button className="landing-secondary-action" onClick={onGuest}>
+              {locale === "es" ? "Continuar como invitado" : "Continue as Guest"}
+              <ArrowRight size={15} />
+            </button>
+          </article>
+
+          <article className="landing-path-card join-path-card">
+            <span className="eyebrow"><Music2 size={14} /> {locale === "es" ? "Unete gratis" : "Join Free"}</span>
+            <h2>{locale === "es" ? "Construye tu audiencia." : "Build your audience."}</h2>
+            <p>
+              {locale === "es"
+                ? "Los Artistas Fundadores reciben tres envios gratis, su insignia y acceso anticipado."
+                : "Founding Artists receive three free submissions, their badge, and early access."}
+            </p>
+            <ul>
+              <li><Check size={14} /> {locale === "es" ? "Publica tus primeras 3 canciones gratis" : "Submit your first 3 songs free"}</li>
+              <li><Check size={14} /> {locale === "es" ? "Recibe escuchas y reviews reales" : "Receive real listens and reviews"}</li>
+              <li><Check size={14} /> {locale === "es" ? "Crea relaciones con artistas" : "Build creator relationships"}</li>
+            </ul>
+            <button className="landing-primary" onClick={onSignUp}>
+              {locale === "es" ? "Crear cuenta gratis" : "Create Free Account"}
+              <ArrowRight size={15} />
+            </button>
+          </article>
         </section>
 
         <section className="landing-hero">
