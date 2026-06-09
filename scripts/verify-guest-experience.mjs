@@ -96,6 +96,19 @@ async function startGuest(anon) {
   };
 }
 
+async function trackBrowserGuest(token) {
+  if (!token) return;
+  const guest = await service
+    .from("guest_sessions")
+    .select("id")
+    .eq("access_token", token)
+    .maybeSingle();
+  assertNoError(guest.error, "Resolve browser guest fixture");
+  if (guest.data?.id && !newGuestIds.includes(guest.data.id)) {
+    newGuestIds.push(guest.data.id);
+  }
+}
+
 await loadEnvironment();
 const projectRef = process.env.SUPABASE_PROJECT_REF;
 const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
@@ -474,6 +487,9 @@ try {
     guestUi.title === expectedFirstTitle,
     `Guest queue rendered an unexpected state: ${JSON.stringify(guestUi)}`,
   );
+  await trackBrowserGuest(
+    await evaluate(`localStorage.getItem("first-listen-guest-token")`),
+  );
 
   await evaluate(`document.querySelector(".guest-listen-button")?.click()`);
   const playback = await waitFor(
@@ -528,6 +544,9 @@ try {
     (value) => value.guestPage,
   );
   assert(!mobile.overflow, `Guest mobile page overflows: ${JSON.stringify(mobile)}`);
+  await trackBrowserGuest(
+    await evaluate(`localStorage.getItem("first-listen-guest-token")`),
+  );
   record("Guest mobile layout", mobile);
 
   const hydrationErrors = browserMessages.filter((message) =>
