@@ -9,10 +9,12 @@ import type {
   CommunityProgram,
   DailyMissionStatus,
   DiscoverySong,
+  FollowedArtist,
   ListeningBankStatus,
   Review,
   Song,
   SongDashboardSummary,
+  TodaySupportSummary,
 } from "@/lib/types";
 
 type DashboardRow = {
@@ -56,6 +58,10 @@ type ListeningBankRow = {
   community_points: number;
   community_rank: string;
   valid_listens: number;
+  complete_listens: number;
+  today_valid_listens: number;
+  today_complete_listens: number;
+  today_average_completion_rate: number;
 };
 
 type DiscoveryRow = {
@@ -104,6 +110,25 @@ type CommunityRow = {
   ends_at: string;
   reward_description: string;
   entry_count: number;
+};
+
+type FollowedArtistRow = {
+  artist_id: string;
+  artist_name: string;
+  followers: number;
+  songs_submitted: number;
+  average_rating: number;
+  community_rank: string;
+};
+
+type TodaySupportRow = {
+  songs_reviewed_today: number;
+  creators_supported: number;
+  listening_seconds_today: number;
+  community_rank: string;
+  valid_listens_today: number;
+  complete_listens_today: number;
+  average_completion_rate: number;
 };
 
 function mapDiscoveryRow(row: DiscoveryRow): DiscoverySong {
@@ -161,6 +186,9 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     { data: topTenRows },
     { data: missionRows },
     { data: communityRows },
+    { data: followedArtistRows },
+    { data: previouslySupportedRows },
+    { data: todaySupportRows },
   ] = await Promise.all([
     supabase
       .from("songs")
@@ -177,6 +205,9 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     supabase.rpc("get_top_ten_songs"),
     supabase.rpc("get_daily_mission_status"),
     supabase.rpc("get_active_community_programs"),
+    supabase.rpc("get_followed_artists", { queue_limit: 8 }),
+    supabase.rpc("get_previously_supported_songs", { queue_limit: 8 }),
+    supabase.rpc("get_today_support_summary"),
   ]);
 
   const { data: reviewRows } = latestSong
@@ -280,6 +311,40 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     communityPoints: Number(listeningRow?.community_points ?? 0),
     communityRank: listeningRow?.community_rank ?? "New Member",
     validListens: Number(listeningRow?.valid_listens ?? 0),
+    completeListens: Number(listeningRow?.complete_listens ?? 0),
+    todayValidListens: Number(listeningRow?.today_valid_listens ?? 0),
+    todayCompleteListens: Number(
+      listeningRow?.today_complete_listens ?? 0,
+    ),
+    todayAverageCompletionRate: Number(
+      listeningRow?.today_average_completion_rate ?? 0,
+    ),
+  };
+
+  const followedArtists: FollowedArtist[] = (
+    (followedArtistRows ?? []) as FollowedArtistRow[]
+  ).map((artist) => ({
+    id: artist.artist_id,
+    name: artist.artist_name,
+    followers: Number(artist.followers ?? 0),
+    songsSubmitted: Number(artist.songs_submitted ?? 0),
+    averageRating: Number(artist.average_rating ?? 0),
+    communityRank: artist.community_rank ?? "New Member",
+  }));
+
+  const todaySupportRow = (
+    Array.isArray(todaySupportRows) ? todaySupportRows[0] : todaySupportRows
+  ) as TodaySupportRow | null;
+  const todaySupport: TodaySupportSummary = {
+    songsReviewed: Number(todaySupportRow?.songs_reviewed_today ?? 0),
+    creatorsSupported: Number(todaySupportRow?.creators_supported ?? 0),
+    listeningSeconds: Number(todaySupportRow?.listening_seconds_today ?? 0),
+    communityRank: todaySupportRow?.community_rank ?? "New Member",
+    validListens: Number(todaySupportRow?.valid_listens_today ?? 0),
+    completeListens: Number(todaySupportRow?.complete_listens_today ?? 0),
+    averageCompletionRate: Number(
+      todaySupportRow?.average_completion_rate ?? 0,
+    ),
   };
 
   const missionRow = (
@@ -348,6 +413,11 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
         topTenSongs: ((topTenRows ?? []) as DiscoveryRow[]).map(
           mapDiscoveryRow,
         ),
+        followedArtists,
+        previouslySupportedSongs: (
+          (previouslySupportedRows ?? []) as DiscoveryRow[]
+        ).map(mapDiscoveryRow),
+        todaySupport,
         dailyMission,
         communityPrograms,
       }}

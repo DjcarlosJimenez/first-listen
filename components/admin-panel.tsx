@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -9,6 +9,7 @@ import {
   Headphones,
   Music2,
   Rocket,
+  Search,
   ShieldCheck,
   Sparkles,
   Users,
@@ -19,8 +20,12 @@ import { createClient } from "@/lib/supabase/client";
 type AdminUser = {
   id: string;
   display_name: string;
+  email: string;
+  username: string;
   role: "super_admin" | "admin" | "moderator" | "user";
   account_status: "active" | "suspended";
+  creator_activity_status: "active" | "paused" | "archived";
+  founder_number: number | null;
   banned_at: string | null;
   warning_count: number;
   credits: number;
@@ -30,6 +35,7 @@ type AdminUser = {
 
 type AdminSong = {
   id: string;
+  user_id: string;
   title: string;
   artist_name: string;
   platform: string;
@@ -40,6 +46,9 @@ type AdminSong = {
   queue_tier: string;
   approval_status: string;
   created_at: string;
+  creator_activity_status: "active" | "paused" | "archived";
+  founder: boolean;
+  report_count: number;
 };
 
 type AdminReport = {
@@ -130,6 +139,14 @@ export function AdminPanel({
 }) {
   const [section, setSection] = useState<"users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics">(initialSection);
   const [notice, setNotice] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [userFilter, setUserFilter] = useState<
+    "all" | "active" | "paused" | "archived" | "founder" | "admin" | "moderator" | "banned"
+  >("all");
+  const [songSearch, setSongSearch] = useState("");
+  const [songFilter, setSongFilter] = useState<
+    "all" | "active" | "paused" | "archived" | "spotlight" | "founder" | "reported"
+  >("all");
   const [creditChanges, setCreditChanges] = useState<Record<string, string>>({});
   const [creditReasons, setCreditReasons] = useState<Record<string, string>>({});
   const [moderationReasons, setModerationReasons] = useState<
@@ -165,6 +182,50 @@ export function AdminPanel({
   );
   const isSuper = role === "super_admin";
   const supabase = createClient();
+  const filteredUsers = useMemo(() => {
+    const query = userSearch.trim().toLowerCase();
+    return users.filter((user) => {
+      const matchesSearch =
+        !query ||
+        user.display_name.toLowerCase().includes(query) ||
+        user.email.toLowerCase().includes(query) ||
+        user.username.toLowerCase().includes(query) ||
+        user.id.toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+      if (userFilter === "all") return true;
+      if (userFilter === "banned") return Boolean(user.banned_at);
+      if (userFilter === "founder") return user.founder_number !== null;
+      if (userFilter === "admin") {
+        return user.role === "admin" || user.role === "super_admin";
+      }
+      if (userFilter === "moderator") return user.role === "moderator";
+      return user.creator_activity_status === userFilter;
+    });
+  }, [userFilter, userSearch, users]);
+  const filteredSongs = useMemo(() => {
+    const query = songSearch.trim().toLowerCase();
+    return songs.filter((song) => {
+      const effectiveStatus = !song.is_active
+        ? "removed"
+        : song.creator_activity_status;
+      const matchesSearch =
+        !query ||
+        song.title.toLowerCase().includes(query) ||
+        song.artist_name.toLowerCase().includes(query) ||
+        song.platform.toLowerCase().includes(query) ||
+        effectiveStatus.includes(query) ||
+        song.approval_status.toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+      if (songFilter === "all") return true;
+      if (songFilter === "spotlight") return song.featured;
+      if (songFilter === "founder") return song.founder;
+      if (songFilter === "reported") return song.report_count > 0;
+      if (songFilter === "active") {
+        return song.is_active && song.creator_activity_status === "active";
+      }
+      return song.creator_activity_status === songFilter;
+    });
+  }, [songFilter, songSearch, songs]);
 
   const runRpc = async (name: string, params: Record<string, unknown>) => {
     if (!supabase) return;
@@ -220,15 +281,40 @@ export function AdminPanel({
 
           {section === "users" && (
             <>
-              <h2>Users</h2>
+              <div className="admin-section-heading">
+                <div><h2>Users</h2><span>Total Users: {statistics?.users ?? users.length}</span></div>
+                <label className="admin-search">
+                  <Search size={16} />
+                  <input
+                    aria-label="Search users"
+                    onChange={(event) => setUserSearch(event.target.value)}
+                    placeholder="Search name, email, username, or user ID"
+                    value={userSearch}
+                  />
+                </label>
+              </div>
+              <div className="admin-filter-row" aria-label="User filters">
+                {(["all", "active", "paused", "archived", "founder", "admin", "moderator", "banned"] as const).map((filter) => (
+                  <button
+                    className={userFilter === filter ? "active" : ""}
+                    key={filter}
+                    onClick={() => setUserFilter(filter)}
+                    type="button"
+                  >
+                    {filter === "all" ? "All Users" : filter.replace("_", " ")}
+                  </button>
+                ))}
+                <span>{filteredUsers.length} shown</span>
+              </div>
               <div className="admin-table">
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <article key={user.id}>
                     <div>
                       <strong>{user.display_name}</strong>
                       <small>
-                        {user.role} / {user.banned_at ? "banned" : user.account_status} /{" "}
-                        {user.warning_count} warnings
+                        {user.email || user.username || user.id} / {user.role} /{" "}
+                        {user.banned_at ? "banned" : user.account_status} /{" "}
+                        creator {user.creator_activity_status} / {user.warning_count} warnings
                       </small>
                     </div>
                     <span>{user.credits} tokens</span>
@@ -306,24 +392,51 @@ export function AdminPanel({
                     </div>
                   </article>
                 ))}
+                {!filteredUsers.length && <div className="empty-state">No users match this search.</div>}
               </div>
             </>
           )}
 
           {section === "songs" && (
             <>
-              <h2>Songs</h2>
+              <div className="admin-section-heading">
+                <div><h2>Songs</h2><span>Total Songs: {statistics?.songs ?? songs.length}</span></div>
+                <label className="admin-search">
+                  <Search size={16} />
+                  <input
+                    aria-label="Search songs"
+                    onChange={(event) => setSongSearch(event.target.value)}
+                    placeholder="Search title, artist, platform, or status"
+                    value={songSearch}
+                  />
+                </label>
+              </div>
+              <div className="admin-filter-row" aria-label="Song filters">
+                {(["all", "active", "paused", "archived", "spotlight", "founder", "reported"] as const).map((filter) => (
+                  <button
+                    className={songFilter === filter ? "active" : ""}
+                    key={filter}
+                    onClick={() => setSongFilter(filter)}
+                    type="button"
+                  >
+                    {filter === "all" ? "All Songs" : filter}
+                  </button>
+                ))}
+                <span>{filteredSongs.length} shown</span>
+              </div>
               <div className="admin-table">
-                {songs.map((song) => (
+                {filteredSongs.map((song) => (
                   <article key={song.id}>
                     <div><strong>{song.title}</strong><small>{song.artist_name} / {song.platform}</small></div>
                     <span>
                       {song.approval_status === "pending"
-                        ? "Pending long-form approval"
+                          ? "Pending long-form approval"
                         : song.is_active
-                          ? "Active"
+                          ? song.creator_activity_status
                           : "Removed"}
                       {song.featured ? " / Spotlight" : ""}
+                      {song.founder ? " / Founder" : ""}
+                      {song.report_count ? ` / ${song.report_count} reports` : ""}
                       {song.content_duration_seconds
                         ? ` / ${Math.floor(song.content_duration_seconds / 60)}:${String(
                             song.content_duration_seconds % 60,
@@ -368,6 +481,7 @@ export function AdminPanel({
                     </div>
                   </article>
                 ))}
+                {!filteredSongs.length && <div className="empty-state">No songs match this search.</div>}
               </div>
             </>
           )}

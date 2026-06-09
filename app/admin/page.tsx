@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AdminPanel } from "@/components/admin-panel";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,9 @@ export async function AdminPageContent({
   if (!profile || !allowedRoles.includes(profile.role)) {
     redirect("/dashboard");
   }
+  await supabase.rpc("refresh_creator_activity_status", {
+    target_user_id: null,
+  });
   const effectiveInitialSection =
     profile.role === "super_admin"
       ? initialSection
@@ -49,14 +53,14 @@ export async function AdminPageContent({
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, display_name, role, account_status, banned_at, warning_count, credits, completed_reviews, created_at")
+      .select("id, display_name, role, account_status, creator_activity_status, founder_number, banned_at, warning_count, credits, completed_reviews, created_at")
       .order("created_at", { ascending: false })
-      .limit(250),
+      .limit(1000),
     supabase
       .from("songs")
-      .select("id, title, artist_name, platform, is_active, featured, content_kind, content_duration_seconds, queue_tier, approval_status, created_at")
+      .select("id, user_id, title, artist_name, platform, is_active, featured, content_kind, content_duration_seconds, queue_tier, approval_status, created_at")
       .order("created_at", { ascending: false })
-      .limit(250),
+      .limit(1000),
     supabase
       .from("review_comment_reports")
       .select(
@@ -66,7 +70,7 @@ export async function AdminPageContent({
       .limit(250),
     supabase
       .from("song_reports")
-      .select("id, reason, status, details, created_at, songs(title, artist_name)")
+      .select("id, song_id, reason, status, details, created_at, songs(title, artist_name)")
       .order("created_at", { ascending: false })
       .limit(250),
     profile.role === "moderator"
@@ -90,6 +94,56 @@ export async function AdminPageContent({
       .limit(100),
   ]);
 
+  let authUsers: Array<{
+    id: string;
+    email?: string;
+    user_metadata?: Record<string, unknown>;
+  }> = [];
+  try {
+    const adminClient = createAdminClient();
+    const { data } = await adminClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    authUsers = data.users;
+  } catch {
+    authUsers = [];
+  }
+  const authById = new Map(authUsers.map((authUser) => [authUser.id, authUser]));
+  const profileById = new Map(
+    (users ?? []).map((listedProfile) => [listedProfile.id, listedProfile]),
+  );
+  const reportCountBySong = new Map<string, number>();
+  for (const report of reports ?? []) {
+    reportCountBySong.set(
+      report.song_id,
+      (reportCountBySong.get(report.song_id) ?? 0) + 1,
+    );
+  }
+  const enrichedUsers = (users ?? []).map((listedProfile) => {
+    const authUser = authById.get(listedProfile.id);
+    const email = authUser?.email ?? "";
+    const metadataUsername =
+      typeof authUser?.user_metadata?.username === "string"
+        ? authUser.user_metadata.username
+        : "";
+    return {
+      ...listedProfile,
+      email,
+      username: metadataUsername || email.split("@")[0] || "",
+    };
+  });
+  const enrichedSongs = (songs ?? []).map((song) => {
+    const owner = profileById.get(song.user_id);
+    return {
+      ...song,
+      creator_activity_status:
+        owner?.creator_activity_status ?? "active",
+      founder: owner?.founder_number !== null && owner?.founder_number !== undefined,
+      report_count: reportCountBySong.get(song.id) ?? 0,
+    };
+  });
+
   return (
     <AdminPanel
       initialSection={effectiveInitialSection as "users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics"}
@@ -103,7 +157,7 @@ export async function AdminPageContent({
       spotlightSlots={(spotlightSlots ?? []) as never}
       boosts={(boosts ?? []) as never}
       role={profile.role}
-      songs={songs ?? []}
+      songs={enrichedSongs}
       statistics={(statistics as {
         users: number;
         songs: number;
@@ -112,7 +166,7 @@ export async function AdminPageContent({
         reviews: number;
         listening_minutes?: number;
       } | null) ?? null}
-      users={users ?? []}
+      users={enrichedUsers}
     />
   );
 }

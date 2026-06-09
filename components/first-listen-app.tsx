@@ -40,6 +40,7 @@ import {
   ThumbsUp,
   UserRound,
   UserPlus,
+  Users,
   Radio,
   Trophy,
   X,
@@ -85,11 +86,13 @@ import type {
   CommunityProgram,
   DailyMissionStatus,
   DiscoverySong,
+  FollowedArtist,
   ListeningBankStatus,
   Platform,
   Review,
   Song,
   SongDashboardSummary,
+  TodaySupportSummary,
 } from "@/lib/types";
 
 export type View = "review" | "dashboard" | "submit";
@@ -123,6 +126,7 @@ type ListeningSessionUi = {
   heartbeatIntervalSeconds: number;
   interactionGraceSeconds: number;
   validListenRecorded: boolean;
+  completeListenRecorded: boolean;
   validRequirementSeconds: number;
   playbackDurationSeconds: number;
   warning: string;
@@ -639,6 +643,141 @@ function PostReviewDiscovery({
   );
 }
 
+function EmptyQueueRetention({
+  spotlightSongs,
+  topTenSongs,
+  followedArtists,
+  previouslySupportedSongs,
+  todaySupport,
+  locale,
+  onSubmit,
+}: {
+  spotlightSongs: DiscoverySong[];
+  topTenSongs: DiscoverySong[];
+  followedArtists: FollowedArtist[];
+  previouslySupportedSongs: DiscoverySong[];
+  todaySupport: TodaySupportSummary;
+  locale: InterfaceLocale;
+  onSubmit: () => void;
+}) {
+  const spanish = locale === "es";
+  const featuredArtists = Array.from(
+    new Map(
+      [...spotlightSongs, ...topTenSongs].map((song) => [
+        song.artistId,
+        { id: song.artistId, name: song.artist, genre: song.genre },
+      ]),
+    ).values(),
+  ).slice(0, 6);
+
+  return (
+    <main className="content queue-retention">
+      <section className="review-complete-card queue-retention-hero">
+        <div className="success-orbit"><CheckCircle2 size={34} /></div>
+        <span className="eyebrow">
+          {spanish ? "Apoyo completado" : "Community support complete"}
+        </span>
+        <h2>{spanish ? "Estas al dia" : "You’re All Caught Up"}</h2>
+        <p>
+          {spanish
+            ? "Has apoyado a cada creador disponible actualmente en tu cola."
+            : "You have supported every available creator currently in the queue."}
+        </p>
+        <button className="primary-button" onClick={onSubmit}>
+          {spanish ? "Enviar una cancion" : "Submit a Song"} <ArrowRight size={17} />
+        </button>
+      </section>
+
+      <section className="queue-retention-stats" aria-label={spanish ? "Estadisticas de hoy" : "Today’s support"}>
+        <div><strong>{todaySupport.songsReviewed}</strong><span>{spanish ? "Canciones revisadas hoy" : "Songs Reviewed Today"}</span></div>
+        <div><strong>{todaySupport.creatorsSupported}</strong><span>{spanish ? "Creadores apoyados" : "Creators Supported"}</span></div>
+        <div><strong>{formatDuration(todaySupport.listeningSeconds)}</strong><span>{spanish ? "Tiempo de escucha ganado" : "Listening Time Earned"}</span></div>
+        <div><strong>{todaySupport.communityRank}</strong><span>{spanish ? "Rango comunitario" : "Current Community Rank"}</span></div>
+      </section>
+
+      <section className="queue-retention-support panel">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow"><Headphones size={13} /> {spanish ? "Apoyo de hoy" : "Today’s Support"}</span>
+            <h3>{spanish ? "Escucha justa y verificable" : "Fair, verifiable listening"}</h3>
+          </div>
+        </div>
+        <div className="queue-retention-stats compact">
+          <div><strong>{todaySupport.validListens}</strong><span>{spanish ? "Escuchas validas" : "Valid Listens"}</span></div>
+          <div><strong>{todaySupport.completeListens}</strong><span>{spanish ? "Escuchas completas" : "Complete Listens"}</span></div>
+          <div><strong>{Math.round(todaySupport.averageCompletionRate)}%</strong><span>{spanish ? "Finalizacion promedio" : "Average Completion Rate"}</span></div>
+        </div>
+      </section>
+
+      <section className="queue-retention-grid">
+        <div className="panel queue-retention-panel">
+          <div className="panel-heading">
+            <div><span className="eyebrow"><Sparkles size={13} /> {spanish ? "Artistas destacados" : "Featured Artists"}</span><h3>{spanish ? "Descubre creadores activos" : "Discover active creators"}</h3></div>
+          </div>
+          <div className="retention-link-list">
+            {featuredArtists.map((artist) => (
+              <Link href={`/artists/${artist.id}`} key={artist.id}>
+                <span className="retention-avatar">{artist.name.slice(0, 2).toUpperCase()}</span>
+                <span><strong>{artist.name}</strong><small>{optionLabel(locale, artist.genre)}</small></span>
+                <ArrowRight size={14} />
+              </Link>
+            ))}
+            {!featuredArtists.length && <p className="discovery-empty">{spanish ? "Los artistas destacados apareceran aqui." : "Featured artists will appear here."}</p>}
+          </div>
+        </div>
+
+        <div className="panel queue-retention-panel">
+          <div className="panel-heading">
+            <div><span className="eyebrow"><Users size={13} /> {spanish ? "Artistas que sigues" : "Artists You Follow"}</span><h3>{spanish ? "Vuelve a sus perfiles" : "Reconnect with their music"}</h3></div>
+          </div>
+          <div className="retention-link-list">
+            {followedArtists.map((artist) => (
+              <Link href={`/artists/${artist.id}`} key={artist.id}>
+                <span className="retention-avatar">{artist.name.slice(0, 2).toUpperCase()}</span>
+                <span><strong>{artist.name}</strong><small>{artist.followers} {spanish ? "seguidores" : "followers"} / {artist.communityRank}</small></span>
+                <ArrowRight size={14} />
+              </Link>
+            ))}
+            {!followedArtists.length && <p className="discovery-empty">{spanish ? "Sigue artistas para encontrarlos aqui." : "Follow artists to find them here."}</p>}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel queue-retention-panel">
+        <div className="panel-heading">
+          <div><span className="eyebrow"><Trophy size={13} /> {spanish ? "Canciones principales" : "Top Songs"}</span><h3>{spanish ? "Ganado por resultados" : "Earned by listener response"}</h3></div>
+        </div>
+        <div className="retention-song-grid">
+          {topTenSongs.slice(0, 4).map((song) => (
+            <a href={song.link} key={song.id} rel="noreferrer" target="_blank">
+              <Image alt="" height={64} src={song.coverUrl} unoptimized width={64} />
+              <span><strong>{song.title}</strong><small>{song.artist} / Hook {song.hookScore}</small></span>
+              <ExternalLink size={14} />
+            </a>
+          ))}
+          {!topTenSongs.length && <p className="discovery-empty">{spanish ? "El ranking aparecera cuando haya suficientes reviews." : "Rankings will appear after enough verified reviews."}</p>}
+        </div>
+      </section>
+
+      <section className="panel queue-retention-panel">
+        <div className="panel-heading">
+          <div><span className="eyebrow"><ListMusic size={13} /> {spanish ? "Canciones apoyadas antes" : "Previously Supported Songs"}</span><h3>{spanish ? "Escucha otra vez sin ganar recompensas duplicadas" : "Listen again without duplicate rewards"}</h3></div>
+        </div>
+        <div className="retention-song-grid">
+          {previouslySupportedSongs.map((song) => (
+            <a href={song.link} key={song.id} rel="noreferrer" target="_blank">
+              <Image alt="" height={64} src={song.coverUrl} unoptimized width={64} />
+              <span><strong>{song.title}</strong><small>{song.artist} / {song.platform}</small></span>
+              <ExternalLink size={14} />
+            </a>
+          ))}
+          {!previouslySupportedSongs.length && <p className="discovery-empty">{spanish ? "Tus canciones apoyadas apareceran aqui." : "Songs you support will appear here."}</p>}
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function ReviewView({
   reviewCount,
   onReviewed,
@@ -656,6 +795,12 @@ function ReviewView({
   approvedListeningSeconds,
   onListeningCredited,
   onAdvanceSong,
+  queueLoading,
+  spotlightSongs,
+  topTenSongs,
+  followedArtists,
+  previouslySupportedSongs,
+  todaySupport,
 }: {
   reviewCount: number;
   onReviewed: (
@@ -677,8 +822,19 @@ function ReviewView({
   queueSongs: Song[];
   unlimitedCredits: boolean;
   approvedListeningSeconds: number;
-  onListeningCredited: (seconds: number, becameValid: boolean) => void;
+  onListeningCredited: (
+    seconds: number,
+    becameValid: boolean,
+    becameComplete: boolean,
+    completionRate: number,
+  ) => void;
   onAdvanceSong: (songId: string) => Promise<void>;
+  queueLoading: boolean;
+  spotlightSongs: DiscoverySong[];
+  topTenSongs: DiscoverySong[];
+  followedArtists: FollowedArtist[];
+  previouslySupportedSongs: DiscoverySong[];
+  todaySupport: TodaySupportSummary;
 }) {
   const reviewerProfile = useMemo(
     () => ({ languages: listenerLanguages, genrePreferences, activityScore }),
@@ -710,6 +866,7 @@ function ReviewView({
       heartbeatIntervalSeconds: 15,
       interactionGraceSeconds: 300,
       validListenRecorded: false,
+      completeListenRecorded: false,
       validRequirementSeconds: 30,
       playbackDurationSeconds: 0,
       warning: "",
@@ -722,6 +879,7 @@ function ReviewView({
   const interactionGraceRef = useRef(300);
   const latestTelemetryRef = useRef<ProviderTelemetrySnapshot | null>(null);
   const validListenRef = useRef(false);
+  const completeListenRef = useRef(false);
 
   useEffect(() => {
     setForm(emptyReview);
@@ -736,6 +894,7 @@ function ReviewView({
     interactionGraceRef.current = 300;
     latestTelemetryRef.current = null;
     validListenRef.current = false;
+    completeListenRef.current = false;
     setListeningSession({
       sessionId: null,
       earningEligible: null,
@@ -744,6 +903,7 @@ function ReviewView({
       heartbeatIntervalSeconds: 15,
       interactionGraceSeconds: 300,
       validListenRecorded: false,
+      completeListenRecorded: false,
       validRequirementSeconds: 30,
       playbackDurationSeconds: 0,
       warning: "",
@@ -814,6 +974,7 @@ function ReviewView({
           heartbeatIntervalSeconds: heartbeatIntervalRef.current,
           interactionGraceSeconds: interactionGraceRef.current,
           validListenRecorded: false,
+          completeListenRecorded: false,
           validRequirementSeconds: calculatedRequirement,
           playbackDurationSeconds: snapshot.duration,
           warning: result.earning_eligible
@@ -862,15 +1023,22 @@ function ReviewView({
         return;
       }
       const validListenRecorded = Boolean(result.valid_listen_recorded);
+      const completeListenRecorded = Boolean(
+        result.complete_listen_recorded,
+      );
       const becameValid =
         validListenRecorded && !validListenRef.current;
+      const becameComplete =
+        completeListenRecorded && !completeListenRef.current;
       validListenRef.current = validListenRecorded;
+      completeListenRef.current = completeListenRecorded;
       const secondsCounted = Number(result.seconds_counted ?? 0);
       setListeningSession((current) => ({
         ...current,
         verifiedSeconds: Number(result.session_verified_seconds ?? 0),
         dailySecondsRemaining: Number(result.daily_seconds_remaining ?? 0),
         validListenRecorded,
+        completeListenRecorded,
         validRequirementSeconds: Number(
           result.valid_requirement_seconds ?? current.validRequirementSeconds,
         ),
@@ -880,8 +1048,15 @@ function ReviewView({
         ),
         warning: result.warning ?? "",
       }));
-      if (secondsCounted > 0 || becameValid) {
-        onListeningCredited(secondsCounted, becameValid);
+      if (secondsCounted > 0 || becameValid || becameComplete) {
+        onListeningCredited(
+          secondsCounted,
+          becameValid,
+          becameComplete,
+          snapshot.duration > 0
+            ? Math.min(100, (snapshot.currentTime / snapshot.duration) * 100)
+            : 0,
+        );
       }
     },
     [locale, onListeningCredited, song],
@@ -980,25 +1155,28 @@ function ReviewView({
   };
 
   if (!song) {
+    if (queueLoading) {
+      return (
+        <main className="content review-complete-wrap">
+          <section className="review-complete-card">
+            <div className="success-orbit"><Headphones size={34} /></div>
+            <span className="eyebrow">{locale === "es" ? "Preparando cola" : "Preparing queue"}</span>
+            <h2>{locale === "es" ? "Buscando la mejor coincidencia..." : "Finding the best match..."}</h2>
+            <p>{locale === "es" ? "Estamos comparando idioma, genero y equidad de cola." : "We’re matching language, genre, and queue fairness."}</p>
+          </section>
+        </main>
+      );
+    }
     return (
-      <main className="content review-complete-wrap">
-        <section className="review-complete-card">
-          <div className="success-orbit"><Headphones size={34} /></div>
-          <span className="eyebrow">{locale === "es" ? "Cola limpia" : "Queue clear"}</span>
-          <h2>{locale === "es" ? "No hay canciones compatibles por ahora." : "No matched songs are waiting right now."}</h2>
-          <p>
-            {locale === "es"
-              ? "Puedes enviar tu cancion Founder o volver pronto para revisar nuevas canciones."
-              : "You can submit your Founder song or come back soon to review new tracks."}
-          </p>
-          <button className="primary-button" onClick={() => setView("submit")}>
-            {copy.app.review.submitSong} <ArrowRight size={17} />
-          </button>
-        </section>
-        <aside className="review-side">
-          <ReviewProgress count={reviewCount} copy={copy} founderFree={founderFree} unlimited={unlimitedCredits} />
-        </aside>
-      </main>
+      <EmptyQueueRetention
+        followedArtists={followedArtists}
+        locale={locale}
+        onSubmit={() => setView("submit")}
+        previouslySupportedSongs={previouslySupportedSongs}
+        spotlightSongs={spotlightSongs}
+        todaySupport={todaySupport}
+        topTenSongs={topTenSongs}
+      />
     );
   }
 
@@ -1412,9 +1590,16 @@ function ListeningBankPanel({
         </div>
         <div><strong>{credits}</strong><span>{spanish ? "Tokens disponibles" : "Available Tokens"}</span></div>
         <div><strong>{status.validListens}</strong><span>{spanish ? "Escuchas válidas" : "Valid Listens"}</span></div>
+        <div><strong>{status.completeListens}</strong><span>{spanish ? "Escuchas completas" : "Complete Listens"}</span></div>
         <div><strong>{formatDuration(status.weeklySeconds)}</strong><span>{spanish ? "Escucha verificada semanal" : "Weekly Verified Listening"}</span></div>
         <div><strong>{formatDuration(status.monthlySeconds)}</strong><span>{spanish ? "Escucha verificada mensual" : "Monthly Verified Listening"}</span></div>
         <div><strong>{formatDuration(status.lifetimeSeconds)}</strong><span>{spanish ? "Escucha total" : "Lifetime Listening"}</span></div>
+      </div>
+      <div className="today-support-strip">
+        <span>{spanish ? "Apoyo de hoy" : "Today’s Support"}</span>
+        <strong>{status.todayValidListens} {spanish ? "validas" : "valid"}</strong>
+        <strong>{status.todayCompleteListens} {spanish ? "completas" : "complete"}</strong>
+        <strong>{Math.round(status.todayAverageCompletionRate)}% {spanish ? "promedio" : "average completion"}</strong>
       </div>
       <div className="listening-bank-progress">
         <div>
@@ -2849,6 +3034,9 @@ type FirstListenAppProps = {
   initialListeningBank: ListeningBankStatus;
   initialSpotlightSongs: DiscoverySong[];
   initialTopTenSongs: DiscoverySong[];
+  initialFollowedArtists: FollowedArtist[];
+  initialPreviouslySupportedSongs: DiscoverySong[];
+  initialTodaySupport: TodaySupportSummary;
   initialDailyMission: DailyMissionStatus | null;
   initialCommunityPrograms: CommunityProgram[];
   role: "super_admin" | "admin" | "moderator" | "user";
@@ -2873,6 +3061,9 @@ export function FirstListenApp({
   initialListeningBank,
   initialSpotlightSongs,
   initialTopTenSongs,
+  initialFollowedArtists,
+  initialPreviouslySupportedSongs,
+  initialTodaySupport,
   initialDailyMission,
   initialCommunityPrograms,
   role,
@@ -2890,6 +3081,8 @@ export function FirstListenApp({
   ]);
   const [listeningBank, setListeningBank] =
     useState<ListeningBankStatus>(initialListeningBank);
+  const [todaySupport, setTodaySupport] =
+    useState<TodaySupportSummary>(initialTodaySupport);
   const [claimingReward, setClaimingReward] = useState(false);
   const [claimingMission, setClaimingMission] = useState(false);
   const [dailyMission, setDailyMission] =
@@ -2908,6 +3101,7 @@ export function FirstListenApp({
   const [languages] = useState<ListenerLanguage[]>(listenerLanguages);
   const [genres] = useState<Genre[]>(genrePreferences);
   const [queueSongs, setQueueSongs] = useState<Song[]>([]);
+  const [queueLoading, setQueueLoading] = useState(true);
 
   useEffect(() => {
     setView(initialView);
@@ -2930,8 +3124,9 @@ export function FirstListenApp({
 
     let active = true;
     supabase.rpc("get_smart_review_queue", { queue_limit: 20 }).then(({ data, error }) => {
-      if (!active || error || !data) return;
-      setQueueSongs(mapQueueRows(data));
+      if (!active) return;
+      if (!error && data) setQueueSongs(mapQueueRows(data));
+      setQueueLoading(false);
     });
 
     return () => {
@@ -3037,6 +3232,35 @@ export function FirstListenApp({
           listeningStatus.community_rank ?? "New Member",
         ),
         validListens: Number(listeningStatus.valid_listens ?? 0),
+        completeListens: Number(listeningStatus.complete_listens ?? 0),
+        todayValidListens: Number(
+          listeningStatus.today_valid_listens ?? 0,
+        ),
+        todayCompleteListens: Number(
+          listeningStatus.today_complete_listens ?? 0,
+        ),
+        todayAverageCompletionRate: Number(
+          listeningStatus.today_average_completion_rate ?? 0,
+        ),
+      });
+    }
+    const { data: todaySupportRows } = await supabase.rpc(
+      "get_today_support_summary",
+    );
+    const support = Array.isArray(todaySupportRows)
+      ? todaySupportRows[0]
+      : todaySupportRows;
+    if (support) {
+      setTodaySupport({
+        songsReviewed: Number(support.songs_reviewed_today ?? 0),
+        creatorsSupported: Number(support.creators_supported ?? 0),
+        listeningSeconds: Number(support.listening_seconds_today ?? 0),
+        communityRank: String(support.community_rank ?? "New Member"),
+        validListens: Number(support.valid_listens_today ?? 0),
+        completeListens: Number(support.complete_listens_today ?? 0),
+        averageCompletionRate: Number(
+          support.average_completion_rate ?? 0,
+        ),
       });
     }
     const { data: currentProfile } = await supabase
@@ -3092,8 +3316,13 @@ export function FirstListenApp({
   };
 
   const handleListeningCredited = useCallback(
-    (seconds: number, becameValid: boolean) => {
-      if (seconds <= 0 && !becameValid) return;
+    (
+      seconds: number,
+      becameValid: boolean,
+      becameComplete: boolean,
+      completionRate: number,
+    ) => {
+      if (seconds <= 0 && !becameValid && !becameComplete) return;
       setListeningBank((current) => {
         const bankSeconds = current.bankSeconds + Math.max(0, seconds);
         const exchangeSeconds = current.minutesPerCredit * 60;
@@ -3114,8 +3343,29 @@ export function FirstListenApp({
           communityPoints:
             current.communityPoints + (becameValid ? 1 : 0),
           validListens: current.validListens + (becameValid ? 1 : 0),
+          completeListens:
+            current.completeListens + (becameComplete ? 1 : 0),
+          todayValidListens:
+            current.todayValidListens + (becameValid ? 1 : 0),
+          todayCompleteListens:
+            current.todayCompleteListens + (becameComplete ? 1 : 0),
+          todayAverageCompletionRate: Math.max(
+            current.todayAverageCompletionRate,
+            completionRate,
+          ),
         };
       });
+      setTodaySupport((current) => ({
+        ...current,
+        listeningSeconds: current.listeningSeconds + Math.max(0, seconds),
+        validListens: current.validListens + (becameValid ? 1 : 0),
+        completeListens:
+          current.completeListens + (becameComplete ? 1 : 0),
+        averageCompletionRate: Math.max(
+          current.averageCompletionRate,
+          completionRate,
+        ),
+      }));
     },
     [],
   );
@@ -3126,10 +3376,12 @@ export function FirstListenApp({
     if (!needsRefill) return;
     const supabase = createClient();
     if (!supabase) return;
+    setQueueLoading(true);
     const { data } = await supabase.rpc("get_smart_review_queue", {
       queue_limit: 20,
     });
     if (data) setQueueSongs(mapQueueRows(data));
+    setQueueLoading(false);
   };
 
   const claimListeningReward = async () => {
@@ -3351,6 +3603,12 @@ export function FirstListenApp({
         approvedListeningSeconds={listeningBank.bankSeconds}
         onListeningCredited={handleListeningCredited}
         onAdvanceSong={advanceReviewQueue}
+        queueLoading={queueLoading}
+        spotlightSongs={initialSpotlightSongs}
+        topTenSongs={initialTopTenSongs}
+        followedArtists={initialFollowedArtists}
+        previouslySupportedSongs={initialPreviouslySupportedSongs}
+        todaySupport={todaySupport}
       />
     );
   })();

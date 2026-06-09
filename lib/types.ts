@@ -90,6 +90,10 @@ export type ListeningBankStatus = {
   communityPoints: number;
   communityRank: string;
   validListens: number;
+  completeListens: number;
+  todayValidListens: number;
+  todayCompleteListens: number;
+  todayAverageCompletionRate: number;
 };
 
 export type ListenerImpact = {
@@ -121,6 +125,25 @@ export type DiscoverySong = {
   badge?: string;
   position?: number;
   rankingScore?: number;
+};
+
+export type FollowedArtist = {
+  id: string;
+  name: string;
+  followers: number;
+  songsSubmitted: number;
+  averageRating: number;
+  communityRank: string;
+};
+
+export type TodaySupportSummary = {
+  songsReviewed: number;
+  creatorsSupported: number;
+  listeningSeconds: number;
+  communityRank: string;
+  validListens: number;
+  completeListens: number;
+  averageCompletionRate: number;
 };
 
 export type DailyMissionStatus = {

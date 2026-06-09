@@ -11,10 +11,12 @@ import type {
   CommunityProgram,
   DailyMissionStatus,
   DiscoverySong,
+  FollowedArtist,
   ListeningBankStatus,
   Review,
   Song,
   SongDashboardSummary,
+  TodaySupportSummary,
 } from "@/lib/types";
 
 type ProfileSeed = {
@@ -35,6 +37,9 @@ type ProfileSeed = {
   listeningBank: ListeningBankStatus;
   spotlightSongs: DiscoverySong[];
   topTenSongs: DiscoverySong[];
+  followedArtists: FollowedArtist[];
+  previouslySupportedSongs: DiscoverySong[];
+  todaySupport: TodaySupportSummary;
   dailyMission: DailyMissionStatus | null;
   communityPrograms: CommunityProgram[];
 };
@@ -110,6 +115,9 @@ export function ProtectedAppEntry({
       initialListeningBank={profile.listeningBank}
       initialSpotlightSongs={profile.spotlightSongs}
       initialTopTenSongs={profile.topTenSongs}
+      initialFollowedArtists={profile.followedArtists}
+      initialPreviouslySupportedSongs={profile.previouslySupportedSongs}
+      initialTodaySupport={profile.todaySupport}
       initialDailyMission={profile.dailyMission}
       initialCommunityPrograms={profile.communityPrograms}
       initialView={initialView}

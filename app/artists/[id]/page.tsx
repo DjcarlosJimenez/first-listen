@@ -17,6 +17,10 @@ type PublicArtistRow = {
   is_following: boolean;
   average_rating: number;
   listening_hours_received: number;
+  valid_listens_received: number;
+  complete_listens_received: number;
+  community_rank: string;
+  activity_status: "active" | "paused" | "archived";
 };
 
 type PublicArtistSongRow = {
@@ -65,6 +69,14 @@ export default async function ArtistPage({
         listeningHoursReceived: Number(
           artist.listening_hours_received ?? 0,
         ),
+        validListensReceived: Number(
+          artist.valid_listens_received ?? 0,
+        ),
+        completeListensReceived: Number(
+          artist.complete_listens_received ?? 0,
+        ),
+        communityRank: artist.community_rank ?? "New Member",
+        activityStatus: artist.activity_status ?? "active",
       }}
       songs={((songRows ?? []) as PublicArtistSongRow[]).map((song) => ({
         id: song.song_id,

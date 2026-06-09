@@ -15,6 +15,7 @@ import {
   Music2,
   Radio,
   Star,
+  Trophy,
   UserPlus,
   Users,
   Youtube,
@@ -34,6 +35,10 @@ type PublicArtist = {
   isFollowing: boolean;
   averageRating: number;
   listeningHoursReceived: number;
+  validListensReceived: number;
+  completeListensReceived: number;
+  communityRank: string;
+  activityStatus: "active" | "paused" | "archived";
 };
 
 type PublicSong = {
@@ -122,11 +127,21 @@ export function PublicArtistProfile({
         <div>
           <span className="eyebrow">Public artist profile</span>
           <h1>{artist.name}</h1>
+          <span className={`artist-activity-badge ${artist.activityStatus}`}>
+            {artist.activityStatus === "active"
+              ? "Active creator"
+              : artist.activityStatus === "paused"
+                ? "Paused creator"
+                : "Archived creator"}
+          </span>
           <div className="artist-profile-stats">
             <span><Users size={14} /> {followerCount} followers</span>
             <span><Music2 size={14} /> {artist.songsSubmitted} songs submitted</span>
             <span><Star size={14} /> {artist.averageRating.toFixed(1)} average rating</span>
             <span><Headphones size={14} /> {artist.listeningHoursReceived.toFixed(1)} listening hours received</span>
+            <span><Radio size={14} /> {artist.validListensReceived} valid listens received</span>
+            <span><Disc3 size={14} /> {artist.completeListensReceived} complete listens</span>
+            <span><Trophy size={14} /> {artist.communityRank}</span>
           </div>
           <div className="artist-profile-tags">
             {artist.genres.map((genre) => <span key={genre}>{genre}</span>)}
