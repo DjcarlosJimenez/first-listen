@@ -335,6 +335,47 @@ try {
   }
 
   await navigate(`${baseUrl}/dashboard?debug=1`);
+  const listeningBankState = await evaluate(`(() => ({
+    claimDisabled: document.querySelector(".listening-claim-button")?.disabled,
+    exists: Boolean(document.querySelector(".listening-bank-panel")),
+    text: document.querySelector(".listening-bank-panel")?.innerText ?? ""
+  }))()`);
+  if (
+    !listeningBankState.exists ||
+    listeningBankState.claimDisabled !== true ||
+    !listeningBankState.text.toLowerCase().includes("listening bank") ||
+    !listeningBankState.text.toLowerCase().includes("explorer")
+  ) {
+    throw new Error(
+      `Listening Bank dashboard state is incorrect: ${JSON.stringify(listeningBankState)}`,
+    );
+  }
+
+  await command("Emulation.setDeviceMetricsOverride", {
+    deviceScaleFactor: 1,
+    height: 844,
+    mobile: true,
+    screenHeight: 844,
+    screenWidth: 390,
+    width: 390,
+  });
+  await navigate(`${baseUrl}/dashboard?debug=1`);
+  const mobileDashboardState = await evaluate(`(() => ({
+    bankVisible: Boolean(document.querySelector(".listening-bank-panel")),
+    hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+    viewportWidth: window.innerWidth
+  }))()`);
+  if (
+    !mobileDashboardState.bankVisible ||
+    mobileDashboardState.hasHorizontalOverflow
+  ) {
+    throw new Error(
+      `Mobile Listening Bank layout is incorrect: ${JSON.stringify(mobileDashboardState)}`,
+    );
+  }
+  await command("Emulation.clearDeviceMetricsOverride");
+  await navigate(`${baseUrl}/dashboard?debug=1`);
+
   const routeTransitionResults = [];
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const navigationStartedAt = Date.now();
@@ -413,6 +454,8 @@ try {
         route_transition_results: routeTransitionResults,
         runtime_message_count: browserMessages.length,
         hydration_messages: hydrationMessages,
+        listening_bank_state: listeningBankState,
+        mobile_dashboard_state: mobileDashboardState,
         status: "passed",
         target: production ? "production" : "local",
         track_debug: trackState.debug,

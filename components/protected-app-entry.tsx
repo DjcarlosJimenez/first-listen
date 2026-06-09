@@ -6,7 +6,13 @@ import { FirstListenApp, type View } from "@/components/first-listen-app";
 import { Onboarding, type OnboardingPreferences } from "@/components/onboarding";
 import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/client";
-import type { AccountSummary, Review, Song, SongDashboardSummary } from "@/lib/types";
+import type {
+  AccountSummary,
+  ListeningBankStatus,
+  Review,
+  Song,
+  SongDashboardSummary,
+} from "@/lib/types";
 
 type ProfileSeed = {
   account: AccountSummary;
@@ -22,6 +28,7 @@ type ProfileSeed = {
   song: Song | null;
   songSummaries: SongDashboardSummary[];
   reviews: Review[];
+  listeningBank: ListeningBankStatus;
 };
 
 export function ProtectedAppEntry({
@@ -92,6 +99,7 @@ export function ProtectedAppEntry({
       initialSongSummaries={profile.songSummaries}
       initialTotalCreditsEarned={profile.totalCreditsEarned}
       initialUserSong={profile.song}
+      initialListeningBank={profile.listeningBank}
       initialView={initialView}
       listenerLanguages={languages}
       locale={locale}

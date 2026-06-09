@@ -11,6 +11,7 @@
     "auth:configure": "node scripts/configure-production-auth.mjs",
     "auth:promote-founder-one": "node scripts/promote-founder-one.mjs",
     "auth:verify-phase-a": "node scripts/verify-phase-a.mjs",
+    "listen:verify": "node scripts/verify-listen-to-earn.mjs",
     "db:schema:sync": "node scripts/sync-schema.mjs",
     "db:schema:check": "node scripts/sync-schema.mjs --check",
     "db:verify": "node scripts/verify-database.mjs"

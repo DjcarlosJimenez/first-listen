@@ -1,7 +1,47 @@
 import { createClient } from "@supabase/supabase-js";
+import { readFile } from "node:fs/promises";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+async function loadLocalEnvironment() {
+  try {
+    const contents = await readFile(".env.local", "utf8");
+    for (const line of contents.split(/\r?\n/)) {
+      if (!line || line.trimStart().startsWith("#")) continue;
+      const separator = line.indexOf("=");
+      if (separator < 1) continue;
+      const key = line.slice(0, separator).trim();
+      const value = line.slice(separator + 1).trim();
+      if (!process.env[key]) process.env[key] = value;
+    }
+  } catch {
+    // CI and production environments provide variables directly.
+  }
+}
+
+await loadLocalEnvironment();
+
+const projectRef = process.env.SUPABASE_PROJECT_REF;
+const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
+const url =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??
+  (projectRef ? `https://${projectRef}.supabase.co` : null);
+let serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!serviceRoleKey && projectRef && accessToken) {
+  const response = await fetch(
+    `https://api.supabase.com/v1/projects/${projectRef}/api-keys?reveal=true`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!response.ok) {
+    throw new Error(`Supabase key lookup failed with ${response.status}.`);
+  }
+  const keys = await response.json();
+  serviceRoleKey = (Array.isArray(keys) ? keys : keys.api_keys ?? []).find(
+    (key) =>
+      key.name === "service_role" ||
+      key.name === "secret" ||
+      key.type === "secret",
+  )?.api_key;
+}
 
 if (!url || !serviceRoleKey) {
   throw new Error(
@@ -15,8 +55,13 @@ const supabase = createClient(url, serviceRoleKey, {
 
 const { data, error } = await supabase.rpc("database_health_report");
 if (error) throw error;
+const { data: listeningData, error: listeningError } = await supabase.rpc(
+  "listening_system_health_report",
+);
+if (listeningError) throw listeningError;
 
 const report = data ?? {};
+const listeningReport = listeningData ?? {};
 const requiredPlatforms = [
   "youtube",
   "spotify",
@@ -82,6 +127,41 @@ const checks = [
     passed: Number(report.orphan_reviews ?? -1) === 0,
     details: report.orphan_reviews,
   },
+  {
+    name: "Listen-to-Earn tables exist",
+    passed: Object.values(listeningReport.tables ?? {}).every(Boolean),
+    details: listeningReport.tables,
+  },
+  {
+    name: "Listen-to-Earn functions exist",
+    passed: Object.values(listeningReport.functions ?? {}).every(Boolean),
+    details: listeningReport.functions,
+  },
+  {
+    name: "Listening settings singleton exists",
+    passed: Number(listeningReport.settings_rows ?? 0) === 1,
+    details: listeningReport.settings_rows,
+  },
+  {
+    name: "All five listening levels exist",
+    passed: Number(listeningReport.levels ?? 0) === 5,
+    details: listeningReport.levels,
+  },
+  {
+    name: "No duplicate active listening sessions",
+    passed: Number(listeningReport.active_session_duplicates ?? -1) === 0,
+    details: listeningReport.active_session_duplicates,
+  },
+  {
+    name: "No orphan listening sessions",
+    passed: Number(listeningReport.orphan_sessions ?? -1) === 0,
+    details: listeningReport.orphan_sessions,
+  },
+  {
+    name: "No negative listening balances",
+    passed: Number(listeningReport.negative_balances ?? -1) === 0,
+    details: listeningReport.negative_balances,
+  },
 ];
 
 const passed = checks.filter((check) => check.passed).length;
@@ -91,6 +171,7 @@ const result = {
   status: score === 100 ? "healthy" : score >= 80 ? "needs_attention" : "unhealthy",
   checks,
   report,
+  listeningReport,
 };
 
 console.log(JSON.stringify(result, null, 2));

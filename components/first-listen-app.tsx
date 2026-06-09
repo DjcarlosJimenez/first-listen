@@ -43,10 +43,20 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { LanguageSelector } from "@/components/language-selector";
 import { Logo } from "@/components/logo";
-import { ProviderPlayer } from "@/components/provider-player";
+import {
+  ProviderPlayer,
+  type ProviderTelemetrySnapshot,
+} from "@/components/provider-player";
 import {
   feedbackFocusOptions,
   genreOptions,
@@ -66,6 +76,7 @@ import { evaluateReviewQuality } from "@/lib/review-quality";
 import { createClient } from "@/lib/supabase/client";
 import type {
   AccountSummary,
+  ListeningBankStatus,
   Platform,
   Review,
   Song,
@@ -89,7 +100,19 @@ type ReviewSubmissionResult = {
   accepted: boolean;
   qualityScore: number;
   creditsBalance?: number;
+  listeningSecondsBanked?: number;
+  listeningBankSeconds?: number;
   warning?: string;
+};
+
+type ListeningSessionUi = {
+  sessionId: string | null;
+  earningEligible: boolean | null;
+  verifiedSeconds: number;
+  dailySecondsRemaining: number;
+  heartbeatIntervalSeconds: number;
+  interactionGraceSeconds: number;
+  warning: string;
 };
 
 type SongSubmission = {
@@ -148,6 +171,24 @@ const emptyReview: ReviewForm = {
   rating: 0,
   comment: "",
 };
+
+function formatMinutes(seconds: number) {
+  return `${Math.floor(Math.max(0, seconds) / 60)} min`;
+}
+
+function formatDuration(seconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function secondsToNextReward(bankSeconds: number, exchangeSeconds: number) {
+  const remainder = bankSeconds % exchangeSeconds;
+  if (remainder === 0 && bankSeconds >= exchangeSeconds) return 0;
+  return exchangeSeconds - remainder;
+}
 
 function navItems(copy: Copy): Array<{ id: View; label: string; icon: typeof Headphones }> {
   return [
@@ -265,7 +306,7 @@ function ReviewProgress({
             ? "Super Admin accounts can submit without spending credits."
             : count >= 1
               ? "One credit submits one validated song."
-              : "Complete review milestones to earn more credits."}
+              : "Bank verified listening minutes and claim credits manually."}
       </p>
     </div>
   );
@@ -525,6 +566,7 @@ function ReviewView({
     form: ReviewForm,
     pastedWithoutEditing: boolean,
     clientQualityScore: number,
+    listeningSessionId: string | null,
   ) => Promise<ReviewSubmissionResult>;
   setView: (view: View) => void;
   notify: (message: string) => void;
@@ -558,11 +600,143 @@ function ReviewView({
   const [submitting, setSubmitting] = useState(false);
   const [reportReason, setReportReason] = useState("spam");
   const [lastReviewedSong, setLastReviewedSong] = useState<Song | null>(null);
+  const [listeningSession, setListeningSession] =
+    useState<ListeningSessionUi>({
+      sessionId: null,
+      earningEligible: null,
+      verifiedSeconds: 0,
+      dailySecondsRemaining: 180 * 60,
+      heartbeatIntervalSeconds: 15,
+      interactionGraceSeconds: 300,
+      warning: "",
+    });
+  const listeningSessionRef = useRef<string | null>(null);
+  const startingSessionRef = useRef(false);
+  const heartbeatInFlightRef = useRef(false);
+  const lastHeartbeatAtRef = useRef(0);
+  const heartbeatIntervalRef = useRef(15);
+  const interactionGraceRef = useRef(300);
 
   useEffect(() => {
     setForm(emptyReview);
     setPastedWithoutEditing(false);
+    listeningSessionRef.current = null;
+    startingSessionRef.current = false;
+    heartbeatInFlightRef.current = false;
+    lastHeartbeatAtRef.current = 0;
+    heartbeatIntervalRef.current = 15;
+    interactionGraceRef.current = 300;
+    setListeningSession({
+      sessionId: null,
+      earningEligible: null,
+      verifiedSeconds: 0,
+      dailySecondsRemaining: 180 * 60,
+      heartbeatIntervalSeconds: 15,
+      interactionGraceSeconds: 300,
+      warning: "",
+    });
   }, [song?.id]);
+
+  const handleListeningTelemetry = useCallback(
+    async (snapshot: ProviderTelemetrySnapshot) => {
+      if (!song) return;
+      if (!snapshot.supported) {
+        setListeningSession((current) => ({
+          ...current,
+          earningEligible: false,
+          warning:
+            locale === "es"
+              ? "Este proveedor no ofrece suficientes datos para ganar minutos."
+              : "This provider does not expose enough playback data for listening rewards.",
+        }));
+        return;
+      }
+      if (snapshot.playbackState !== "playing") return;
+
+      const supabase = createClient();
+      if (!supabase) return;
+
+      if (!listeningSessionRef.current && !startingSessionRef.current) {
+        startingSessionRef.current = true;
+        const { data, error } = await supabase.rpc("start_listening_session", {
+          target_song_id: song.id,
+        });
+        startingSessionRef.current = false;
+        const result = Array.isArray(data) ? data[0] : data;
+        if (error || !result?.session_id) {
+          setListeningSession((current) => ({
+            ...current,
+            warning: error?.message ?? "Listening session could not start.",
+          }));
+          return;
+        }
+        listeningSessionRef.current = result.session_id;
+        heartbeatIntervalRef.current = Number(
+          result.heartbeat_interval_seconds ?? 15,
+        );
+        interactionGraceRef.current = Number(
+          result.interaction_grace_seconds ?? 300,
+        );
+        setListeningSession({
+          sessionId: result.session_id,
+          earningEligible: Boolean(result.earning_eligible),
+          verifiedSeconds: 0,
+          dailySecondsRemaining: Number(result.daily_cap_seconds ?? 10800),
+          heartbeatIntervalSeconds: heartbeatIntervalRef.current,
+          interactionGraceSeconds: interactionGraceRef.current,
+          warning: result.earning_eligible
+            ? ""
+            : "This provider cannot verify reward-eligible playback.",
+        });
+      }
+
+      const sessionId = listeningSessionRef.current;
+      if (!sessionId || heartbeatInFlightRef.current) return;
+      const now = Date.now();
+      const intervalMilliseconds = heartbeatIntervalRef.current * 1000;
+      if (
+        lastHeartbeatAtRef.current &&
+        now - lastHeartbeatAtRef.current < intervalMilliseconds
+      ) {
+        return;
+      }
+
+      heartbeatInFlightRef.current = true;
+      lastHeartbeatAtRef.current = now;
+      const { data, error } = await supabase.rpc(
+        "record_listening_heartbeat",
+        {
+          target_session_id: sessionId,
+          playback_position_seconds: snapshot.currentTime,
+          playback_duration_seconds: snapshot.duration,
+          playback_state: snapshot.playbackState,
+          playback_muted: snapshot.muted,
+          playback_volume: snapshot.volume,
+          page_visible: snapshot.pageVisible,
+          page_focused: snapshot.pageFocused,
+          interaction_recent:
+            now - snapshot.lastInteractionAt <=
+            interactionGraceRef.current * 1000,
+        },
+      );
+      heartbeatInFlightRef.current = false;
+      const result = Array.isArray(data) ? data[0] : data;
+      if (error || !result) {
+        setListeningSession((current) => ({
+          ...current,
+          warning: error?.message ?? "Listening progress could not be verified.",
+        }));
+        return;
+      }
+      setListeningSession((current) => ({
+        ...current,
+        verifiedSeconds: Number(result.session_verified_seconds ?? 0),
+        dailySecondsRemaining: Number(result.daily_seconds_remaining ?? 0),
+        warning: result.warning ?? "",
+      }));
+    },
+    [locale, song],
+  );
 
   const requiredAnswersComplete =
     form.listenFull !== null &&
@@ -588,7 +762,13 @@ function ReviewView({
     }
     if (!song) return;
     setSubmitting(true);
-    const result = await onReviewed(song.id, form, pastedWithoutEditing, reviewQuality.score);
+    const result = await onReviewed(
+      song.id,
+      form,
+      pastedWithoutEditing,
+      reviewQuality.score,
+      listeningSessionRef.current,
+    );
     setSubmitting(false);
     if (!result.accepted) {
       notify(result.warning || copy.app.review.warning);
@@ -596,9 +776,13 @@ function ReviewView({
     }
     setLastReviewedSong(song);
     notify(
-      locale === "es"
-        ? "Review enviada. La siguiente cancion ya esta lista."
-        : "Review submitted. The next song is ready.",
+      result.listeningSecondsBanked
+        ? locale === "es"
+          ? `Review enviada. ${formatMinutes(result.listeningSecondsBanked)} agregados al banco.`
+          : `Review submitted. ${formatMinutes(result.listeningSecondsBanked)} added to your Listening Bank.`
+        : locale === "es"
+          ? "Review enviada. La siguiente cancion ya esta lista."
+          : "Review submitted. The next song is ready.",
     );
   };
 
@@ -655,6 +839,7 @@ function ReviewView({
               platform={song.platform}
               songLoadedAt={songLoadedAt}
               title={song.title}
+              onTelemetry={handleListeningTelemetry}
             />
             <span className="listen-badge">
               <Clock3 size={13} /> {locale === "es" ? "Reproductor oficial" : "Provider player"}
@@ -802,6 +987,37 @@ function ReviewView({
       </section>
 
       <aside className="review-side">
+        <div className="listening-session-card">
+          <span className="eyebrow">
+            <Headphones size={13} />{" "}
+            {locale === "es" ? "Banco de escucha" : "Listening Bank"}
+          </span>
+          <strong>{formatMinutes(listeningSession.verifiedSeconds)}</strong>
+          <p>
+            {listeningSession.earningEligible === false
+              ? locale === "es"
+                ? "La reproduccion esta disponible, pero este proveedor no puede ganar minutos verificados."
+                : "Playback is available, but this provider cannot earn verified minutes."
+              : locale === "es"
+                ? "Los minutos pendientes se guardan solo cuando la review pasa el control de calidad."
+                : "Pending minutes are banked only after this review passes quality checks."}
+          </p>
+          <div className="progress-track">
+            <i
+              style={{
+                width: `${Math.min(
+                  100,
+                  (listeningSession.verifiedSeconds /
+                    Math.max(1, listeningSession.dailySecondsRemaining)) *
+                    100,
+                )}%`,
+              }}
+            />
+          </div>
+          {listeningSession.warning && (
+            <small>{listeningSession.warning}</small>
+          )}
+        </div>
         {lastReviewedSong && (
           <PostReviewDiscovery notify={notify} song={lastReviewedSong} />
         )}
@@ -857,6 +1073,95 @@ function StatCard({
   );
 }
 
+function ListeningBankPanel({
+  status,
+  credits,
+  claiming,
+  onClaim,
+  locale,
+}: {
+  status: ListeningBankStatus;
+  credits: number;
+  claiming: boolean;
+  onClaim: () => void;
+  locale: InterfaceLocale;
+}) {
+  const spanish = locale === "es";
+  const spanishLevelNames: Record<string, string> = {
+        Explorer: "Explorador",
+        Discoverer: "Descubridor",
+        "Talent Scout": "Cazatalentos",
+        Curator: "Curador",
+        "Elite Curator": "Curador Elite",
+      };
+  const levelName = spanish
+    ? spanishLevelNames[status.levelName] ?? status.levelName
+    : status.levelName;
+  const exchangeSeconds = status.minutesPerCredit * 60;
+  const progressSeconds =
+    status.bankSeconds % Math.max(1, exchangeSeconds);
+  const progress =
+    status.availableRewardCredits > 0 && status.secondsToNextCredit === 0
+      ? 100
+      : Math.round((progressSeconds / Math.max(1, exchangeSeconds)) * 100);
+
+  return (
+    <section className="listening-bank-panel">
+      <div className="listening-bank-heading">
+        <div>
+          <span className="eyebrow">
+            <Headphones size={13} /> {spanish ? "Banco de escucha" : "Listening Bank"}
+          </span>
+          <strong>{Math.floor(status.bankSeconds / 60)} <small>min</small></strong>
+        </div>
+        <div className="listener-level">
+          <span>{spanish ? "Nivel" : "Level"} {status.levelNumber}</span>
+          <strong>{levelName}</strong>
+        </div>
+      </div>
+      <div className="listening-bank-stats">
+        <div><strong>{credits}</strong><span>{spanish ? "Creditos disponibles" : "Available Credits"}</span></div>
+        <div><strong>{status.availableRewardCredits}</strong><span>{spanish ? "Recompensas disponibles" : "Claimable Rewards"}</span></div>
+        <div><strong>{formatMinutes(status.todaySeconds)}</strong><span>{spanish ? "Ganados hoy" : "Earned Today"}</span></div>
+        <div><strong>{formatDuration(status.lifetimeSeconds)}</strong><span>{spanish ? "Escucha total" : "Lifetime Listening"}</span></div>
+      </div>
+      <div className="listening-bank-progress">
+        <div>
+          <span>{spanish ? "Siguiente credito" : "Next credit"}</span>
+          <strong>
+            {status.availableRewardCredits > 0
+              ? spanish ? "Listo para reclamar" : "Ready to claim"
+              : `${Math.ceil(status.secondsToNextCredit / 60)} min ${spanish ? "restantes" : "remaining"}`}
+          </strong>
+        </div>
+        <div className="progress-track" aria-label={`${progress}% toward the next listening reward`}>
+          <i style={{ width: `${progress}%` }} />
+        </div>
+        <small>
+          {status.minutesPerCredit} {spanish ? "minutos de escucha" : "listening minutes"} = 1{" "}
+          {spanish ? "credito" : "credit"} / {spanish ? "Limite diario" : "Daily cap"}{" "}
+          {status.dailyCapMinutes} min
+        </small>
+      </div>
+      <button
+        className="primary-button listening-claim-button"
+        disabled={
+          claiming ||
+          !status.rewardsEnabled ||
+          status.availableRewardCredits < 1
+        }
+        onClick={onClaim}
+        type="button"
+      >
+        {claiming
+          ? spanish ? "Reclamando..." : "Claiming..."
+          : spanish ? "Reclamar recompensa" : "Claim Reward"}{" "}
+        <ArrowRight size={16} />
+      </button>
+    </section>
+  );
+}
+
 function DashboardView({
   setView,
   founder,
@@ -868,6 +1173,9 @@ function DashboardView({
   song,
   songSummaries,
   songReviews,
+  listeningBank,
+  claimingReward,
+  onClaimReward,
 }: {
   setView: (view: View) => void;
   founder: boolean;
@@ -879,12 +1187,22 @@ function DashboardView({
   song: Song | null;
   songSummaries: SongDashboardSummary[];
   songReviews: Review[];
+  listeningBank: ListeningBankStatus;
+  claimingReward: boolean;
+  onClaimReward: () => void;
 }) {
   const reviews = songReviews;
   if (!song) {
     return (
-      <main className="content submit-success">
-        <section>
+      <main className="content dashboard-empty">
+        <ListeningBankPanel
+          claiming={claimingReward}
+          credits={reviewCredits}
+          onClaim={onClaimReward}
+          status={listeningBank}
+          locale={locale}
+        />
+        <section className="review-complete-card">
           <div className="success-orbit"><Music2 size={34} /></div>
           <span className="eyebrow">{copy.app.dashboard.latest}</span>
           <h2>No songs submitted yet.</h2>
@@ -918,6 +1236,8 @@ function DashboardView({
       percentage("shareWithFriend")
     ) / 4,
   );
+  const latestSummary =
+    songSummaries.find((summary) => summary.id === song.id) ?? null;
 
   return (
     <main className="content dashboard-layout">
@@ -931,6 +1251,14 @@ function DashboardView({
             <Plus size={16} /> {copy.app.dashboard.newSubmission}
           </button>
         </div>
+
+        <ListeningBankPanel
+          claiming={claimingReward}
+          credits={reviewCredits}
+          onClaim={onClaimReward}
+          status={listeningBank}
+          locale={locale}
+        />
 
         <div className="active-song">
           <Image src={song.coverUrl} alt={`${song.title} cover`} unoptimized width={90} height={90} />
@@ -1012,6 +1340,30 @@ function DashboardView({
             detail={copy.app.dashboard.outOf100}
             icon={ShieldCheck}
           />
+          <StatCard
+            label={locale === "es" ? "Escucha total" : "Total Listening"}
+            value={formatDuration(latestSummary?.totalListeningSeconds ?? 0)}
+            detail={locale === "es" ? "Sesiones verificadas" : "Verified review sessions"}
+            icon={Clock3}
+          />
+          <StatCard
+            label={locale === "es" ? "Escucha promedio" : "Average Listen"}
+            value={formatDuration(latestSummary?.averageListeningSeconds ?? 0)}
+            detail={locale === "es" ? "Por review valida" : "Per qualified review"}
+            icon={Headphones}
+          />
+          <StatCard
+            label={locale === "es" ? "Tasa de finalizacion" : "Completion Rate"}
+            value={`${Math.round(latestSummary?.completionRate ?? 0)}%`}
+            detail={locale === "es" ? "Alcanzo al menos 90%" : "Reached at least 90%"}
+            icon={CheckCircle2}
+          />
+          <StatCard
+            label={locale === "es" ? "Retencion" : "Listener Retention"}
+            value={`${Math.round(latestSummary?.listenerRetention ?? 0)}%`}
+            detail={locale === "es" ? "Progreso verificado promedio" : "Average verified progress"}
+            icon={Gauge}
+          />
         </div>
 
         <section className="panel song-performance-panel">
@@ -1035,6 +1387,7 @@ function DashboardView({
                 <div><strong>{summary.reviewsReceived}</strong><span>Reviews received</span></div>
                 <div><strong>{summary.averageRating.toFixed(1)}</strong><span>Average rating</span></div>
                 <div><strong>{summary.hookScore}</strong><span>Hook score</span></div>
+                <div><strong>{formatDuration(summary.totalListeningSeconds)}</strong><span>Listening time</span></div>
                 <div><strong>{summary.reportCount}</strong><span>Reports</span></div>
                 <Link href={`/dashboard/comments?song=${summary.id}`}>
                   Comments <ArrowRight size={13} />
@@ -1381,7 +1734,11 @@ function SubmitView({
             <LockKeyhole size={19} />
             <div>
               <strong>{locale === "es" ? "Necesitas 1 credito para enviar" : "One credit is required to submit"}</strong>
-              <p>{locale === "es" ? "Completa hitos de reviews para ganar creditos." : "Complete review milestones to earn credits."}</p>
+              <p>
+                {locale === "es"
+                  ? "Acumula minutos verificados y reclama una recompensa."
+                  : "Bank verified listening minutes and claim a reward."}
+              </p>
             </div>
           </div>
         )}
@@ -1657,6 +2014,7 @@ type FirstListenAppProps = {
   initialReviewCredits: number;
   initialTotalCreditsEarned: number;
   initialReviewQualityScore: number;
+  initialListeningBank: ListeningBankStatus;
   role: "super_admin" | "admin" | "moderator" | "user";
   initialUserSong: Song | null;
   initialSongSummaries: SongDashboardSummary[];
@@ -1676,6 +2034,7 @@ export function FirstListenApp({
   initialReviewCredits,
   initialTotalCreditsEarned,
   initialReviewQualityScore,
+  initialListeningBank,
   role,
   initialUserSong,
   initialSongSummaries,
@@ -1689,6 +2048,9 @@ export function FirstListenApp({
   const [reviewQualityScores, setReviewQualityScores] = useState<number[]>([
     initialReviewQualityScore,
   ]);
+  const [listeningBank, setListeningBank] =
+    useState<ListeningBankStatus>(initialListeningBank);
+  const [claimingReward, setClaimingReward] = useState(false);
   const [priorComments, setPriorComments] = useState<string[]>([]);
   const founder = initialFounder;
   const founderFree = initialFounderFree;
@@ -1744,6 +2106,7 @@ export function FirstListenApp({
     form: ReviewForm,
     pastedWithoutEditing: boolean,
     clientQualityScore: number,
+    listeningSessionId: string | null,
   ): Promise<ReviewSubmissionResult> => {
     let qualityScore = clientQualityScore;
     const supabase = createClient();
@@ -1757,7 +2120,7 @@ export function FirstListenApp({
       };
     }
 
-    const { data, error } = await supabase.rpc("submit_review", {
+    const { data, error } = await supabase.rpc("submit_review_with_listening", {
       reviewed_song_id: songId,
       review_listen_full: form.listenFull,
       review_add_to_playlist: form.addPlaylist,
@@ -1766,6 +2129,7 @@ export function FirstListenApp({
       review_rating: form.rating,
       review_comment: form.comment.trim(),
       review_pasted_comment_detected: pastedWithoutEditing,
+      listening_session_id: listeningSessionId,
     });
     const result = Array.isArray(data) ? data[0] : data;
     if (error || !result?.accepted) {
@@ -1776,6 +2140,19 @@ export function FirstListenApp({
       };
     }
     qualityScore = Number(result.quality_score);
+    const bankedSeconds = Number(result.listening_seconds_banked ?? 0);
+    const bankSeconds = Number(
+      result.listening_bank_seconds ?? listeningBank.bankSeconds,
+    );
+    const exchangeSeconds = listeningBank.minutesPerCredit * 60;
+    setListeningBank((current) => ({
+      ...current,
+      bankSeconds,
+      lifetimeSeconds: current.lifetimeSeconds + bankedSeconds,
+      todaySeconds: current.todaySeconds + bankedSeconds,
+      availableRewardCredits: Math.floor(bankSeconds / exchangeSeconds),
+      secondsToNextCredit: secondsToNextReward(bankSeconds, exchangeSeconds),
+    }));
     const { data: currentProfile } = await supabase
       .from("profiles")
       .select("credits, total_review_credits_earned")
@@ -1800,7 +2177,42 @@ export function FirstListenApp({
       const { data } = await supabase.rpc("get_smart_review_queue", { queue_limit: 20 });
       if (data) setQueueSongs(mapQueueRows(data));
     }
-    return { accepted: true, qualityScore };
+    return {
+      accepted: true,
+      qualityScore,
+      listeningSecondsBanked: bankedSeconds,
+      listeningBankSeconds: bankSeconds,
+      warning: result.warning,
+    };
+  };
+
+  const claimListeningReward = async () => {
+    const supabase = createClient();
+    if (!supabase) {
+      notify("Reward service is unavailable. Please refresh and try again.");
+      return;
+    }
+    setClaimingReward(true);
+    const { data, error } = await supabase.rpc("claim_listening_reward");
+    setClaimingReward(false);
+    const result = Array.isArray(data) ? data[0] : data;
+    if (error || !result) {
+      notify(error?.message ?? "Listening reward could not be claimed.");
+      return;
+    }
+    const bankSeconds = Number(result.bank_seconds ?? 0);
+    const exchangeSeconds = listeningBank.minutesPerCredit * 60;
+    setReviewCount(Number(result.credits_balance ?? reviewCount + 1));
+    setTotalCreditsEarned((current) => current + 1);
+    setListeningBank((current) => ({
+      ...current,
+      bankSeconds,
+      availableRewardCredits: Number(
+        result.available_reward_credits ?? 0,
+      ),
+      secondsToNextCredit: secondsToNextReward(bankSeconds, exchangeSeconds),
+    }));
+    notify("Listening reward claimed. One credit was added to your account.");
   };
 
   const handleSongSubmitted = async (
@@ -1859,6 +2271,9 @@ export function FirstListenApp({
           copy={copy}
           founder={founder}
           locale={locale}
+          listeningBank={listeningBank}
+          claimingReward={claimingReward}
+          onClaimReward={() => void claimListeningReward()}
           reviewCredits={reviewCount}
           reviewQualityScore={averageReviewQuality}
           setView={changeView}

@@ -4,7 +4,12 @@ import type { View } from "@/components/first-listen-app";
 import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
 import { getInitials, platformLabels } from "@/lib/discovery";
 import { createClient } from "@/lib/supabase/server";
-import type { Review, Song, SongDashboardSummary } from "@/lib/types";
+import type {
+  ListeningBankStatus,
+  Review,
+  Song,
+  SongDashboardSummary,
+} from "@/lib/types";
 
 type DashboardRow = {
   song_id: string;
@@ -16,6 +21,25 @@ type DashboardRow = {
   average_rating: number;
   hook_score: number;
   report_count: number;
+  total_listening_seconds: number;
+  average_listening_seconds: number;
+  completion_rate: number;
+  playlist_intent: number;
+  share_intent: number;
+  listener_retention: number;
+};
+
+type ListeningBankRow = {
+  bank_seconds: number;
+  lifetime_seconds: number;
+  today_seconds: number;
+  available_reward_credits: number;
+  seconds_to_next_credit: number;
+  minutes_per_credit: number;
+  daily_cap_minutes: number;
+  level_number: number;
+  level_name: string;
+  rewards_enabled: boolean;
 };
 
 export async function ProtectedAppPage({ initialView }: { initialView: View }) {
@@ -35,7 +59,11 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
 
   if (!profile) redirect("/login?error=profile");
 
-  const [{ data: latestSong }, { data: dashboardRows }] = await Promise.all([
+  const [
+    { data: latestSong },
+    { data: dashboardRows },
+    { data: listeningRows },
+  ] = await Promise.all([
     supabase
       .from("songs")
       .select(
@@ -45,14 +73,15 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase.rpc("get_my_song_dashboard"),
+    supabase.rpc("get_my_song_dashboard_with_listening"),
+    supabase.rpc("get_listening_bank_status"),
   ]);
 
   const { data: reviewRows } = latestSong
     ? await supabase
         .from("reviews")
         .select(
-          "id, song_id, listen_full, add_to_playlist, grabbed_attention, share_with_friend, rating, comment, quality_score, quality_passed, created_at",
+          "id, song_id, listen_full, add_to_playlist, grabbed_attention, share_with_friend, rating, comment, quality_score, quality_passed, listening_seconds, listening_duration_seconds, listening_completion_percent, created_at",
         )
         .eq("song_id", latestSong.id)
         .order("created_at", { ascending: false })
@@ -89,6 +118,12 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     averageRating: Number(row.average_rating ?? 0),
     hookScore: Number(row.hook_score ?? 0),
     reportCount: Number(row.report_count ?? 0),
+    totalListeningSeconds: Number(row.total_listening_seconds ?? 0),
+    averageListeningSeconds: Number(row.average_listening_seconds ?? 0),
+    completionRate: Number(row.completion_rate ?? 0),
+    playlistIntent: Number(row.playlist_intent ?? 0),
+    shareIntent: Number(row.share_intent ?? 0),
+    listenerRetention: Number(row.listener_retention ?? 0),
   }));
 
   const reviews: Review[] = (reviewRows ?? []).map((review) => ({
@@ -103,8 +138,35 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     comment: review.comment,
     qualityScore: review.quality_score,
     qualityPassed: review.quality_passed,
+    listeningSeconds: Number(review.listening_seconds ?? 0),
+    listeningDurationSeconds:
+      review.listening_duration_seconds === null
+        ? undefined
+        : Number(review.listening_duration_seconds),
+    listeningCompletionPercent:
+      review.listening_completion_percent === null
+        ? undefined
+        : Number(review.listening_completion_percent),
     createdAt: review.created_at.slice(0, 10),
   }));
+
+  const listeningRow = (
+    Array.isArray(listeningRows) ? listeningRows[0] : listeningRows
+  ) as ListeningBankRow | null;
+  const listeningBank: ListeningBankStatus = {
+    bankSeconds: Number(listeningRow?.bank_seconds ?? 0),
+    lifetimeSeconds: Number(listeningRow?.lifetime_seconds ?? 0),
+    todaySeconds: Number(listeningRow?.today_seconds ?? 0),
+    availableRewardCredits: Number(
+      listeningRow?.available_reward_credits ?? 0,
+    ),
+    secondsToNextCredit: Number(listeningRow?.seconds_to_next_credit ?? 7200),
+    minutesPerCredit: Number(listeningRow?.minutes_per_credit ?? 120),
+    dailyCapMinutes: Number(listeningRow?.daily_cap_minutes ?? 180),
+    levelNumber: Number(listeningRow?.level_number ?? 1),
+    levelName: listeningRow?.level_name ?? "Explorer",
+    rewardsEnabled: Boolean(listeningRow?.rewards_enabled ?? true),
+  };
 
   return (
     <ProtectedAppEntry
@@ -128,6 +190,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
         song,
         songSummaries,
         reviews,
+        listeningBank,
       }}
     />
   );

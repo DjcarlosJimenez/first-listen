@@ -8,7 +8,7 @@ export async function AdminPageContent({
   initialSection = "users",
   allowModerator = false,
 }: {
-  initialSection?: "users" | "songs" | "reports" | "credits" | "statistics";
+  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "statistics";
   allowModerator?: boolean;
 }) {
   const supabase = await createClient();
@@ -37,7 +37,13 @@ export async function AdminPageContent({
           : "songs"
         : "reports";
 
-  const [{ data: users }, { data: songs }, { data: reports }, { data: statistics }] = await Promise.all([
+  const [
+    { data: users },
+    { data: songs },
+    { data: reports },
+    { data: statistics },
+    { data: listeningRows },
+  ] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, display_name, role, account_status, credits, completed_reviews, created_at")
@@ -56,11 +62,21 @@ export async function AdminPageContent({
     profile.role === "moderator"
       ? Promise.resolve({ data: null })
       : supabase.rpc("admin_get_statistics"),
+    supabase
+      .from("listening_reward_settings")
+      .select("minutes_per_credit, daily_cap_minutes, enabled")
+      .eq("id", true)
+      .maybeSingle(),
   ]);
 
   return (
     <AdminPanel
-      initialSection={effectiveInitialSection as "users" | "songs" | "reports" | "credits" | "statistics"}
+      initialSection={effectiveInitialSection as "users" | "songs" | "reports" | "credits" | "listening" | "statistics"}
+      listeningSettings={{
+        minutes_per_credit: Number(listeningRows?.minutes_per_credit ?? 120),
+        daily_cap_minutes: Number(listeningRows?.daily_cap_minutes ?? 180),
+        enabled: Boolean(listeningRows?.enabled ?? true),
+      }}
       reports={(reports ?? []) as never}
       role={profile.role}
       songs={songs ?? []}
@@ -70,6 +86,7 @@ export async function AdminPageContent({
         active_songs: number;
         open_reports: number;
         reviews: number;
+        listening_minutes?: number;
       } | null) ?? null}
       users={users ?? []}
     />

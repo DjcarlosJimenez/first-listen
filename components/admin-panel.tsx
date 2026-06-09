@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, BarChart3, Flag, Music2, ShieldCheck, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  BarChart3,
+  Flag,
+  Headphones,
+  Music2,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { Logo } from "@/components/logo";
 import { createClient } from "@/lib/supabase/client";
 
@@ -41,23 +49,39 @@ export function AdminPanel({
   songs,
   reports,
   initialSection = "users",
+  listeningSettings,
   statistics,
 }: {
   role: "super_admin" | "admin" | "moderator";
   users: AdminUser[];
   songs: AdminSong[];
   reports: AdminReport[];
-  initialSection?: "users" | "songs" | "reports" | "credits" | "statistics";
+  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "statistics";
+  listeningSettings: {
+    minutes_per_credit: number;
+    daily_cap_minutes: number;
+    enabled: boolean;
+  };
   statistics: {
     users: number;
     songs: number;
     active_songs: number;
     open_reports: number;
     reviews: number;
+    listening_minutes?: number;
   } | null;
 }) {
-  const [section, setSection] = useState<"users" | "songs" | "reports" | "credits" | "statistics">(initialSection);
+  const [section, setSection] = useState<"users" | "songs" | "reports" | "credits" | "listening" | "statistics">(initialSection);
   const [notice, setNotice] = useState("");
+  const [minutesPerCredit, setMinutesPerCredit] = useState(
+    listeningSettings.minutes_per_credit,
+  );
+  const [dailyCapMinutes, setDailyCapMinutes] = useState(
+    listeningSettings.daily_cap_minutes,
+  );
+  const [rewardsEnabled, setRewardsEnabled] = useState(
+    listeningSettings.enabled,
+  );
   const isSuper = role === "super_admin";
   const supabase = createClient();
 
@@ -83,11 +107,12 @@ export function AdminPanel({
     ["songs", "Songs", Music2],
     ["reports", "Reports", Flag],
     ["credits", "Credits", ShieldCheck],
+    ["listening", "Listening", Headphones],
     ["statistics", "Statistics", BarChart3],
   ] as const;
   const sections = allSections.filter(([id]) => {
     if (role === "super_admin") return true;
-    if (role === "admin") return !["users", "credits"].includes(id);
+    if (role === "admin") return !["users", "credits", "listening"].includes(id);
     return id === "reports";
   });
 
@@ -237,6 +262,60 @@ export function AdminPanel({
                 <div><strong>{statistics?.songs ?? songs.length}</strong><span>Songs</span></div>
                 <div><strong>{statistics?.open_reports ?? reports.filter((report) => report.status === "open").length}</strong><span>Open reports</span></div>
                 <div><strong>{statistics?.active_songs ?? songs.filter((song) => song.is_active).length}</strong><span>Active songs</span></div>
+                <div><strong>{statistics?.listening_minutes ?? 0}</strong><span>Listening minutes</span></div>
+              </div>
+            </>
+          )}
+
+          {section === "listening" && isSuper && (
+            <>
+              <h2>Listen-to-Earn Settings</h2>
+              <div className="admin-settings-card">
+                <label>
+                  Minutes per credit
+                  <input
+                    min={30}
+                    max={1440}
+                    onChange={(event) =>
+                      setMinutesPerCredit(Number(event.target.value))
+                    }
+                    type="number"
+                    value={minutesPerCredit}
+                  />
+                </label>
+                <label>
+                  Daily cap in minutes
+                  <input
+                    min={30}
+                    max={1440}
+                    onChange={(event) =>
+                      setDailyCapMinutes(Number(event.target.value))
+                    }
+                    type="number"
+                    value={dailyCapMinutes}
+                  />
+                </label>
+                <label className="admin-setting-toggle">
+                  <input
+                    checked={rewardsEnabled}
+                    onChange={(event) => setRewardsEnabled(event.target.checked)}
+                    type="checkbox"
+                  />
+                  Listening rewards enabled
+                </label>
+                <button
+                  className="primary-button"
+                  onClick={() =>
+                    void runRpc("admin_update_listening_settings", {
+                      new_minutes_per_credit: minutesPerCredit,
+                      new_daily_cap_minutes: dailyCapMinutes,
+                      rewards_enabled: rewardsEnabled,
+                    })
+                  }
+                  type="button"
+                >
+                  Save settings
+                </button>
               </div>
             </>
           )}

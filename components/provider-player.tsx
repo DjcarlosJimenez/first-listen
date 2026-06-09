@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { AlertTriangle, ExternalLink, LoaderCircle } from "lucide-react";
 import type { InterfaceLocale } from "@/lib/catalog";
@@ -16,6 +16,18 @@ type PlaybackState =
   | "buffering"
   | "cued"
   | "unknown";
+
+export type ProviderTelemetrySnapshot = {
+  supported: boolean;
+  playbackState: PlaybackState;
+  currentTime: number;
+  duration: number;
+  muted: boolean | null;
+  volume: number | null;
+  pageVisible: boolean;
+  pageFocused: boolean;
+  lastInteractionAt: number;
+};
 
 type YouTubePlayer = {
   destroy: () => void;
@@ -44,16 +56,40 @@ type YouTubeApi = {
   ) => YouTubePlayer;
 };
 
+type SoundCloudWidget = {
+  bind: (event: string, listener: () => void) => void;
+  unbind: (event: string) => void;
+  getDuration: (callback: (duration: number) => void) => void;
+  getPosition: (callback: (position: number) => void) => void;
+  getVolume: (callback: (volume: number) => void) => void;
+  isPaused: (callback: (paused: boolean) => void) => void;
+};
+
+type SoundCloudApi = {
+  Widget: ((iframe: HTMLIFrameElement) => SoundCloudWidget) & {
+    Events: {
+      READY: string;
+      PLAY: string;
+      PAUSE: string;
+      FINISH: string;
+      ERROR: string;
+    };
+  };
+};
+
 declare global {
   interface Window {
     YT?: YouTubeApi;
     onYouTubeIframeAPIReady?: () => void;
+    SC?: SoundCloudApi;
   }
 }
 
 const YOUTUBE_API_SRC = "https://www.youtube.com/iframe_api";
+const SOUNDCLOUD_API_SRC = "https://w.soundcloud.com/player/api.js";
 const MAX_INITIALIZATION_ATTEMPTS = 3;
 let youtubeApiPromise: Promise<YouTubeApi> | null = null;
+let soundCloudApiPromise: Promise<SoundCloudApi> | null = null;
 
 function loadYouTubeApi() {
   if (window.YT?.Player) return Promise.resolve(window.YT);
@@ -114,6 +150,46 @@ function loadYouTubeApi() {
   return youtubeApiPromise;
 }
 
+function loadSoundCloudApi() {
+  if (window.SC?.Widget) return Promise.resolve(window.SC);
+  if (soundCloudApiPromise) return soundCloudApiPromise;
+
+  soundCloudApiPromise = new Promise<SoundCloudApi>((resolve, reject) => {
+    let settled = false;
+    const finish = (api?: SoundCloudApi) => {
+      if (settled || !api?.Widget) return;
+      settled = true;
+      window.clearInterval(poll);
+      window.clearTimeout(timeout);
+      resolve(api);
+    };
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      window.clearInterval(poll);
+      window.clearTimeout(timeout);
+      reject(new Error("SoundCloud Widget API did not become ready."));
+    };
+    const poll = window.setInterval(() => finish(window.SC), 50);
+    const timeout = window.setTimeout(fail, 15000);
+    let script = document.querySelector<HTMLScriptElement>(
+      `script[src="${SOUNDCLOUD_API_SRC}"]`,
+    );
+    if (!script) {
+      script = document.createElement("script");
+      script.async = true;
+      script.src = SOUNDCLOUD_API_SRC;
+      document.head.append(script);
+    }
+    script.addEventListener("error", fail, { once: true });
+  }).catch((error) => {
+    soundCloudApiPromise = null;
+    throw error;
+  });
+
+  return soundCloudApiPromise;
+}
+
 function mapYouTubeState(state: number): PlaybackState {
   if (state === -1) return "unstarted";
   if (state === 0) return "ended";
@@ -136,6 +212,7 @@ export function ProviderPlayer({
   platform,
   songLoadedAt,
   title,
+  onTelemetry,
 }: {
   artist: string;
   coverUrl: string;
@@ -144,6 +221,7 @@ export function ProviderPlayer({
   platform: Platform;
   songLoadedAt: string | null;
   title: string;
+  onTelemetry?: (snapshot: ProviderTelemetrySnapshot) => void;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [clientOrigin, setClientOrigin] = useState<string | null>(null);
@@ -167,7 +245,65 @@ export function ProviderPlayer({
   const [muted, setMuted] = useState<boolean | null>(null);
   const [volume, setVolume] = useState<number | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(false);
+  const onTelemetryRef = useRef(onTelemetry);
+  const lastInteractionAtRef = useRef(Date.now());
+  const previousPlaybackStateRef = useRef<PlaybackState>("unknown");
   const spanish = locale === "es";
+
+  useEffect(() => {
+    onTelemetryRef.current = onTelemetry;
+  }, [onTelemetry]);
+
+  useEffect(() => {
+    const markInteraction = () => {
+      lastInteractionAtRef.current = Date.now();
+    };
+    const events: Array<keyof WindowEventMap> = [
+      "pointerdown",
+      "keydown",
+      "touchstart",
+      "wheel",
+    ];
+    events.forEach((event) =>
+      window.addEventListener(event, markInteraction, { passive: true }),
+    );
+    return () => {
+      events.forEach((event) =>
+        window.removeEventListener(event, markInteraction),
+      );
+    };
+  }, []);
+
+  const emitTelemetry = useCallback(
+    (
+      nextState: PlaybackState,
+      nextCurrentTime: number,
+      nextDuration: number,
+      nextMuted: boolean | null,
+      nextVolume: number | null,
+      supported: boolean,
+    ) => {
+      if (
+        nextState === "playing" &&
+        previousPlaybackStateRef.current !== "playing"
+      ) {
+        lastInteractionAtRef.current = Date.now();
+      }
+      previousPlaybackStateRef.current = nextState;
+      onTelemetryRef.current?.({
+        supported,
+        playbackState: nextState,
+        currentTime: nextCurrentTime,
+        duration: nextDuration,
+        muted: nextMuted,
+        volume: nextVolume,
+        pageVisible: document.visibilityState === "visible",
+        pageFocused: document.hasFocus(),
+        lastInteractionAt: lastInteractionAtRef.current,
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     const mountedAt = timestamp();
@@ -302,6 +438,14 @@ export function ProviderPlayer({
         setDuration(nextDuration);
         setMuted(nextMuted);
         setVolume(nextVolume);
+        emitTelemetry(
+          nextState,
+          nextCurrentTime,
+          nextDuration,
+          nextMuted,
+          nextVolume,
+          true,
+        );
 
         if (nextState === "playing") {
           console.info("[First Listen player] Provider reports active playback", {
@@ -393,6 +537,7 @@ export function ProviderPlayer({
   }, [
     embed,
     embedResult.generatedAt,
+    emitTelemetry,
     iframeLoadedAt,
     initializationAttempt,
     link,
@@ -402,6 +547,102 @@ export function ProviderPlayer({
     songLoadedAt,
     title,
   ]);
+
+  useEffect(() => {
+    if (
+      !embed ||
+      embed.telemetry !== "soundcloud_widget_api" ||
+      loadedEmbedSrc !== embed.src ||
+      !iframeRef.current
+    ) {
+      return;
+    }
+
+    let disposed = false;
+    let widget: SoundCloudWidget | null = null;
+    let telemetryInterval: number | null = null;
+
+    loadSoundCloudApi()
+      .then((api) => {
+        if (disposed || !iframeRef.current) return;
+        widget = api.Widget(iframeRef.current);
+        const refreshTelemetry = () => {
+          widget?.getDuration((durationMs) => {
+            widget?.getPosition((positionMs) => {
+              widget?.getVolume((nextVolume) => {
+                widget?.isPaused((paused) => {
+                  if (disposed) return;
+                  const nextState: PlaybackState = paused ? "paused" : "playing";
+                  const nextDuration = Math.max(0, durationMs / 1000);
+                  const nextPosition = Math.max(0, positionMs / 1000);
+                  const nextMuted = nextVolume <= 0;
+                  setPlaybackState(nextState);
+                  setDuration(nextDuration);
+                  setCurrentTime(nextPosition);
+                  setMuted(nextMuted);
+                  setVolume(nextVolume);
+                  emitTelemetry(
+                    nextState,
+                    nextPosition,
+                    nextDuration,
+                    nextMuted,
+                    nextVolume,
+                    true,
+                  );
+                });
+              });
+            });
+          });
+        };
+        const ready = () => {
+          if (disposed) return;
+          const readyAt = timestamp();
+          setProviderReadyAt(readyAt);
+          setStatus("ready");
+          refreshTelemetry();
+          telemetryInterval = window.setInterval(refreshTelemetry, 1000);
+        };
+        const playing = () => {
+          lastInteractionAtRef.current = Date.now();
+          refreshTelemetry();
+        };
+        const paused = () => {
+          setPlaybackState("paused");
+          refreshTelemetry();
+        };
+        const finished = () => {
+          setPlaybackState("ended");
+          refreshTelemetry();
+        };
+        const failed = () => setStatus("error");
+
+        widget.bind(api.Widget.Events.READY, ready);
+        widget.bind(api.Widget.Events.PLAY, playing);
+        widget.bind(api.Widget.Events.PAUSE, paused);
+        widget.bind(api.Widget.Events.FINISH, finished);
+        widget.bind(api.Widget.Events.ERROR, failed);
+      })
+      .catch((error) => {
+        if (disposed) return;
+        console.error("[First Listen player] SoundCloud telemetry unavailable", {
+          embedUrl: embed.src,
+          error,
+          platform,
+          title,
+        });
+        setStatus("error");
+      });
+
+    return () => {
+      disposed = true;
+      if (telemetryInterval !== null) window.clearInterval(telemetryInterval);
+      if (widget && window.SC?.Widget.Events) {
+        Object.values(window.SC.Widget.Events).forEach((event) =>
+          widget?.unbind(event),
+        );
+      }
+    };
+  }, [embed, emitTelemetry, loadedEmbedSrc, platform, title]);
 
   const playerLoaded = () => {
     if (!embed) return;
@@ -415,9 +656,20 @@ export function ProviderPlayer({
       platform,
       title,
     });
-    if (embed.telemetry !== "youtube_iframe_api") {
+    if (
+      embed.telemetry !== "youtube_iframe_api" &&
+      embed.telemetry !== "soundcloud_widget_api"
+    ) {
       setProviderReadyAt(loadedAt);
       setStatus("ready");
+      emitTelemetry(
+        "unknown",
+        0,
+        0,
+        null,
+        null,
+        false,
+      );
     }
   };
 

@@ -301,7 +301,11 @@ try {
     { queue_limit: 20 },
     "Load smart review queue",
   );
-  assert(initialQueue.length === 2, "Smart queue did not include both eligible songs");
+  assert(
+    initialQueue.some((song) => song.song_id === firstSongId) &&
+      initialQueue.some((song) => song.song_id === secondSongId),
+    "Smart queue did not include both isolated eligible songs",
+  );
   assert(
     initialQueue.some(
       (song) =>
@@ -348,7 +352,10 @@ try {
     "Submit quality review",
   );
   assert(acceptedFirst[0]?.accepted === true, "Quality review was rejected");
-  assert(acceptedFirst[0]?.credit_granted === true, "Five-review reward was not granted");
+  assert(
+    acceptedFirst[0]?.credit_granted === false,
+    "Review incorrectly granted an automatic credit",
+  );
 
   const nextQueue = await rpc(
     reviewerClient,
@@ -357,8 +364,9 @@ try {
     "Load next review song",
   );
   assert(
-    nextQueue.length === 1 && nextQueue[0].song_id === secondSongId,
-    "Reviewed song was not removed or next song was not loaded",
+    !nextQueue.some((song) => song.song_id === firstSongId) &&
+      nextQueue.some((song) => song.song_id === secondSongId),
+    "Reviewed song was not removed or the next isolated song was not loaded",
   );
   record("Review completion advances to the next available song");
 
@@ -424,16 +432,16 @@ try {
     .single();
   assertNoError(reviewerStateError, "Read reviewer reward state");
   assert(reviewerState.completed_reviews === 6, "Completed review count is incorrect");
-  assert(reviewerState.credits === 2, "Review milestone credits are incorrect");
+  assert(reviewerState.credits === 1, "Review incorrectly changed the credit balance");
   assert(
-    reviewerState.total_review_credits_earned === 1,
-    "Earned credit total is incorrect",
+    reviewerState.total_review_credits_earned === 0,
+    "Review incorrectly changed earned credits",
   );
   assert(
     Number(reviewerState.review_quality_score) === 100,
     "Review quality score is incorrect",
   );
-  record("Five-review milestone awards exactly one credit");
+  record("Review milestones do not bypass manual Listening Bank claims");
 
   await rpc(
     reviewerClient,
@@ -530,7 +538,12 @@ try {
     { queue_limit: 20 },
     "Verify completed queue",
   );
-  assert(exhaustedQueue.length === 0, "Reviewed songs remained in the queue");
+  assert(
+    !exhaustedQueue.some(
+      (song) => song.song_id === firstSongId || song.song_id === secondSongId,
+    ),
+    "Reviewed isolated songs remained in the queue",
+  );
   record("Reviewed songs are excluded from future queue results");
 } catch (error) {
   checks.push({

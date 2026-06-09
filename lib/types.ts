@@ -41,6 +41,12 @@ export type SongDashboardSummary = {
   averageRating: number;
   hookScore: number;
   reportCount: number;
+  totalListeningSeconds: number;
+  averageListeningSeconds: number;
+  completionRate: number;
+  playlistIntent: number;
+  shareIntent: number;
+  listenerRetention: number;
 };
 
 export type Review = {
@@ -55,5 +61,21 @@ export type Review = {
   comment?: string;
   qualityScore: number;
   qualityPassed: boolean;
+  listeningSeconds?: number;
+  listeningDurationSeconds?: number;
+  listeningCompletionPercent?: number;
   createdAt: string;
+};
+
+export type ListeningBankStatus = {
+  bankSeconds: number;
+  lifetimeSeconds: number;
+  todaySeconds: number;
+  availableRewardCredits: number;
+  secondsToNextCredit: number;
+  minutesPerCredit: number;
+  dailyCapMinutes: number;
+  levelNumber: number;
+  levelName: string;
+  rewardsEnabled: boolean;
 };
