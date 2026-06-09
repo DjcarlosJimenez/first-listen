@@ -51,6 +51,8 @@ declare global {
   }
 }
 
+const YOUTUBE_API_SRC = "https://www.youtube.com/iframe_api";
+const MAX_INITIALIZATION_ATTEMPTS = 3;
 let youtubeApiPromise: Promise<YouTubeApi> | null = null;
 
 function loadYouTubeApi() {
@@ -58,30 +60,55 @@ function loadYouTubeApi() {
   if (youtubeApiPromise) return youtubeApiPromise;
 
   youtubeApiPromise = new Promise<YouTubeApi>((resolve, reject) => {
-    const previousReady = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      previousReady?.();
-      if (window.YT?.Player) resolve(window.YT);
-      else reject(new Error("YouTube IFrame API loaded without Player support."));
+    let settled = false;
+    const finish = (api?: YouTubeApi) => {
+      if (settled) return;
+      if (!api?.Player) return;
+      settled = true;
+      window.clearInterval(poll);
+      window.clearTimeout(timeout);
+      resolve(api);
+    };
+    const fail = (message: string) => {
+      if (settled) return;
+      settled = true;
+      window.clearInterval(poll);
+      window.clearTimeout(timeout);
+      reject(new Error(message));
     };
 
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[src="https://www.youtube.com/iframe_api"]',
-    );
-    if (existing) {
-      existing.addEventListener(
-        "error",
-        () => reject(new Error("YouTube IFrame API failed to load.")),
-        { once: true },
-      );
-      return;
-    }
+    const previousReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      try {
+        previousReady?.();
+      } catch (error) {
+        console.warn("[First Listen player] Previous YouTube callback failed", error);
+      }
+      finish(window.YT);
+    };
 
-    const script = document.createElement("script");
-    script.async = true;
-    script.onerror = () => reject(new Error("YouTube IFrame API failed to load."));
-    script.src = "https://www.youtube.com/iframe_api";
-    document.head.append(script);
+    const poll = window.setInterval(() => finish(window.YT), 50);
+    const timeout = window.setTimeout(
+      () => fail("YouTube IFrame API did not become ready."),
+      15000,
+    );
+    let script = document.querySelector<HTMLScriptElement>(
+      `script[src="${YOUTUBE_API_SRC}"]`,
+    );
+    if (!script) {
+      script = document.createElement("script");
+      script.async = true;
+      script.src = YOUTUBE_API_SRC;
+      document.head.append(script);
+    }
+    script.addEventListener(
+      "error",
+      () => fail("YouTube IFrame API failed to load."),
+      { once: true },
+    );
+  }).catch((error) => {
+    youtubeApiPromise = null;
+    throw error;
   });
 
   return youtubeApiPromise;
@@ -97,12 +124,17 @@ function mapYouTubeState(state: number): PlaybackState {
   return "unknown";
 }
 
+function timestamp() {
+  return new Date().toISOString();
+}
+
 export function ProviderPlayer({
   artist,
   coverUrl,
   link,
   locale,
   platform,
+  songLoadedAt,
   title,
 }: {
   artist: string;
@@ -110,15 +142,25 @@ export function ProviderPlayer({
   link: string;
   locale: InterfaceLocale;
   platform: Platform;
+  songLoadedAt: string | null;
   title: string;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [origin, setOrigin] = useState<string>();
-  const embed = useMemo(
-    () => getProviderEmbed(link, platform, origin),
-    [link, origin, platform],
-  );
-  const [status, setStatus] = useState<PlayerStatus>(embed ? "loading" : "error");
+  const [clientOrigin, setClientOrigin] = useState<string | null>(null);
+  const [playerMountedAt, setPlayerMountedAt] = useState<string | null>(null);
+  const embedResult = useMemo(() => {
+    if (!clientOrigin) return { embed: null, generatedAt: null };
+    return {
+      embed: getProviderEmbed(link, platform, clientOrigin),
+      generatedAt: timestamp(),
+    };
+  }, [clientOrigin, link, platform]);
+  const embed = embedResult.embed;
+  const [loadedEmbedSrc, setLoadedEmbedSrc] = useState<string | null>(null);
+  const [iframeLoadedAt, setIframeLoadedAt] = useState<string | null>(null);
+  const [providerReadyAt, setProviderReadyAt] = useState<string | null>(null);
+  const [initializationAttempt, setInitializationAttempt] = useState(1);
+  const [status, setStatus] = useState<PlayerStatus>("loading");
   const [playbackState, setPlaybackState] = useState<PlaybackState>("unknown");
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -128,54 +170,119 @@ export function ProviderPlayer({
   const spanish = locale === "es";
 
   useEffect(() => {
-    setOrigin(window.location.origin);
-    setDebugEnabled(new URLSearchParams(window.location.search).get("debug") === "1");
-  }, []);
+    const mountedAt = timestamp();
+    const queryDebug =
+      new URLSearchParams(window.location.search).get("debug") === "1";
+    if (queryDebug) {
+      window.sessionStorage.setItem("first-listen-player-debug", "1");
+    }
+    setClientOrigin(window.location.origin);
+    setDebugEnabled(
+      queryDebug ||
+        window.sessionStorage.getItem("first-listen-player-debug") === "1",
+    );
+    setPlayerMountedAt(mountedAt);
+    console.info("[First Listen player] Player mounted", {
+      playerMountedAt: mountedAt,
+      songLoadedAt,
+      title,
+    });
+  }, [songLoadedAt, title]);
 
   useEffect(() => {
-    setStatus(embed ? "loading" : "error");
+    setStatus("loading");
     setPlaybackState("unknown");
     setCurrentTime(0);
     setDuration(0);
     setMuted(null);
     setVolume(null);
+    setLoadedEmbedSrc(null);
+    setIframeLoadedAt(null);
+    setProviderReadyAt(null);
+    setInitializationAttempt(1);
+  }, [link, platform]);
+
+  useEffect(() => {
+    if (!clientOrigin) return;
     if (!embed) {
+      setStatus("error");
       console.error("[First Listen player] Unsupported or invalid provider URL", {
         link,
         platform,
+        songLoadedAt,
         title,
       });
       return;
     }
 
     console.info("[First Listen player] Generated provider embed", {
+      embedGeneratedAt: embedResult.generatedAt,
       embedUrl: embed.src,
+      initializationAttempt,
       link,
       platform,
+      playerMountedAt,
+      songLoadedAt,
       telemetry: embed.telemetry,
       title,
     });
-
-    const timeout = window.setTimeout(() => {
-      setStatus((current) => {
-        if (current === "loading") {
-          console.error("[First Listen player] Provider iframe timed out", {
-            embedUrl: embed.src,
-            link,
-            platform,
-            title,
-          });
-          return "error";
-        }
-        return current;
-      });
-    }, 15000);
-
-    return () => window.clearTimeout(timeout);
-  }, [embed, link, platform, title]);
+  }, [
+    clientOrigin,
+    embed,
+    embedResult.generatedAt,
+    initializationAttempt,
+    link,
+    platform,
+    playerMountedAt,
+    songLoadedAt,
+    title,
+  ]);
 
   useEffect(() => {
-    if (!embed || embed.telemetry !== "youtube_iframe_api" || !iframeRef.current) {
+    if (!embed || status !== "loading") return;
+    const timeout = window.setTimeout(() => {
+      if (initializationAttempt < MAX_INITIALIZATION_ATTEMPTS) {
+        console.warn("[First Listen player] Initialization timed out; retrying", {
+          embedUrl: embed.src,
+          initializationAttempt,
+          loadedEmbedSrc,
+          platform,
+          title,
+        });
+        setLoadedEmbedSrc(null);
+        setIframeLoadedAt(null);
+        setInitializationAttempt((current) => current + 1);
+        return;
+      }
+
+      setStatus("error");
+      console.error("[First Listen player] Provider initialization failed", {
+        embedUrl: embed.src,
+        initializationAttempt,
+        link,
+        platform,
+        title,
+      });
+    }, 12000);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    embed,
+    initializationAttempt,
+    link,
+    loadedEmbedSrc,
+    platform,
+    status,
+    title,
+  ]);
+
+  useEffect(() => {
+    if (
+      !embed ||
+      embed.telemetry !== "youtube_iframe_api" ||
+      loadedEmbedSrc !== embed.src ||
+      !iframeRef.current
+    ) {
       return;
     }
 
@@ -219,22 +326,31 @@ export function ProviderPlayer({
         player = new api.Player(iframeRef.current, {
           events: {
             onError: (event) => {
+              if (disposed) return;
               setStatus("error");
               console.error("[First Listen player] YouTube API error", {
                 code: event.data,
                 embedUrl: embed.src,
+                initializationAttempt,
                 link,
                 platform,
                 title,
               });
             },
             onReady: (event) => {
+              if (disposed) return;
+              const readyAt = timestamp();
+              setProviderReadyAt(readyAt);
               setStatus("ready");
               refreshTelemetry(event.target);
-              console.info("[First Listen player] YouTube API ready", {
+              console.info("[First Listen player] Provider ready", {
+                embedGeneratedAt: embedResult.generatedAt,
                 embedUrl: embed.src,
-                link,
-                platform,
+                iframeLoadedAt,
+                initializationAttempt,
+                playerMountedAt,
+                providerReadyAt: readyAt,
+                songLoadedAt,
                 title,
               });
               telemetryInterval = window.setInterval(
@@ -247,13 +363,22 @@ export function ProviderPlayer({
         });
       })
       .catch((error) => {
+        if (disposed) return;
         console.error("[First Listen player] YouTube telemetry unavailable", {
           embedUrl: embed.src,
           error,
+          initializationAttempt,
           link,
           platform,
           title,
         });
+        if (initializationAttempt < MAX_INITIALIZATION_ATTEMPTS) {
+          setLoadedEmbedSrc(null);
+          setIframeLoadedAt(null);
+          setInitializationAttempt((current) => current + 1);
+        } else {
+          setStatus("error");
+        }
       });
 
     return () => {
@@ -265,21 +390,48 @@ export function ProviderPlayer({
         // The provider can remove the iframe before React cleanup completes.
       }
     };
-  }, [embed, link, platform, title]);
+  }, [
+    embed,
+    embedResult.generatedAt,
+    iframeLoadedAt,
+    initializationAttempt,
+    link,
+    loadedEmbedSrc,
+    platform,
+    playerMountedAt,
+    songLoadedAt,
+    title,
+  ]);
 
   const playerLoaded = () => {
-    if (embed?.telemetry !== "youtube_iframe_api") setStatus("ready");
+    if (!embed) return;
+    const loadedAt = timestamp();
+    setLoadedEmbedSrc(embed.src);
+    setIframeLoadedAt(loadedAt);
     console.info("[First Listen player] Provider iframe loaded", {
-      embedUrl: embed?.src,
+      embedUrl: embed.src,
+      iframeLoadedAt: loadedAt,
+      initializationAttempt,
       platform,
       title,
     });
+    if (embed.telemetry !== "youtube_iframe_api") {
+      setProviderReadyAt(loadedAt);
+      setStatus("ready");
+    }
   };
 
   const playerFailed = () => {
+    if (initializationAttempt < MAX_INITIALIZATION_ATTEMPTS) {
+      setLoadedEmbedSrc(null);
+      setIframeLoadedAt(null);
+      setInitializationAttempt((current) => current + 1);
+      return;
+    }
     setStatus("error");
     console.error("[First Listen player] Provider iframe failed", {
       embedUrl: embed?.src,
+      initializationAttempt,
       link,
       platform,
       title,
@@ -304,6 +456,7 @@ export function ProviderPlayer({
         <iframe
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           className={status === "ready" ? "ready" : ""}
+          key={`${embed.src}:${initializationAttempt}`}
           onError={playerFailed}
           onLoad={playerLoaded}
           ref={iframeRef}
@@ -339,8 +492,14 @@ export function ProviderPlayer({
 
       {debugEnabled && (
         <dl className="provider-player-debug" data-testid="provider-player-debug">
+          <div><dt>Song loaded</dt><dd>{songLoadedAt ?? "not recorded"}</dd></div>
+          <div><dt>Player mounted</dt><dd>{playerMountedAt ?? "pending"}</dd></div>
+          <div><dt>Embed generated</dt><dd>{embedResult.generatedAt ?? "pending"}</dd></div>
+          <div><dt>Iframe loaded</dt><dd>{iframeLoadedAt ?? "pending"}</dd></div>
+          <div><dt>Provider ready</dt><dd>{providerReadyAt ?? "pending"}</dd></div>
+          <div><dt>Attempt</dt><dd>{initializationAttempt} / {MAX_INITIALIZATION_ATTEMPTS}</dd></div>
           <div><dt>Provider</dt><dd>{platform}</dd></div>
-          <div><dt>Embed URL</dt><dd>{embed?.src ?? "unavailable"}</dd></div>
+          <div><dt>Embed URL</dt><dd>{embed?.src ?? "pending"}</dd></div>
           <div><dt>Iframe</dt><dd>{status}</dd></div>
           <div><dt>Play state</dt><dd>{playbackState}</dd></div>
           <div><dt>Current time</dt><dd>{currentTime.toFixed(1)}s</dd></div>

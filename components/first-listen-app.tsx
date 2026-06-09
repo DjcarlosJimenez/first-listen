@@ -548,6 +548,10 @@ function ReviewView({
   );
   const queueIndex = 0;
   const song = matchedQueue[queueIndex];
+  const songLoadedAt = useMemo(
+    () => (song ? new Date().toISOString() : null),
+    [song],
+  );
   const matchReason = song ? describeMatch(song, reviewerProfile) : "";
   const [form, setForm] = useState<ReviewForm>(emptyReview);
   const [pastedWithoutEditing, setPastedWithoutEditing] = useState(false);
@@ -649,6 +653,7 @@ function ReviewView({
               link={song.link}
               locale={locale}
               platform={song.platform}
+              songLoadedAt={songLoadedAt}
               title={song.title}
             />
             <span className="listen-badge">
@@ -1695,6 +1700,10 @@ export function FirstListenApp({
   const [queueSongs, setQueueSongs] = useState<Song[]>([]);
 
   useEffect(() => {
+    setView(initialView);
+  }, [initialView]);
+
+  useEffect(() => {
     document.documentElement.lang = locale;
     setToast("");
   }, [locale]);
@@ -1836,9 +1845,11 @@ export function FirstListenApp({
   };
 
   const changeView = (nextView: View) => {
-    setView(nextView);
     setMenuOpen(false);
-    router.push(`/${nextView}`);
+    if (nextView === view) return;
+    const debug =
+      new URLSearchParams(window.location.search).get("debug") === "1";
+    router.push(`/${nextView}${debug ? "?debug=1" : ""}`);
   };
 
   const viewContent = (() => {

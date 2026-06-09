@@ -5,11 +5,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
+const production = process.argv.includes("--production");
 const edgePath =
-  process.argv[2] ??
+  process.argv.slice(2).find((argument) => !argument.startsWith("--")) ??
   "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const appPort = 3002;
 const browserPort = 9334;
+const baseUrl = production
+  ? "https://www.firstlisten.net"
+  : `http://127.0.0.1:${appPort}`;
 
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -127,25 +131,27 @@ try {
     NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
     SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
   };
-  await run(
-    "C:\\Program Files\\nodejs\\node.exe",
-    ["node_modules\\next\\dist\\bin\\next", "build"],
-    environment,
-  );
+  if (!production) {
+    await run(
+      "C:\\Program Files\\nodejs\\node.exe",
+      ["node_modules\\next\\dist\\bin\\next", "build"],
+      environment,
+    );
 
-  app = spawn(
-    "C:\\Program Files\\nodejs\\node.exe",
-    ["node_modules\\next\\dist\\bin\\next", "start", "-p", String(appPort)],
-    { env: environment, stdio: "ignore", windowsHide: true },
-  );
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    try {
-      const response = await fetch(`http://127.0.0.1:${appPort}/login`);
-      if (response.ok) break;
-    } catch {
-      // The production server is still starting.
+    app = spawn(
+      "C:\\Program Files\\nodejs\\node.exe",
+      ["node_modules\\next\\dist\\bin\\next", "start", "-p", String(appPort)],
+      { env: environment, stdio: "ignore", windowsHide: true },
+    );
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      try {
+        const response = await fetch(`${baseUrl}/login`);
+        if (response.ok) break;
+      } catch {
+        // The production server is still starting.
+      }
+      await delay(250);
     }
-    await delay(250);
   }
 
   browser = spawn(
@@ -187,9 +193,27 @@ try {
 
   let commandId = 0;
   const pendingCommands = new Map();
+  const browserMessages = [];
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(event.data);
-    if (!message.id) return;
+    if (!message.id) {
+      if (message.method === "Runtime.consoleAPICalled") {
+        browserMessages.push(
+          message.params.args
+            .map((argument) => argument.value ?? argument.description ?? "")
+            .join(" "),
+        );
+      } else if (message.method === "Runtime.exceptionThrown") {
+        browserMessages.push(
+          message.params.exceptionDetails.exception?.description ??
+            message.params.exceptionDetails.text ??
+            "Runtime exception",
+        );
+      } else if (message.method === "Log.entryAdded") {
+        browserMessages.push(message.params.entry.text);
+      }
+      return;
+    }
     const pending = pendingCommands.get(message.id);
     if (!pending) return;
     pendingCommands.delete(message.id);
@@ -231,8 +255,9 @@ try {
   };
 
   await command("Page.enable");
+  await command("Log.enable");
   await command("Runtime.enable");
-  await navigate(`http://127.0.0.1:${appPort}/login`);
+  await navigate(`${baseUrl}/login`);
   await evaluate(`(() => {
     const setInput = (selector, value) => {
       const input = document.querySelector(selector);
@@ -256,7 +281,7 @@ try {
     throw new Error(`UI login did not reach the dashboard: ${loggedInUrl}`);
   }
 
-  await navigate(`http://127.0.0.1:${appPort}/submit?debug=1`);
+  await navigate(`${baseUrl}/submit?debug=1`);
   const setField = async (selector, value) =>
     evaluate(`(() => {
       const input = document.querySelector(${JSON.stringify(selector)});
@@ -309,6 +334,75 @@ try {
     throw new Error("Submission UI state did not match the expected validation behavior.");
   }
 
+  await navigate(`${baseUrl}/dashboard?debug=1`);
+  const routeTransitionResults = [];
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const navigationStartedAt = Date.now();
+    const clickedReview = await evaluate(`(() => {
+      const button = document.querySelectorAll(".sidebar nav button")[0];
+      button?.click();
+      return Boolean(button);
+    })()`);
+    if (!clickedReview) throw new Error("Review Songs navigation button was not found.");
+
+    const playerState = await waitFor(
+      `(() => ({
+        diagnostics: Object.fromEntries(
+          [...document.querySelectorAll(".provider-player-debug > div")].map((row) => [
+            row.querySelector("dt")?.textContent ?? "",
+            row.querySelector("dd")?.textContent ?? ""
+          ])
+        ),
+        iframeReady: Boolean(document.querySelector(".provider-player iframe.ready")),
+        loading: document.querySelector(".provider-player-status")?.textContent ?? "",
+        url: window.location.href
+      }))()`,
+      (value) => value.iframeReady,
+      20000,
+    );
+    routeTransitionResults.push({
+      attempt,
+      readyMilliseconds: Date.now() - navigationStartedAt,
+      ...playerState,
+    });
+    if (!playerState.iframeReady) {
+      throw new Error(
+        `Provider did not become ready after client navigation attempt ${attempt}: ${JSON.stringify(playerState)}`,
+      );
+    }
+    if (
+      !playerState.diagnostics["Song loaded"] ||
+      !playerState.diagnostics["Embed generated"] ||
+      !playerState.diagnostics["Player mounted"] ||
+      !playerState.diagnostics["Provider ready"] ||
+      playerState.diagnostics["Provider ready"] === "pending"
+    ) {
+      throw new Error(
+        `Player lifecycle diagnostics were incomplete after attempt ${attempt}: ${JSON.stringify(playerState.diagnostics)}`,
+      );
+    }
+
+    const clickedDashboard = await evaluate(`(() => {
+      const button = document.querySelectorAll(".sidebar nav button")[1];
+      button?.click();
+      return Boolean(button);
+    })()`);
+    if (!clickedDashboard) throw new Error("Artist Dashboard navigation button was not found.");
+    await waitFor(
+      "window.location.pathname",
+      (value) => value === "/dashboard",
+    );
+  }
+
+  const hydrationMessages = browserMessages.filter((message) =>
+    /hydration|did not match|server rendered html/i.test(message),
+  );
+  if (hydrationMessages.length > 0) {
+    throw new Error(
+      `Hydration errors were logged during route-transition testing: ${JSON.stringify(hydrationMessages)}`,
+    );
+  }
+
   console.log(
     JSON.stringify(
       {
@@ -316,7 +410,11 @@ try {
         direct_track_submit_enabled: true,
         playlist_error_visible: playlistState.linkMessage,
         playlist_submit_disabled: true,
+        route_transition_results: routeTransitionResults,
+        runtime_message_count: browserMessages.length,
+        hydration_messages: hydrationMessages,
         status: "passed",
+        target: production ? "production" : "local",
         track_debug: trackState.debug,
       },
       null,
