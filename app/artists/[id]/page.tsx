@@ -15,6 +15,8 @@ type PublicArtistRow = {
   genres: string[];
   languages: string[];
   is_following: boolean;
+  average_rating: number;
+  listening_hours_received: number;
 };
 
 type PublicArtistSongRow = {
@@ -59,6 +61,10 @@ export default async function ArtistPage({
         genres: artist.genres ?? [],
         languages: artist.languages ?? [],
         isFollowing: Boolean(artist.is_following),
+        averageRating: Number(artist.average_rating ?? 0),
+        listeningHoursReceived: Number(
+          artist.listening_hours_received ?? 0,
+        ),
       }}
       songs={((songRows ?? []) as PublicArtistSongRow[]).map((song) => ({
         id: song.song_id,

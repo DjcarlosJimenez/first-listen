@@ -11,10 +11,15 @@ export default async function ProfilePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/profile");
 
-  const [{ data: profile }, { data: songs }, { data: savedSongs }] = await Promise.all([
+  const [
+    { data: profile },
+    { data: songs },
+    { data: savedSongs },
+    { data: impactRows },
+  ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("display_name, founder_number, role, credits, show_explicit_content")
+      .select("display_name, founder_number, founder_free_submissions_remaining, role, credits, show_explicit_content")
       .eq("id", user.id)
       .single(),
     supabase
@@ -23,6 +28,7 @@ export default async function ProfilePage() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
     supabase.rpc("get_saved_songs"),
+    supabase.rpc("get_listener_impact_profile"),
   ]);
   if (!profile) redirect("/login?error=profile");
 
@@ -35,8 +41,13 @@ export default async function ProfilePage() {
         founder: profile.founder_number !== null,
         role: profile.role,
         credits: profile.credits,
+        founderSubmissionsRemaining:
+          profile.founder_free_submissions_remaining,
         showExplicitContent: profile.show_explicit_content,
       }}
+      impact={(
+        Array.isArray(impactRows) ? impactRows[0] : impactRows
+      ) as never}
       savedSongs={(savedSongs ?? []) as never}
       songs={songs ?? []}
     />

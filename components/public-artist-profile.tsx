@@ -32,6 +32,8 @@ type PublicArtist = {
   genres: string[];
   languages: string[];
   isFollowing: boolean;
+  averageRating: number;
+  listeningHoursReceived: number;
 };
 
 type PublicSong = {
@@ -123,6 +125,8 @@ export function PublicArtistProfile({
           <div className="artist-profile-stats">
             <span><Users size={14} /> {followerCount} followers</span>
             <span><Music2 size={14} /> {artist.songsSubmitted} songs submitted</span>
+            <span><Star size={14} /> {artist.averageRating.toFixed(1)} average rating</span>
+            <span><Headphones size={14} /> {artist.listeningHoursReceived.toFixed(1)} listening hours received</span>
           </div>
           <div className="artist-profile-tags">
             {artist.genres.map((genre) => <span key={genre}>{genre}</span>)}

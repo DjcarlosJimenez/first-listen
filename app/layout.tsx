@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "First Listen - Know if your song hooks listeners",
+  title: "First Listen - Real Listeners. Real Viewers. Real Reactions.",
   description:
-    "Get honest first-impression feedback before spending money on music promotion.",
+    "Get your first listens, views, reactions, and engagement from real people before spending money on promotion.",
 };
 
 export default function RootLayout({

@@ -44,6 +44,8 @@ type ListeningBankRow = {
   pending_seconds: number;
   lifetime_seconds: number;
   today_seconds: number;
+  weekly_seconds: number;
+  monthly_seconds: number;
   available_reward_credits: number;
   seconds_to_next_credit: number;
   minutes_per_credit: number;
@@ -51,6 +53,9 @@ type ListeningBankRow = {
   level_number: number;
   level_name: string;
   rewards_enabled: boolean;
+  community_points: number;
+  community_rank: string;
+  valid_listens: number;
 };
 
 type DiscoveryRow = {
@@ -141,7 +146,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "display_name, founder_number, credits, total_review_credits_earned, review_quality_score, languages_understood, genre_preferences, interface_language, onboarding_completed, role",
+      "display_name, founder_number, founder_free_submissions_remaining, credits, total_review_credits_earned, review_quality_score, languages_understood, genre_preferences, interface_language, onboarding_completed, role",
     )
     .eq("id", user.id)
     .single();
@@ -261,6 +266,8 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     pendingSeconds: Number(listeningRow?.pending_seconds ?? 0),
     lifetimeSeconds: Number(listeningRow?.lifetime_seconds ?? 0),
     todaySeconds: Number(listeningRow?.today_seconds ?? 0),
+    weeklySeconds: Number(listeningRow?.weekly_seconds ?? 0),
+    monthlySeconds: Number(listeningRow?.monthly_seconds ?? 0),
     availableRewardCredits: Number(
       listeningRow?.available_reward_credits ?? 0,
     ),
@@ -270,6 +277,9 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     levelNumber: Number(listeningRow?.level_number ?? 1),
     levelName: listeningRow?.level_name ?? "Explorer",
     rewardsEnabled: Boolean(listeningRow?.rewards_enabled ?? true),
+    communityPoints: Number(listeningRow?.community_points ?? 0),
+    communityRank: listeningRow?.community_rank ?? "New Member",
+    validListens: Number(listeningRow?.valid_listens ?? 0),
   };
 
   const missionRow = (
@@ -317,6 +327,9 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
           initials: getInitials(profile.display_name),
         },
         founder: profile.founder_number !== null,
+        founderSubmissionsRemaining: Number(
+          profile.founder_free_submissions_remaining ?? 0,
+        ),
         reviewCredits: Number(profile.credits ?? 0),
         totalCreditsEarned: Number(profile.total_review_credits_earned ?? 0),
         reviewQualityScore: Math.round(Number(profile.review_quality_score ?? 100)),

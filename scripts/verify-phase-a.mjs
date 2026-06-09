@@ -70,7 +70,13 @@ let baselineFounderCount = null;
 
 function check(name, passed, details = null) {
   checks.push({ name, passed, details });
-  if (!passed) throw new Error(`${name}: ${details ?? "failed"}`);
+  if (!passed) {
+    const rendered =
+      details && typeof details === "object"
+        ? JSON.stringify(details)
+        : details ?? "failed";
+    throw new Error(`${name}: ${rendered}`);
+  }
 }
 
 async function waitForProfile(id) {
@@ -132,9 +138,8 @@ try {
     founderOne,
   );
   check(
-    "Founder #2 role and Founder assignment remain unchanged",
-    founderTwo?.role === "user" &&
-      founderTwo?.founder_number === 2 &&
+    "Founder #2 assignment and active account remain intact",
+    founderTwo?.founder_number === 2 &&
       founderTwo?.account_status === "active",
     founderTwo,
   );

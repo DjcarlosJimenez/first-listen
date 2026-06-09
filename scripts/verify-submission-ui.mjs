@@ -315,6 +315,8 @@ try {
   await setField("#genre", "Pop");
   await setField("#song-language", "English");
   await setField("#country", "United States");
+  await setField('input[aria-label="Minutes"]', "3");
+  await setField('input[aria-label="Seconds"]', "30");
   await setField("#cover-url", "");
   await evaluate(`(() => {
     document.querySelector(".focus-picker button")?.click();
@@ -353,7 +355,10 @@ try {
     `(() => ({
       artist: document.querySelector("#artist-name")?.value ?? null,
       country: document.querySelector("#country")?.value ?? null,
+      contentKind: document.querySelector("#content-kind")?.value ?? null,
       cover: document.querySelector("#cover-url")?.value ?? null,
+      durationMinutes: document.querySelector('input[aria-label="Minutes"]')?.value ?? null,
+      durationSeconds: document.querySelector('input[aria-label="Seconds"]')?.value ?? null,
       explicitChecked: Boolean(document.querySelector('.explicit-field input:checked')),
       focusSelected: document.querySelectorAll(".focus-picker button.selected").length,
       genre: document.querySelector("#genre")?.value ?? null,
@@ -367,7 +372,10 @@ try {
   if (
     resetState.artist !== "" ||
     resetState.country !== "" ||
+    resetState.contentKind !== "song" ||
     resetState.cover !== "" ||
+    resetState.durationMinutes !== "" ||
+    resetState.durationSeconds !== "" ||
     resetState.explicitChecked ||
     resetState.focusSelected !== 0 ||
     resetState.genre !== "" ||
@@ -419,9 +427,10 @@ try {
     !listeningBankState.discoveryVisible ||
     listeningBankState.claimDisabled !== true ||
     !listeningBankState.text.toLowerCase().includes("listening bank") ||
-    !listeningBankState.text.toLowerCase().includes("pending minutes") ||
-    !listeningBankState.text.toLowerCase().includes("approved minutes") ||
-    !listeningBankState.text.includes("0.5 min") ||
+    !listeningBankState.text.toLowerCase().includes("today's verified listening") ||
+    !listeningBankState.text.toLowerCase().includes("weekly verified listening") ||
+    !listeningBankState.text.toLowerCase().includes("monthly verified listening") ||
+    !listeningBankState.text.toLowerCase().includes("community rank") ||
     !listeningBankState.text.includes("0.8 min") ||
     !listeningBankState.text.toLowerCase().includes("explorer")
   ) {
@@ -620,9 +629,10 @@ try {
   );
   if (
     !spanishPostReview.includes("Sigue escuchando") ||
-    !spanishPostReview.includes("Tu próxima review está lista") ||
+    !spanishPostReview.includes("Continuar escuchando") ||
+    !spanishPostReview.includes("Siguiente canción") ||
     spanishPostReview.includes("Keep listening") ||
-    spanishPostReview.includes("Your next review is ready")
+    spanishPostReview.includes("Continue Listening")
   ) {
     throw new Error(
       `Post-review localization is incomplete: ${spanishPostReview}`,

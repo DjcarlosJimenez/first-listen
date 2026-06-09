@@ -21,6 +21,8 @@ type AdminUser = {
   display_name: string;
   role: "super_admin" | "admin" | "moderator" | "user";
   account_status: "active" | "suspended";
+  banned_at: string | null;
+  warning_count: number;
   credits: number;
   completed_reviews: number;
   created_at: string;
@@ -33,6 +35,10 @@ type AdminSong = {
   platform: string;
   is_active: boolean;
   featured: boolean;
+  content_kind: string;
+  content_duration_seconds: number | null;
+  queue_tier: string;
+  approval_status: string;
   created_at: string;
 };
 
@@ -43,6 +49,21 @@ type AdminReport = {
   details: string | null;
   created_at: string;
   songs: { title: string; artist_name: string } | null;
+};
+
+type AdminCommentReport = {
+  id: string;
+  review_id: string;
+  reported_user_id: string;
+  reason: string;
+  status: string;
+  details: string | null;
+  created_at: string;
+  reviews: {
+    comment: string;
+    songs: { title: string; artist_name: string } | null;
+  } | null;
+  profiles: { display_name: string } | null;
 };
 
 type SpotlightSlot = {
@@ -78,6 +99,7 @@ export function AdminPanel({
   users,
   songs,
   reports,
+  commentReports,
   initialSection = "users",
   listeningSettings,
   spotlightSlots,
@@ -88,6 +110,7 @@ export function AdminPanel({
   users: AdminUser[];
   songs: AdminSong[];
   reports: AdminReport[];
+  commentReports: AdminCommentReport[];
   initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics";
   listeningSettings: {
     minutes_per_credit: number;
@@ -107,6 +130,11 @@ export function AdminPanel({
 }) {
   const [section, setSection] = useState<"users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics">(initialSection);
   const [notice, setNotice] = useState("");
+  const [creditChanges, setCreditChanges] = useState<Record<string, string>>({});
+  const [creditReasons, setCreditReasons] = useState<Record<string, string>>({});
+  const [moderationReasons, setModerationReasons] = useState<
+    Record<string, string>
+  >({});
   const [minutesPerCredit, setMinutesPerCredit] = useState(
     listeningSettings.minutes_per_credit,
   );
@@ -166,8 +194,8 @@ export function AdminPanel({
   ] as const;
   const sections = allSections.filter(([id]) => {
     if (role === "super_admin") return true;
-    if (role === "admin") return !["users", "credits", "listening"].includes(id);
-    return id === "reports";
+    if (role === "admin") return !["credits", "listening"].includes(id);
+    return ["users", "reports"].includes(id);
   });
 
   return (
@@ -190,38 +218,92 @@ export function AdminPanel({
         <section className="admin-content">
           {notice && <div className="admin-notice" role="status">{notice}</div>}
 
-          {section === "users" && isSuper && (
+          {section === "users" && (
             <>
               <h2>Users</h2>
               <div className="admin-table">
                 {users.map((user) => (
                   <article key={user.id}>
-                    <div><strong>{user.display_name}</strong><small>{user.role} / {user.account_status}</small></div>
-                    <span>{user.credits} credits</span>
-                    {isSuper && (
-                      <div className="admin-actions">
-                        <select
-                          aria-label={`Role for ${user.display_name}`}
-                          defaultValue={user.role}
-                          onChange={(event) => void runRpc("admin_set_role", {
+                    <div>
+                      <strong>{user.display_name}</strong>
+                      <small>
+                        {user.role} / {user.banned_at ? "banned" : user.account_status} /{" "}
+                        {user.warning_count} warnings
+                      </small>
+                    </div>
+                    <span>{user.credits} tokens</span>
+                    <div className="admin-actions admin-user-actions">
+                      {isSuper && (
+                        <>
+                          <select
+                            aria-label={`Role for ${user.display_name}`}
+                            defaultValue={user.role}
+                            onChange={(event) => void runRpc("admin_set_role", {
+                              target_user_id: user.id,
+                              new_role: event.target.value,
+                            })}
+                          >
+                            <option value="user">User</option>
+                            <option value="moderator">Moderator</option>
+                            <option value="admin">Admin</option>
+                            <option value="super_admin">Super Admin</option>
+                          </select>
+                          <button onClick={() => void resetPassword(user.id)}>Send password reset</button>
+                        </>
+                      )}
+                      <input
+                        aria-label={`Moderation reason for ${user.display_name}`}
+                        onChange={(event) =>
+                          setModerationReasons((current) => ({
+                            ...current,
+                            [user.id]: event.target.value,
+                          }))
+                        }
+                        placeholder="Moderation reason"
+                        value={moderationReasons[user.id] ?? ""}
+                      />
+                      <button
+                        onClick={() =>
+                          void runRpc("admin_issue_user_warning", {
                             target_user_id: user.id,
-                            new_role: event.target.value,
-                          })}
-                        >
-                          <option value="user">User</option>
-                          <option value="moderator">Moderator</option>
-                          <option value="admin">Admin</option>
-                          <option value="super_admin">Super Admin</option>
-                        </select>
-                        <button onClick={() => void runRpc("admin_set_account_status", {
-                          target_user_id: user.id,
-                          new_status: user.account_status === "active" ? "suspended" : "active",
-                        })}>
-                          {user.account_status === "active" ? "Suspend" : "Activate"}
-                        </button>
-                        <button onClick={() => void resetPassword(user.id)}>Send password reset</button>
-                      </div>
-                    )}
+                            warning_reason:
+                              moderationReasons[user.id] ||
+                              "Community guideline violation",
+                          })
+                        }
+                      >
+                        Warn
+                      </button>
+                      <button
+                        onClick={() =>
+                          void runRpc("admin_enforce_account", {
+                            target_user_id: user.id,
+                            enforcement:
+                              user.account_status === "active"
+                                ? "suspend"
+                                : "activate",
+                            enforcement_reason:
+                              moderationReasons[user.id] ||
+                              "Moderator account action",
+                          })
+                        }
+                      >
+                        {user.account_status === "active" ? "Suspend" : "Activate"}
+                      </button>
+                      <button
+                        onClick={() =>
+                          void runRpc("admin_enforce_account", {
+                            target_user_id: user.id,
+                            enforcement: "ban",
+                            enforcement_reason:
+                              moderationReasons[user.id] ||
+                              "Repeated community guideline violations",
+                          })
+                        }
+                      >
+                        Ban
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -236,10 +318,48 @@ export function AdminPanel({
                   <article key={song.id}>
                     <div><strong>{song.title}</strong><small>{song.artist_name} / {song.platform}</small></div>
                     <span>
-                      {song.is_active ? "Active" : "Removed"}
+                      {song.approval_status === "pending"
+                        ? "Pending long-form approval"
+                        : song.is_active
+                          ? "Active"
+                          : "Removed"}
                       {song.featured ? " / Spotlight" : ""}
+                      {song.content_duration_seconds
+                        ? ` / ${Math.floor(song.content_duration_seconds / 60)}:${String(
+                            song.content_duration_seconds % 60,
+                          ).padStart(2, "0")}`
+                        : ""}
                     </span>
                     <div className="admin-actions">
+                      {song.approval_status === "pending" &&
+                        role !== "moderator" && (
+                          <>
+                            <button
+                              onClick={() =>
+                                void runRpc("admin_approve_long_form_song", {
+                                  target_song_id: song.id,
+                                  approve: true,
+                                  approval_reason:
+                                    "Approved for the long-form queue",
+                                })
+                              }
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() =>
+                                void runRpc("admin_approve_long_form_song", {
+                                  target_song_id: song.id,
+                                  approve: false,
+                                  approval_reason:
+                                    "Not approved for the public queue",
+                                })
+                              }
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
                       <button onClick={() => void runRpc("admin_set_song_state", {
                         target_song_id: song.id,
                         active: !song.is_active,
@@ -276,30 +396,171 @@ export function AdminPanel({
                   </article>
                 ))}
               </div>
+              <div className="admin-discovery-divider">
+                <span className="eyebrow">Comment moderation</span>
+                <h3>Reported review comments</h3>
+              </div>
+              <div className="admin-table">
+                {commentReports.length ? (
+                  commentReports.map((report) => (
+                    <article key={report.id}>
+                      <div>
+                        <strong>
+                          {report.reviews?.songs?.title ?? "Deleted song"}
+                        </strong>
+                        <small>
+                          {report.profiles?.display_name ?? "Listener"} /{" "}
+                          {report.reason.replaceAll("_", " ")} / {report.status}
+                        </small>
+                      </div>
+                      <span>
+                        {report.reviews?.comment ?? report.details ?? "No comment"}
+                      </span>
+                      <div className="admin-actions">
+                        <button
+                          onClick={() =>
+                            void runRpc("admin_moderate_review_comment", {
+                              target_review_id: report.review_id,
+                              moderation_action: "remove",
+                              moderation_reason: report.reason.replaceAll("_", " "),
+                            })
+                          }
+                        >
+                          Remove comment
+                        </button>
+                        <button
+                          onClick={() =>
+                            void runRpc("admin_issue_user_warning", {
+                              target_user_id: report.reported_user_id,
+                              warning_reason: `Reported comment: ${report.reason.replaceAll("_", " ")}`,
+                            })
+                          }
+                        >
+                          Warn user
+                        </button>
+                        <button
+                          onClick={() =>
+                            void runRpc("admin_enforce_account", {
+                              target_user_id: report.reported_user_id,
+                              enforcement: "suspend",
+                              enforcement_reason: `Reported comment: ${report.reason.replaceAll("_", " ")}`,
+                            })
+                          }
+                        >
+                          Suspend
+                        </button>
+                        <button
+                          onClick={() =>
+                            void runRpc("admin_resolve_comment_report", {
+                              target_report_id: report.id,
+                              new_status: "resolved",
+                            })
+                          }
+                        >
+                          Resolve
+                        </button>
+                        <button
+                          onClick={() =>
+                            void runRpc("admin_resolve_comment_report", {
+                              target_report_id: report.id,
+                              new_status: "dismissed",
+                            })
+                          }
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div className="empty-state">No comment reports.</div>
+                )}
+              </div>
             </>
           )}
 
           {section === "credits" && isSuper && (
             <>
               <h2>Credits</h2>
+              <p className="admin-section-copy">
+                Submission credits are displayed to members as Tokens. Enter a
+                positive or negative amount; every change remains in the audit
+                and credit ledgers.
+              </p>
               <div className="admin-table">
-                  {users.map((user) => (
+                {users.map((user) => {
+                  const delta = Number(creditChanges[user.id] ?? 0);
+                  const nextBalance = user.credits + (Number.isFinite(delta) ? delta : 0);
+                  return (
                     <article key={user.id}>
-                      <div><strong>{user.display_name}</strong><small>{user.credits} credits</small></div>
-                      <div className="admin-actions">
-                        <button onClick={() => void runRpc("admin_adjust_credits", {
-                          target_user_id: user.id,
-                          credit_delta: 1,
-                          adjustment_reason: "Admin adjustment",
-                        })}>+1</button>
-                        <button onClick={() => void runRpc("admin_adjust_credits", {
-                          target_user_id: user.id,
-                          credit_delta: -1,
-                          adjustment_reason: "Admin adjustment",
-                        })}>-1</button>
+                      <div>
+                        <strong>{user.display_name}</strong>
+                        <small>Current balance: {user.credits} tokens</small>
+                      </div>
+                      <div className="credit-adjustment-preview">
+                        <span>Change: {delta > 0 ? `+${delta}` : delta}</span>
+                        <strong>New balance: {nextBalance}</strong>
+                      </div>
+                      <div className="admin-actions credit-adjustment-actions">
+                        <input
+                          aria-label={`Token change for ${user.display_name}`}
+                          onChange={(event) =>
+                            setCreditChanges((current) => ({
+                              ...current,
+                              [user.id]: event.target.value,
+                            }))
+                          }
+                          placeholder="+10 or -3"
+                          type="number"
+                          value={creditChanges[user.id] ?? ""}
+                        />
+                        <input
+                          aria-label={`Reason for ${user.display_name}`}
+                          onChange={(event) =>
+                            setCreditReasons((current) => ({
+                              ...current,
+                              [user.id]: event.target.value,
+                            }))
+                          }
+                          placeholder="Adjustment reason"
+                          value={creditReasons[user.id] ?? ""}
+                        />
+                        {[3, 10, 25, 50, 100].map((amount) => (
+                          <button
+                            key={amount}
+                            onClick={() =>
+                              setCreditChanges((current) => ({
+                                ...current,
+                                [user.id]: String(amount),
+                              }))
+                            }
+                            type="button"
+                          >
+                            +{amount}
+                          </button>
+                        ))}
+                        <button
+                          disabled={
+                            !Number.isInteger(delta) ||
+                            delta === 0 ||
+                            nextBalance < 0
+                          }
+                          onClick={() =>
+                            void runRpc("admin_adjust_credits", {
+                              target_user_id: user.id,
+                              credit_delta: delta,
+                              adjustment_reason:
+                                creditReasons[user.id] || "Admin token adjustment",
+                            })
+                          }
+                          type="button"
+                        >
+                          Apply change
+                        </button>
                       </div>
                     </article>
-                  ))}
+                  );
+                })}
               </div>
             </>
           )}
@@ -436,7 +697,7 @@ export function AdminPanel({
                             {boost.profiles?.display_name ?? "Artist"}
                           </small>
                         </div>
-                        <span>{boost.credit_cost} credit</span>
+                        <span>{boost.credit_cost} tokens</span>
                         <div className="admin-actions">
                           <button
                             onClick={() =>
@@ -475,7 +736,7 @@ export function AdminPanel({
               <h2>Listen-to-Earn Settings</h2>
               <div className="admin-settings-card">
                 <label>
-                  Minutes per credit
+                  Minutes per token
                   <input
                     min={30}
                     max={1440}

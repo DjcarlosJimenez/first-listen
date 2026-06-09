@@ -63,10 +63,15 @@ const { data: discoveryData, error: discoveryError } = await supabase.rpc(
   "discovery_system_health_report",
 );
 if (discoveryError) throw discoveryError;
+const { data: alphaData, error: alphaError } = await supabase.rpc(
+  "master_alpha_health_report",
+);
+if (alphaError) throw alphaError;
 
 const report = data ?? {};
 const listeningReport = listeningData ?? {};
 const discoveryReport = discoveryData ?? {};
+const alphaReport = alphaData ?? {};
 const requiredPlatforms = [
   "youtube",
   "spotify",
@@ -192,6 +197,41 @@ const checks = [
     passed: discoveryReport.top_ten_is_organic === true,
     details: discoveryReport.top_ten_is_organic,
   },
+  {
+    name: "Master Alpha tables exist",
+    passed: Object.values(alphaReport.tables ?? {}).every(Boolean),
+    details: alphaReport.tables,
+  },
+  {
+    name: "Master Alpha functions exist",
+    passed: Object.values(alphaReport.functions ?? {}).every(Boolean),
+    details: alphaReport.functions,
+  },
+  {
+    name: "Master Alpha RLS is enabled",
+    passed: Object.values(alphaReport.rls ?? {}).every(Boolean),
+    details: alphaReport.rls,
+  },
+  {
+    name: "Founder submission balances are valid",
+    passed: Number(alphaReport.invalid_founder_submission_balances ?? -1) === 0,
+    details: alphaReport.invalid_founder_submission_balances,
+  },
+  {
+    name: "Community Point ledger matches profile balances",
+    passed: Number(alphaReport.community_point_balance_mismatches ?? -1) === 0,
+    details: alphaReport.community_point_balance_mismatches,
+  },
+  {
+    name: "No orphan comment reports",
+    passed: Number(alphaReport.orphan_comment_reports ?? -1) === 0,
+    details: alphaReport.orphan_comment_reports,
+  },
+  {
+    name: "No unapproved long-form content is active",
+    passed: Number(alphaReport.invalid_active_long_form ?? -1) === 0,
+    details: alphaReport.invalid_active_long_form,
+  },
 ];
 
 const passed = checks.filter((check) => check.passed).length;
@@ -199,6 +239,7 @@ const score = Math.round((passed / checks.length) * 100);
 const result = {
   score,
   status: score === 100 ? "healthy" : score >= 80 ? "needs_attention" : "unhealthy",
+  alphaReport,
   checks,
   discoveryReport,
   report,

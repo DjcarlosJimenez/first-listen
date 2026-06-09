@@ -70,6 +70,7 @@ const userIds = [];
 const programIds = { contests: [], events: [] };
 const checks = [];
 let originalSlots = [];
+let reviewerId = null;
 
 function record(name, details = true) {
   checks.push({ name, passed: true, details });
@@ -141,13 +142,34 @@ async function submitVerifiedReview(songId, rating) {
     .update({
       telemetry_supported: true,
       provider_duration_seconds: 120,
+      valid_requirement_seconds: 30,
+      valid_listen_at: new Date().toISOString(),
+      community_point_awarded: true,
       last_position_seconds: 60,
       max_position_seconds: 60,
       verified_seconds: 60,
+      settled_seconds: 60,
       last_heartbeat_at: new Date().toISOString(),
     })
     .eq("id", session.session_id);
   assertNoError(prepared.error, "Prepare verified session");
+
+  const currentProfile = await service
+    .from("profiles")
+    .select("listening_bank_seconds, lifetime_listening_seconds")
+    .eq("id", reviewerId)
+    .single();
+  assertNoError(currentProfile.error, "Read reviewer listening balances");
+  const banked = await service
+    .from("profiles")
+    .update({
+      listening_bank_seconds:
+        Number(currentProfile.data.listening_bank_seconds) + 60,
+      lifetime_listening_seconds:
+        Number(currentProfile.data.lifetime_listening_seconds) + 60,
+    })
+    .eq("id", reviewerId);
+  assertNoError(banked.error, "Mirror immediate heartbeat banking");
 
   return rpc(
     reviewerClient,
@@ -204,7 +226,8 @@ try {
 
   const admin = await createUser("admin");
   const owner = await createUser("owner");
-  await createUser("reviewer");
+  const reviewer = await createUser("reviewer");
+  reviewerId = reviewer.id;
   await createUser("viewer");
 
   assertNoError(
@@ -290,7 +313,8 @@ try {
   record("Spotlight exposes exactly two admin-selected songs");
 
   const firstReview = await submitVerifiedReview(songOne, 9);
-  assert(firstReview.listening_seconds_banked === 60, "First listen was not banked");
+  assert(firstReview.listening_seconds_banked === 0, "First listen was banked twice");
+  assert(firstReview.community_points_awarded === 5, "First review points are incorrect");
   let mission = await rpc(
     reviewerClient,
     "get_daily_mission_status",
@@ -303,7 +327,8 @@ try {
   );
 
   const secondReview = await submitVerifiedReview(songTwo, 8);
-  assert(secondReview.listening_seconds_banked === 60, "Second listen was not banked");
+  assert(secondReview.listening_seconds_banked === 0, "Second listen was banked twice");
+  assert(secondReview.community_points_awarded === 5, "Second review points are incorrect");
   mission = await rpc(
     reviewerClient,
     "get_daily_mission_status",
@@ -327,7 +352,7 @@ try {
       Number(bankBeforeClaim.pending_seconds) === 0,
     "Approved and pending listening balances are incorrect",
   );
-  record("Listening Bank distinguishes pending from approved seconds", bankBeforeClaim);
+  record("Listening Bank reports immediately approved verified seconds", bankBeforeClaim);
 
   const missionClaim = await rpc(
     reviewerClient,

@@ -78,6 +78,8 @@ export type ListeningBankStatus = {
   pendingSeconds: number;
   lifetimeSeconds: number;
   todaySeconds: number;
+  weeklySeconds: number;
+  monthlySeconds: number;
   availableRewardCredits: number;
   secondsToNextCredit: number;
   minutesPerCredit: number;
@@ -85,6 +87,20 @@ export type ListeningBankStatus = {
   levelNumber: number;
   levelName: string;
   rewardsEnabled: boolean;
+  communityPoints: number;
+  communityRank: string;
+  validListens: number;
+};
+
+export type ListenerImpact = {
+  supportingSeconds: number;
+  songsReviewed: number;
+  creatorsSupported: number;
+  validListens: number;
+  averageListeningSeconds: number;
+  daysActive: number;
+  communityPoints: number;
+  communityRank: string;
 };
 
 export type DiscoverySong = {

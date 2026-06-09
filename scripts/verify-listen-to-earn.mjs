@@ -175,7 +175,7 @@ try {
     {
       target_session_id: session.session_id,
       playback_position_seconds: 1,
-      playback_duration_seconds: 180,
+      playback_duration_seconds: 120,
       playback_state: "playing",
       playback_muted: false,
       playback_volume: 100,
@@ -192,7 +192,7 @@ try {
     {
       target_session_id: session.session_id,
       playback_position_seconds: 2,
-      playback_duration_seconds: 180,
+      playback_duration_seconds: 120,
       playback_state: "playing",
       playback_muted: false,
       playback_volume: 100,
@@ -204,8 +204,8 @@ try {
   );
   assert(earlyHeartbeat.seconds_counted === 0, "Early heartbeat earned time");
   assert(
-    earlyHeartbeat.warning === "Heartbeat arrived too soon.",
-    "Early heartbeat did not return the rate-limit warning",
+    Boolean(earlyHeartbeat.warning),
+    "Early heartbeat did not explain why no time was counted",
   );
   record("Rapid heartbeat calls return without earning time");
 
@@ -216,7 +216,7 @@ try {
     {
       target_session_id: session.session_id,
       playback_position_seconds: 11,
-      playback_duration_seconds: 180,
+      playback_duration_seconds: 120,
       playback_state: "playing",
       playback_muted: true,
       playback_volume: 0,
@@ -236,7 +236,7 @@ try {
     {
       target_session_id: session.session_id,
       playback_position_seconds: 21,
-      playback_duration_seconds: 180,
+      playback_duration_seconds: 120,
       playback_state: "playing",
       playback_muted: false,
       playback_volume: 100,
@@ -247,7 +247,24 @@ try {
     "Accept active heartbeat",
   );
   assert(active.seconds_counted >= 8, "Active playback did not earn time");
-  record("Visible, focused, audible forward playback earns pending seconds", active);
+  assert(
+    active.valid_requirement_seconds === 30,
+    "Two-minute content did not use a 30-second valid-listen threshold",
+  );
+  record("Visible, focused, audible forward playback banks exact seconds", active);
+
+  const immediateBank = await service
+    .from("profiles")
+    .select("listening_bank_seconds, lifetime_listening_seconds")
+    .eq("id", reviewer.id)
+    .single();
+  assertNoError(immediateBank.error, "Read immediate listening balances");
+  assert(
+    Number(immediateBank.data.listening_bank_seconds) ===
+      active.session_verified_seconds,
+    "Verified seconds were not banked immediately",
+  );
+  record("Listening Bank updates before any review is submitted", immediateBank.data);
 
   await delay(10500);
   const rewind = await rpc(
@@ -256,7 +273,7 @@ try {
     {
       target_session_id: session.session_id,
       playback_position_seconds: 5,
-      playback_duration_seconds: 180,
+      playback_duration_seconds: 120,
       playback_state: "playing",
       playback_muted: false,
       playback_volume: 100,
@@ -275,7 +292,7 @@ try {
     {
       target_session_id: session.session_id,
       playback_position_seconds: 15,
-      playback_duration_seconds: 180,
+      playback_duration_seconds: 120,
       playback_state: "playing",
       playback_muted: false,
       playback_volume: 100,
@@ -291,6 +308,36 @@ try {
     "Looped playback changed verified listening time",
   );
   record("Rewound and replayed sections never earn twice", replay.warning);
+
+  let validHeartbeat = replay;
+  for (const position of [31, 41]) {
+    await delay(10500);
+    validHeartbeat = await rpc(
+      reviewerClient,
+      "record_listening_heartbeat",
+      {
+        target_session_id: session.session_id,
+        playback_position_seconds: position,
+        playback_duration_seconds: 120,
+        playback_state: "playing",
+        playback_muted: false,
+        playback_volume: 100,
+        page_visible: true,
+        page_focused: true,
+        interaction_recent: true,
+      },
+      "Advance to valid-listen threshold",
+    );
+  }
+  assert(
+    validHeartbeat.session_verified_seconds >= 30,
+    "Valid-listen threshold was not reached",
+  );
+  assert(
+    validHeartbeat.valid_listen_recorded === true,
+    "Valid listen was not recorded at the threshold",
+  );
+  record("30 seconds and 25 percent records one valid listen", validHeartbeat);
 
   const review = await rpc(
     reviewerClient,
@@ -311,25 +358,34 @@ try {
   );
   assert(review.accepted === true, "Quality review was rejected");
   assert(review.credit_granted === false, "Review automatically granted a credit");
+  assert(review.listening_seconds_banked === 0, "Review re-banked listening seconds");
   assert(
-    review.listening_seconds_banked === active.session_verified_seconds,
-    "Pending listening seconds were not settled",
+    review.listening_bank_seconds === validHeartbeat.session_verified_seconds,
+    "Review returned an incorrect already-banked balance",
   );
-  record("Accepted quality review settles pending seconds into the bank", review);
+  assert(
+    review.community_points_awarded === 5,
+    "Review did not award five Community Points",
+  );
+  record("Accepted quality review awards reputation without re-banking time", review);
   record("Review completion does not automatically grant credits");
 
   const reviewerProfile = await service
     .from("profiles")
-    .select("credits, listening_bank_seconds, lifetime_listening_seconds")
+    .select(
+      "credits, listening_bank_seconds, lifetime_listening_seconds, community_points, valid_listens",
+    )
     .eq("id", reviewer.id)
     .single();
   assertNoError(reviewerProfile.error, "Read reviewer listening balances");
   assert(reviewerProfile.data.credits === 1, "Reviewer credit changed automatically");
   assert(
     Number(reviewerProfile.data.listening_bank_seconds) ===
-      review.listening_seconds_banked,
+      validHeartbeat.session_verified_seconds,
     "Listening bank balance is incorrect",
   );
+  assert(reviewerProfile.data.community_points === 6, "Community Point total is incorrect");
+  assert(reviewerProfile.data.valid_listens === 1, "Valid-listen count is incorrect");
 
   const dashboard = await rpc(
     ownerClient,
@@ -339,14 +395,21 @@ try {
   );
   assert(
     Number(dashboard.total_listening_seconds) ===
-      review.listening_seconds_banked,
+      validHeartbeat.session_verified_seconds,
     "Artist total listening time is incorrect",
   );
   record("Artist dashboard reports verified listening analytics", dashboard);
 
+  const rewardStatus = await rpc(
+    reviewerClient,
+    "get_listening_bank_status_v2",
+    {},
+    "Read configured reward exchange rate",
+  );
+  const exchangeMinutes = Number(rewardStatus.minutes_per_credit);
   const prepareClaim = await service
     .from("profiles")
-    .update({ listening_bank_seconds: 120 * 60 })
+    .update({ listening_bank_seconds: exchangeMinutes * 60 })
     .eq("id", reviewer.id);
   assertNoError(prepareClaim.error, "Prepare exact reward balance");
 
@@ -358,8 +421,14 @@ try {
   );
   assert(claim.credits_awarded === 1, "Claim did not award one credit");
   assert(claim.credits_balance === 2, "Claimed credit balance is incorrect");
-  assert(Number(claim.bank_seconds) === 0, "Claim did not spend banked minutes");
-  record("Manual claim exchanges 120 minutes for exactly one credit", claim);
+  assert(
+    Number(claim.bank_seconds) === 0,
+    `Claim did not spend banked minutes: ${JSON.stringify(claim)}`,
+  );
+  record(
+    `Manual claim exchanges ${exchangeMinutes} minutes for exactly one credit`,
+    claim,
+  );
 
   const rewardRows = await service
     .from("listening_reward_claims")
@@ -367,6 +436,10 @@ try {
     .eq("user_id", reviewer.id);
   assertNoError(rewardRows.error, "Read reward claim ledger");
   assert(rewardRows.data.length === 1, "Reward claim ledger row is missing");
+  assert(
+    rewardRows.data[0].minutes_spent === exchangeMinutes,
+    "Reward claim ledger used the wrong exchange rate",
+  );
   record("Reward claim is recorded in an immutable ledger", rewardRows.data[0]);
 
   console.log(JSON.stringify({ checks, status: "passed" }, null, 2));

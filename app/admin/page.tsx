@@ -40,6 +40,7 @@ export async function AdminPageContent({
   const [
     { data: users },
     { data: songs },
+    { data: commentReports },
     { data: reports },
     { data: statistics },
     { data: listeningRows },
@@ -48,12 +49,19 @@ export async function AdminPageContent({
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, display_name, role, account_status, credits, completed_reviews, created_at")
+      .select("id, display_name, role, account_status, banned_at, warning_count, credits, completed_reviews, created_at")
       .order("created_at", { ascending: false })
       .limit(250),
     supabase
       .from("songs")
-      .select("id, title, artist_name, platform, is_active, featured, created_at")
+      .select("id, title, artist_name, platform, is_active, featured, content_kind, content_duration_seconds, queue_tier, approval_status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(250),
+    supabase
+      .from("review_comment_reports")
+      .select(
+        "id, review_id, reported_user_id, reason, status, details, created_at, reviews(comment, songs(title, artist_name)), profiles!review_comment_reports_reported_user_id_fkey(display_name)",
+      )
       .order("created_at", { ascending: false })
       .limit(250),
     supabase
@@ -91,6 +99,7 @@ export async function AdminPageContent({
         enabled: Boolean(listeningRows?.enabled ?? true),
       }}
       reports={(reports ?? []) as never}
+      commentReports={(commentReports ?? []) as never}
       spotlightSlots={(spotlightSlots ?? []) as never}
       boosts={(boosts ?? []) as never}
       role={profile.role}

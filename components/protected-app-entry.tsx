@@ -20,6 +20,7 @@ import type {
 type ProfileSeed = {
   account: AccountSummary;
   founder: boolean;
+  founderSubmissionsRemaining: number;
   reviewCredits: number;
   totalCreditsEarned: number;
   reviewQualityScore: number;
@@ -99,7 +100,7 @@ export function ProtectedAppEntry({
       genrePreferences={genres}
       account={profile.account}
       initialFounder={profile.founder}
-      initialFounderFree={false}
+      initialFounderSubmissionsRemaining={profile.founderSubmissionsRemaining}
       initialReviewCredits={profile.reviewCredits}
       initialReviewQualityScore={profile.reviewQualityScore}
       initialSongReviews={profile.reviews}

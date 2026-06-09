@@ -9,6 +9,7 @@
     "lint": "eslint . --max-warnings=0",
     "bootstrap:admins": "node scripts/bootstrap-admins.mjs",
     "auth:configure": "node scripts/configure-production-auth.mjs",
+    "auth:brand": "node scripts/configure-auth-branding.mjs",
     "auth:promote-founder-one": "node scripts/promote-founder-one.mjs",
     "auth:verify-phase-a": "node scripts/verify-phase-a.mjs",
     "listen:verify": "node scripts/verify-listen-to-earn.mjs",

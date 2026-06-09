@@ -111,6 +111,7 @@ type ReviewSubmissionResult = {
   creditsBalance?: number;
   listeningSecondsBanked?: number;
   listeningBankSeconds?: number;
+  communityPointsAwarded?: number;
   warning?: string;
 };
 
@@ -121,6 +122,9 @@ type ListeningSessionUi = {
   dailySecondsRemaining: number;
   heartbeatIntervalSeconds: number;
   interactionGraceSeconds: number;
+  validListenRecorded: boolean;
+  validRequirementSeconds: number;
+  playbackDurationSeconds: number;
   warning: string;
 };
 
@@ -135,6 +139,14 @@ type SongSubmission = {
   feedbackFocus: FeedbackFocus[];
   country: string;
   explicitContent: boolean;
+  contentKind:
+    | "song"
+    | "music_video"
+    | "remix"
+    | "live_session"
+    | "performance"
+    | "long_form";
+  durationSeconds: number | null;
 };
 
 const databasePlatform: Record<Platform, string> = {
@@ -181,10 +193,6 @@ const emptyReview: ReviewForm = {
   comment: "",
 };
 
-function formatMinutes(seconds: number) {
-  return `${Math.floor(Math.max(0, seconds) / 60)} min`;
-}
-
 function formatPreciseMinutes(seconds: number) {
   const minutes = Math.max(0, seconds) / 60;
   if (minutes === 0) return "0 min";
@@ -198,6 +206,13 @@ function formatDuration(seconds: number) {
   const minutes = Math.floor((safeSeconds % 3600) / 60);
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
+}
+
+function formatClock(seconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = safeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
 function secondsToNextReward(bankSeconds: number, exchangeSeconds: number) {
@@ -306,23 +321,23 @@ function ReviewProgress({
       <div>
         <span className="eyebrow">
           <Sparkles size={13} />
-          Submission credits
+          Submission tokens
         </span>
         <strong>
           {unlimited ? "∞" : count}<span>{unlimited ? "" : " available"}</span>
         </strong>
       </div>
-      <div className="progress-track" aria-label={`${unlimited ? "Unlimited" : count} submission credits`}>
+      <div className="progress-track" aria-label={`${unlimited ? "Unlimited" : count} submission tokens`}>
         <i style={{ width: `${unlimited ? 100 : Math.min(count, 10) * 10}%` }} />
       </div>
       <p>
         {founderFree
           ? copy.app.review.founderReady
           : unlimited
-            ? "Super Admin accounts can submit without spending credits."
+            ? "Super Admin accounts can submit without spending tokens."
             : count >= 1
-              ? "One credit submits one validated song."
-              : "Bank verified listening minutes and claim credits manually."}
+              ? "One token submits one validated song."
+              : "Bank verified listening minutes and claim tokens manually."}
       </p>
     </div>
   );
@@ -487,10 +502,16 @@ function PostReviewDiscovery({
   song,
   notify,
   locale,
+  onContinueListening,
+  onNextSong,
+  validListenRecorded,
 }: {
   song: Song;
   notify: (message: string) => void;
   locale: InterfaceLocale;
+  onContinueListening: () => void;
+  onNextSong: () => void;
+  validListenRecorded: boolean;
 }) {
   const links = getDiscoveryLinks(song);
   const [following, setFollowing] = useState(false);
@@ -555,9 +576,23 @@ function PostReviewDiscovery({
       <h3>{spanish ? "Sigue escuchando" : "Keep listening"}</h3>
       <p>
         {spanish
-          ? "Tu próxima review está lista. First Listen permanece abierto mientras escuchas música."
-          : "Your next review is ready. First Listen stays open while you listen to music."}
+          ? "Tu review fue enviada. Puedes terminar la canción o avanzar cuando estés listo."
+          : "Your review was submitted. Finish the song or move on when you are ready."}
       </p>
+      <div className="post-review-choice">
+        <button onClick={onContinueListening} type="button">
+          <Play size={14} /> {spanish ? "Continuar escuchando" : "Continue Listening"}
+        </button>
+        <button className="primary-button" onClick={onNextSong} type="button">
+          <ArrowRight size={14} /> {spanish ? "Siguiente canción" : "Next Song"}
+        </button>
+      </div>
+      {validListenRecorded && (
+        <strong className="valid-listen-confirmation">
+          <CheckCircle2 size={15} />
+          {spanish ? "Escucha válida registrada" : "Valid Listen Recorded"}
+        </strong>
+      )}
       <div className="discovery-links">
         <a href={links.spotify} rel="noreferrer" target="_blank">
           <Disc3 size={15} />{" "}
@@ -619,6 +654,8 @@ function ReviewView({
   queueSongs,
   unlimitedCredits,
   approvedListeningSeconds,
+  onListeningCredited,
+  onAdvanceSong,
 }: {
   reviewCount: number;
   onReviewed: (
@@ -640,6 +677,8 @@ function ReviewView({
   queueSongs: Song[];
   unlimitedCredits: boolean;
   approvedListeningSeconds: number;
+  onListeningCredited: (seconds: number, becameValid: boolean) => void;
+  onAdvanceSong: (songId: string) => Promise<void>;
 }) {
   const reviewerProfile = useMemo(
     () => ({ languages: listenerLanguages, genrePreferences, activityScore }),
@@ -661,6 +700,7 @@ function ReviewView({
   const [submitting, setSubmitting] = useState(false);
   const [reportReason, setReportReason] = useState("spam");
   const [lastReviewedSong, setLastReviewedSong] = useState<Song | null>(null);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [listeningSession, setListeningSession] =
     useState<ListeningSessionUi>({
       sessionId: null,
@@ -669,6 +709,9 @@ function ReviewView({
       dailySecondsRemaining: 180 * 60,
       heartbeatIntervalSeconds: 15,
       interactionGraceSeconds: 300,
+      validListenRecorded: false,
+      validRequirementSeconds: 30,
+      playbackDurationSeconds: 0,
       warning: "",
     });
   const listeningSessionRef = useRef<string | null>(null);
@@ -678,10 +721,13 @@ function ReviewView({
   const heartbeatIntervalRef = useRef(15);
   const interactionGraceRef = useRef(300);
   const latestTelemetryRef = useRef<ProviderTelemetrySnapshot | null>(null);
+  const validListenRef = useRef(false);
 
   useEffect(() => {
     setForm(emptyReview);
     setPastedWithoutEditing(false);
+    setReviewSubmitted(false);
+    setLastReviewedSong(null);
     listeningSessionRef.current = null;
     startingSessionRef.current = false;
     heartbeatInFlightRef.current = false;
@@ -689,6 +735,7 @@ function ReviewView({
     heartbeatIntervalRef.current = 15;
     interactionGraceRef.current = 300;
     latestTelemetryRef.current = null;
+    validListenRef.current = false;
     setListeningSession({
       sessionId: null,
       earningEligible: null,
@@ -696,6 +743,9 @@ function ReviewView({
       dailySecondsRemaining: 180 * 60,
       heartbeatIntervalSeconds: 15,
       interactionGraceSeconds: 300,
+      validListenRecorded: false,
+      validRequirementSeconds: 30,
+      playbackDurationSeconds: 0,
       warning: "",
     });
   }, [song?.id]);
@@ -704,6 +754,21 @@ function ReviewView({
     async (snapshot: ProviderTelemetrySnapshot, force = false) => {
       latestTelemetryRef.current = snapshot;
       if (!song) return;
+      const calculatedRequirement =
+        snapshot.duration > 0
+          ? Math.min(120, Math.max(30, Math.ceil(snapshot.duration * 0.25)))
+          : 30;
+      setListeningSession((current) => ({
+        ...current,
+        playbackDurationSeconds: Math.max(
+          current.playbackDurationSeconds,
+          snapshot.duration,
+        ),
+        validRequirementSeconds:
+          snapshot.duration > 0
+            ? calculatedRequirement
+            : current.validRequirementSeconds,
+      }));
       if (!snapshot.supported) {
         setListeningSession((current) => ({
           ...current,
@@ -748,6 +813,9 @@ function ReviewView({
           dailySecondsRemaining: Number(result.daily_cap_seconds ?? 10800),
           heartbeatIntervalSeconds: heartbeatIntervalRef.current,
           interactionGraceSeconds: interactionGraceRef.current,
+          validListenRecorded: false,
+          validRequirementSeconds: calculatedRequirement,
+          playbackDurationSeconds: snapshot.duration,
           warning: result.earning_eligible
             ? ""
             : "This provider cannot verify reward-eligible playback.",
@@ -793,14 +861,30 @@ function ReviewView({
         }));
         return;
       }
+      const validListenRecorded = Boolean(result.valid_listen_recorded);
+      const becameValid =
+        validListenRecorded && !validListenRef.current;
+      validListenRef.current = validListenRecorded;
+      const secondsCounted = Number(result.seconds_counted ?? 0);
       setListeningSession((current) => ({
         ...current,
         verifiedSeconds: Number(result.session_verified_seconds ?? 0),
         dailySecondsRemaining: Number(result.daily_seconds_remaining ?? 0),
+        validListenRecorded,
+        validRequirementSeconds: Number(
+          result.valid_requirement_seconds ?? current.validRequirementSeconds,
+        ),
+        playbackDurationSeconds: Math.max(
+          current.playbackDurationSeconds,
+          snapshot.duration,
+        ),
         warning: result.warning ?? "",
       }));
+      if (secondsCounted > 0 || becameValid) {
+        onListeningCredited(secondsCounted, becameValid);
+      }
     },
-    [locale, song],
+    [locale, onListeningCredited, song],
   );
 
   const flushListeningTelemetry = async () => {
@@ -850,15 +934,32 @@ function ReviewView({
       return;
     }
     setLastReviewedSong(song);
+    setReviewSubmitted(true);
     notify(
-      result.listeningSecondsBanked
-        ? locale === "es"
-          ? `Review enviada. ${formatPreciseMinutes(result.listeningSecondsBanked)} agregados al banco.`
-          : `Review submitted. ${formatPreciseMinutes(result.listeningSecondsBanked)} added to your Listening Bank.`
-        : locale === "es"
-          ? "Review enviada. La siguiente cancion ya esta lista."
-          : "Review submitted. The next song is ready.",
+      locale === "es"
+        ? `Review enviada. +${result.communityPointsAwarded ?? 5} puntos de comunidad.`
+        : `Review submitted. +${result.communityPointsAwarded ?? 5} Community Points.`,
     );
+  };
+
+  const advanceToNextSong = async () => {
+    if (!song) return;
+    await flushListeningTelemetry();
+    const sessionId = listeningSessionRef.current;
+    if (sessionId) {
+      const supabase = createClient();
+      if (supabase) {
+        const { error } = await supabase.rpc("finish_listening_session", {
+          target_session_id: sessionId,
+        });
+        if (error) {
+          notify(error.message);
+          return;
+        }
+      }
+    }
+    setLastReviewedSong(null);
+    await onAdvanceSong(song.id);
   };
 
   const reportSong = async () => {
@@ -905,20 +1006,73 @@ function ReviewView({
     <main className="content review-layout">
       <section className="review-card">
         <div className="song-hero">
-          <div className="cover-wrap">
-            <ProviderPlayer
-              artist={song.artist}
-              coverUrl={song.coverUrl}
-              link={song.link}
-              locale={locale}
-              platform={song.platform}
-              songLoadedAt={songLoadedAt}
-              title={song.title}
-              onTelemetry={handleListeningTelemetry}
-            />
-            <span className="listen-badge">
-              <Clock3 size={13} /> {locale === "es" ? "Reproductor oficial" : "Provider player"}
-            </span>
+          <div className="player-listening-column">
+            <div className="cover-wrap">
+              <ProviderPlayer
+                artist={song.artist}
+                coverUrl={song.coverUrl}
+                link={song.link}
+                locale={locale}
+                platform={song.platform}
+                songLoadedAt={songLoadedAt}
+                title={song.title}
+                onTelemetry={handleListeningTelemetry}
+              />
+              <span className="listen-badge">
+                <Clock3 size={13} /> {locale === "es" ? "Reproductor oficial" : "Provider player"}
+              </span>
+            </div>
+            <div className="listen-tracking-panel" aria-live="polite">
+              <div>
+                <span><Headphones size={13} /> {locale === "es" ? "Tiempo escuchado" : "Listening Time"}</span>
+                <strong>{formatClock(listeningSession.verifiedSeconds)}</strong>
+              </div>
+              <div>
+                <span><Target size={13} /> {locale === "es" ? "Escucha válida" : "Valid Listen Requirement"}</span>
+                <strong>{formatClock(listeningSession.validRequirementSeconds)}</strong>
+              </div>
+              <div className="listen-tracking-progress">
+                <span>
+                  {locale === "es" ? "Progreso" : "Progress"}{" "}
+                  <b>
+                    {Math.min(
+                      100,
+                      Math.floor(
+                        (listeningSession.verifiedSeconds /
+                          Math.max(1, listeningSession.validRequirementSeconds)) *
+                          100,
+                      ),
+                    )}%
+                  </b>
+                </span>
+                <div className="progress-track">
+                  <i
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (listeningSession.verifiedSeconds /
+                          Math.max(1, listeningSession.validRequirementSeconds)) *
+                          100,
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              {listeningSession.validListenRecorded && (
+                <div className="valid-listen-confirmation">
+                  <CheckCircle2 size={15} />
+                  <strong>
+                    {locale === "es"
+                      ? "Gracias por apoyar a este artista"
+                      : "Valid Listen Recorded"}
+                  </strong>
+                  <button onClick={() => void advanceToNextSong()} type="button">
+                    {locale === "es" ? "Siguiente canción" : "Next Song"}{" "}
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div className="song-copy">
             <div className="song-meta-row">
@@ -971,8 +1125,16 @@ function ReviewView({
         <div className="review-form">
           <div className="form-heading">
             <div>
-              <span className="eyebrow">{copy.app.review.firstImpression}</span>
+              <span className="eyebrow">
+                {locale === "es" ? "Review opcional" : "Optional Review"} /{" "}
+                {copy.app.review.firstImpression}
+              </span>
               <h3>{copy.app.review.direct}</h3>
+              <p className="optional-review-note">
+                {locale === "es"
+                  ? "Puedes apoyar al artista solo escuchando. Completa la review para ganar 5 puntos de comunidad."
+                  : "Listening supports the artist by itself. Complete the review to earn 5 Community Points."}
+              </p>
             </div>
             <span className="anonymous-badge">{copy.app.review.anonymous}</span>
           </div>
@@ -1051,12 +1213,29 @@ function ReviewView({
             </div>
           )}
 
+          <div className="review-respect-note">
+            <ShieldCheck size={15} />
+            <p>
+              <strong>{locale === "es" ? "Por favor sé respetuoso." : "Please be respectful."}</strong>{" "}
+              {locale === "es"
+                ? "Enfoca el feedback en el contenido. El acoso, discriminación, spam, amenazas o ataques personales pueden resultar en moderación."
+                : "Focus feedback on the content. Harassment, discrimination, spam, threats, or personal attacks may result in moderation action."}
+            </p>
+          </div>
+
           <button
             className="submit-review-button"
-            disabled={!complete || submitting}
+            disabled={!complete || submitting || reviewSubmitted}
             onClick={submitReview}
           >
-            {submitting ? "..." : copy.app.review.submitReview} <Send size={17} />
+            {reviewSubmitted
+              ? locale === "es"
+                ? "Review enviada"
+                : "Review Submitted"
+              : submitting
+                ? "..."
+                : copy.app.review.submitReview}{" "}
+            <Send size={17} />
           </button>
         </div>
       </section>
@@ -1069,11 +1248,11 @@ function ReviewView({
           </span>
           <div className="listening-validation-totals">
             <div>
-              <span>{locale === "es" ? "Minutos pendientes" : "Pending Minutes"}</span>
-              <strong>{formatPreciseMinutes(listeningSession.verifiedSeconds)}</strong>
+              <span>{locale === "es" ? "Sesión verificada" : "Verified Session"}</span>
+              <strong>{formatClock(listeningSession.verifiedSeconds)}</strong>
             </div>
             <div>
-              <span>{locale === "es" ? "Minutos aprobados" : "Approved Minutes"}</span>
+              <span>{locale === "es" ? "Banco aprobado" : "Approved Bank"}</span>
               <strong>{formatPreciseMinutes(approvedListeningSeconds)}</strong>
             </div>
           </div>
@@ -1083,8 +1262,8 @@ function ReviewView({
                 ? "La reproduccion esta disponible, pero este proveedor no puede ganar minutos verificados."
                 : "Playback is available, but this provider cannot earn verified minutes."
               : locale === "es"
-                ? "Los minutos pendientes se guardan solo cuando la review pasa el control de calidad."
-                : "Pending minutes are banked only after this review passes quality checks."}
+                ? "Cada segundo verificado se agrega al banco sin redondear. La review es opcional."
+                : "Every verified second is banked without rounding. The review is optional."}
           </p>
           <div className="progress-track">
             <i
@@ -1092,7 +1271,7 @@ function ReviewView({
                 width: `${Math.min(
                   100,
                   (listeningSession.verifiedSeconds /
-                    Math.max(1, listeningSession.dailySecondsRemaining)) *
+                    Math.max(1, listeningSession.validRequirementSeconds)) *
                     100,
                 )}%`,
               }}
@@ -1103,7 +1282,21 @@ function ReviewView({
           )}
         </div>
         {lastReviewedSong && (
-          <PostReviewDiscovery locale={locale} notify={notify} song={lastReviewedSong} />
+          <PostReviewDiscovery
+            locale={locale}
+            notify={notify}
+            onContinueListening={() => {
+              setLastReviewedSong(null);
+              notify(
+                locale === "es"
+                  ? "Sigue escuchando. Tu tiempo verificado continúa contando."
+                  : "Keep listening. Your verified time is still counting.",
+              );
+            }}
+            onNextSong={() => void advanceToNextSong()}
+            song={lastReviewedSong}
+            validListenRecorded={listeningSession.validListenRecorded}
+          />
         )}
         <ReviewProgress count={reviewCount} copy={copy} founderFree={founderFree} unlimited={unlimitedCredits} />
         <div className="side-note">
@@ -1199,30 +1392,36 @@ function ListeningBankPanel({
           <strong>{formatPreciseMinutes(status.bankSeconds)}</strong>
         </div>
         <div className="listener-level">
-          <span>{spanish ? "Nivel" : "Level"} {status.levelNumber}</span>
-          <strong>{levelName}</strong>
+          <span>{spanish ? "Rango comunitario" : "Community Rank"}</span>
+          <strong>{status.communityRank}</strong>
+          <small>
+            {status.communityPoints} {spanish ? "puntos" : "points"} /{" "}
+            {spanish ? "Nivel de escucha" : "Listening level"} {status.levelNumber}:{" "}
+            {levelName}
+          </small>
         </div>
       </div>
       <div className="listening-bank-stats">
         <div>
-          <strong>{formatPreciseMinutes(status.pendingSeconds)}</strong>
-          <span>{spanish ? "Minutos pendientes" : "Pending Minutes"}</span>
+          <strong>{formatClock(status.todaySeconds)}</strong>
+          <span>{spanish ? "Escucha verificada hoy" : "Today's Verified Listening"}</span>
         </div>
         <div>
           <strong>{formatPreciseMinutes(status.bankSeconds)}</strong>
-          <span>{spanish ? "Minutos aprobados" : "Approved Minutes"}</span>
+          <span>{spanish ? "Banco disponible" : "Available Listening Bank"}</span>
         </div>
-        <div><strong>{credits}</strong><span>{spanish ? "Creditos disponibles" : "Available Credits"}</span></div>
-        <div><strong>{status.availableRewardCredits}</strong><span>{spanish ? "Recompensas disponibles" : "Claimable Rewards"}</span></div>
-        <div><strong>{formatMinutes(status.todaySeconds)}</strong><span>{spanish ? "Ganados hoy" : "Earned Today"}</span></div>
+        <div><strong>{credits}</strong><span>{spanish ? "Tokens disponibles" : "Available Tokens"}</span></div>
+        <div><strong>{status.validListens}</strong><span>{spanish ? "Escuchas válidas" : "Valid Listens"}</span></div>
+        <div><strong>{formatDuration(status.weeklySeconds)}</strong><span>{spanish ? "Escucha verificada semanal" : "Weekly Verified Listening"}</span></div>
+        <div><strong>{formatDuration(status.monthlySeconds)}</strong><span>{spanish ? "Escucha verificada mensual" : "Monthly Verified Listening"}</span></div>
         <div><strong>{formatDuration(status.lifetimeSeconds)}</strong><span>{spanish ? "Escucha total" : "Lifetime Listening"}</span></div>
       </div>
       <div className="listening-bank-progress">
         <div>
-          <span>{spanish ? "Siguiente credito" : "Next credit"}</span>
+          <span>{spanish ? "Siguiente token" : "Next token"}</span>
           <strong>
             {status.availableRewardCredits > 0
-              ? spanish ? "Listo para reclamar" : "Ready to claim"
+              ? spanish ? "Token listo para reclamar" : "Token ready to claim"
               : `${Math.ceil(status.secondsToNextCredit / 60)} min ${spanish ? "restantes" : "remaining"}`}
           </strong>
         </div>
@@ -1231,7 +1430,7 @@ function ListeningBankPanel({
         </div>
         <small>
           {status.minutesPerCredit} {spanish ? "minutos de escucha" : "listening minutes"} = 1{" "}
-          {spanish ? "credito" : "credit"} / {spanish ? "Limite diario" : "Daily cap"}{" "}
+          {spanish ? "token" : "token"} / {spanish ? "Limite diario" : "Daily cap"}{" "}
           {status.dailyCapMinutes} min
         </small>
       </div>
@@ -1247,7 +1446,7 @@ function ListeningBankPanel({
       >
         {claiming
           ? spanish ? "Reclamando..." : "Claiming..."
-          : spanish ? "Reclamar recompensa" : "Claim Reward"}{" "}
+          : spanish ? "Reclamar token" : "Claim Token"}{" "}
         <ArrowRight size={16} />
       </button>
     </section>
@@ -1517,7 +1716,7 @@ function DailyMissionPanel({
   );
   const reward =
     mission.rewardKind === "credit"
-      ? `${mission.rewardAmount} ${spanish ? "credito" : "credit"}`
+      ? `${mission.rewardAmount} ${spanish ? "token" : "token"}`
       : `${mission.rewardAmount} ${spanish ? "min del Banco" : "Bank min"}`;
 
   return (
@@ -2027,6 +2226,11 @@ function SubmitView({
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [feedbackFocus, setFeedbackFocus] = useState<FeedbackFocus[]>([]);
   const [explicitContent, setExplicitContent] = useState<boolean | null>(null);
+  const [contentKind, setContentKind] =
+    useState<SongSubmission["contentKind"]>("song");
+  const [durationMinutes, setDurationMinutes] = useState("");
+  const [durationSeconds, setDurationSeconds] = useState("");
+  const [submittedForApproval, setSubmittedForApproval] = useState(false);
   const [saving, setSaving] = useState(false);
   const [metadataLoading, setMetadataLoading] = useState(false);
   const [debugEnabled, setDebugEnabled] = useState(false);
@@ -2043,13 +2247,15 @@ function SubmitView({
     platformDetection.valid,
     platformDetection.message,
   );
+  const reportedDurationSeconds =
+    Number(durationMinutes || 0) * 60 + Number(durationSeconds || 0);
   const validationFailures = useMemo(() => {
     const failures: string[] = [];
     if (!unlocked) {
       failures.push(
         locale === "es"
-          ? "Necesitas al menos un credito para enviar una cancion."
-          : "At least one credit is required to submit a song.",
+          ? "Necesitas al menos un token para enviar una cancion."
+          : "At least one token is required to submit a song.",
       );
     }
     if (!platformDetection.valid || !platformDetection.platform) {
@@ -2088,6 +2294,18 @@ function SubmitView({
           : "Choose whether the song contains explicit content.",
       );
     }
+    if (
+      !Number.isInteger(reportedDurationSeconds) ||
+      reportedDurationSeconds < 15 ||
+      reportedDurationSeconds > 43200 ||
+      Number(durationSeconds || 0) > 59
+    ) {
+      failures.push(
+        locale === "es"
+          ? "Escribe una duración válida en minutos y segundos."
+          : "Enter a valid content duration in minutes and seconds.",
+      );
+    }
     if (coverImageUrl && !/^https:\/\//i.test(coverImageUrl.trim())) {
       failures.push(
         locale === "es"
@@ -2099,6 +2317,7 @@ function SubmitView({
   }, [
     artistName,
     country,
+    durationSeconds,
     coverImageUrl,
     feedbackFocus.length,
     genre,
@@ -2109,6 +2328,7 @@ function SubmitView({
     songLanguage,
     songTitle,
     unlocked,
+    reportedDurationSeconds,
   ]);
   const submitDisabled = saving || validationFailures.length > 0;
 
@@ -2200,6 +2420,8 @@ function SubmitView({
       feedbackFocus,
       country,
       explicitContent: explicitContent ?? false,
+      contentKind,
+      durationSeconds: reportedDurationSeconds,
     };
 
     setSaving(true);
@@ -2208,6 +2430,9 @@ function SubmitView({
     if (!saved) return;
 
     setPlatform(platformDetection.platform);
+    setSubmittedForApproval(
+      reportedDurationSeconds > 480 || contentKind === "long_form",
+    );
     setSubmitted(true);
     notify(locale === "es" ? "Cancion enviada. Ya entra a la cola de reviews." : "Song submitted. It is now entering the review queue.");
   };
@@ -2223,6 +2448,10 @@ function SubmitView({
     setCoverImageUrl("");
     setFeedbackFocus([]);
     setExplicitContent(null);
+    setContentKind("song");
+    setDurationMinutes("");
+    setDurationSeconds("");
+    setSubmittedForApproval(false);
     setMetadataLoading(false);
     setSaving(false);
     setSubmitted(false);
@@ -2235,13 +2464,24 @@ function SubmitView({
           <div className="success-orbit"><Check size={36} /></div>
           <span className="eyebrow">{copy.app.submit.received}</span>
           <h2>{copy.app.submit.queue}</h2>
-          <p>{copy.app.submit.saved}</p>
+          <p>
+            {submittedForApproval
+              ? locale === "es"
+                ? "El contenido de más de 8 minutos fue guardado y está esperando aprobación manual antes de entrar a la cola pública."
+                : "Content over 8 minutes was saved and is awaiting manual approval before entering the public queue."
+              : copy.app.submit.saved}
+          </p>
           <div className="success-song">
             <div className="success-cover"><Music2 size={28} /></div>
             <span>
               <strong>{copy.app.submit.newRelease}</strong>
               <small>
-                {platform} / {songLanguage && optionLabel(locale, songLanguage)} / {copy.app.submit.waiting}
+                {platform} / {songLanguage && optionLabel(locale, songLanguage)} /{" "}
+                {submittedForApproval
+                  ? locale === "es"
+                    ? "Aprobación pendiente"
+                    : "Pending approval"
+                  : copy.app.submit.waiting}
               </small>
             </span>
             <CheckCircle2 size={20} />
@@ -2270,7 +2510,7 @@ function SubmitView({
           <div className="locked-banner">
             <LockKeyhole size={19} />
             <div>
-              <strong>{locale === "es" ? "Necesitas 1 credito para enviar" : "One credit is required to submit"}</strong>
+              <strong>{locale === "es" ? "Necesitas 1 token para enviar" : "One token is required to submit"}</strong>
               <p>
                 {locale === "es"
                   ? "Acumula minutos verificados y reclama una recompensa."
@@ -2394,6 +2634,61 @@ function SubmitView({
                 <option>Spain</option>
                 <option>{optionLabel(locale, "Other")}</option>
               </select>
+            </div>
+            <div className="field">
+              <label htmlFor="content-kind">
+                {locale === "es" ? "Tipo de contenido" : "Content type"}
+              </label>
+              <select
+                disabled={!unlocked}
+                id="content-kind"
+                onChange={(event) =>
+                  setContentKind(
+                    event.target.value as SongSubmission["contentKind"],
+                  )
+                }
+                value={contentKind}
+              >
+                <option value="song">{locale === "es" ? "Canción" : "Song"}</option>
+                <option value="music_video">{locale === "es" ? "Video musical" : "Music Video"}</option>
+                <option value="remix">Remix</option>
+                <option value="live_session">{locale === "es" ? "Sesión en vivo corta" : "Short Live Session"}</option>
+                <option value="performance">{locale === "es" ? "Presentación corta" : "Short Performance"}</option>
+                <option value="long_form">{locale === "es" ? "Contenido largo" : "Long-form Content"}</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>
+                {locale === "es" ? "Duración" : "Content duration"}
+              </label>
+              <div className="duration-inputs">
+                <input
+                  aria-label={locale === "es" ? "Minutos" : "Minutes"}
+                  disabled={!unlocked}
+                  max={720}
+                  min={0}
+                  onChange={(event) => setDurationMinutes(event.target.value)}
+                  placeholder="min"
+                  type="number"
+                  value={durationMinutes}
+                />
+                <span>:</span>
+                <input
+                  aria-label={locale === "es" ? "Segundos" : "Seconds"}
+                  disabled={!unlocked}
+                  max={59}
+                  min={0}
+                  onChange={(event) => setDurationSeconds(event.target.value)}
+                  placeholder="sec"
+                  type="number"
+                  value={durationSeconds}
+                />
+              </div>
+              <small>
+                {locale === "es"
+                  ? "Hasta 8:00 entra automáticamente. Más de 8:00 requiere aprobación."
+                  : "Up to 8:00 enters automatically. Longer content requires approval."}
+              </small>
             </div>
             <div className="field">
               <label htmlFor="cover-url">
@@ -2547,7 +2842,7 @@ type FirstListenAppProps = {
   listenerLanguages: ListenerLanguage[];
   genrePreferences: Genre[];
   initialFounder: boolean;
-  initialFounderFree: boolean;
+  initialFounderSubmissionsRemaining: number;
   initialReviewCredits: number;
   initialTotalCreditsEarned: number;
   initialReviewQualityScore: number;
@@ -2571,7 +2866,7 @@ export function FirstListenApp({
   listenerLanguages,
   genrePreferences,
   initialFounder,
-  initialFounderFree,
+  initialFounderSubmissionsRemaining,
   initialReviewCredits,
   initialTotalCreditsEarned,
   initialReviewQualityScore,
@@ -2604,7 +2899,9 @@ export function FirstListenApp({
   );
   const [priorComments, setPriorComments] = useState<string[]>([]);
   const founder = initialFounder;
-  const founderFree = initialFounderFree;
+  const [founderSubmissionsRemaining, setFounderSubmissionsRemaining] =
+    useState(initialFounderSubmissionsRemaining);
+  const founderFree = founderSubmissionsRemaining > 0;
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [darkMode, setDarkMode] = useState(false);
@@ -2717,6 +3014,8 @@ export function FirstListenApp({
         pendingSeconds: Number(listeningStatus.pending_seconds ?? 0),
         lifetimeSeconds: Number(listeningStatus.lifetime_seconds ?? 0),
         todaySeconds: Number(listeningStatus.today_seconds ?? 0),
+        weeklySeconds: Number(listeningStatus.weekly_seconds ?? 0),
+        monthlySeconds: Number(listeningStatus.monthly_seconds ?? 0),
         availableRewardCredits: Number(
           listeningStatus.available_reward_credits ?? 0,
         ),
@@ -2733,6 +3032,11 @@ export function FirstListenApp({
         levelNumber: Number(listeningStatus.level_number ?? 1),
         levelName: String(listeningStatus.level_name ?? "Explorer"),
         rewardsEnabled: Boolean(listeningStatus.rewards_enabled ?? true),
+        communityPoints: Number(listeningStatus.community_points ?? 0),
+        communityRank: String(
+          listeningStatus.community_rank ?? "New Member",
+        ),
+        validListens: Number(listeningStatus.valid_listens ?? 0),
       });
     }
     const { data: currentProfile } = await supabase
@@ -2775,19 +3079,57 @@ export function FirstListenApp({
       window.localStorage.setItem("first-listen-prior-comments", JSON.stringify(next));
       return next;
     });
-    const needsRefill = queueSongs.length <= 1;
-    setQueueSongs((current) => current.filter((song) => song.id !== songId));
-    if (supabase && needsRefill) {
-      const { data } = await supabase.rpc("get_smart_review_queue", { queue_limit: 20 });
-      if (data) setQueueSongs(mapQueueRows(data));
-    }
     return {
       accepted: true,
       qualityScore,
       listeningSecondsBanked: bankedSeconds,
       listeningBankSeconds: bankSeconds,
+      communityPointsAwarded: Number(
+        result.community_points_awarded ?? 5,
+      ),
       warning: result.warning,
     };
+  };
+
+  const handleListeningCredited = useCallback(
+    (seconds: number, becameValid: boolean) => {
+      if (seconds <= 0 && !becameValid) return;
+      setListeningBank((current) => {
+        const bankSeconds = current.bankSeconds + Math.max(0, seconds);
+        const exchangeSeconds = current.minutesPerCredit * 60;
+        return {
+          ...current,
+          bankSeconds,
+          lifetimeSeconds: current.lifetimeSeconds + Math.max(0, seconds),
+          todaySeconds: current.todaySeconds + Math.max(0, seconds),
+          weeklySeconds: current.weeklySeconds + Math.max(0, seconds),
+          monthlySeconds: current.monthlySeconds + Math.max(0, seconds),
+          availableRewardCredits: Math.floor(
+            bankSeconds / Math.max(1, exchangeSeconds),
+          ),
+          secondsToNextCredit: secondsToNextReward(
+            bankSeconds,
+            Math.max(1, exchangeSeconds),
+          ),
+          communityPoints:
+            current.communityPoints + (becameValid ? 1 : 0),
+          validListens: current.validListens + (becameValid ? 1 : 0),
+        };
+      });
+    },
+    [],
+  );
+
+  const advanceReviewQueue = async (songId: string) => {
+    const needsRefill = queueSongs.length <= 2;
+    setQueueSongs((current) => current.filter((song) => song.id !== songId));
+    if (!needsRefill) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    const { data } = await supabase.rpc("get_smart_review_queue", {
+      queue_limit: 20,
+    });
+    if (data) setQueueSongs(mapQueueRows(data));
   };
 
   const claimListeningReward = async () => {
@@ -2827,8 +3169,8 @@ export function FirstListenApp({
     }));
     notify(
       locale === "es"
-        ? "Recompensa reclamada. Se agrego un credito a tu cuenta."
-        : "Listening reward claimed. One credit was added to your account.",
+        ? "Recompensa reclamada. Se agregó un token a tu cuenta."
+        : "Listening reward claimed. One token was added to your account.",
     );
   };
 
@@ -2891,13 +3233,13 @@ export function FirstListenApp({
     );
     notify(
       locale === "es"
-        ? "Solicitud de boost enviada para aprobacion."
+          ? "Solicitud de boost enviada para aprobación."
         : "Boost request submitted for approval.",
     );
   };
 
   const handleSongSubmitted = async (
-    _usedFounderFree: boolean,
+    usedFounderFree: boolean,
     submission: SongSubmission,
   ) => {
     const supabase = createClient();
@@ -2916,16 +3258,22 @@ export function FirstListenApp({
       song_feedback_focus: submission.feedbackFocus,
       song_country: submission.country,
       song_explicit_content: submission.explicitContent,
+      song_content_kind: submission.contentKind,
+      song_duration_seconds: submission.durationSeconds,
     });
     if (error) {
       notify(error.message);
       return false;
     }
 
-    setReviewCount((current) => {
-      const next = role === "super_admin" ? current : Math.max(0, current - 1);
-      return next;
-    });
+    if (usedFounderFree) {
+      setFounderSubmissionsRemaining((current) => Math.max(0, current - 1));
+    } else {
+      setReviewCount((current) => {
+        const next = role === "super_admin" ? current : Math.max(0, current - 1);
+        return next;
+      });
+    }
     return true;
   };
 
@@ -3001,6 +3349,8 @@ export function FirstListenApp({
         setView={changeView}
         unlimitedCredits={role === "super_admin"}
         approvedListeningSeconds={listeningBank.bankSeconds}
+        onListeningCredited={handleListeningCredited}
+        onAdvanceSong={advanceReviewQueue}
       />
     );
   })();

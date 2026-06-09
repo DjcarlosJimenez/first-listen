@@ -22,7 +22,7 @@ const projectRef = process.env.SUPABASE_PROJECT_REF;
 const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
 const resendApiKey = process.env.RESEND_API_KEY;
 const senderEmail =
-  process.env.AUTH_SENDER_EMAIL ?? "auth@firstlisten.net";
+  process.env.AUTH_SENDER_EMAIL ?? "noreply@firstlisten.net";
 const senderName = process.env.AUTH_SENDER_NAME ?? "First Listen";
 
 if (!projectRef || !accessToken || !resendApiKey) {
@@ -56,6 +56,9 @@ const response = await fetch(
       password_min_length: 8,
       password_required_characters:
         "abcdefghijklmnopqrstuvwxyz:ABCDEFGHIJKLMNOPQRSTUVWXYZ:0123456789",
+      mailer_subjects_confirmation: "Confirm your First Listen account",
+      mailer_subjects_recovery: "Reset your First Listen password",
+      mailer_subjects_email_change: "Confirm your new First Listen email",
     }),
   },
 );

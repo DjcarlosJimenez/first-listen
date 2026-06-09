@@ -2,6 +2,7 @@
 
 import {
   ArrowRight,
+  AlertTriangle,
   BadgeCheck,
   BarChart3,
   Check,
@@ -35,7 +36,7 @@ type PublicLandingProps = {
 };
 
 const stepIcons = [Headphones, Link2, BarChart3];
-const benefitIcons = [BadgeCheck, Music2, Sparkles, Crown];
+const benefitIcons = [BadgeCheck, Music2, Sparkles, Crown, Star];
 
 export function PublicLanding({
   founderRemaining,
@@ -62,7 +63,18 @@ export function PublicLanding({
   return (
     <div className="landing-page">
       <div className="founder-sticky-banner">
-        <span><Flame size={15} fill="currentColor" /> {copy.landing.sticky.label}</span>
+        <span>
+          {founderRemaining > 0 && founderRemaining < 10 ? (
+            <AlertTriangle size={15} />
+          ) : (
+            <Flame size={15} fill="currentColor" />
+          )}{" "}
+          {founderRemaining > 0 && founderRemaining < 10
+            ? locale === "es"
+              ? `Solo quedan ${founderRemaining} lugares Founder`
+              : `Only ${founderRemaining} Founder Spots Remaining`
+            : copy.landing.sticky.label}
+        </span>
         <strong>
           {copy.landing.sticky.spots}: {founderRemaining} / 50
         </strong>
@@ -129,7 +141,11 @@ export function PublicLanding({
             </div>
             <p>
               {founderRemaining > 0
-                ? copy.landing.founder.open
+                ? founderRemaining < 10
+                  ? locale === "es"
+                    ? "Últimos lugares Founder disponibles."
+                    : "Final Founder Spots Available."
+                  : copy.landing.founder.open
                 : copy.landing.founder.closed}
             </p>
           </div>
@@ -205,6 +221,22 @@ export function PublicLanding({
             <span><LockKeyhole size={18} /> {copy.landing.proof.private}</span>
             <span><Link2 size={18} /> {copy.landing.proof.platform}</span>
           </div>
+        </section>
+
+        <section className="brand-positioning-section">
+          <span className="eyebrow">
+            {locale === "es" ? "Atención humana verificada" : "Verified human attention"}
+          </span>
+          <h2>
+            {locale === "es"
+              ? "First Listen no vende vistas. Construye oportunidades justas."
+              : "First Listen does not sell views. It creates fair first chances."}
+          </h2>
+          <p>
+            {locale === "es"
+              ? "No somos una red de bots ni una plataforma de interacción falsa. Somos una comunidad de creadores que intercambia atención humana real de forma medible, transparente y justa."
+              : "First Listen is not a bot network or a fake-engagement platform. It is a creator community where real human attention is exchanged measurably, transparently, and fairly."}
+          </p>
         </section>
 
         <section className="landing-section how-section" id="how-it-works">
