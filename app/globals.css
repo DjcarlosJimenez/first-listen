@@ -4768,6 +4768,394 @@ button {
   }
 }
 
+.listening-validation-totals {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+  margin: 12px 0;
+}
+
+.listening-validation-totals div {
+  background: rgba(200, 255, 79, 0.08);
+  border: 1px solid rgba(200, 255, 79, 0.17);
+  border-radius: 11px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.listening-validation-totals span {
+  color: #8f988f;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.listening-validation-totals strong {
+  color: var(--acid);
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 20px;
+}
+
+.dashboard-discovery {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.discovery-section .panel-heading {
+  gap: 18px;
+}
+
+.discovery-section .panel-heading small {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 900;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.discovery-song-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.top-ten-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.discovery-song-card {
+  background: #f8f9f5;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  gap: 13px;
+  grid-template-columns: 112px minmax(0, 1fr);
+  overflow: hidden;
+  padding: 12px;
+}
+
+.discovery-song-cover {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  grid-row: span 2;
+  overflow: hidden;
+  position: relative;
+}
+
+.discovery-song-cover img {
+  object-fit: cover;
+}
+
+.discovery-song-cover > span {
+  background: var(--acid);
+  border-radius: 16px;
+  bottom: 7px;
+  color: #151815;
+  font-size: 8px;
+  font-weight: 900;
+  left: 7px;
+  max-width: calc(100% - 14px);
+  overflow: hidden;
+  padding: 5px 7px;
+  position: absolute;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.discovery-song-copy {
+  min-width: 0;
+}
+
+.discovery-song-copy h4,
+.community-program-grid h4 {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 22px;
+  letter-spacing: -0.04em;
+  margin: 6px 0 2px;
+}
+
+.discovery-song-copy > a {
+  color: #5f8314;
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  overflow: hidden;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.discovery-song-copy > small {
+  color: var(--muted);
+  display: block;
+  font-size: 8px;
+  margin-top: 5px;
+}
+
+.discovery-song-actions {
+  display: grid;
+  gap: 6px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.discovery-song-actions button,
+.discovery-song-actions a,
+.song-boost-button {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  display: inline-flex;
+  font-size: 8px;
+  font-weight: 900;
+  gap: 5px;
+  justify-content: center;
+  min-height: 34px;
+  padding: 8px;
+  text-decoration: none;
+}
+
+.discovery-song-actions .primary-button {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: var(--acid);
+}
+
+.discovery-song-actions button.active {
+  background: #eefaD4;
+  border-color: #cfe49e;
+  color: #526f16;
+}
+
+.discovery-inline-player,
+.discovery-song-details {
+  grid-column: 1 / -1;
+}
+
+.discovery-inline-player {
+  aspect-ratio: 16 / 9;
+  border-radius: 13px;
+  overflow: hidden;
+}
+
+.discovery-inline-player .provider-player {
+  aspect-ratio: 16 / 9;
+}
+
+.discovery-song-details {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 11px;
+}
+
+.discovery-song-details div {
+  display: grid;
+  gap: 3px;
+}
+
+.discovery-song-details strong {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 20px;
+}
+
+.discovery-song-details span {
+  color: var(--muted);
+  font-size: 7px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.discovery-empty,
+.admin-section-copy {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.daily-mission-panel {
+  align-items: center;
+  background:
+    linear-gradient(115deg, rgba(200, 255, 79, 0.22), transparent 60%),
+    var(--surface-strong);
+  border: 1px solid #d9e8b8;
+  border-radius: 17px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(180px, 1fr) minmax(200px, 0.7fr) auto;
+  margin: 12px 0;
+  padding: 16px;
+}
+
+.daily-mission-icon {
+  align-items: center;
+  background: var(--acid);
+  border-radius: 12px;
+  color: #151815;
+  display: flex;
+  height: 46px;
+  justify-content: center;
+  width: 46px;
+}
+
+.daily-mission-panel h3 {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 20px;
+  margin: 4px 0;
+}
+
+.daily-mission-panel p {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.daily-mission-progress {
+  display: grid;
+  gap: 6px;
+}
+
+.daily-mission-progress strong {
+  font-size: 11px;
+}
+
+.daily-mission-progress small {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.daily-mission-panel > button {
+  background: var(--dark);
+  border: 0;
+  border-radius: 10px;
+  color: var(--acid);
+  font-size: 9px;
+  font-weight: 900;
+  padding: 11px 14px;
+}
+
+.daily-mission-panel > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.community-programs-panel {
+  margin: 12px 0;
+}
+
+.community-program-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.community-program-grid article {
+  background: #f8f9f5;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 15px;
+}
+
+.community-program-grid article > span {
+  color: #668d19;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.community-program-grid p,
+.community-program-grid small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.song-boost-button {
+  color: #5f8314;
+}
+
+.song-boost-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.admin-spotlight-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.admin-spotlight-grid article {
+  background: #f8f9f5;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  gap: 13px;
+  padding: 18px;
+}
+
+.admin-spotlight-grid label {
+  color: var(--muted);
+  display: grid;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.admin-spotlight-grid input,
+.admin-spotlight-grid select {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  min-height: 40px;
+  padding: 9px;
+}
+
+.admin-discovery-divider {
+  border-top: 1px solid var(--line);
+  margin-top: 28px;
+  padding-top: 22px;
+}
+
+.admin-discovery-divider h3 {
+  margin: 6px 0 0;
+}
+
+.theme-dark .discovery-song-card,
+.theme-dark .discovery-song-details,
+.theme-dark .community-program-grid article,
+.theme-dark .admin-spotlight-grid article,
+.theme-dark .admin-spotlight-grid input,
+.theme-dark .admin-spotlight-grid select {
+  background: #242a25;
+}
+
+.theme-dark .daily-mission-panel {
+  border-color: #40562b;
+}
+
+.theme-dark .discovery-song-actions button,
+.theme-dark .discovery-song-actions a,
+.theme-dark .song-boost-button {
+  background: #242a25;
+  border-color: #353d36;
+  color: #d8ded5;
+}
+
 @media (max-width: 1180px) {
   .sidebar {
     width: 220px;
@@ -4807,6 +5195,15 @@ button {
 
   .comments-panel {
     width: 100%;
+  }
+
+  .daily-mission-panel {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .daily-mission-progress,
+  .daily-mission-panel > button {
+    grid-column: 2;
   }
 
   .comment-list {
@@ -5059,6 +5456,13 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .discovery-song-grid,
+  .top-ten-grid,
+  .community-program-grid,
+  .admin-spotlight-grid {
+    grid-template-columns: 1fr;
+  }
+
   .review-complete-card {
     grid-row: 2;
     min-height: 480px;
@@ -5198,6 +5602,33 @@ button {
 
   .stat-card {
     min-height: 137px;
+  }
+
+  .discovery-song-card {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .discovery-song-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .daily-mission-panel {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .daily-mission-icon,
+  .daily-mission-progress,
+  .daily-mission-panel > button {
+    grid-column: 1;
+  }
+
+  .daily-mission-panel > button {
+    width: 100%;
+  }
+
+  .listening-validation-totals {
+    grid-template-columns: 1fr;
   }
 
   .comment-list {

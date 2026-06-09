@@ -8,7 +8,7 @@ export async function AdminPageContent({
   initialSection = "users",
   allowModerator = false,
 }: {
-  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "statistics";
+  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics";
   allowModerator?: boolean;
 }) {
   const supabase = await createClient();
@@ -32,7 +32,7 @@ export async function AdminPageContent({
     profile.role === "super_admin"
       ? initialSection
       : profile.role === "admin"
-        ? ["songs", "reports", "statistics"].includes(initialSection)
+        ? ["songs", "reports", "discovery", "statistics"].includes(initialSection)
           ? initialSection
           : "songs"
         : "reports";
@@ -43,6 +43,8 @@ export async function AdminPageContent({
     { data: reports },
     { data: statistics },
     { data: listeningRows },
+    { data: spotlightSlots },
+    { data: boosts },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -67,17 +69,30 @@ export async function AdminPageContent({
       .select("minutes_per_credit, daily_cap_minutes, enabled")
       .eq("id", true)
       .maybeSingle(),
+    supabase
+      .from("spotlight_slots")
+      .select("slot_number, song_id, placement_kind, custom_label")
+      .order("slot_number"),
+    supabase
+      .from("song_boosts")
+      .select(
+        "id, credit_cost, status, requested_at, songs(title, artist_name), profiles!song_boosts_requested_by_fkey(display_name)",
+      )
+      .order("requested_at", { ascending: false })
+      .limit(100),
   ]);
 
   return (
     <AdminPanel
-      initialSection={effectiveInitialSection as "users" | "songs" | "reports" | "credits" | "listening" | "statistics"}
+      initialSection={effectiveInitialSection as "users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics"}
       listeningSettings={{
         minutes_per_credit: Number(listeningRows?.minutes_per_credit ?? 120),
         daily_cap_minutes: Number(listeningRows?.daily_cap_minutes ?? 180),
         enabled: Boolean(listeningRows?.enabled ?? true),
       }}
       reports={(reports ?? []) as never}
+      spotlightSlots={(spotlightSlots ?? []) as never}
+      boosts={(boosts ?? []) as never}
       role={profile.role}
       songs={songs ?? []}
       statistics={(statistics as {

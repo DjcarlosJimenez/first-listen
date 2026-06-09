@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PublicArtistProfile } from "@/components/public-artist-profile";
 import { platformLabels } from "@/lib/discovery";
+import { safeCoverUrl } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import type { Platform } from "@/lib/types";
 
@@ -64,7 +65,7 @@ export default async function ArtistPage({
         artistId: id,
         title: song.title,
         artist: song.artist_name,
-        coverUrl: song.cover_image_url,
+        coverUrl: safeCoverUrl(song.cover_image_url),
         link: song.music_url,
         platform: (platformLabels[song.platform] ?? "Spotify") as Platform,
         genre: song.genre,

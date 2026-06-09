@@ -33,9 +33,14 @@ export type AccountSummary = {
 
 export type SongDashboardSummary = {
   id: string;
+  artistId: string;
   title: string;
   artist: string;
+  coverUrl: string;
+  link: string;
   platform: Platform;
+  genre: string;
+  language: string;
   submittedAt: string;
   reviewsReceived: number;
   averageRating: number;
@@ -47,6 +52,7 @@ export type SongDashboardSummary = {
   playlistIntent: number;
   shareIntent: number;
   listenerRetention: number;
+  boostStatus?: string;
 };
 
 export type Review = {
@@ -69,6 +75,7 @@ export type Review = {
 
 export type ListeningBankStatus = {
   bankSeconds: number;
+  pendingSeconds: number;
   lifetimeSeconds: number;
   todaySeconds: number;
   availableRewardCredits: number;
@@ -78,4 +85,51 @@ export type ListeningBankStatus = {
   levelNumber: number;
   levelName: string;
   rewardsEnabled: boolean;
+};
+
+export type DiscoverySong = {
+  id: string;
+  artistId: string;
+  title: string;
+  artist: string;
+  coverUrl: string;
+  link: string;
+  platform: Platform;
+  genre: string;
+  language: string;
+  reviewsReceived: number;
+  averageRating: number;
+  hookScore: number;
+  totalListeningSeconds: number;
+  completionRate: number;
+  badge?: string;
+  position?: number;
+  rankingScore?: number;
+};
+
+export type DailyMissionStatus = {
+  id: string;
+  key: string;
+  titleEn: string;
+  titleEs: string;
+  descriptionEn: string;
+  descriptionEs: string;
+  targetCount: number;
+  progressCount: number;
+  rewardKind: "listening_minutes" | "credit";
+  rewardAmount: number;
+  completed: boolean;
+  claimed: boolean;
+};
+
+export type CommunityProgram = {
+  kind: "contest" | "event";
+  id: string;
+  title: string;
+  description: string;
+  genre?: string;
+  startsAt: string;
+  endsAt: string;
+  rewardDescription?: string;
+  entryCount: number;
 };

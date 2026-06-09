@@ -308,7 +308,7 @@ try {
 
   await setField(
     "#music-link",
-    "https://music.youtube.com/watch?v=Tl1YrfQ9bkY&list=PL0ZUQXp9nO7WxNHiw5ObNTVjf5wTb1xim",
+    `https://www.youtube.com/watch?v=${runId.slice(0, 11)}`,
   );
   await setField("#song-title", "Submission UI Check");
   await setField("#artist-name", "First Listen Diagnostics");
@@ -316,6 +316,10 @@ try {
   await setField("#song-language", "English");
   await setField("#country", "United States");
   await setField("#cover-url", "");
+  await evaluate(`(() => {
+    document.querySelector(".focus-picker button")?.click();
+    document.querySelector('.explicit-field input[value="no"]')?.click();
+  })()`);
   await delay(1200);
   const trackState = await evaluate(`(() => ({
     buttonDisabled: document.querySelector('button[type="submit"].wide')?.disabled,
@@ -334,22 +338,149 @@ try {
     throw new Error("Submission UI state did not match the expected validation behavior.");
   }
 
+  await evaluate(
+    `document.querySelector('button[type="submit"].wide')?.click()`,
+  );
+  const submissionSucceeded = await waitFor(
+    "Boolean(document.querySelector('.submit-success'))",
+    Boolean,
+  );
+  if (!submissionSucceeded) {
+    throw new Error("Validated song submission did not reach the success screen.");
+  }
+  await evaluate(`document.querySelector(".submit-success button")?.click()`);
+  const resetState = await waitFor(
+    `(() => ({
+      artist: document.querySelector("#artist-name")?.value ?? null,
+      country: document.querySelector("#country")?.value ?? null,
+      cover: document.querySelector("#cover-url")?.value ?? null,
+      explicitChecked: Boolean(document.querySelector('.explicit-field input:checked')),
+      focusSelected: document.querySelectorAll(".focus-picker button.selected").length,
+      genre: document.querySelector("#genre")?.value ?? null,
+      language: document.querySelector("#song-language")?.value ?? null,
+      link: document.querySelector("#music-link")?.value ?? null,
+      platformActive: document.querySelectorAll(".platform-picker button.active").length,
+      title: document.querySelector("#song-title")?.value ?? null
+    }))()`,
+    (value) => value.link === "",
+  );
+  if (
+    resetState.artist !== "" ||
+    resetState.country !== "" ||
+    resetState.cover !== "" ||
+    resetState.explicitChecked ||
+    resetState.focusSelected !== 0 ||
+    resetState.genre !== "" ||
+    resetState.language !== "" ||
+    resetState.link !== "" ||
+    resetState.platformActive !== 0 ||
+    resetState.title !== ""
+  ) {
+    throw new Error(
+      `Submit another song did not clear the form: ${JSON.stringify(resetState)}`,
+    );
+  }
+
+  const submittedSong = await service
+    .from("songs")
+    .select("id, platform")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+  if (submittedSong.error) throw submittedSong.error;
+  const bankFixture = await service
+    .from("profiles")
+    .update({
+      lifetime_listening_seconds: 45,
+      listening_bank_seconds: 45,
+    })
+    .eq("id", userId);
+  if (bankFixture.error) throw bankFixture.error;
+  const pendingFixture = await service.from("listening_sessions").insert({
+    platform: submittedSong.data.platform,
+    song_id: submittedSong.data.id,
+    status: "active",
+    telemetry_supported: true,
+    user_id: userId,
+    verified_seconds: 30,
+  });
+  if (pendingFixture.error) throw pendingFixture.error;
+
   await navigate(`${baseUrl}/dashboard?debug=1`);
   const listeningBankState = await evaluate(`(() => ({
     claimDisabled: document.querySelector(".listening-claim-button")?.disabled,
+    discoveryVisible: Boolean(document.querySelector(".dashboard-discovery")),
     exists: Boolean(document.querySelector(".listening-bank-panel")),
     text: document.querySelector(".listening-bank-panel")?.innerText ?? ""
   }))()`);
   if (
     !listeningBankState.exists ||
+    !listeningBankState.discoveryVisible ||
     listeningBankState.claimDisabled !== true ||
     !listeningBankState.text.toLowerCase().includes("listening bank") ||
+    !listeningBankState.text.toLowerCase().includes("pending minutes") ||
+    !listeningBankState.text.toLowerCase().includes("approved minutes") ||
+    !listeningBankState.text.includes("0.5 min") ||
+    !listeningBankState.text.includes("0.8 min") ||
     !listeningBankState.text.toLowerCase().includes("explorer")
   ) {
     throw new Error(
       `Listening Bank dashboard state is incorrect: ${JSON.stringify(listeningBankState)}`,
     );
   }
+  const spotlightCardState = await evaluate(`(() => {
+    const card = document.querySelector(".discovery-song-card");
+    const openLink = card?.querySelector(".discovery-song-actions a");
+    return {
+      actionText: card?.querySelector(".discovery-song-actions")?.innerText ?? "",
+      count: document.querySelectorAll(".discovery-section:first-child .discovery-song-card").length,
+      imageSrc: card?.querySelector(".discovery-song-cover img")?.getAttribute("src") ?? "",
+      openTarget: openLink?.getAttribute("target") ?? ""
+    };
+  })()`);
+  if (
+    spotlightCardState.count < 1 ||
+    !spotlightCardState.imageSrc.includes("/covers/default-song.svg") ||
+    spotlightCardState.openTarget !== "_blank" ||
+    !spotlightCardState.actionText.includes("Listen Now") ||
+    !spotlightCardState.actionText.includes("Open Platform") ||
+    !spotlightCardState.actionText.includes("Reviews") ||
+    !spotlightCardState.actionText.includes("Statistics")
+  ) {
+    throw new Error(
+      `Spotlight card actions or cover fallback are incomplete: ${JSON.stringify(spotlightCardState)}`,
+    );
+  }
+  await evaluate(
+    `document.querySelector(".discovery-song-card .discovery-song-actions button:nth-of-type(2)")?.click()`,
+  );
+  const reviewDetailsVisible = await waitFor(
+    "Boolean(document.querySelector('.discovery-song-card .discovery-song-details'))",
+    Boolean,
+  );
+  if (!reviewDetailsVisible) throw new Error("Spotlight review summary did not open.");
+  await evaluate(
+    `document.querySelector(".discovery-song-card .discovery-song-actions button:nth-of-type(3)")?.click()`,
+  );
+  const statisticsVisible = await waitFor(
+    `document.querySelector(".discovery-song-card .discovery-song-details")?.innerText ?? ""`,
+    (value) => value.toLowerCase().includes("listening time"),
+  );
+  if (!statisticsVisible.toLowerCase().includes("listening time")) {
+    throw new Error("Spotlight statistics did not open.");
+  }
+  await evaluate(
+    `document.querySelector(".discovery-song-card .discovery-song-actions button:first-child")?.click()`,
+  );
+  const inlinePlayerVisible = await waitFor(
+    "Boolean(document.querySelector('.discovery-song-card .discovery-inline-player'))",
+    Boolean,
+  );
+  if (!inlinePlayerVisible) throw new Error("Spotlight inline player did not open.");
+  await evaluate(
+    `document.querySelector(".discovery-song-card .discovery-song-actions button:first-child")?.click()`,
+  );
 
   await command("Emulation.setDeviceMetricsOverride", {
     deviceScaleFactor: 1,
@@ -362,11 +493,13 @@ try {
   await navigate(`${baseUrl}/dashboard?debug=1`);
   const mobileDashboardState = await evaluate(`(() => ({
     bankVisible: Boolean(document.querySelector(".listening-bank-panel")),
+    discoveryVisible: Boolean(document.querySelector(".dashboard-discovery")),
     hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
     viewportWidth: window.innerWidth
   }))()`);
   if (
     !mobileDashboardState.bankVisible ||
+    !mobileDashboardState.discoveryVisible ||
     mobileDashboardState.hasHorizontalOverflow
   ) {
     throw new Error(
@@ -374,6 +507,12 @@ try {
     );
   }
   await command("Emulation.clearDeviceMetricsOverride");
+  const pendingCleanup = await service
+    .from("listening_sessions")
+    .delete()
+    .eq("user_id", userId)
+    .eq("status", "active");
+  if (pendingCleanup.error) throw pendingCleanup.error;
   await navigate(`${baseUrl}/dashboard?debug=1`);
 
   const routeTransitionResults = [];
@@ -435,6 +574,61 @@ try {
     );
   }
 
+  const localeUpdate = await service
+    .from("profiles")
+    .update({ interface_language: "es" })
+    .eq("id", userId);
+  if (localeUpdate.error) throw localeUpdate.error;
+  await navigate(`${baseUrl}/review?debug=1`);
+  const hasReviewSong = await waitFor(
+    "Boolean(document.querySelector('.review-card'))",
+    Boolean,
+  );
+  if (!hasReviewSong) {
+    throw new Error("Spanish post-review check could not find a queue song.");
+  }
+  for (let questionIndex = 0; questionIndex < 4; questionIndex += 1) {
+    await evaluate(
+      `document.querySelectorAll(".question-row .binary-choice button:first-child")[${questionIndex}]?.click()`,
+    );
+    await delay(150);
+  }
+  await evaluate(`document.querySelector(".rating-options button:nth-child(8)")?.click()`);
+  await delay(150);
+  await evaluate(`(() => {
+    const textarea = document.querySelector(".comment-field textarea");
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value"
+    ).set;
+    setter.call(
+      textarea,
+      "El inicio atrapa de inmediato y el arreglo deja suficiente espacio para que la voz y el hook se sientan claros."
+    );
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    textarea.dispatchEvent(new Event("change", { bubbles: true }));
+  })()`);
+  const reviewReady = await waitFor(
+    "document.querySelector('.submit-review-button')?.disabled === false",
+    Boolean,
+  );
+  if (!reviewReady) throw new Error("Spanish review form did not become valid.");
+  await evaluate(`document.querySelector(".submit-review-button")?.click()`);
+  const spanishPostReview = await waitFor(
+    `(() => document.querySelector(".discovery-card")?.innerText ?? "")()`,
+    (value) => value.includes("Sigue escuchando"),
+  );
+  if (
+    !spanishPostReview.includes("Sigue escuchando") ||
+    !spanishPostReview.includes("Tu próxima review está lista") ||
+    spanishPostReview.includes("Keep listening") ||
+    spanishPostReview.includes("Your next review is ready")
+  ) {
+    throw new Error(
+      `Post-review localization is incomplete: ${spanishPostReview}`,
+    );
+  }
+
   const hydrationMessages = browserMessages.filter((message) =>
     /hydration|did not match|server rendered html/i.test(message),
   );
@@ -456,6 +650,9 @@ try {
         hydration_messages: hydrationMessages,
         listening_bank_state: listeningBankState,
         mobile_dashboard_state: mobileDashboardState,
+        post_review_spanish: spanishPostReview,
+        spotlight_card_state: spotlightCardState,
+        submit_another_reset: resetState,
         status: "passed",
         target: production ? "production" : "local",
         track_debug: trackState.debug,

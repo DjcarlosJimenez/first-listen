@@ -8,7 +8,9 @@ import {
   Flag,
   Headphones,
   Music2,
+  Rocket,
   ShieldCheck,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -43,6 +45,34 @@ type AdminReport = {
   songs: { title: string; artist_name: string } | null;
 };
 
+type SpotlightSlot = {
+  slot_number: number;
+  song_id: string | null;
+  placement_kind:
+    | "sponsored"
+    | "new_release"
+    | "founder_artist"
+    | "contest_winner"
+    | "special_event"
+    | "editor_pick";
+  custom_label: string;
+};
+
+type AdminBoost = {
+  id: string;
+  credit_cost: number;
+  status: string;
+  requested_at: string;
+  songs: { title: string; artist_name: string } | null;
+  profiles: { display_name: string } | null;
+};
+
+type SpotlightDraft = {
+  songId: string;
+  placement: SpotlightSlot["placement_kind"];
+  label: string;
+};
+
 export function AdminPanel({
   role,
   users,
@@ -50,18 +80,22 @@ export function AdminPanel({
   reports,
   initialSection = "users",
   listeningSettings,
+  spotlightSlots,
+  boosts,
   statistics,
 }: {
   role: "super_admin" | "admin" | "moderator";
   users: AdminUser[];
   songs: AdminSong[];
   reports: AdminReport[];
-  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "statistics";
+  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics";
   listeningSettings: {
     minutes_per_credit: number;
     daily_cap_minutes: number;
     enabled: boolean;
   };
+  spotlightSlots: SpotlightSlot[];
+  boosts: AdminBoost[];
   statistics: {
     users: number;
     songs: number;
@@ -71,7 +105,7 @@ export function AdminPanel({
     listening_minutes?: number;
   } | null;
 }) {
-  const [section, setSection] = useState<"users" | "songs" | "reports" | "credits" | "listening" | "statistics">(initialSection);
+  const [section, setSection] = useState<"users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics">(initialSection);
   const [notice, setNotice] = useState("");
   const [minutesPerCredit, setMinutesPerCredit] = useState(
     listeningSettings.minutes_per_credit,
@@ -81,6 +115,25 @@ export function AdminPanel({
   );
   const [rewardsEnabled, setRewardsEnabled] = useState(
     listeningSettings.enabled,
+  );
+  const [spotlightDrafts, setSpotlightDrafts] = useState<
+    Record<number, SpotlightDraft>
+  >(
+    Object.fromEntries(
+      [1, 2].map((slotNumber) => {
+        const slot = spotlightSlots.find(
+          (candidate) => candidate.slot_number === slotNumber,
+        );
+        return [
+          slotNumber,
+          {
+            songId: slot?.song_id ?? "",
+            placement: slot?.placement_kind ?? "editor_pick",
+            label: slot?.custom_label ?? "",
+          },
+        ];
+      }),
+    ),
   );
   const isSuper = role === "super_admin";
   const supabase = createClient();
@@ -108,6 +161,7 @@ export function AdminPanel({
     ["reports", "Reports", Flag],
     ["credits", "Credits", ShieldCheck],
     ["listening", "Listening", Headphones],
+    ["discovery", "Discovery", Sparkles],
     ["statistics", "Statistics", BarChart3],
   ] as const;
   const sections = allSections.filter(([id]) => {
@@ -181,15 +235,11 @@ export function AdminPanel({
                 {songs.map((song) => (
                   <article key={song.id}>
                     <div><strong>{song.title}</strong><small>{song.artist_name} / {song.platform}</small></div>
-                    <span>{song.is_active ? "Active" : "Removed"}</span>
+                    <span>
+                      {song.is_active ? "Active" : "Removed"}
+                      {song.featured ? " / Spotlight" : ""}
+                    </span>
                     <div className="admin-actions">
-                      {role !== "moderator" && (
-                        <button onClick={() => void runRpc("admin_set_song_state", {
-                          target_song_id: song.id,
-                          active: true,
-                          feature: !song.featured,
-                        })}>{song.featured ? "Unfeature" : "Feature"}</button>
-                      )}
                       <button onClick={() => void runRpc("admin_set_song_state", {
                         target_song_id: song.id,
                         active: !song.is_active,
@@ -263,6 +313,159 @@ export function AdminPanel({
                 <div><strong>{statistics?.open_reports ?? reports.filter((report) => report.status === "open").length}</strong><span>Open reports</span></div>
                 <div><strong>{statistics?.active_songs ?? songs.filter((song) => song.is_active).length}</strong><span>Active songs</span></div>
                 <div><strong>{statistics?.listening_minutes ?? 0}</strong><span>Listening minutes</span></div>
+              </div>
+            </>
+          )}
+
+          {section === "discovery" && role !== "moderator" && (
+            <>
+              <h2>Discovery Controls</h2>
+              <p className="admin-section-copy">
+                Spotlight has two editorial slots. Top 10 remains automatic and
+                cannot be edited here.
+              </p>
+              <div className="admin-spotlight-grid">
+                {[1, 2].map((slotNumber) => {
+                  const draft = spotlightDrafts[slotNumber];
+                  return (
+                    <article key={slotNumber}>
+                      <span className="eyebrow">
+                        <Sparkles size={13} /> Spotlight #{slotNumber}
+                      </span>
+                      <label>
+                        Song
+                        <select
+                          onChange={(event) =>
+                            setSpotlightDrafts((current) => ({
+                              ...current,
+                              [slotNumber]: {
+                                ...current[slotNumber],
+                                songId: event.target.value,
+                              },
+                            }))
+                          }
+                          value={draft.songId}
+                        >
+                          <option value="">Empty slot</option>
+                          {songs
+                            .filter((song) => song.is_active)
+                            .map((song) => (
+                              <option key={song.id} value={song.id}>
+                                {song.title} / {song.artist_name}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                      <label>
+                        Placement type
+                        <select
+                          onChange={(event) =>
+                            setSpotlightDrafts((current) => ({
+                              ...current,
+                              [slotNumber]: {
+                                ...current[slotNumber],
+                                placement: event.target
+                                  .value as SpotlightDraft["placement"],
+                              },
+                            }))
+                          }
+                          value={draft.placement}
+                        >
+                          <option value="editor_pick">Editor Pick</option>
+                          <option value="new_release">New Release</option>
+                          <option value="founder_artist">Founder Artist</option>
+                          <option value="sponsored">Sponsored Song</option>
+                          <option value="contest_winner">Contest Winner</option>
+                          <option value="special_event">Special Event</option>
+                        </select>
+                      </label>
+                      <label>
+                        Public badge
+                        <input
+                          maxLength={80}
+                          onChange={(event) =>
+                            setSpotlightDrafts((current) => ({
+                              ...current,
+                              [slotNumber]: {
+                                ...current[slotNumber],
+                                label: event.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="Editor Pick"
+                          value={draft.label}
+                        />
+                      </label>
+                      <button
+                        className="primary-button"
+                        onClick={() =>
+                          void runRpc("admin_set_spotlight_slot", {
+                            target_slot: slotNumber,
+                            target_song_id: draft.songId || null,
+                            placement: draft.placement,
+                            label: draft.label,
+                            starts_at: null,
+                            ends_at: null,
+                          })
+                        }
+                        type="button"
+                      >
+                        Save Spotlight #{slotNumber}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div className="admin-discovery-divider">
+                <span className="eyebrow">
+                  <Rocket size={13} /> Boost requests
+                </span>
+                <h3>Pending approval</h3>
+              </div>
+              <div className="admin-table">
+                {boosts.filter((boost) => boost.status === "pending").length ? (
+                  boosts
+                    .filter((boost) => boost.status === "pending")
+                    .map((boost) => (
+                      <article key={boost.id}>
+                        <div>
+                          <strong>{boost.songs?.title ?? "Unavailable song"}</strong>
+                          <small>
+                            {boost.songs?.artist_name} /{" "}
+                            {boost.profiles?.display_name ?? "Artist"}
+                          </small>
+                        </div>
+                        <span>{boost.credit_cost} credit</span>
+                        <div className="admin-actions">
+                          <button
+                            onClick={() =>
+                              void runRpc("admin_review_song_boost", {
+                                target_boost_id: boost.id,
+                                approve: true,
+                                note: "Approved from admin panel",
+                              })
+                            }
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() =>
+                              void runRpc("admin_review_song_boost", {
+                                target_boost_id: boost.id,
+                                approve: false,
+                                note: "Rejected from admin panel",
+                              })
+                            }
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </article>
+                    ))
+                ) : (
+                  <div className="empty-state">No pending boost requests.</div>
+                )}
               </div>
             </>
           )}

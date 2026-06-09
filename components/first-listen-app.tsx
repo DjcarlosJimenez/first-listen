@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   BarChart3,
   Bookmark,
+  CalendarDays,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -26,17 +27,21 @@ import {
   Moon,
   Music2,
   Plus,
+  Play,
+  Rocket,
   Send,
   Share2,
   ShieldCheck,
   Sparkles,
   Star,
   Sun,
+  Target,
   ThumbsDown,
   ThumbsUp,
   UserRound,
   UserPlus,
   Radio,
+  Trophy,
   X,
   Youtube,
 } from "lucide-react";
@@ -69,6 +74,7 @@ import {
 } from "@/lib/catalog";
 import { getCopy, optionLabel } from "@/lib/i18n";
 import { getDiscoveryLinks } from "@/lib/discovery";
+import { safeCoverUrl } from "@/lib/media";
 import { describeMatch, prioritizeReviewQueue } from "@/lib/matching";
 import { detectMusicPlatform } from "@/lib/platform";
 import { getProviderEmbed } from "@/lib/player";
@@ -76,6 +82,9 @@ import { evaluateReviewQuality } from "@/lib/review-quality";
 import { createClient } from "@/lib/supabase/client";
 import type {
   AccountSummary,
+  CommunityProgram,
+  DailyMissionStatus,
+  DiscoverySong,
   ListeningBankStatus,
   Platform,
   Review,
@@ -150,7 +159,7 @@ function mapQueueRows(data: Array<Record<string, unknown>>): Song[] {
     artistId: String(row.artist_id),
     title: String(row.title),
     artist: String(row.artist_name),
-    coverUrl: String(row.cover_image_url),
+    coverUrl: safeCoverUrl(String(row.cover_image_url)),
     link: String(row.music_url),
     platform: displayPlatform[String(row.platform)] ?? "Spotify",
     genre: String(row.genre) as Genre,
@@ -174,6 +183,13 @@ const emptyReview: ReviewForm = {
 
 function formatMinutes(seconds: number) {
   return `${Math.floor(Math.max(0, seconds) / 60)} min`;
+}
+
+function formatPreciseMinutes(seconds: number) {
+  const minutes = Math.max(0, seconds) / 60;
+  if (minutes === 0) return "0 min";
+  if (minutes < 10) return `${minutes.toFixed(1)} min`;
+  return `${Math.floor(minutes)} min`;
 }
 
 function formatDuration(seconds: number) {
@@ -470,18 +486,25 @@ function Topbar({
 function PostReviewDiscovery({
   song,
   notify,
+  locale,
 }: {
   song: Song;
   notify: (message: string) => void;
+  locale: InterfaceLocale;
 }) {
   const links = getDiscoveryLinks(song);
   const [following, setFollowing] = useState(false);
   const [saved, setSaved] = useState(false);
+  const spanish = locale === "es";
 
   const followArtist = async () => {
     const supabase = createClient();
     if (!supabase || !song.artistId) {
-      notify("Log in again to follow this artist.");
+      notify(
+        spanish
+          ? "Inicia sesión de nuevo para seguir a este artista."
+          : "Log in again to follow this artist.",
+      );
       return;
     }
     const { error } = await supabase.rpc("follow_artist", {
@@ -492,13 +515,21 @@ function PostReviewDiscovery({
       return;
     }
     setFollowing(true);
-    notify(`You are now following ${song.artist}.`);
+    notify(
+        spanish
+        ? `Ahora sigues a ${song.artist}.`
+        : `You are now following ${song.artist}.`,
+    );
   };
 
   const saveForLater = async () => {
     const supabase = createClient();
     if (!supabase) {
-      notify("Log in again to save this song.");
+      notify(
+        spanish
+          ? "Inicia sesión de nuevo para guardar esta canción."
+          : "Log in again to save this song.",
+      );
       return;
     }
     const { error } = await supabase.rpc("save_song_for_later", {
@@ -509,36 +540,64 @@ function PostReviewDiscovery({
       return;
     }
     setSaved(true);
-    notify(`${song.title} was saved for later.`);
+    notify(
+        spanish
+        ? `${song.title} se guardó para después.`
+        : `${song.title} was saved for later.`,
+    );
   };
 
   return (
     <div className="discovery-card">
-      <span className="eyebrow"><Sparkles size={13} /> Review complete</span>
-      <h3>Keep listening</h3>
-      <p>Your next review is ready. First Listen stays open when you visit a music platform.</p>
+      <span className="eyebrow">
+        <Sparkles size={13} /> {spanish ? "Review completada" : "Review complete"}
+      </span>
+      <h3>{spanish ? "Sigue escuchando" : "Keep listening"}</h3>
+      <p>
+        {spanish
+          ? "Tu próxima review está lista. First Listen permanece abierto mientras escuchas música."
+          : "Your next review is ready. First Listen stays open while you listen to music."}
+      </p>
       <div className="discovery-links">
         <a href={links.spotify} rel="noreferrer" target="_blank">
-          <Disc3 size={15} /> Listen Full Song on Spotify
+          <Disc3 size={15} />{" "}
+          {spanish ? "Escuchar completa en Spotify" : "Listen Full Song on Spotify"}
         </a>
         <a href={links.youtube} rel="noreferrer" target="_blank">
-          <Youtube size={15} /> Listen Full Song on YouTube
+          <Youtube size={15} />{" "}
+          {spanish ? "Escuchar completa en YouTube" : "Listen Full Song on YouTube"}
         </a>
         <a href={links.apple} rel="noreferrer" target="_blank">
-          <Radio size={15} /> Listen Full Song on Apple Music
+          <Radio size={15} />{" "}
+          {spanish ? "Escuchar completa en Apple Music" : "Listen Full Song on Apple Music"}
         </a>
       </div>
       <div className="discovery-actions">
         <button disabled={following || !song.artistId} onClick={followArtist} type="button">
-          <UserPlus size={14} /> {following ? "Following" : "Follow Artist"}
+          <UserPlus size={14} />{" "}
+          {following
+            ? spanish
+              ? "Siguiendo"
+              : "Following"
+            : spanish
+              ? "Seguir artista"
+              : "Follow Artist"}
         </button>
         <button disabled={saved} onClick={saveForLater} type="button">
-          <Bookmark size={14} /> {saved ? "Saved" : "Save For Later"}
+          <Bookmark size={14} />{" "}
+          {saved
+            ? spanish
+              ? "Guardada"
+              : "Saved"
+            : spanish
+              ? "Guardar para después"
+              : "Save For Later"}
         </button>
       </div>
       {song.artistId && (
         <Link href={`/artists/${song.artistId}`}>
-          View {song.artist}&apos;s profile <ArrowRight size={13} />
+          {spanish ? `Ver perfil de ${song.artist}` : `View ${song.artist}'s profile`}{" "}
+          <ArrowRight size={13} />
         </Link>
       )}
     </div>
@@ -559,6 +618,7 @@ function ReviewView({
   activityScore,
   queueSongs,
   unlimitedCredits,
+  approvedListeningSeconds,
 }: {
   reviewCount: number;
   onReviewed: (
@@ -579,6 +639,7 @@ function ReviewView({
   activityScore: number;
   queueSongs: Song[];
   unlimitedCredits: boolean;
+  approvedListeningSeconds: number;
 }) {
   const reviewerProfile = useMemo(
     () => ({ languages: listenerLanguages, genrePreferences, activityScore }),
@@ -616,6 +677,7 @@ function ReviewView({
   const lastHeartbeatAtRef = useRef(0);
   const heartbeatIntervalRef = useRef(15);
   const interactionGraceRef = useRef(300);
+  const latestTelemetryRef = useRef<ProviderTelemetrySnapshot | null>(null);
 
   useEffect(() => {
     setForm(emptyReview);
@@ -626,6 +688,7 @@ function ReviewView({
     lastHeartbeatAtRef.current = 0;
     heartbeatIntervalRef.current = 15;
     interactionGraceRef.current = 300;
+    latestTelemetryRef.current = null;
     setListeningSession({
       sessionId: null,
       earningEligible: null,
@@ -638,7 +701,8 @@ function ReviewView({
   }, [song?.id]);
 
   const handleListeningTelemetry = useCallback(
-    async (snapshot: ProviderTelemetrySnapshot) => {
+    async (snapshot: ProviderTelemetrySnapshot, force = false) => {
+      latestTelemetryRef.current = snapshot;
       if (!song) return;
       if (!snapshot.supported) {
         setListeningSession((current) => ({
@@ -695,6 +759,7 @@ function ReviewView({
       const now = Date.now();
       const intervalMilliseconds = heartbeatIntervalRef.current * 1000;
       if (
+        !force &&
         lastHeartbeatAtRef.current &&
         now - lastHeartbeatAtRef.current < intervalMilliseconds
       ) {
@@ -738,6 +803,15 @@ function ReviewView({
     [locale, song],
   );
 
+  const flushListeningTelemetry = async () => {
+    const snapshot = latestTelemetryRef.current;
+    if (!snapshot || snapshot.playbackState !== "playing") return;
+    for (let attempt = 0; attempt < 10 && heartbeatInFlightRef.current; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+    await handleListeningTelemetry(snapshot, true);
+  };
+
   const requiredAnswersComplete =
     form.listenFull !== null &&
     form.addPlaylist !== null &&
@@ -762,6 +836,7 @@ function ReviewView({
     }
     if (!song) return;
     setSubmitting(true);
+    await flushListeningTelemetry();
     const result = await onReviewed(
       song.id,
       form,
@@ -778,8 +853,8 @@ function ReviewView({
     notify(
       result.listeningSecondsBanked
         ? locale === "es"
-          ? `Review enviada. ${formatMinutes(result.listeningSecondsBanked)} agregados al banco.`
-          : `Review submitted. ${formatMinutes(result.listeningSecondsBanked)} added to your Listening Bank.`
+          ? `Review enviada. ${formatPreciseMinutes(result.listeningSecondsBanked)} agregados al banco.`
+          : `Review submitted. ${formatPreciseMinutes(result.listeningSecondsBanked)} added to your Listening Bank.`
         : locale === "es"
           ? "Review enviada. La siguiente cancion ya esta lista."
           : "Review submitted. The next song is ready.",
@@ -992,7 +1067,16 @@ function ReviewView({
             <Headphones size={13} />{" "}
             {locale === "es" ? "Banco de escucha" : "Listening Bank"}
           </span>
-          <strong>{formatMinutes(listeningSession.verifiedSeconds)}</strong>
+          <div className="listening-validation-totals">
+            <div>
+              <span>{locale === "es" ? "Minutos pendientes" : "Pending Minutes"}</span>
+              <strong>{formatPreciseMinutes(listeningSession.verifiedSeconds)}</strong>
+            </div>
+            <div>
+              <span>{locale === "es" ? "Minutos aprobados" : "Approved Minutes"}</span>
+              <strong>{formatPreciseMinutes(approvedListeningSeconds)}</strong>
+            </div>
+          </div>
           <p>
             {listeningSession.earningEligible === false
               ? locale === "es"
@@ -1019,7 +1103,7 @@ function ReviewView({
           )}
         </div>
         {lastReviewedSong && (
-          <PostReviewDiscovery notify={notify} song={lastReviewedSong} />
+          <PostReviewDiscovery locale={locale} notify={notify} song={lastReviewedSong} />
         )}
         <ReviewProgress count={reviewCount} copy={copy} founderFree={founderFree} unlimited={unlimitedCredits} />
         <div className="side-note">
@@ -1112,7 +1196,7 @@ function ListeningBankPanel({
           <span className="eyebrow">
             <Headphones size={13} /> {spanish ? "Banco de escucha" : "Listening Bank"}
           </span>
-          <strong>{Math.floor(status.bankSeconds / 60)} <small>min</small></strong>
+          <strong>{formatPreciseMinutes(status.bankSeconds)}</strong>
         </div>
         <div className="listener-level">
           <span>{spanish ? "Nivel" : "Level"} {status.levelNumber}</span>
@@ -1120,6 +1204,14 @@ function ListeningBankPanel({
         </div>
       </div>
       <div className="listening-bank-stats">
+        <div>
+          <strong>{formatPreciseMinutes(status.pendingSeconds)}</strong>
+          <span>{spanish ? "Minutos pendientes" : "Pending Minutes"}</span>
+        </div>
+        <div>
+          <strong>{formatPreciseMinutes(status.bankSeconds)}</strong>
+          <span>{spanish ? "Minutos aprobados" : "Approved Minutes"}</span>
+        </div>
         <div><strong>{credits}</strong><span>{spanish ? "Creditos disponibles" : "Available Credits"}</span></div>
         <div><strong>{status.availableRewardCredits}</strong><span>{spanish ? "Recompensas disponibles" : "Claimable Rewards"}</span></div>
         <div><strong>{formatMinutes(status.todaySeconds)}</strong><span>{spanish ? "Ganados hoy" : "Earned Today"}</span></div>
@@ -1162,6 +1254,363 @@ function ListeningBankPanel({
   );
 }
 
+function DiscoverySongCard({
+  song,
+  active,
+  onPlay,
+  locale,
+  topTen,
+}: {
+  song: DiscoverySong;
+  active: boolean;
+  onPlay: () => void;
+  locale: InterfaceLocale;
+  topTen?: boolean;
+}) {
+  const [details, setDetails] = useState<"reviews" | "statistics" | null>(null);
+  const spanish = locale === "es";
+
+  return (
+    <article className="discovery-song-card">
+      <div className="discovery-song-cover">
+        <Image
+          alt={`${song.title} cover`}
+          fill
+          sizes="(max-width: 760px) 100vw, 320px"
+          src={song.coverUrl}
+          unoptimized
+        />
+        <span>
+          {topTen
+            ? `Top ${song.position}`
+            : song.badge || `Spotlight #${song.position}`}
+        </span>
+      </div>
+      <div className="discovery-song-copy">
+        <span className="eyebrow">
+          {topTen ? <Trophy size={13} /> : <Sparkles size={13} />}
+          {topTen
+            ? spanish
+              ? "Ranking organico"
+              : "Organic ranking"
+            : spanish
+              ? "Seleccion editorial"
+              : "Editorial selection"}
+        </span>
+        <h4>{song.title}</h4>
+        <Link href={`/artists/${song.artistId}`}>{song.artist}</Link>
+        <small>
+          {song.platform} / {optionLabel(locale, song.genre)} /{" "}
+          {optionLabel(locale, song.language)}
+        </small>
+      </div>
+      <div className="discovery-song-actions">
+        <button className="primary-button" onClick={onPlay} type="button">
+          <Play size={14} fill="currentColor" />
+          {active
+            ? spanish
+              ? "Ocultar reproductor"
+              : "Hide Player"
+            : spanish
+              ? "Escuchar ahora"
+              : "Listen Now"}
+        </button>
+        <a href={song.link} rel="noreferrer" target="_blank">
+          <ExternalLink size={14} />
+          {spanish ? "Abrir plataforma" : "Open Platform"}
+        </a>
+        <button
+          className={details === "reviews" ? "active" : ""}
+          onClick={() =>
+            setDetails((current) => (current === "reviews" ? null : "reviews"))
+          }
+          type="button"
+        >
+          <MessageSquareText size={14} />
+          {spanish ? "Reviews" : "Reviews"}
+        </button>
+        <button
+          className={details === "statistics" ? "active" : ""}
+          onClick={() =>
+            setDetails((current) =>
+              current === "statistics" ? null : "statistics",
+            )
+          }
+          type="button"
+        >
+          <BarChart3 size={14} />
+          {spanish ? "Estadisticas" : "Statistics"}
+        </button>
+      </div>
+      {active && (
+        <div className="discovery-inline-player">
+          <ProviderPlayer
+            artist={song.artist}
+            coverUrl={song.coverUrl}
+            link={song.link}
+            locale={locale}
+            platform={song.platform}
+            songLoadedAt={null}
+            title={song.title}
+          />
+        </div>
+      )}
+      {details && (
+        <div className="discovery-song-details" role="status">
+          {details === "reviews" ? (
+            <>
+              <div>
+                <strong>{song.reviewsReceived}</strong>
+                <span>{spanish ? "Reviews recibidas" : "Reviews received"}</span>
+              </div>
+              <div>
+                <strong>{song.averageRating.toFixed(1)}</strong>
+                <span>{spanish ? "Rating promedio" : "Average rating"}</span>
+              </div>
+              <div>
+                <strong>{song.hookScore}</strong>
+                <span>Hook Score</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <strong>{formatDuration(song.totalListeningSeconds)}</strong>
+                <span>{spanish ? "Tiempo escuchado" : "Listening time"}</span>
+              </div>
+              <div>
+                <strong>{Math.round(song.completionRate)}%</strong>
+                <span>{spanish ? "Finalizacion" : "Completion"}</span>
+              </div>
+              {topTen && (
+                <div>
+                  <strong>{song.rankingScore?.toFixed(1) ?? "0.0"}</strong>
+                  <span>{spanish ? "Score organico" : "Organic score"}</span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function DiscoverySections({
+  spotlightSongs,
+  topTenSongs,
+  locale,
+}: {
+  spotlightSongs: DiscoverySong[];
+  topTenSongs: DiscoverySong[];
+  locale: InterfaceLocale;
+}) {
+  const [activeSongId, setActiveSongId] = useState<string | null>(null);
+  const spanish = locale === "es";
+
+  return (
+    <div className="dashboard-discovery">
+      <section className="panel discovery-section">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">
+              <Sparkles size={13} /> Spotlight
+            </span>
+            <h3>
+              {spanish
+                ? "Dos selecciones editoriales"
+                : "Two editorial selections"}
+            </h3>
+          </div>
+          <small>
+            {spanish
+              ? "Seleccionado manualmente"
+              : "Manually selected"}
+          </small>
+        </div>
+        {spotlightSongs.length ? (
+          <div className="discovery-song-grid">
+            {spotlightSongs.map((song) => (
+              <DiscoverySongCard
+                active={activeSongId === song.id}
+                key={`spotlight-${song.id}`}
+                locale={locale}
+                onPlay={() =>
+                  setActiveSongId((current) =>
+                    current === song.id ? null : song.id,
+                  )
+                }
+                song={song}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="discovery-empty">
+            {spanish
+              ? "Los proximos Spotlight apareceran aqui."
+              : "The next Spotlight selections will appear here."}
+          </p>
+        )}
+      </section>
+
+      <section className="panel discovery-section top-ten-section">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">
+              <Trophy size={13} /> Top 10
+            </span>
+            <h3>
+              {spanish ? "Ganado por resultados" : "Earned by performance"}
+            </h3>
+          </div>
+          <small>
+            {spanish
+              ? "Sin patrocinio ni control editorial"
+              : "No sponsorship or editorial control"}
+          </small>
+        </div>
+        {topTenSongs.length ? (
+          <div className="discovery-song-grid top-ten-grid">
+            {topTenSongs.map((song) => (
+              <DiscoverySongCard
+                active={activeSongId === song.id}
+                key={`top-${song.id}`}
+                locale={locale}
+                onPlay={() =>
+                  setActiveSongId((current) =>
+                    current === song.id ? null : song.id,
+                  )
+                }
+                song={song}
+                topTen
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="discovery-empty">
+            {spanish
+              ? "El Top 10 aparecera cuando haya suficientes reviews verificadas."
+              : "Top 10 will appear after songs receive verified reviews."}
+          </p>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function DailyMissionPanel({
+  mission,
+  claiming,
+  locale,
+  onClaim,
+}: {
+  mission: DailyMissionStatus | null;
+  claiming: boolean;
+  locale: InterfaceLocale;
+  onClaim: () => void;
+}) {
+  if (!mission) return null;
+  const spanish = locale === "es";
+  const progress = Math.min(
+    100,
+    Math.round((mission.progressCount / Math.max(1, mission.targetCount)) * 100),
+  );
+  const reward =
+    mission.rewardKind === "credit"
+      ? `${mission.rewardAmount} ${spanish ? "credito" : "credit"}`
+      : `${mission.rewardAmount} ${spanish ? "min del Banco" : "Bank min"}`;
+
+  return (
+    <section className="daily-mission-panel">
+      <div className="daily-mission-icon">
+        <Target size={22} />
+      </div>
+      <div>
+        <span className="eyebrow">
+          {spanish ? "Mision diaria" : "Daily Mission"}
+        </span>
+        <h3>{spanish ? mission.titleEs : mission.titleEn}</h3>
+        <p>{spanish ? mission.descriptionEs : mission.descriptionEn}</p>
+      </div>
+      <div className="daily-mission-progress">
+        <strong>
+          {mission.progressCount}/{mission.targetCount}
+          {mission.completed ? ` ${spanish ? "Completa" : "Complete"}` : ""}
+        </strong>
+        <div className="progress-track">
+          <i style={{ width: `${progress}%` }} />
+        </div>
+        <small>
+          {spanish ? "Recompensa" : "Reward"}: {reward}
+        </small>
+      </div>
+      <button
+        disabled={!mission.completed || mission.claimed || claiming}
+        onClick={onClaim}
+        type="button"
+      >
+        {mission.claimed
+          ? spanish
+            ? "Reclamada"
+            : "Claimed"
+          : claiming
+            ? "..."
+            : spanish
+              ? "Reclamar"
+              : "Claim"}
+      </button>
+    </section>
+  );
+}
+
+function CommunityProgramsPanel({
+  programs,
+  locale,
+}: {
+  programs: CommunityProgram[];
+  locale: InterfaceLocale;
+}) {
+  if (!programs.length) return null;
+  const spanish = locale === "es";
+  return (
+    <section className="panel community-programs-panel">
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">
+            <CalendarDays size={13} />{" "}
+            {spanish ? "Comunidad" : "Community"}
+          </span>
+          <h3>{spanish ? "Concursos y eventos activos" : "Active contests and events"}</h3>
+        </div>
+      </div>
+      <div className="community-program-grid">
+        {programs.map((program) => (
+          <article key={program.id}>
+            <span>
+              {program.kind === "contest"
+                ? spanish
+                  ? "Concurso"
+                  : "Contest"
+                : spanish
+                  ? "Evento especial"
+                  : "Special event"}
+            </span>
+            <h4>{program.title}</h4>
+            <p>{program.description}</p>
+            <small>
+              {program.genre ? `${optionLabel(locale, program.genre)} / ` : ""}
+              {new Date(program.endsAt).toLocaleDateString(locale)}
+              {program.kind === "contest"
+                ? ` / ${program.entryCount} ${spanish ? "entradas" : "entries"}`
+                : ""}
+            </small>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function DashboardView({
   setView,
   founder,
@@ -1176,6 +1625,13 @@ function DashboardView({
   listeningBank,
   claimingReward,
   onClaimReward,
+  spotlightSongs,
+  topTenSongs,
+  dailyMission,
+  claimingMission,
+  onClaimMission,
+  communityPrograms,
+  onBoostSong,
 }: {
   setView: (view: View) => void;
   founder: boolean;
@@ -1190,6 +1646,13 @@ function DashboardView({
   listeningBank: ListeningBankStatus;
   claimingReward: boolean;
   onClaimReward: () => void;
+  spotlightSongs: DiscoverySong[];
+  topTenSongs: DiscoverySong[];
+  dailyMission: DailyMissionStatus | null;
+  claimingMission: boolean;
+  onClaimMission: () => void;
+  communityPrograms: CommunityProgram[];
+  onBoostSong: (songId: string) => void;
 }) {
   const reviews = songReviews;
   if (!song) {
@@ -1202,6 +1665,18 @@ function DashboardView({
           status={listeningBank}
           locale={locale}
         />
+        <DailyMissionPanel
+          claiming={claimingMission}
+          locale={locale}
+          mission={dailyMission}
+          onClaim={onClaimMission}
+        />
+        <DiscoverySections
+          locale={locale}
+          spotlightSongs={spotlightSongs}
+          topTenSongs={topTenSongs}
+        />
+        <CommunityProgramsPanel locale={locale} programs={communityPrograms} />
         <section className="review-complete-card">
           <div className="success-orbit"><Music2 size={34} /></div>
           <span className="eyebrow">{copy.app.dashboard.latest}</span>
@@ -1259,6 +1734,18 @@ function DashboardView({
           status={listeningBank}
           locale={locale}
         />
+        <DailyMissionPanel
+          claiming={claimingMission}
+          locale={locale}
+          mission={dailyMission}
+          onClaim={onClaimMission}
+        />
+        <DiscoverySections
+          locale={locale}
+          spotlightSongs={spotlightSongs}
+          topTenSongs={topTenSongs}
+        />
+        <CommunityProgramsPanel locale={locale} programs={communityPrograms} />
 
         <div className="active-song">
           <Image src={song.coverUrl} alt={`${song.title} cover`} unoptimized width={90} height={90} />
@@ -1369,10 +1856,14 @@ function DashboardView({
         <section className="panel song-performance-panel">
           <div className="panel-heading">
             <div>
-              <span className="eyebrow">Song performance</span>
-              <h3>Every submitted song</h3>
+              <span className="eyebrow">
+                {locale === "es" ? "Rendimiento" : "Song performance"}
+              </span>
+              <h3>
+                {locale === "es" ? "Cada cancion enviada" : "Every submitted song"}
+              </h3>
             </div>
-            <span>{songSummaries.length} total</span>
+            <span>{songSummaries.length} {locale === "es" ? "total" : "total"}</span>
           </div>
           <div className="song-performance-list">
             {songSummaries.map((summary) => (
@@ -1380,18 +1871,40 @@ function DashboardView({
                 <div className="song-performance-title">
                   <strong>{summary.title}</strong>
                   <small>
-                    {summary.platform} / Submitted{" "}
+                    {summary.platform} / {locale === "es" ? "Enviada" : "Submitted"}{" "}
                     {new Date(summary.submittedAt).toLocaleDateString(locale, { timeZone: "UTC" })}
                   </small>
                 </div>
-                <div><strong>{summary.reviewsReceived}</strong><span>Reviews received</span></div>
-                <div><strong>{summary.averageRating.toFixed(1)}</strong><span>Average rating</span></div>
+                <div><strong>{summary.reviewsReceived}</strong><span>{locale === "es" ? "Reviews recibidas" : "Reviews received"}</span></div>
+                <div><strong>{summary.averageRating.toFixed(1)}</strong><span>{locale === "es" ? "Rating promedio" : "Average rating"}</span></div>
                 <div><strong>{summary.hookScore}</strong><span>Hook score</span></div>
-                <div><strong>{formatDuration(summary.totalListeningSeconds)}</strong><span>Listening time</span></div>
-                <div><strong>{summary.reportCount}</strong><span>Reports</span></div>
+                <div><strong>{formatDuration(summary.totalListeningSeconds)}</strong><span>{locale === "es" ? "Tiempo escuchado" : "Listening time"}</span></div>
+                <div><strong>{summary.reportCount}</strong><span>{locale === "es" ? "Reportes" : "Reports"}</span></div>
                 <Link href={`/dashboard/comments?song=${summary.id}`}>
-                  Comments <ArrowRight size={13} />
+                  {locale === "es" ? "Comentarios" : "Comments"} <ArrowRight size={13} />
                 </Link>
+                <button
+                  className="song-boost-button"
+                  disabled={
+                    summary.boostStatus === "pending" ||
+                    summary.boostStatus === "approved"
+                  }
+                  onClick={() => onBoostSong(summary.id)}
+                  type="button"
+                >
+                  <Rocket size={13} />
+                  {summary.boostStatus === "pending"
+                    ? locale === "es"
+                      ? "Boost pendiente"
+                      : "Boost pending"
+                    : summary.boostStatus === "approved"
+                      ? locale === "es"
+                        ? "Boost activo"
+                        : "Boost active"
+                      : locale === "es"
+                        ? "Impulsar cancion"
+                        : "Boost Song"}
+                </button>
               </article>
             ))}
           </div>
@@ -1512,8 +2025,8 @@ function SubmitView({
   const [songLanguage, setSongLanguage] = useState<SongLanguage | "">("");
   const [country, setCountry] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
-  const [feedbackFocus, setFeedbackFocus] = useState<FeedbackFocus[]>(["Hook Strength"]);
-  const [explicitContent, setExplicitContent] = useState(false);
+  const [feedbackFocus, setFeedbackFocus] = useState<FeedbackFocus[]>([]);
+  const [explicitContent, setExplicitContent] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [metadataLoading, setMetadataLoading] = useState(false);
   const [debugEnabled, setDebugEnabled] = useState(false);
@@ -1568,6 +2081,13 @@ function SubmitView({
           : "Select at least one feedback focus.",
       );
     }
+    if (explicitContent === null) {
+      failures.push(
+        locale === "es"
+          ? "Indica si la cancion contiene contenido explicito."
+          : "Choose whether the song contains explicit content.",
+      );
+    }
     if (coverImageUrl && !/^https:\/\//i.test(coverImageUrl.trim())) {
       failures.push(
         locale === "es"
@@ -1582,6 +2102,7 @@ function SubmitView({
     coverImageUrl,
     feedbackFocus.length,
     genre,
+    explicitContent,
     locale,
     platformDetection.platform,
     platformDetection.valid,
@@ -1678,7 +2199,7 @@ function SubmitView({
       language: songLanguage,
       feedbackFocus,
       country,
-      explicitContent,
+      explicitContent: explicitContent ?? false,
     };
 
     setSaving(true);
@@ -1689,6 +2210,22 @@ function SubmitView({
     setPlatform(platformDetection.platform);
     setSubmitted(true);
     notify(locale === "es" ? "Cancion enviada. Ya entra a la cola de reviews." : "Song submitted. It is now entering the review queue.");
+  };
+
+  const resetSubmissionForm = () => {
+    setMusicLink("");
+    setPlatform(null);
+    setSongTitle("");
+    setArtistName("");
+    setGenre("");
+    setSongLanguage("");
+    setCountry("");
+    setCoverImageUrl("");
+    setFeedbackFocus([]);
+    setExplicitContent(null);
+    setMetadataLoading(false);
+    setSaving(false);
+    setSubmitted(false);
   };
 
   if (submitted) {
@@ -1709,7 +2246,7 @@ function SubmitView({
             </span>
             <CheckCircle2 size={20} />
           </div>
-          <button className="primary-button" onClick={() => setSubmitted(false)}>
+          <button className="primary-button" onClick={resetSubmissionForm}>
             {copy.app.submit.another}
           </button>
         </section>
@@ -1905,7 +2442,7 @@ function SubmitView({
             <legend>Explicit Content</legend>
             <label>
               <input
-                checked={!explicitContent}
+                checked={explicitContent === false}
                 name="explicitContent"
                 onChange={() => setExplicitContent(false)}
                 type="radio"
@@ -1915,7 +2452,7 @@ function SubmitView({
             </label>
             <label>
               <input
-                checked={explicitContent}
+                checked={explicitContent === true}
                 name="explicitContent"
                 onChange={() => setExplicitContent(true)}
                 type="radio"
@@ -2015,6 +2552,10 @@ type FirstListenAppProps = {
   initialTotalCreditsEarned: number;
   initialReviewQualityScore: number;
   initialListeningBank: ListeningBankStatus;
+  initialSpotlightSongs: DiscoverySong[];
+  initialTopTenSongs: DiscoverySong[];
+  initialDailyMission: DailyMissionStatus | null;
+  initialCommunityPrograms: CommunityProgram[];
   role: "super_admin" | "admin" | "moderator" | "user";
   initialUserSong: Song | null;
   initialSongSummaries: SongDashboardSummary[];
@@ -2035,6 +2576,10 @@ export function FirstListenApp({
   initialTotalCreditsEarned,
   initialReviewQualityScore,
   initialListeningBank,
+  initialSpotlightSongs,
+  initialTopTenSongs,
+  initialDailyMission,
+  initialCommunityPrograms,
   role,
   initialUserSong,
   initialSongSummaries,
@@ -2051,6 +2596,12 @@ export function FirstListenApp({
   const [listeningBank, setListeningBank] =
     useState<ListeningBankStatus>(initialListeningBank);
   const [claimingReward, setClaimingReward] = useState(false);
+  const [claimingMission, setClaimingMission] = useState(false);
+  const [dailyMission, setDailyMission] =
+    useState<DailyMissionStatus | null>(initialDailyMission);
+  const [songSummaries, setSongSummaries] = useState(
+    initialSongSummaries,
+  );
   const [priorComments, setPriorComments] = useState<string[]>([]);
   const founder = initialFounder;
   const founderFree = initialFounderFree;
@@ -2148,11 +2699,42 @@ export function FirstListenApp({
     setListeningBank((current) => ({
       ...current,
       bankSeconds,
+      pendingSeconds: 0,
       lifetimeSeconds: current.lifetimeSeconds + bankedSeconds,
       todaySeconds: current.todaySeconds + bankedSeconds,
       availableRewardCredits: Math.floor(bankSeconds / exchangeSeconds),
       secondsToNextCredit: secondsToNextReward(bankSeconds, exchangeSeconds),
     }));
+    const { data: listeningStatusRows } = await supabase.rpc(
+      "get_listening_bank_status_v2",
+    );
+    const listeningStatus = Array.isArray(listeningStatusRows)
+      ? listeningStatusRows[0]
+      : listeningStatusRows;
+    if (listeningStatus) {
+      setListeningBank({
+        bankSeconds: Number(listeningStatus.bank_seconds ?? bankSeconds),
+        pendingSeconds: Number(listeningStatus.pending_seconds ?? 0),
+        lifetimeSeconds: Number(listeningStatus.lifetime_seconds ?? 0),
+        todaySeconds: Number(listeningStatus.today_seconds ?? 0),
+        availableRewardCredits: Number(
+          listeningStatus.available_reward_credits ?? 0,
+        ),
+        secondsToNextCredit: Number(
+          listeningStatus.seconds_to_next_credit ?? exchangeSeconds,
+        ),
+        minutesPerCredit: Number(
+          listeningStatus.minutes_per_credit ??
+            listeningBank.minutesPerCredit,
+        ),
+        dailyCapMinutes: Number(
+          listeningStatus.daily_cap_minutes ?? listeningBank.dailyCapMinutes,
+        ),
+        levelNumber: Number(listeningStatus.level_number ?? 1),
+        levelName: String(listeningStatus.level_name ?? "Explorer"),
+        rewardsEnabled: Boolean(listeningStatus.rewards_enabled ?? true),
+      });
+    }
     const { data: currentProfile } = await supabase
       .from("profiles")
       .select("credits, total_review_credits_earned")
@@ -2161,6 +2743,28 @@ export function FirstListenApp({
     if (currentProfile) {
       setReviewCount(Number(currentProfile.credits));
       setTotalCreditsEarned(Number(currentProfile.total_review_credits_earned));
+    }
+    const { data: missionStatusRows } = await supabase.rpc(
+      "get_daily_mission_status",
+    );
+    const missionStatus = Array.isArray(missionStatusRows)
+      ? missionStatusRows[0]
+      : missionStatusRows;
+    if (missionStatus) {
+      setDailyMission({
+        id: String(missionStatus.mission_id),
+        key: String(missionStatus.mission_key),
+        titleEn: String(missionStatus.title_en),
+        titleEs: String(missionStatus.title_es),
+        descriptionEn: String(missionStatus.description_en),
+        descriptionEs: String(missionStatus.description_es),
+        targetCount: Number(missionStatus.target_count),
+        progressCount: Number(missionStatus.progress_count),
+        rewardKind: missionStatus.reward_kind,
+        rewardAmount: Number(missionStatus.reward_amount),
+        completed: Boolean(missionStatus.completed),
+        claimed: Boolean(missionStatus.claimed),
+      });
     }
 
     setReviewQualityScores((current) => {
@@ -2189,7 +2793,11 @@ export function FirstListenApp({
   const claimListeningReward = async () => {
     const supabase = createClient();
     if (!supabase) {
-      notify("Reward service is unavailable. Please refresh and try again.");
+      notify(
+        locale === "es"
+          ? "El servicio de recompensas no esta disponible. Actualiza la pagina."
+          : "Reward service is unavailable. Please refresh and try again.",
+      );
       return;
     }
     setClaimingReward(true);
@@ -2197,7 +2805,12 @@ export function FirstListenApp({
     setClaimingReward(false);
     const result = Array.isArray(data) ? data[0] : data;
     if (error || !result) {
-      notify(error?.message ?? "Listening reward could not be claimed.");
+      notify(
+        error?.message ??
+          (locale === "es"
+            ? "No se pudo reclamar la recompensa."
+            : "Listening reward could not be claimed."),
+      );
       return;
     }
     const bankSeconds = Number(result.bank_seconds ?? 0);
@@ -2212,7 +2825,75 @@ export function FirstListenApp({
       ),
       secondsToNextCredit: secondsToNextReward(bankSeconds, exchangeSeconds),
     }));
-    notify("Listening reward claimed. One credit was added to your account.");
+    notify(
+      locale === "es"
+        ? "Recompensa reclamada. Se agrego un credito a tu cuenta."
+        : "Listening reward claimed. One credit was added to your account.",
+    );
+  };
+
+  const claimDailyMission = async () => {
+    if (!dailyMission) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    setClaimingMission(true);
+    const { data, error } = await supabase.rpc("claim_daily_mission_reward", {
+      target_mission_id: dailyMission.id,
+    });
+    setClaimingMission(false);
+    const result = Array.isArray(data) ? data[0] : data;
+    if (error || !result) {
+      notify(
+        error?.message ??
+          (locale === "es"
+            ? "No se pudo reclamar la mision."
+            : "Mission reward could not be claimed."),
+      );
+      return;
+    }
+    setDailyMission((current) =>
+      current ? { ...current, claimed: true } : current,
+    );
+    setReviewCount(Number(result.credits_balance ?? reviewCount));
+    const bankSeconds = Number(
+      result.bank_seconds ?? listeningBank.bankSeconds,
+    );
+    const exchangeSeconds = listeningBank.minutesPerCredit * 60;
+    setListeningBank((current) => ({
+      ...current,
+      bankSeconds,
+      availableRewardCredits: Math.floor(bankSeconds / exchangeSeconds),
+      secondsToNextCredit: secondsToNextReward(bankSeconds, exchangeSeconds),
+    }));
+    notify(
+      locale === "es"
+        ? "Recompensa de mision agregada."
+        : "Daily mission reward added.",
+    );
+  };
+
+  const requestSongBoost = async (songId: string) => {
+    const supabase = createClient();
+    if (!supabase) return;
+    const { error } = await supabase.rpc("request_song_boost", {
+      target_song_id: songId,
+    });
+    if (error) {
+      notify(error.message);
+      return;
+    }
+    setSongSummaries((current) =>
+      current.map((summary) =>
+        summary.id === songId
+          ? { ...summary, boostStatus: "pending" }
+          : summary,
+      ),
+    );
+    notify(
+      locale === "es"
+        ? "Solicitud de boost enviada para aprobacion."
+        : "Boost request submitted for approval.",
+    );
   };
 
   const handleSongSubmitted = async (
@@ -2278,9 +2959,16 @@ export function FirstListenApp({
           reviewQualityScore={averageReviewQuality}
           setView={changeView}
           song={initialUserSong}
-          songSummaries={initialSongSummaries}
+          songSummaries={songSummaries}
           songReviews={initialSongReviews}
           totalCreditsEarned={totalCreditsEarned}
+          spotlightSongs={initialSpotlightSongs}
+          topTenSongs={initialTopTenSongs}
+          dailyMission={dailyMission}
+          claimingMission={claimingMission}
+          onClaimMission={() => void claimDailyMission()}
+          communityPrograms={initialCommunityPrograms}
+          onBoostSong={(songId) => void requestSongBoost(songId)}
         />
       );
     }
@@ -2312,6 +3000,7 @@ export function FirstListenApp({
         reviewCount={reviewCount}
         setView={changeView}
         unlimitedCredits={role === "super_admin"}
+        approvedListeningSeconds={listeningBank.bankSeconds}
       />
     );
   })();

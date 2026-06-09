@@ -8,6 +8,9 @@ import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/client";
 import type {
   AccountSummary,
+  CommunityProgram,
+  DailyMissionStatus,
+  DiscoverySong,
   ListeningBankStatus,
   Review,
   Song,
@@ -29,6 +32,10 @@ type ProfileSeed = {
   songSummaries: SongDashboardSummary[];
   reviews: Review[];
   listeningBank: ListeningBankStatus;
+  spotlightSongs: DiscoverySong[];
+  topTenSongs: DiscoverySong[];
+  dailyMission: DailyMissionStatus | null;
+  communityPrograms: CommunityProgram[];
 };
 
 export function ProtectedAppEntry({
@@ -100,6 +107,10 @@ export function ProtectedAppEntry({
       initialTotalCreditsEarned={profile.totalCreditsEarned}
       initialUserSong={profile.song}
       initialListeningBank={profile.listeningBank}
+      initialSpotlightSongs={profile.spotlightSongs}
+      initialTopTenSongs={profile.topTenSongs}
+      initialDailyMission={profile.dailyMission}
+      initialCommunityPrograms={profile.communityPrograms}
       initialView={initialView}
       listenerLanguages={languages}
       locale={locale}

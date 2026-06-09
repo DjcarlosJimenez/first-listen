@@ -59,9 +59,14 @@ const { data: listeningData, error: listeningError } = await supabase.rpc(
   "listening_system_health_report",
 );
 if (listeningError) throw listeningError;
+const { data: discoveryData, error: discoveryError } = await supabase.rpc(
+  "discovery_system_health_report",
+);
+if (discoveryError) throw discoveryError;
 
 const report = data ?? {};
 const listeningReport = listeningData ?? {};
+const discoveryReport = discoveryData ?? {};
 const requiredPlatforms = [
   "youtube",
   "spotify",
@@ -162,6 +167,31 @@ const checks = [
     passed: Number(listeningReport.negative_balances ?? -1) === 0,
     details: listeningReport.negative_balances,
   },
+  {
+    name: "Discovery and community tables exist",
+    passed: Object.values(discoveryReport.tables ?? {}).every(Boolean),
+    details: discoveryReport.tables,
+  },
+  {
+    name: "Exactly two Spotlight slots exist",
+    passed: Number(discoveryReport.spotlight_slots ?? 0) === 2,
+    details: discoveryReport.spotlight_slots,
+  },
+  {
+    name: "Spotlight has no duplicate songs",
+    passed: Number(discoveryReport.active_spotlight_duplicates ?? -1) === 0,
+    details: discoveryReport.active_spotlight_duplicates,
+  },
+  {
+    name: "Active boosts have valid schedules",
+    passed: Number(discoveryReport.invalid_active_boosts ?? -1) === 0,
+    details: discoveryReport.invalid_active_boosts,
+  },
+  {
+    name: "Top 10 is marked organic-only",
+    passed: discoveryReport.top_ten_is_organic === true,
+    details: discoveryReport.top_ten_is_organic,
+  },
 ];
 
 const passed = checks.filter((check) => check.passed).length;
@@ -170,6 +200,7 @@ const result = {
   score,
   status: score === 100 ? "healthy" : score >= 80 ? "needs_attention" : "unhealthy",
   checks,
+  discoveryReport,
   report,
   listeningReport,
 };

@@ -3,8 +3,12 @@ import { ProtectedAppEntry } from "@/components/protected-app-entry";
 import type { View } from "@/components/first-listen-app";
 import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
 import { getInitials, platformLabels } from "@/lib/discovery";
+import { safeCoverUrl } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import type {
+  CommunityProgram,
+  DailyMissionStatus,
+  DiscoverySong,
   ListeningBankStatus,
   Review,
   Song,
@@ -13,9 +17,14 @@ import type {
 
 type DashboardRow = {
   song_id: string;
+  artist_id: string;
   title: string;
   artist_name: string;
+  cover_image_url: string;
+  music_url: string;
   platform: string;
+  genre: string;
+  song_language: string;
   submitted_at: string;
   reviews_received: number;
   average_rating: number;
@@ -27,10 +36,12 @@ type DashboardRow = {
   playlist_intent: number;
   share_intent: number;
   listener_retention: number;
+  boost_status: string | null;
 };
 
 type ListeningBankRow = {
   bank_seconds: number;
+  pending_seconds: number;
   lifetime_seconds: number;
   today_seconds: number;
   available_reward_credits: number;
@@ -41,6 +52,84 @@ type ListeningBankRow = {
   level_name: string;
   rewards_enabled: boolean;
 };
+
+type DiscoveryRow = {
+  slot_number?: number;
+  rank?: number;
+  ranking_score?: number;
+  badge?: string;
+  song_id: string;
+  artist_id: string;
+  title: string;
+  artist_name: string;
+  cover_image_url: string;
+  music_url: string;
+  platform: string;
+  genre: string;
+  song_language: string;
+  reviews_received: number;
+  average_rating: number;
+  hook_score: number;
+  total_listening_seconds: number;
+  completion_rate: number;
+};
+
+type MissionRow = {
+  mission_id: string;
+  mission_key: string;
+  title_en: string;
+  title_es: string;
+  description_en: string;
+  description_es: string;
+  target_count: number;
+  progress_count: number;
+  reward_kind: "listening_minutes" | "credit";
+  reward_amount: number;
+  completed: boolean;
+  claimed: boolean;
+};
+
+type CommunityRow = {
+  program_kind: "contest" | "event";
+  program_id: string;
+  title: string;
+  description: string;
+  genre: string | null;
+  starts_at: string;
+  ends_at: string;
+  reward_description: string;
+  entry_count: number;
+};
+
+function mapDiscoveryRow(row: DiscoveryRow): DiscoverySong {
+  return {
+    id: row.song_id,
+    artistId: row.artist_id,
+    title: row.title,
+    artist: row.artist_name,
+    coverUrl: safeCoverUrl(row.cover_image_url),
+    link: row.music_url,
+    platform: platformLabels[row.platform],
+    genre: row.genre,
+    language: row.song_language,
+    reviewsReceived: Number(row.reviews_received ?? 0),
+    averageRating: Number(row.average_rating ?? 0),
+    hookScore: Number(row.hook_score ?? 0),
+    totalListeningSeconds: Number(row.total_listening_seconds ?? 0),
+    completionRate: Number(row.completion_rate ?? 0),
+    badge: row.badge,
+    position:
+      row.slot_number === undefined
+        ? row.rank === undefined
+          ? undefined
+          : Number(row.rank)
+        : Number(row.slot_number),
+    rankingScore:
+      row.ranking_score === undefined
+        ? undefined
+        : Number(row.ranking_score),
+  };
+}
 
 export async function ProtectedAppPage({ initialView }: { initialView: View }) {
   const supabase = await createClient();
@@ -63,6 +152,10 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     { data: latestSong },
     { data: dashboardRows },
     { data: listeningRows },
+    { data: spotlightRows },
+    { data: topTenRows },
+    { data: missionRows },
+    { data: communityRows },
   ] = await Promise.all([
     supabase
       .from("songs")
@@ -73,8 +166,12 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase.rpc("get_my_song_dashboard_with_listening"),
-    supabase.rpc("get_listening_bank_status"),
+    supabase.rpc("get_my_song_dashboard_v2"),
+    supabase.rpc("get_listening_bank_status_v2"),
+    supabase.rpc("get_spotlight_songs"),
+    supabase.rpc("get_top_ten_songs"),
+    supabase.rpc("get_daily_mission_status"),
+    supabase.rpc("get_active_community_programs"),
   ]);
 
   const { data: reviewRows } = latestSong
@@ -99,7 +196,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
         country: latestSong.country,
         platform: platformLabels[latestSong.platform],
         link: latestSong.music_url,
-        coverUrl: latestSong.cover_image_url,
+        coverUrl: safeCoverUrl(latestSong.cover_image_url),
         explicitContent: latestSong.explicit_content,
         accent: "#c8ff4f",
         submittedAt: latestSong.created_at,
@@ -110,9 +207,14 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     (dashboardRows ?? []) as DashboardRow[]
   ).map((row) => ({
     id: row.song_id,
+    artistId: row.artist_id,
     title: row.title,
     artist: row.artist_name,
+    coverUrl: safeCoverUrl(row.cover_image_url),
+    link: row.music_url,
     platform: platformLabels[row.platform],
+    genre: row.genre,
+    language: row.song_language,
     submittedAt: row.submitted_at,
     reviewsReceived: Number(row.reviews_received ?? 0),
     averageRating: Number(row.average_rating ?? 0),
@@ -124,6 +226,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     playlistIntent: Number(row.playlist_intent ?? 0),
     shareIntent: Number(row.share_intent ?? 0),
     listenerRetention: Number(row.listener_retention ?? 0),
+    boostStatus: row.boost_status ?? undefined,
   }));
 
   const reviews: Review[] = (reviewRows ?? []).map((review) => ({
@@ -155,6 +258,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
   ) as ListeningBankRow | null;
   const listeningBank: ListeningBankStatus = {
     bankSeconds: Number(listeningRow?.bank_seconds ?? 0),
+    pendingSeconds: Number(listeningRow?.pending_seconds ?? 0),
     lifetimeSeconds: Number(listeningRow?.lifetime_seconds ?? 0),
     todaySeconds: Number(listeningRow?.today_seconds ?? 0),
     availableRewardCredits: Number(
@@ -167,6 +271,40 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     levelName: listeningRow?.level_name ?? "Explorer",
     rewardsEnabled: Boolean(listeningRow?.rewards_enabled ?? true),
   };
+
+  const missionRow = (
+    Array.isArray(missionRows) ? missionRows[0] : missionRows
+  ) as MissionRow | null;
+  const dailyMission: DailyMissionStatus | null = missionRow
+    ? {
+        id: missionRow.mission_id,
+        key: missionRow.mission_key,
+        titleEn: missionRow.title_en,
+        titleEs: missionRow.title_es,
+        descriptionEn: missionRow.description_en,
+        descriptionEs: missionRow.description_es,
+        targetCount: Number(missionRow.target_count),
+        progressCount: Number(missionRow.progress_count),
+        rewardKind: missionRow.reward_kind,
+        rewardAmount: Number(missionRow.reward_amount),
+        completed: Boolean(missionRow.completed),
+        claimed: Boolean(missionRow.claimed),
+      }
+    : null;
+
+  const communityPrograms: CommunityProgram[] = (
+    (communityRows ?? []) as CommunityRow[]
+  ).map((row) => ({
+    kind: row.program_kind,
+    id: row.program_id,
+    title: row.title,
+    description: row.description,
+    genre: row.genre ?? undefined,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    rewardDescription: row.reward_description || undefined,
+    entryCount: Number(row.entry_count ?? 0),
+  }));
 
   return (
     <ProtectedAppEntry
@@ -191,6 +329,14 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
         songSummaries,
         reviews,
         listeningBank,
+        spotlightSongs: ((spotlightRows ?? []) as DiscoveryRow[]).map(
+          mapDiscoveryRow,
+        ),
+        topTenSongs: ((topTenRows ?? []) as DiscoveryRow[]).map(
+          mapDiscoveryRow,
+        ),
+        dailyMission,
+        communityPrograms,
       }}
     />
   );
