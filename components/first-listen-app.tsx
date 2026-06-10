@@ -24,6 +24,7 @@ import {
   ListMusic,
   LockKeyhole,
   LogOut,
+  LoaderCircle,
   Menu,
   MessageSquareText,
   Moon,
@@ -115,6 +116,17 @@ import type {
 export type View = "review" | "dashboard" | "submit";
 type BinaryAnswer = boolean | null;
 type Copy = ReturnType<typeof getCopy>;
+
+type SubmissionDuplicate = {
+  song_id: string;
+  existing_title: string;
+  existing_music_url: string;
+  existing_platform: string;
+  catalog_status: string;
+  exact_match: boolean;
+  similarity_score: number;
+  submitted_at: string;
+};
 
 type ReviewForm = {
   listenFull: BinaryAnswer;
@@ -3248,6 +3260,12 @@ function SubmitView({
   const [submittedForApproval, setSubmittedForApproval] = useState(false);
   const [saving, setSaving] = useState(false);
   const [metadataLoading, setMetadataLoading] = useState(false);
+  const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false);
+  const [duplicateMatches, setDuplicateMatches] = useState<
+    SubmissionDuplicate[]
+  >([]);
+  const [duplicateWarningAccepted, setDuplicateWarningAccepted] =
+    useState(false);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [browserOrigin, setBrowserOrigin] = useState<string>();
   const platformDetection = detectMusicPlatform(musicLink);
@@ -3272,6 +3290,10 @@ function SubmitView({
   );
   const reportedDurationSeconds =
     Number(durationMinutes || 0) * 60 + Number(durationSeconds || 0);
+  const exactDuplicate = duplicateMatches.find((match) => match.exact_match);
+  const possibleDuplicates = duplicateMatches.filter(
+    (match) => !match.exact_match,
+  );
   const validationFailures = useMemo(() => {
     const failures: string[] = [];
     if (!unlocked) {
@@ -3336,6 +3358,22 @@ function SubmitView({
           : "The optional cover image must use an https:// URL.",
       );
     }
+    if (exactDuplicate) {
+      failures.push(
+        locale === "es"
+          ? "Cancion ya enviada."
+          : "Song already submitted.",
+      );
+    } else if (
+      possibleDuplicates.length > 0 &&
+      !duplicateWarningAccepted
+    ) {
+      failures.push(
+        locale === "es"
+          ? "Revisa la posible cancion duplicada antes de continuar."
+          : "Review the possible duplicate before continuing.",
+      );
+    }
     return failures;
   }, [
     artistName,
@@ -3345,6 +3383,7 @@ function SubmitView({
     feedbackFocus.length,
     genre,
     explicitContent,
+    exactDuplicate,
     locale,
     platformDetection.platform,
     platformDetection.valid,
@@ -3353,8 +3392,11 @@ function SubmitView({
     unlocked,
     reportedDurationSeconds,
     requiredTokenCost,
+    possibleDuplicates.length,
+    duplicateWarningAccepted,
   ]);
-  const submitDisabled = saving || validationFailures.length > 0;
+  const submitDisabled =
+    saving || duplicateCheckLoading || validationFailures.length > 0;
 
   useEffect(() => {
     setBrowserOrigin(window.location.origin);
@@ -3400,6 +3442,50 @@ function SubmitView({
   }, [platformDetection.parsedUrl, platformDetection.valid]);
 
   useEffect(() => {
+    setDuplicateWarningAccepted(false);
+    if (
+      !platformDetection.valid ||
+      !platformDetection.platform ||
+      !musicLink.trim() ||
+      songTitle.trim().length < 3
+    ) {
+      setDuplicateMatches([]);
+      setDuplicateCheckLoading(false);
+      return;
+    }
+
+    let active = true;
+    const timeout = window.setTimeout(async () => {
+      const supabase = createClient();
+      if (!supabase) return;
+      setDuplicateCheckLoading(true);
+      const { data, error } = await supabase.rpc(
+        "check_song_submission_duplicates",
+        {
+          song_title: songTitle.trim(),
+          song_platform: databasePlatform[platformDetection.platform!],
+          song_music_url: musicLink.trim(),
+        },
+      );
+      if (!active) return;
+      setDuplicateMatches(
+        error ? [] : ((data ?? []) as SubmissionDuplicate[]),
+      );
+      setDuplicateCheckLoading(false);
+    }, 450);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [
+    musicLink,
+    platformDetection.platform,
+    platformDetection.valid,
+    songTitle,
+  ]);
+
+  useEffect(() => {
     console.info("[First Listen submission] Validation state", {
       detectedPlatform: platformDetection.platform,
       embedUrl: providerEmbed?.src ?? null,
@@ -3408,6 +3494,8 @@ function SubmitView({
       resourceType: platformDetection.resourceType,
       submitDisabled,
       validationFailures,
+      duplicateMatches,
+      duplicateCheckLoading,
     });
   }, [
     platformDetection.parsedUrl,
@@ -3417,6 +3505,8 @@ function SubmitView({
     providerEmbed?.src,
     submitDisabled,
     validationFailures,
+    duplicateCheckLoading,
+    duplicateMatches,
   ]);
 
   const submitSong = async (event: FormEvent<HTMLFormElement>) => {
@@ -3477,6 +3567,9 @@ function SubmitView({
     setDurationSeconds("");
     setSubmittedForApproval(false);
     setMetadataLoading(false);
+    setDuplicateCheckLoading(false);
+    setDuplicateMatches([]);
+    setDuplicateWarningAccepted(false);
     setSaving(false);
     setSubmitted(false);
   };
@@ -3831,6 +3924,89 @@ function SubmitView({
             </div>
           </div>
 
+          {duplicateCheckLoading && (
+            <div className="duplicate-check-card checking" role="status">
+              <LoaderCircle className="spin" size={17} />
+              <span>
+                <strong>
+                  {locale === "es"
+                    ? "Buscando duplicados"
+                    : "Checking your song library"}
+                </strong>
+                {locale === "es"
+                  ? "Estamos comparando el enlace y el titulo."
+                  : "Comparing this link and title with your submissions."}
+              </span>
+            </div>
+          )}
+
+          {exactDuplicate && (
+            <div className="duplicate-check-card exact" role="alert">
+              <Flag size={18} />
+              <span>
+                <strong>
+                  {locale === "es"
+                    ? "Cancion ya enviada"
+                    : "Song already submitted"}
+                </strong>
+                {exactDuplicate.existing_title} /{" "}
+                {exactDuplicate.catalog_status.replaceAll("_", " ")}
+              </span>
+              <Link
+                href={
+                  exactDuplicate.catalog_status === "removed"
+                    ? "/profile#removed-song-history"
+                    : `/profile#song-${exactDuplicate.song_id}`
+                }
+              >
+                {locale === "es"
+                  ? "Ver envio existente"
+                  : "View existing submission"}
+              </Link>
+            </div>
+          )}
+
+          {!exactDuplicate && possibleDuplicates.length > 0 && (
+            <div className="duplicate-check-card possible" role="alert">
+              <Flag size={18} />
+              <span>
+                <strong>
+                  {locale === "es"
+                    ? "Posible duplicado detectado"
+                    : "Possible duplicate detected"}
+                </strong>
+                {possibleDuplicates[0].existing_title} /{" "}
+                {Math.round(
+                  Number(possibleDuplicates[0].similarity_score) * 100,
+                )}
+                % title match
+              </span>
+              <Link href={`/profile#song-${possibleDuplicates[0].song_id}`}>
+                {locale === "es"
+                  ? "Ver envio existente"
+                  : "View existing submission"}
+              </Link>
+              <button
+                className={
+                  duplicateWarningAccepted ? "accepted" : ""
+                }
+                onClick={() => setDuplicateWarningAccepted(true)}
+                type="button"
+              >
+                {duplicateWarningAccepted ? (
+                  <>
+                    <Check size={14} />{" "}
+                    {locale === "es" ? "Revisado" : "Reviewed"}
+                  </>
+                ) : locale === "es" ? (
+                  "Continuar de todos modos"
+                ) : (
+                  "Continue anyway"
+                )}
+              </button>
+            </div>
+          )}
+
           <div className="privacy-note">
             <LockKeyhole size={16} />
             <span>
@@ -3857,6 +4033,7 @@ function SubmitView({
               <div><dt>Resource</dt><dd>{platformDetection.resourceType ?? "none"} / {platformDetection.resourceId ?? "none"}</dd></div>
               <div><dt>Embed URL</dt><dd>{providerEmbed?.src ?? "unavailable"}</dd></div>
               <div><dt>Validation</dt><dd>{validationFailures.length === 0 ? "valid" : "invalid"}</dd></div>
+              <div><dt>Duplicate check</dt><dd>{duplicateCheckLoading ? "checking" : exactDuplicate ? "exact duplicate" : possibleDuplicates.length ? "possible duplicate" : "clear"}</dd></div>
               <div><dt>Submit</dt><dd>{submitDisabled ? `disabled: ${validationFailures.join(" | ") || "saving"}` : "enabled"}</dd></div>
             </dl>
           )}

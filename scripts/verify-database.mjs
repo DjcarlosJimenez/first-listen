@@ -83,6 +83,9 @@ const { data: economyData, error: economyError } = await supabase.rpc(
   "content_economy_health_report",
 );
 if (economyError) throw economyError;
+const { data: songManagementData, error: songManagementError } =
+  await supabase.rpc("song_management_health_report");
+if (songManagementError) throw songManagementError;
 
 const report = data ?? {};
 const listeningReport = listeningData ?? {};
@@ -92,6 +95,7 @@ const networkReport = networkData ?? {};
 const guestReport = guestData ?? {};
 const connectedReport = connectedData ?? {};
 const economyReport = economyData ?? {};
+const songManagementReport = songManagementData ?? {};
 const requiredPlatforms = [
   "youtube",
   "spotify",
@@ -114,8 +118,16 @@ const checks = [
   },
   {
     name: "Required indexes exist",
-    passed: Object.values(report.indexes ?? {}).every(Boolean),
-    details: report.indexes,
+    passed:
+      Object.entries(report.indexes ?? {})
+        .filter(([name]) => name !== "songs_unique_music_url_idx")
+        .every(([, exists]) => Boolean(exists)) &&
+      songManagementReport.owner_unique_index === true,
+    details: {
+      ...report.indexes,
+      songs_owner_platform_music_url_idx:
+        songManagementReport.owner_unique_index,
+    },
   },
   {
     name: "RLS is enabled",
@@ -149,9 +161,9 @@ const checks = [
     },
   },
   {
-    name: "No duplicate active song links",
-    passed: Number(report.duplicate_active_song_urls ?? -1) === 0,
-    details: report.duplicate_active_song_urls,
+    name: "No duplicate creator song links",
+    passed: Number(songManagementReport.owner_duplicate_groups ?? -1) === 0,
+    details: songManagementReport.owner_duplicate_groups,
   },
   {
     name: "No orphan reviews",
@@ -362,6 +374,33 @@ const checks = [
       invalidSubmissionCosts: economyReport.invalid_submission_costs,
     },
   },
+  {
+    name: "Song management storage and functions exist",
+    passed:
+      Object.values(songManagementReport.tables ?? {}).every(Boolean) &&
+      Object.values(songManagementReport.functions ?? {}).every(Boolean),
+    details: {
+      tables: songManagementReport.tables,
+      functions: songManagementReport.functions,
+    },
+  },
+  {
+    name: "Song management RLS is enabled",
+    passed: songManagementReport.rls_enabled === true,
+    details: songManagementReport.rls_enabled,
+  },
+  {
+    name: "Song lifecycle state is valid",
+    passed:
+      Number(songManagementReport.invalid_archives ?? -1) === 0 &&
+      Number(songManagementReport.invalid_merges ?? -1) === 0 &&
+      Number(songManagementReport.removed_in_active_catalog ?? -1) === 0,
+    details: {
+      invalidArchives: songManagementReport.invalid_archives,
+      invalidMerges: songManagementReport.invalid_merges,
+      removedInActiveCatalog: songManagementReport.removed_in_active_catalog,
+    },
+  },
 ];
 
 const passed = checks.filter((check) => check.passed).length;
@@ -373,6 +412,7 @@ const result = {
   checks,
   connectedReport,
   economyReport,
+  songManagementReport,
   discoveryReport,
   guestReport,
   networkReport,

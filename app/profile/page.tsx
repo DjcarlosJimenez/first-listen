@@ -25,17 +25,14 @@ export default async function ProfilePage() {
     { data: networkRows },
     { data: activityRows },
     { data: connectedPlatformRows },
+    { data: removedSongHistory },
   ] = await Promise.all([
     supabase
       .from("profiles")
       .select("display_name, founder_number, founder_free_submissions_remaining, role, credits, show_explicit_content, community_visibility, autoplay_next_song, external_redirect_notice_disabled")
       .eq("id", user.id)
       .single(),
-    supabase
-      .from("songs")
-      .select("id, title, artist_name, music_url, platform, is_active, explicit_content, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false }),
+    supabase.rpc("get_my_song_management"),
     supabase.rpc("get_saved_songs"),
     supabase.rpc("get_listener_impact_profile"),
     supabase.rpc("get_my_community_network"),
@@ -48,6 +45,7 @@ export default async function ProfilePage() {
         "platform, connection_status, provider_username, display_name, profile_url, avatar_url, creator_account, provider_verified, follower_count, following_count, content_count, likes_count, connected_at, last_synced_at",
       )
       .eq("user_id", user.id),
+    supabase.rpc("get_my_removed_song_history"),
   ]);
   if (!profile) redirect("/login?error=profile");
   const networkRow = (
@@ -90,6 +88,7 @@ export default async function ProfilePage() {
       ) as never}
       savedSongs={(savedSongs ?? []) as never}
       songs={songs ?? []}
+      removedSongHistory={(removedSongHistory ?? []) as never}
       network={network}
       activity={((activityRows ?? []) as Array<Record<string, unknown>>).map(
         (row) => ({

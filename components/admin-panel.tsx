@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   BarChart3,
+  CopyCheck,
   Flag,
   Headphones,
   Link2,
@@ -13,6 +14,7 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  Trash2,
   Users,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -44,8 +46,12 @@ type AdminSong = {
   title: string;
   artist_name: string;
   platform: string;
+  music_url: string;
   is_active: boolean;
   featured: boolean;
+  archived_at: string | null;
+  removed_at: string | null;
+  merged_into_song_id: string | null;
   content_kind: string;
   content_duration_seconds: number | null;
   queue_tier: string;
@@ -54,6 +60,33 @@ type AdminSong = {
   creator_activity_status: "active" | "paused" | "archived";
   founder: boolean;
   report_count: number;
+};
+
+type DuplicateCandidate = {
+  canonical_song_id: string;
+  canonical_title: string;
+  canonical_owner_id: string;
+  canonical_owner_name: string;
+  duplicate_song_id: string;
+  duplicate_title: string;
+  duplicate_owner_id: string;
+  duplicate_owner_name: string;
+  platform: string;
+  match_type: "exact_url" | "similar_title";
+  similarity_score: number;
+  same_owner: boolean;
+  duplicate_activity: number;
+  duplicate_can_delete: boolean;
+  duplicate_status: string;
+};
+
+type DuplicateStatistics = {
+  exact_url_pairs?: number;
+  possible_title_pairs?: number;
+  abandoned_duplicates?: number;
+  archived_songs?: number;
+  removed_songs?: number;
+  merged_songs?: number;
 };
 
 type AdminReport = {
@@ -143,6 +176,8 @@ export function AdminPanel({
   spotlightSlots,
   boosts,
   contentEconomy,
+  duplicateCandidates,
+  duplicateStatistics,
   statistics,
 }: {
   role: "super_admin" | "admin" | "moderator";
@@ -159,6 +194,8 @@ export function AdminPanel({
   spotlightSlots: SpotlightSlot[];
   boosts: AdminBoost[];
   contentEconomy: ExternalPricingSetting[];
+  duplicateCandidates: DuplicateCandidate[];
+  duplicateStatistics: DuplicateStatistics;
   statistics: {
     users: number;
     songs: number;
@@ -176,7 +213,16 @@ export function AdminPanel({
   >("all");
   const [songSearch, setSongSearch] = useState("");
   const [songFilter, setSongFilter] = useState<
-    "all" | "active" | "paused" | "archived" | "spotlight" | "founder" | "reported"
+    | "all"
+    | "active"
+    | "paused"
+    | "archived"
+    | "removed"
+    | "merged"
+    | "duplicates"
+    | "spotlight"
+    | "founder"
+    | "reported"
   >("all");
   const [creditChanges, setCreditChanges] = useState<Record<string, string>>({});
   const [creditReasons, setCreditReasons] = useState<Record<string, string>>({});
@@ -252,10 +298,22 @@ export function AdminPanel({
   }, [userFilter, userSearch, users]);
   const filteredSongs = useMemo(() => {
     const query = songSearch.trim().toLowerCase();
+    const duplicateIds = new Set(
+      duplicateCandidates.flatMap((candidate) => [
+        candidate.canonical_song_id,
+        candidate.duplicate_song_id,
+      ]),
+    );
     return songs.filter((song) => {
-      const effectiveStatus = !song.is_active
-        ? "removed"
-        : song.creator_activity_status;
+      const effectiveStatus = song.merged_into_song_id
+        ? "merged"
+        : song.removed_at
+          ? "removed"
+          : song.archived_at
+            ? "archived"
+            : song.is_active
+              ? song.creator_activity_status
+              : song.approval_status;
       const matchesSearch =
         !query ||
         song.title.toLowerCase().includes(query) ||
@@ -268,12 +326,22 @@ export function AdminPanel({
       if (songFilter === "spotlight") return song.featured;
       if (songFilter === "founder") return song.founder;
       if (songFilter === "reported") return song.report_count > 0;
+      if (songFilter === "duplicates") return duplicateIds.has(song.id);
+      if (songFilter === "removed") return Boolean(song.removed_at);
+      if (songFilter === "merged") return Boolean(song.merged_into_song_id);
+      if (songFilter === "archived") return Boolean(song.archived_at);
       if (songFilter === "active") {
-        return song.is_active && song.creator_activity_status === "active";
+        return (
+          song.is_active &&
+          !song.removed_at &&
+          !song.archived_at &&
+          !song.merged_into_song_id &&
+          song.creator_activity_status === "active"
+        );
       }
       return song.creator_activity_status === songFilter;
     });
-  }, [songFilter, songSearch, songs]);
+  }, [duplicateCandidates, songFilter, songSearch, songs]);
 
   const runRpc = async (name: string, params: Record<string, unknown>) => {
     if (!supabase) return;
@@ -460,8 +528,118 @@ export function AdminPanel({
                   />
                 </label>
               </div>
+              <div className="admin-duplicate-stat-grid">
+                <article>
+                  <strong>{duplicateStatistics.exact_url_pairs ?? 0}</strong>
+                  <span>Exact URL pairs</span>
+                </article>
+                <article>
+                  <strong>
+                    {duplicateStatistics.possible_title_pairs ?? 0}
+                  </strong>
+                  <span>Possible title pairs</span>
+                </article>
+                <article>
+                  <strong>
+                    {duplicateStatistics.abandoned_duplicates ?? 0}
+                  </strong>
+                  <span>Abandoned duplicates</span>
+                </article>
+                <article>
+                  <strong>{duplicateStatistics.merged_songs ?? 0}</strong>
+                  <span>Merged records</span>
+                </article>
+              </div>
+              <div className="admin-duplicate-panel">
+                <div>
+                  <span className="eyebrow">
+                    <CopyCheck size={14} /> Duplicate cleanup
+                  </span>
+                  <h3>Catalog duplicate candidates</h3>
+                  <p>
+                    Similar titles are warnings. Permanent deletion is enabled
+                    only for server-verified abandoned duplicates.
+                  </p>
+                </div>
+                {duplicateCandidates.length ? (
+                  <div className="admin-duplicate-list">
+                    {duplicateCandidates.map((candidate) => (
+                      <article
+                        key={`${candidate.canonical_song_id}-${candidate.duplicate_song_id}`}
+                      >
+                        <div>
+                          <strong>{candidate.canonical_title}</strong>
+                          <small>
+                            Keep / {candidate.canonical_owner_name}
+                          </small>
+                        </div>
+                        <span>
+                          {candidate.match_type.replaceAll("_", " ")} /{" "}
+                          {Math.round(
+                            Number(candidate.similarity_score) * 100,
+                          )}
+                          %
+                        </span>
+                        <div>
+                          <strong>{candidate.duplicate_title}</strong>
+                          <small>
+                            Candidate / {candidate.duplicate_owner_name} /{" "}
+                            {candidate.duplicate_activity} activity
+                          </small>
+                        </div>
+                        <div className="admin-actions">
+                          {candidate.same_owner && (
+                            <button
+                              onClick={() =>
+                                void runRpc(
+                                  "admin_merge_duplicate_songs",
+                                  {
+                                    canonical_song_id:
+                                      candidate.canonical_song_id,
+                                    duplicate_song_id:
+                                      candidate.duplicate_song_id,
+                                  },
+                                )
+                              }
+                            >
+                              <CopyCheck size={14} /> Merge
+                            </button>
+                          )}
+                          {candidate.duplicate_can_delete && (
+                            <button
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Delete abandoned duplicate "${candidate.duplicate_title}"? Its original token cost will be refunded.`,
+                                  )
+                                ) {
+                                  void runRpc(
+                                    "admin_delete_abandoned_duplicate",
+                                    {
+                                      target_song_id:
+                                        candidate.duplicate_song_id,
+                                      matching_song_id:
+                                        candidate.canonical_song_id,
+                                    },
+                                  );
+                                }
+                              }}
+                            >
+                              <Trash2 size={14} /> Delete abandoned
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    No duplicate candidates found.
+                  </div>
+                )}
+              </div>
               <div className="admin-filter-row" aria-label="Song filters">
-                {(["all", "active", "paused", "archived", "spotlight", "founder", "reported"] as const).map((filter) => (
+                {(["all", "active", "paused", "archived", "removed", "merged", "duplicates", "spotlight", "founder", "reported"] as const).map((filter) => (
                   <button
                     className={songFilter === filter ? "active" : ""}
                     key={filter}
@@ -489,9 +667,15 @@ export function AdminPanel({
                     <span>
                       {song.approval_status === "pending"
                           ? "Pending long-form approval"
-                        : song.is_active
-                          ? song.creator_activity_status
-                          : "Removed"}
+                        : song.merged_into_song_id
+                          ? "Merged"
+                          : song.removed_at
+                            ? "Removed"
+                            : song.archived_at
+                              ? "Archived"
+                              : song.is_active
+                                ? song.creator_activity_status
+                                : "Inactive"}
                       {song.featured ? " / Spotlight" : ""}
                       {song.founder ? " / Founder" : ""}
                       {song.report_count ? ` / ${song.report_count} reports` : ""}
@@ -535,7 +719,9 @@ export function AdminPanel({
                         target_song_id: song.id,
                         active: !song.is_active,
                         feature: false,
-                      })}>{song.is_active ? "Remove" : "Restore"}</button>
+                      })} disabled={Boolean(song.merged_into_song_id)}>
+                        {song.is_active ? "Remove" : "Restore"}
+                      </button>
                     </div>
                   </article>
                 ))}

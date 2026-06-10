@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Apple,
   ArrowLeft,
+  Archive,
   BadgeCheck,
   CalendarDays,
   Clapperboard,
@@ -21,6 +22,7 @@ import {
   Play,
   Save,
   ShieldCheck,
+  Trash2,
   Users,
   Youtube,
 } from "lucide-react";
@@ -38,13 +40,33 @@ import type {
 } from "@/lib/types";
 
 type ProfileSong = {
-  id: string;
+  song_id: string;
   title: string;
   artist_name: string;
   music_url: string;
   platform: string;
   is_active: boolean;
+  catalog_status: string;
+  submission_token_cost: number;
+  reviews: number;
+  valid_listens: number;
+  guest_valid_listens: number;
+  community_activity: number;
+  can_delete: boolean;
+  can_archive: boolean;
   explicit_content: boolean;
+  created_at: string;
+};
+
+type RemovedSongHistory = {
+  history_id: string;
+  original_song_id: string;
+  title: string;
+  artist_name: string;
+  music_url: string;
+  platform: string;
+  action: string;
+  refunded_tokens: number;
   created_at: string;
 };
 
@@ -105,6 +127,7 @@ export function ProfilePanel({
   network,
   activity,
   connectedPlatforms,
+  removedSongHistory,
 }: {
   profile: {
     id: string;
@@ -134,6 +157,7 @@ export function ProfilePanel({
   network: CommunityNetwork;
   activity: CommunityActivity[];
   connectedPlatforms: ConnectedPlatformAccount[];
+  removedSongHistory: RemovedSongHistory[];
 }) {
   const [name, setName] = useState(profile.displayName);
   const [showExplicit, setShowExplicit] = useState(profile.showExplicitContent);
@@ -146,6 +170,10 @@ export function ProfilePanel({
     setExternalRedirectNoticeDisabled,
   ] = useState(profile.externalRedirectNoticeDisabled);
   const [message, setMessage] = useState("");
+  const [tokenBalance, setTokenBalance] = useState(profile.credits);
+  const [managedSongs, setManagedSongs] = useState(songs);
+  const [removedSongs, setRemovedSongs] = useState(removedSongHistory);
+  const [managingSongId, setManagingSongId] = useState<string | null>(null);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -177,6 +205,86 @@ export function ProfilePanel({
     );
   };
 
+  const manageSong = async (
+    song: ProfileSong,
+    action: "delete" | "archive",
+  ) => {
+    const confirmation =
+      action === "delete"
+        ? `Delete "${song.title}" permanently? ${
+            song.submission_token_cost > 0
+              ? `${song.submission_token_cost} token${song.submission_token_cost === 1 ? "" : "s"} will be refunded.`
+              : "No token was charged for this submission."
+          }`
+        : `Archive "${song.title}"? It will leave discovery and the review queue, while its statistics remain available. No tokens will be refunded.`;
+    if (!window.confirm(confirmation)) return;
+
+    const supabase = createClient();
+    if (!supabase) return;
+    setManagingSongId(song.song_id);
+    setMessage("");
+
+    if (action === "delete") {
+      const { data, error } = await supabase.rpc("delete_my_song", {
+        target_song_id: song.song_id,
+      });
+      const result = Array.isArray(data) ? data[0] : data;
+      if (error) {
+        setMessage(error.message);
+      } else {
+        setManagedSongs((current) =>
+          current.filter((item) => item.song_id !== song.song_id),
+        );
+        setTokenBalance(
+          Number(result?.new_credit_balance ?? tokenBalance),
+        );
+        setRemovedSongs((current) => [
+          {
+            history_id: crypto.randomUUID(),
+            original_song_id: song.song_id,
+            title: song.title,
+            artist_name: song.artist_name,
+            music_url: song.music_url,
+            platform: song.platform,
+            action: "deleted",
+            refunded_tokens: Number(result?.refunded_tokens ?? 0),
+            created_at: new Date().toISOString(),
+          },
+          ...current,
+        ]);
+        setMessage(
+          Number(result?.refunded_tokens ?? 0) > 0
+            ? `Song deleted. ${result.refunded_tokens} token${Number(result.refunded_tokens) === 1 ? "" : "s"} refunded.`
+            : "Song deleted.",
+        );
+      }
+    } else {
+      const { error } = await supabase.rpc("archive_my_song", {
+        target_song_id: song.song_id,
+      });
+      if (error) {
+        setMessage(error.message);
+      } else {
+        setManagedSongs((current) =>
+          current.map((item) =>
+            item.song_id === song.song_id
+              ? {
+                  ...item,
+                  catalog_status: "archived",
+                  is_active: false,
+                  can_archive: false,
+                  can_delete: false,
+                }
+              : item,
+          ),
+        );
+        setMessage("Song archived. Its statistics are preserved.");
+      }
+    }
+
+    setManagingSongId(null);
+  };
+
   return (
     <main className="account-page">
       <header className="account-header">
@@ -190,7 +298,7 @@ export function ProfilePanel({
           <div className="profile-badges">
             <span><ShieldCheck size={14} /> {profile.role.replace("_", " ")}</span>
             {profile.founder && <span><BadgeCheck size={14} /> Founding Artist</span>}
-            <span>{profile.role === "super_admin" ? "Unlimited tokens" : `${profile.credits} tokens`}</span>
+            <span>{profile.role === "super_admin" ? "Unlimited tokens" : `${tokenBalance} tokens`}</span>
             {profile.founder && (
               <span>
                 {profile.founderSubmissionsRemaining} Founder submissions remaining
@@ -423,15 +531,15 @@ export function ProfilePanel({
             <span className="eyebrow">My Songs</span>
             <h2>Submitted songs</h2>
           </div>
-          {songs.length === 0 ? (
+          {managedSongs.length === 0 ? (
             <div className="empty-state">
               <p>No songs submitted yet.</p>
               <Link href="/submit">Submit your first song</Link>
             </div>
           ) : (
             <div className="song-table">
-              {songs.map((song) => (
-                <article key={song.id}>
+              {managedSongs.map((song) => (
+                <article id={`song-${song.song_id}`} key={song.song_id}>
                   <div>
                     <strong>{song.title}</strong>
                     <span>
@@ -443,18 +551,92 @@ export function ProfilePanel({
                           )
                         : ""}
                     </span>
+                    <small className="song-activity-summary">
+                      {song.reviews} reviews /{" "}
+                      {song.valid_listens + song.guest_valid_listens} valid
+                      listens / {song.community_activity} other activity
+                    </small>
                   </div>
-                  <span className={song.is_active ? "status-active" : "status-removed"}>
-                    {song.is_active ? "In review queue" : "Removed"}
+                  <span
+                    className={
+                      song.catalog_status === "active"
+                        ? "status-active"
+                        : "status-removed"
+                    }
+                  >
+                    {song.catalog_status === "active"
+                      ? "In review queue"
+                      : song.catalog_status.replaceAll("_", " ")}
                   </span>
                   {song.explicit_content && <small>Explicit</small>}
-                  <a href={song.music_url} rel="noreferrer" target="_blank" aria-label={`Open ${song.title}`}>
-                    <ExternalLink size={15} />
-                  </a>
+                  <div className="song-management-actions">
+                    {song.can_delete && (
+                      <button
+                        disabled={managingSongId === song.song_id}
+                        onClick={() => void manageSong(song, "delete")}
+                        type="button"
+                      >
+                        <Trash2 size={14} /> Delete Song
+                      </button>
+                    )}
+                    {song.can_archive && (
+                      <button
+                        disabled={managingSongId === song.song_id}
+                        onClick={() => void manageSong(song, "archive")}
+                        type="button"
+                      >
+                        <Archive size={14} /> Archive Song
+                      </button>
+                    )}
+                    <a href={song.music_url} rel="noreferrer" target="_blank" aria-label={`Open ${song.title}`}>
+                      <ExternalLink size={15} />
+                    </a>
+                  </div>
                 </article>
               ))}
             </div>
           )}
+          {message && <p className="form-message" role="status">{message}</p>}
+
+          <details className="removed-song-history" id="removed-song-history">
+            <summary>
+              Removed Songs History
+              <span>{removedSongs.length}</span>
+            </summary>
+            {removedSongs.length ? (
+              <div className="song-table">
+                {removedSongs.map((song) => (
+                  <article key={song.history_id}>
+                    <div>
+                      <strong>{song.title}</strong>
+                      <span>
+                        {song.artist_name} /{" "}
+                        {displayPlatform[song.platform] ?? song.platform}
+                      </span>
+                    </div>
+                    <span className="status-removed">
+                      {song.action.replaceAll("_", " ")}
+                    </span>
+                    <small>
+                      {song.refunded_tokens > 0
+                        ? `${song.refunded_tokens} token refund`
+                        : "No token refund"}
+                    </small>
+                    <a
+                      aria-label={`Open ${song.title}`}
+                      href={song.music_url}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      <ExternalLink size={15} />
+                    </a>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p>No removed songs.</p>
+            )}
+          </details>
 
           <div className="saved-song-heading">
             <span className="eyebrow">Saved For Later</span>

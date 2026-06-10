@@ -66,11 +66,13 @@ export async function AdminPageContent({
     { data: spotlightSlots },
     { data: boosts },
     { data: contentEconomy },
+    { data: duplicateCandidates },
+    { data: duplicateStatistics },
   ] = await Promise.all([
     supabase.rpc("admin_list_users", { result_limit: 1000 }),
     supabase
       .from("songs")
-      .select("id, user_id, title, artist_name, platform, is_active, featured, content_kind, content_duration_seconds, queue_tier, approval_status, created_at")
+      .select("id, user_id, title, artist_name, platform, music_url, is_active, featured, archived_at, removed_at, merged_into_song_id, content_kind, content_duration_seconds, queue_tier, approval_status, created_at")
       .order("created_at", { ascending: false })
       .limit(1000),
     supabase
@@ -105,6 +107,8 @@ export async function AdminPageContent({
       .order("requested_at", { ascending: false })
       .limit(100),
     supabase.rpc("get_content_economy_settings"),
+    supabase.rpc("admin_get_duplicate_song_candidates"),
+    supabase.rpc("admin_get_duplicate_statistics"),
   ]);
 
   const profileById = new Map(
@@ -144,6 +148,8 @@ export async function AdminPageContent({
       spotlightSlots={(spotlightSlots ?? []) as never}
       boosts={(boosts ?? []) as never}
       contentEconomy={(contentEconomy ?? []) as never}
+      duplicateCandidates={(duplicateCandidates ?? []) as never}
+      duplicateStatistics={(duplicateStatistics ?? {}) as never}
       role={profile.role}
       songs={enrichedSongs}
       statistics={(statistics as {
