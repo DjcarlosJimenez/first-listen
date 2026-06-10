@@ -2,14 +2,18 @@
 
 import {
   ArrowRight,
+  Bookmark,
   CheckCircle2,
   Copy,
   Headphones,
+  Heart,
   KeyRound,
+  MessageSquareText,
   Music2,
   Pause,
   Play,
   ShieldCheck,
+  Share2,
   SkipForward,
   Sparkles,
   UserPlus,
@@ -531,14 +535,21 @@ export function GuestExperience() {
           </span>
           <h1>
             {spanish
-              ? "Elige un nombre para participar en la comunidad."
-              : "Choose a nickname to join the community."}
+              ? "Participa en la comunidad sin crear una cuenta."
+              : "Join the community without creating an account."}
           </h1>
           <p>
             {spanish
-              ? "Tu nombre será visible cuando des like, comentes, sigas artistas o guardes canciones."
-              : "Your nickname appears when you like, comment, follow artists, or save songs."}
+              ? "Elige un nombre para mostrar. Es opcional y aparecerá cuando participes."
+              : "Choose a display name. It is optional and appears when you participate."}
           </p>
+          <div className="guest-identity-benefits">
+            <span><Heart size={14} /> {spanish ? "Des Like" : "Like songs"}</span>
+            <span><MessageSquareText size={14} /> {spanish ? "Comentes" : "Comment"}</span>
+            <span><UserPlus size={14} /> {spanish ? "Sigas artistas" : "Follow artists"}</span>
+            <span><Bookmark size={14} /> {spanish ? "Guardes canciones" : "Save songs"}</span>
+            <span><Share2 size={14} /> {spanish ? "Compartas canciones" : "Share songs"}</span>
+          </div>
 
           {!recoverMode ? (
             <form onSubmit={(event) => void completeIdentity(event, "create")}>
@@ -549,13 +560,16 @@ export function GuestExperience() {
                 autoComplete="nickname"
                 id="guest-nickname"
                 maxLength={30}
-                minLength={2}
                 onChange={(event) => setNickname(event.target.value)}
-                placeholder={spanish ? "Tu nombre en la comunidad" : "Your community name"}
-                required
+                placeholder={spanish ? "Nickname (opcional)" : "Nickname (optional)"}
                 value={nickname}
               />
-              <button disabled={identityBusy || nickname.trim().length < 2} type="submit">
+              <small>
+                {spanish
+                  ? "Si lo dejas vacío, crearemos un nombre Listener automáticamente."
+                  : "Leave it blank and we will generate a Listener name automatically."}
+              </small>
+              <button disabled={identityBusy} type="submit">
                 {identityBusy
                   ? spanish
                     ? "Preparando..."
@@ -628,7 +642,7 @@ export function GuestExperience() {
           <span className="guest-listener-pill">
             <Headphones size={14} />
             <strong>{guest.nickname}</strong>
-            <small>{guest.listenerId}</small>
+            <small>ID: {guest.listenerId}</small>
           </span>
           <Link className="guest-login-link" href="/login">
             {spanish ? "Iniciar sesión" : "Log In"}

@@ -41,6 +41,9 @@ type PublicArtistSongRow = {
   reviews_received: number;
   average_rating: number;
   hook_score: number;
+  platform_links:
+    | Array<{ platform: string; music_url: string }>
+    | null;
 };
 
 export default async function ArtistPage({
@@ -111,6 +114,18 @@ export default async function ArtistPage({
         reviewsReceived: Number(song.reviews_received ?? 0),
         averageRating: Number(song.average_rating ?? 0),
         hookScore: Number(song.hook_score ?? 0),
+        platformLinks:
+          song.platform_links?.map((link) => ({
+            platform: (platformLabels[link.platform] ??
+              platformLabels[song.platform] ??
+              "Spotify") as Platform,
+            url: link.music_url,
+          })) ?? [
+            {
+              platform: (platformLabels[song.platform] ?? "Spotify") as Platform,
+              url: song.music_url,
+            },
+          ],
       }))}
       topSupporters={(
         (supporterRows ?? []) as Array<Record<string, unknown>>

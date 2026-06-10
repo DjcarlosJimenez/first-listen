@@ -248,7 +248,14 @@ export type ArtistTopSupporter = {
 
 export type ArtistCommunityActivity = {
   id: string;
-  type: "valid_listen" | "complete_listen" | "review" | "follow";
+  type:
+    | "valid_listen"
+    | "complete_listen"
+    | "review"
+    | "follow"
+    | "like"
+    | "comment"
+    | "share";
   actorId?: string;
   actorName: string;
   songId?: string;

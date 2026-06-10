@@ -12,16 +12,22 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  CirclePlay,
+  Cloud,
   Disc3,
   Globe2,
   Headphones,
+  Heart,
+  MessageSquareText,
   Music2,
   Play,
   Radio,
+  Share2,
   Star,
   Trophy,
   UserPlus,
   Users,
+  Youtube,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import {
@@ -69,7 +75,29 @@ type PublicSong = {
   reviewsReceived: number;
   averageRating: number;
   hookScore: number;
+  platformLinks: Array<{
+    platform: Platform;
+    url: string;
+  }>;
 };
+
+const platformOrder: Record<Platform, number> = {
+  "YouTube Music": 1,
+  YouTube: 2,
+  "Apple Music": 3,
+  Spotify: 4,
+  TikTok: 5,
+  SoundCloud: 6,
+};
+
+function PlatformIcon({ platform }: { platform: Platform }) {
+  if (platform === "YouTube Music") return <CirclePlay size={15} />;
+  if (platform === "YouTube") return <Youtube size={15} />;
+  if (platform === "Apple Music") return <Radio size={15} />;
+  if (platform === "Spotify") return <Disc3 size={15} />;
+  if (platform === "SoundCloud") return <Cloud size={15} />;
+  return <Music2 size={15} />;
+}
 
 function ProfileSong({
   song,
@@ -271,23 +299,34 @@ function ProfileSong({
           <section className="artist-platform-reveal">
             <span className="eyebrow">
               <Globe2 size={13} />
-              {spanish ? "También disponible en" : "Also Available On"}
+              {spanish
+                ? "También disponible en estas plataformas"
+                : "Also Available on These Platforms"}
             </span>
             <p>
               {spanish
                 ? "Gracias por escuchar. ¿Quieres seguir apoyando a este artista?"
                 : "Thanks for listening. Want to continue supporting this artist?"}
             </p>
-            <a href={song.link} rel="noreferrer" target="_blank">
-              {song.platform === "Apple Music" ? (
-                <Radio size={14} />
-              ) : song.platform === "Spotify" ? (
-                <Disc3 size={14} />
-              ) : (
-                <Play size={14} />
-              )}
-              {song.platform}
-            </a>
+            <div className="artist-song-links">
+              {[...song.platformLinks]
+                .sort(
+                  (left, right) =>
+                    platformOrder[left.platform] -
+                    platformOrder[right.platform],
+                )
+                .map((platformLink) => (
+                  <a
+                    href={platformLink.url}
+                    key={`${song.id}-${platformLink.platform}`}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <PlatformIcon platform={platformLink.platform} />
+                    {platformLink.platform}
+                  </a>
+                ))}
+            </div>
           </section>
         )}
       </div>
@@ -463,6 +502,12 @@ export function PublicArtistProfile({
                     <UserPlus size={14} />
                   ) : item.type === "review" ? (
                     <Star size={14} />
+                  ) : item.type === "like" ? (
+                    <Heart size={14} />
+                  ) : item.type === "comment" ? (
+                    <MessageSquareText size={14} />
+                  ) : item.type === "share" ? (
+                    <Share2 size={14} />
                   ) : (
                     <Headphones size={14} />
                   )}
@@ -473,6 +518,12 @@ export function PublicArtistProfile({
                       ? `${item.actorName} ${spanish ? "siguió a este artista" : "followed this artist"}`
                       : item.type === "review"
                         ? `${item.actorName} ${spanish ? "dejó una review de" : "reviewed"} ${item.songTitle ?? (spanish ? "una canción" : "a song")}`
+                        : item.type === "like"
+                          ? `${item.actorName} ${spanish ? "le dio Like a" : "liked"} ${item.songTitle ?? (spanish ? "una canción" : "a song")}`
+                          : item.type === "comment"
+                            ? `${item.actorName} ${spanish ? "comentó en" : "commented on"} ${item.songTitle ?? (spanish ? "una canción" : "a song")}`
+                            : item.type === "share"
+                              ? `${item.actorName} ${spanish ? "compartió" : "shared"} ${item.songTitle ?? (spanish ? "una canción" : "a song")}`
                         : `${item.actorName} ${spanish ? "escuchó" : "listened to"} ${item.songTitle ?? (spanish ? "una canción" : "a song")}`}
                   </strong>
                   <small>{new Date(item.createdAt).toLocaleDateString()}</small>

@@ -83,8 +83,9 @@ export function ProtectedAppEntry({
         window.localStorage.removeItem("first-listen-guest-recovery-code");
         document.cookie =
           "first-listen-guest-token=; Max-Age=0; Path=/; SameSite=Lax; Secure";
+        router.refresh();
       });
-  }, []);
+  }, [router]);
 
   const changeLocale = (nextLocale: InterfaceLocale) => {
     setLocale(nextLocale);

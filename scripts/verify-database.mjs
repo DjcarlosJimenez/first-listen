@@ -90,6 +90,9 @@ const { data: engagementData, error: engagementError } = await supabase.rpc(
   "community_engagement_health_report",
 );
 if (engagementError) throw engagementError;
+const { data: guestIdentityData, error: guestIdentityError } =
+  await supabase.rpc("true_guest_identity_health_report");
+if (guestIdentityError) throw guestIdentityError;
 
 const report = data ?? {};
 const listeningReport = listeningData ?? {};
@@ -101,6 +104,7 @@ const connectedReport = connectedData ?? {};
 const economyReport = economyData ?? {};
 const songManagementReport = songManagementData ?? {};
 const engagementReport = engagementData ?? {};
+const guestIdentityReport = guestIdentityData ?? {};
 const requiredPlatforms = [
   "youtube",
   "spotify",
@@ -347,6 +351,15 @@ const checks = [
     },
   },
   {
+    name: "Guest identity and platform-link storage is healthy",
+    passed:
+      guestIdentityReport.platform_links_table === true &&
+      Number(guestIdentityReport.songs_without_primary_link ?? -1) === 0 &&
+      Number(guestIdentityReport.invalid_guest_actor_events ?? -1) === 0 &&
+      Number(guestIdentityReport.guest_events_without_names ?? -1) === 0,
+    details: guestIdentityReport,
+  },
+  {
     name: "Connected platform account storage exists",
     passed: connectedReport.table_exists === true,
     details: connectedReport.table_exists,
@@ -444,6 +457,7 @@ const result = {
   connectedReport,
   economyReport,
   engagementReport,
+  guestIdentityReport,
   songManagementReport,
   discoveryReport,
   guestReport,

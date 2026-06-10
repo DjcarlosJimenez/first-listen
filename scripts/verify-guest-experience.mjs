@@ -12,6 +12,7 @@ const edgePath =
   "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const browserPort = production ? 9338 : 9337;
 const newGuestIds = [];
+const newAuthUserIds = [];
 const checks = [];
 let service;
 let browser;
@@ -74,8 +75,11 @@ async function listRpc(client, name, params, context) {
   return data ?? [];
 }
 
-async function startGuest(anon) {
-  const nickname = `Listener ${Date.now().toString(36).slice(-6)}`;
+async function startGuest(anon, requestedNickname) {
+  const nickname =
+    requestedNickname === undefined
+      ? `MusicFan${Date.now().toString(36).slice(-6)}`
+      : requestedNickname;
   const row = await singleRpc(
     anon,
     "create_guest_identity",
@@ -96,6 +100,7 @@ async function startGuest(anon) {
     nickname: String(guest.data.nickname),
     listenerId: String(guest.data.guest_listener_id),
     recoveryCode: String(guest.data.recovery_code),
+    locale: "en",
     expiresAt: guest.data.expires_at,
   };
 }
@@ -216,6 +221,16 @@ try {
       databaseGuest.recoveryCode.startsWith("MUSIC-"),
     "Guest identity was not created as a permanent recoverable profile",
   );
+  const automaticGuest = await startGuest(anon, "");
+  assert(
+    /^Listener [A-Z0-9]{6}$/.test(automaticGuest.nickname) &&
+      automaticGuest.listenerId.startsWith("FL-"),
+    "Blank nickname did not generate a human-readable Listener identity",
+  );
+  record("Optional nickname generates a recoverable Listener identity", {
+    nickname: automaticGuest.nickname,
+    listenerId: automaticGuest.listenerId,
+  });
   const recoveredGuest = await singleRpc(
     anon,
     "recover_guest_identity",
@@ -336,6 +351,255 @@ try {
     communityShares: engagement.community_share_count,
     originalShares: engagement.original_share_count,
   });
+  const publicActivity = await listRpc(
+    anon,
+    "get_public_artist_activity",
+    {
+      target_artist_id: eligibleSong.artist_id,
+      activity_limit: 50,
+    },
+    "Read nickname-attributed artist activity",
+  );
+  const guestActivityTypes = publicActivity
+    .filter((event) => event.actor_name === databaseGuest.nickname)
+    .map((event) => event.event_type);
+  assert(
+    ["like", "follow", "comment", "share"].every((type) =>
+      guestActivityTypes.includes(type),
+    ),
+    "Guest nickname activity did not appear in the artist feed",
+  );
+  record("Artist activity feed displays the selected guest nickname", {
+    nickname: databaseGuest.nickname,
+    activityTypes: [...new Set(guestActivityTypes)].sort(),
+  });
+  const publicSongs = await listRpc(
+    anon,
+    "get_public_artist_songs",
+    { target_artist_id: eligibleSong.artist_id },
+    "Read public song platform links",
+  );
+  const publicSong = publicSongs.find(
+    (song) => song.song_id === eligibleSong.song_id,
+  );
+  assert(
+    Array.isArray(publicSong?.platform_links) &&
+      publicSong.platform_links.some(
+        (link) =>
+          link.platform === eligibleSong.platform &&
+          link.music_url === eligibleSong.music_url,
+      ),
+    "Public artist song did not expose its official platform link",
+  );
+  record("Artist profile exposes only stored official platform links", {
+    platformLinks: publicSong.platform_links,
+  });
+
+  const conversionGuest = await startGuest(
+    anon,
+    `CarlosMinnesota${Date.now().toString(36).slice(-4)}`,
+  );
+  await singleRpc(
+    anon,
+    "toggle_song_like",
+    {
+      target_song_id: eligibleSong.song_id,
+      guest_access_token: conversionGuest.token,
+    },
+    "Prepare conversion guest like",
+  );
+  await singleRpc(
+    anon,
+    "toggle_save_song",
+    {
+      target_song_id: eligibleSong.song_id,
+      guest_access_token: conversionGuest.token,
+    },
+    "Prepare conversion guest save",
+  );
+  await singleRpc(
+    anon,
+    "toggle_follow_artist",
+    {
+      target_artist_id: eligibleSong.artist_id,
+      guest_access_token: conversionGuest.token,
+    },
+    "Prepare conversion guest follow",
+  );
+  await singleRpc(
+    anon,
+    "add_song_comment",
+    {
+      target_song_id: eligibleSong.song_id,
+      comment_body: "Guest conversion identity preservation check.",
+      guest_access_token: conversionGuest.token,
+    },
+    "Prepare conversion guest comment",
+  );
+  const conversionListen = await service
+    .from("guest_listening_sessions")
+    .insert({
+      guest_session_id: conversionGuest.id,
+      song_id: eligibleSong.song_id,
+      platform: eligibleSong.platform,
+      status: "finished",
+      telemetry_supported: true,
+      verified_seconds: 18,
+      last_position_seconds: 18,
+      max_position_seconds: 18,
+    })
+    .select("id")
+    .single();
+  assertNoError(conversionListen.error, "Prepare conversion listening history");
+
+  const conversionEmail =
+    `guest-conversion-${Date.now()}@example.com`;
+  const conversionPassword = `GuestPass${Date.now()}A1`;
+  const createdAccount = await service.auth.admin.createUser({
+    email: conversionEmail,
+    password: conversionPassword,
+    email_confirm: true,
+    user_metadata: {
+      explicit_content_acknowledged: true,
+      full_name: "Temporary Conversion User",
+      legal_accepted: true,
+      system_bootstrap: true,
+    },
+  });
+  assertNoError(createdAccount.error, "Create conversion account");
+  newAuthUserIds.push(createdAccount.data.user.id);
+  const conversionClient = createClient(supabaseUrl, anonKey, clientOptions);
+  const signedIn = await conversionClient.auth.signInWithPassword({
+    email: conversionEmail,
+    password: conversionPassword,
+  });
+  assertNoError(signedIn.error, "Sign in conversion account");
+  const converted = await singleRpc(
+    conversionClient,
+    "convert_guest_to_account",
+    { guest_access_token: conversionGuest.token },
+    "Convert guest to authenticated account",
+  );
+  assert(converted === true, "Guest conversion did not complete");
+
+  const [
+    convertedProfile,
+    convertedLike,
+    convertedSave,
+    convertedFollow,
+    convertedComment,
+    convertedActivity,
+    convertedListeningHistory,
+    convertedGuestIdentity,
+  ] = await Promise.all([
+    service
+      .from("profiles")
+      .select("display_name, interface_language")
+      .eq("id", createdAccount.data.user.id)
+      .single(),
+    service
+      .from("song_likes")
+      .select("id")
+      .eq("user_id", createdAccount.data.user.id)
+      .eq("song_id", eligibleSong.song_id)
+      .maybeSingle(),
+    service
+      .from("saved_songs")
+      .select("song_id")
+      .eq("user_id", createdAccount.data.user.id)
+      .eq("song_id", eligibleSong.song_id)
+      .maybeSingle(),
+    service
+      .from("artist_follows")
+      .select("artist_id")
+      .eq("follower_id", createdAccount.data.user.id)
+      .eq("artist_id", eligibleSong.artist_id)
+      .maybeSingle(),
+    service
+      .from("song_comments")
+      .select("id")
+      .eq("user_id", createdAccount.data.user.id)
+      .eq("song_id", eligibleSong.song_id)
+      .maybeSingle(),
+    service
+      .from("community_support_events")
+      .select("id, event_type")
+      .eq("supporter_id", createdAccount.data.user.id)
+      .eq("artist_id", eligibleSong.artist_id),
+    service
+      .from("guest_listening_sessions")
+      .select("id")
+      .eq("id", conversionListen.data.id)
+      .maybeSingle(),
+    service
+      .from("guest_sessions")
+      .select("converted_to_user_id")
+      .eq("id", conversionGuest.id)
+      .single(),
+  ]);
+  for (const result of [
+    convertedProfile,
+    convertedLike,
+    convertedSave,
+    convertedFollow,
+    convertedComment,
+    convertedActivity,
+    convertedListeningHistory,
+    convertedGuestIdentity,
+  ]) {
+    assertNoError(result.error, "Verify converted guest data");
+  }
+  const convertedTypes = (convertedActivity.data ?? []).map(
+    (event) => event.event_type,
+  );
+  const conversionDetails = {
+    expectedNickname: conversionGuest.nickname,
+    profile: convertedProfile.data,
+    like: Boolean(convertedLike.data),
+    save: Boolean(convertedSave.data),
+    follow: Boolean(convertedFollow.data),
+    comment: Boolean(convertedComment.data),
+    listeningHistory:
+      Boolean(convertedListeningHistory.data) &&
+      convertedGuestIdentity.data.converted_to_user_id ===
+        createdAccount.data.user.id,
+    activityTypes: convertedTypes,
+  };
+  assert(
+    convertedProfile.data.display_name === conversionGuest.nickname &&
+      convertedProfile.data.interface_language === conversionGuest.locale &&
+      convertedLike.data &&
+      convertedSave.data &&
+      convertedFollow.data &&
+      convertedComment.data &&
+      conversionDetails.listeningHistory &&
+      ["like", "follow", "comment"].every((type) =>
+        convertedTypes.includes(type),
+      ) &&
+      convertedTypes.filter((type) => type === "follow").length === 1,
+    `Guest conversion did not preserve identity and activity exactly once: ${JSON.stringify(conversionDetails)}`,
+  );
+  record("Guest conversion preserves nickname and community history", {
+    ...conversionDetails,
+    activityTypes: convertedTypes.sort(),
+  });
+  await managementQuery(`
+    begin;
+    delete from public.song_comments
+    where user_id = '${createdAccount.data.user.id}'::uuid;
+    delete from public.song_shares
+    where user_id = '${createdAccount.data.user.id}'::uuid;
+    delete from public.community_notifications
+    where actor_id = '${createdAccount.data.user.id}'::uuid;
+    delete from public.community_support_events
+    where supporter_id = '${createdAccount.data.user.id}'::uuid;
+    commit;
+  `);
+  await service.auth.admin.deleteUser(createdAccount.data.user.id);
+  newAuthUserIds.splice(
+    newAuthUserIds.indexOf(createdAccount.data.user.id),
+    1,
+  );
 
   const profileBefore = await singleRpc(
     anon,
@@ -665,6 +929,108 @@ try {
   );
   record("Guest mobile layout", mobile);
 
+  await command("Emulation.setDeviceMetricsOverride", {
+    deviceScaleFactor: 1,
+    height: 900,
+    mobile: false,
+    screenHeight: 900,
+    screenWidth: 1280,
+    width: 1280,
+  });
+  await command("Emulation.setFocusEmulationEnabled", { enabled: true });
+  const profileSong = uiQueue[supportedIndex];
+  await navigate(`${baseUrl}/artists/${profileSong.artist_id}`);
+  const profileBeforeListen = await waitFor(
+    `(() => {
+      const card = [...document.querySelectorAll(".artist-song-grid article")]
+        .find((item) => item.querySelector("h2")?.textContent === ${JSON.stringify(
+          profileSong.title,
+        )});
+      return {
+        cardFound: Boolean(card),
+        chipsVisible: Boolean(card?.querySelector(".artist-platform-reveal")),
+        playButton: card?.querySelector(".artist-play-button")?.textContent ?? ""
+      };
+    })()`,
+    (value) => value.cardFound && value.playButton.includes("Play Now"),
+    25000,
+  );
+  assert(
+    profileBeforeListen.cardFound && !profileBeforeListen.chipsVisible,
+    `Platform chips were visible before engagement: ${JSON.stringify(profileBeforeListen)}`,
+  );
+  await evaluate(`(() => {
+    const card = [...document.querySelectorAll(".artist-song-grid article")]
+      .find((item) => item.querySelector("h2")?.textContent === ${JSON.stringify(
+        profileSong.title,
+      )});
+    card?.querySelector(".artist-play-button")?.click();
+  })()`);
+  const profileAfterListen = await waitFor(
+    `(() => {
+      const card = [...document.querySelectorAll(".artist-song-grid article")]
+        .find((item) => item.querySelector("h2")?.textContent === ${JSON.stringify(
+          profileSong.title,
+        )});
+      const chips = [...(card?.querySelectorAll(".artist-platform-reveal .artist-song-links a") ?? [])];
+      return {
+        revealed: Boolean(card?.querySelector(".artist-platform-reveal")),
+        player: Object.fromEntries(
+          [...(card?.querySelectorAll(".provider-player-debug > div") ?? [])]
+            .map((row) => [
+              row.querySelector("dt")?.textContent ?? "",
+              row.querySelector("dd")?.textContent ?? ""
+            ])
+        ),
+        chips: chips.map((chip) => ({
+          href: chip.href,
+          text: chip.textContent?.trim() ?? ""
+        }))
+      };
+    })()`,
+    (value) =>
+      value.revealed &&
+      value.chips.some(
+        (chip) =>
+          chip.href === profileSong.music_url &&
+          chip.text.includes(
+            profileSong.platform === "youtube_music"
+              ? "YouTube Music"
+              : profileSong.platform === "youtube"
+                ? "YouTube"
+                : profileSong.platform === "soundcloud"
+                  ? "SoundCloud"
+                  : "",
+          ),
+      ),
+    75000,
+  );
+  const profileListeningSession = await service
+    .from("guest_listening_sessions")
+    .select(
+      "status, verified_seconds, valid_listen_at, last_position_seconds, last_heartbeat_at",
+    )
+    .eq("guest_session_id", uiGuest.id)
+    .eq("song_id", profileSong.song_id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  assertNoError(
+    profileListeningSession.error,
+    "Read artist profile listening session",
+  );
+  assert(
+    profileAfterListen.revealed,
+    `Platform chips did not reveal after a valid listen: ${JSON.stringify({
+      browser: profileAfterListen,
+      session: profileListeningSession.data,
+    })}`,
+  );
+  record("Artist profile reveals official platform chips after engagement", {
+    beforeEngagement: profileBeforeListen.chipsVisible,
+    chips: profileAfterListen.chips,
+  });
+
   const hydrationErrors = browserMessages.filter((message) =>
     /hydration|did not match|server rendered html/i.test(message),
   );
@@ -713,6 +1079,26 @@ try {
   app?.kill();
   browser?.kill();
   await delay(400);
+  if (newAuthUserIds.length) {
+    const userIds = newAuthUserIds
+      .map((id) => `'${id.replaceAll("'", "''")}'::uuid`)
+      .join(", ");
+    await managementQuery(`
+      begin;
+      delete from public.song_comments
+      where user_id in (${userIds});
+      delete from public.song_shares
+      where user_id in (${userIds});
+      delete from public.community_notifications
+      where actor_id in (${userIds});
+      delete from public.community_support_events
+      where supporter_id in (${userIds});
+      commit;
+    `);
+    for (const userId of newAuthUserIds) {
+      await service.auth.admin.deleteUser(userId);
+    }
+  }
   if (newGuestIds.length) {
     const guestIds = newGuestIds
       .map((id) => `'${id.replaceAll("'", "''")}'::uuid`)
@@ -724,6 +1110,8 @@ try {
       delete from public.song_shares
       where guest_session_id in (${guestIds});
       delete from public.song_views
+      where guest_session_id in (${guestIds});
+      delete from public.community_support_events
       where guest_session_id in (${guestIds});
       delete from public.community_notifications
       where source_id in (
