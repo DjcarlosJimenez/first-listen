@@ -144,6 +144,34 @@ export function detectMusicPlatform(rawUrl: string): PlatformDetection {
       };
     }
 
+    if (
+      host === "tiktok.com" ||
+      host === "m.tiktok.com" ||
+      host === "vm.tiktok.com" ||
+      host === "vt.tiktok.com"
+    ) {
+      const parts = path.split("/").filter(Boolean);
+      const directVideo =
+        parts.length >= 3 &&
+        parts[0].startsWith("@") &&
+        parts[1].toLowerCase() === "video" &&
+        /^[0-9]+$/.test(parts[2]);
+      const shortLink =
+        (host === "vm.tiktok.com" || host === "vt.tiktok.com") &&
+        parts.length >= 1;
+      const valid = directVideo || shortLink;
+      return {
+        platform: "TikTok",
+        valid,
+        message: valid
+          ? "TikTok video detected."
+          : "Use a direct public TikTok video link.",
+        parsedUrl: valid ? url.toString() : null,
+        resourceId: directVideo ? parts[2] : shortLink ? parts[0] : null,
+        resourceType: valid ? "video" : null,
+      };
+    }
+
     return {
       platform: null,
       valid: false,

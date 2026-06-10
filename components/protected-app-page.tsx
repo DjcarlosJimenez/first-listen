@@ -9,6 +9,7 @@ import type {
   CommunityNotification,
   CommunityNotificationSummary,
   CommunityProgram,
+  ContentEconomySetting,
   DailyMissionStatus,
   DiscoverySong,
   FollowedArtist,
@@ -158,6 +159,20 @@ type CommunityNotificationSummaryRow = {
   top_supporter_name: string | null;
 };
 
+type ContentEconomyRow = {
+  platform: string;
+  classification: "internal" | "external";
+  compatibility_status:
+    | "Partially Supported"
+    | "Discovery Only"
+    | "Not Recommended";
+  current_token_cost: number;
+  scheduled_token_cost: number;
+  activation_at: string | null;
+  effective_token_cost: number;
+  activation_pending: boolean;
+};
+
 function mapDiscoveryRow(row: DiscoveryRow): DiscoverySong {
   return {
     id: row.song_id,
@@ -198,7 +213,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "display_name, founder_number, founder_free_submissions_remaining, credits, total_review_credits_earned, review_quality_score, languages_understood, genre_preferences, interface_language, onboarding_completed, role, community_visibility, autoplay_next_song",
+      "display_name, founder_number, founder_free_submissions_remaining, credits, total_review_credits_earned, review_quality_score, languages_understood, genre_preferences, interface_language, onboarding_completed, role, community_visibility, autoplay_next_song, external_redirect_notice_disabled",
     )
     .eq("id", user.id)
     .single();
@@ -218,6 +233,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     { data: todaySupportRows },
     { data: notificationRows },
     { data: notificationSummaryRows },
+    { data: contentEconomyRows },
   ] = await Promise.all([
     supabase
       .from("songs")
@@ -241,6 +257,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
       notification_limit: 20,
     }),
     supabase.rpc("get_my_community_notification_summary"),
+    supabase.rpc("get_content_economy_settings"),
   ]);
 
   const { data: reviewRows } = latestSong
@@ -478,6 +495,23 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
         communityVisibility:
           profile.community_visibility === "anonymous" ? "anonymous" : "public",
         autoplayNextSong: Boolean(profile.autoplay_next_song),
+        externalRedirectNoticeDisabled: Boolean(
+          profile.external_redirect_notice_disabled,
+        ),
+        contentEconomy: (
+          (contentEconomyRows ?? []) as ContentEconomyRow[]
+        ).map(
+          (setting): ContentEconomySetting => ({
+            platform: platformLabels[setting.platform],
+            classification: setting.classification,
+            compatibilityStatus: setting.compatibility_status,
+            currentTokenCost: Number(setting.current_token_cost),
+            scheduledTokenCost: Number(setting.scheduled_token_cost),
+            activationAt: setting.activation_at ?? undefined,
+            effectiveTokenCost: Number(setting.effective_token_cost),
+            activationPending: Boolean(setting.activation_pending),
+          }),
+        ),
         song,
         songSummaries,
         reviews,

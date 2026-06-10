@@ -1,12 +1,7 @@
 import type { Platform, Song } from "@/lib/types";
+import { displayPlatform } from "@/lib/content-economy";
 
-export const platformLabels: Record<string, Platform> = {
-  spotify: "Spotify",
-  youtube: "YouTube",
-  youtube_music: "YouTube Music",
-  soundcloud: "SoundCloud",
-  apple_music: "Apple Music",
-};
+export const platformLabels: Record<string, Platform> = displayPlatform;
 
 export function getDiscoveryLinks(song: Pick<Song, "artist" | "title" | "link" | "platform">) {
   const query = encodeURIComponent(`${song.artist} ${song.title}`);

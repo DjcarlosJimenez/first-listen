@@ -11,6 +11,7 @@ import type {
   CommunityNotification,
   CommunityNotificationSummary,
   CommunityProgram,
+  ContentEconomySetting,
   DailyMissionStatus,
   DiscoverySong,
   FollowedArtist,
@@ -35,6 +36,8 @@ type ProfileSeed = {
   role: "super_admin" | "admin" | "moderator" | "user";
   communityVisibility: "public" | "anonymous";
   autoplayNextSong: boolean;
+  externalRedirectNoticeDisabled: boolean;
+  contentEconomy: ContentEconomySetting[];
   song: Song | null;
   songSummaries: SongDashboardSummary[];
   reviews: Review[];
@@ -128,6 +131,10 @@ export function ProtectedAppEntry({
       initialNotificationSummary={profile.notificationSummary}
       initialCommunityVisibility={profile.communityVisibility}
       initialAutoplayNextSong={profile.autoplayNextSong}
+      initialExternalRedirectNoticeDisabled={
+        profile.externalRedirectNoticeDisabled
+      }
+      contentEconomy={profile.contentEconomy}
       initialDailyMission={profile.dailyMission}
       initialCommunityPrograms={profile.communityPrograms}
       initialView={initialView}

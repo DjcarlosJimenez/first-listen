@@ -28,7 +28,7 @@ export default async function ProfilePage() {
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("display_name, founder_number, founder_free_submissions_remaining, role, credits, show_explicit_content, community_visibility, autoplay_next_song")
+      .select("display_name, founder_number, founder_free_submissions_remaining, role, credits, show_explicit_content, community_visibility, autoplay_next_song, external_redirect_notice_disabled")
       .eq("id", user.id)
       .single(),
     supabase
@@ -81,6 +81,9 @@ export default async function ProfilePage() {
         communityVisibility:
           profile.community_visibility === "anonymous" ? "anonymous" : "public",
         autoplayNextSong: Boolean(profile.autoplay_next_song),
+        externalRedirectNoticeDisabled: Boolean(
+          profile.external_redirect_notice_disabled,
+        ),
       }}
       impact={(
         Array.isArray(impactRows) ? impactRows[0] : impactRows

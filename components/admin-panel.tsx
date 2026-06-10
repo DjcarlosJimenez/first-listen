@@ -7,6 +7,7 @@ import {
   BarChart3,
   Flag,
   Headphones,
+  Link2,
   Music2,
   Rocket,
   Search,
@@ -15,6 +16,10 @@ import {
   Users,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
+import {
+  compactClassificationLabel,
+  displayPlatform,
+} from "@/lib/content-economy";
 import { createClient } from "@/lib/supabase/client";
 
 type AdminUser = {
@@ -103,6 +108,30 @@ type SpotlightDraft = {
   label: string;
 };
 
+type ExternalPricingSetting = {
+  platform: "spotify" | "apple_music" | "tiktok";
+  classification: "external";
+  compatibility_status: string;
+  current_token_cost: number;
+  scheduled_token_cost: number;
+  activation_at: string | null;
+  effective_token_cost: number;
+  activation_pending: boolean;
+};
+
+type ExternalPricingDraft = {
+  currentCost: number;
+  scheduledCost: number;
+  activationAt: string;
+};
+
+function localDateTimeValue(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 export function AdminPanel({
   role,
   users,
@@ -113,6 +142,7 @@ export function AdminPanel({
   listeningSettings,
   spotlightSlots,
   boosts,
+  contentEconomy,
   statistics,
 }: {
   role: "super_admin" | "admin" | "moderator";
@@ -120,7 +150,7 @@ export function AdminPanel({
   songs: AdminSong[];
   reports: AdminReport[];
   commentReports: AdminCommentReport[];
-  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics";
+  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "economy" | "discovery" | "statistics";
   listeningSettings: {
     minutes_per_credit: number;
     daily_cap_minutes: number;
@@ -128,6 +158,7 @@ export function AdminPanel({
   };
   spotlightSlots: SpotlightSlot[];
   boosts: AdminBoost[];
+  contentEconomy: ExternalPricingSetting[];
   statistics: {
     users: number;
     songs: number;
@@ -137,7 +168,7 @@ export function AdminPanel({
     listening_minutes?: number;
   } | null;
 }) {
-  const [section, setSection] = useState<"users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics">(initialSection);
+  const [section, setSection] = useState<"users" | "songs" | "reports" | "credits" | "listening" | "economy" | "discovery" | "statistics">(initialSection);
   const [notice, setNotice] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [userFilter, setUserFilter] = useState<
@@ -160,6 +191,23 @@ export function AdminPanel({
   );
   const [rewardsEnabled, setRewardsEnabled] = useState(
     listeningSettings.enabled,
+  );
+  const externalSettings = contentEconomy.filter(
+    (setting) => setting.classification === "external",
+  );
+  const [pricingDrafts, setPricingDrafts] = useState<
+    Record<string, ExternalPricingDraft>
+  >(
+    Object.fromEntries(
+      externalSettings.map((setting) => [
+        setting.platform,
+        {
+          currentCost: Number(setting.current_token_cost),
+          scheduledCost: Number(setting.scheduled_token_cost),
+          activationAt: localDateTimeValue(setting.activation_at),
+        },
+      ]),
+    ),
   );
   const [spotlightDrafts, setSpotlightDrafts] = useState<
     Record<number, SpotlightDraft>
@@ -250,12 +298,13 @@ export function AdminPanel({
     ["reports", "Reports", Flag],
     ["credits", "Credits", ShieldCheck],
     ["listening", "Listening", Headphones],
+    ["economy", "Economy", Link2],
     ["discovery", "Discovery", Sparkles],
     ["statistics", "Statistics", BarChart3],
   ] as const;
   const sections = allSections.filter(([id]) => {
     if (role === "super_admin") return true;
-    if (role === "admin") return !["credits", "listening"].includes(id);
+    if (role === "admin") return !["credits", "listening", "economy"].includes(id);
     return ["users", "reports"].includes(id);
   });
 
@@ -427,7 +476,16 @@ export function AdminPanel({
               <div className="admin-table">
                 {filteredSongs.map((song) => (
                   <article key={song.id}>
-                    <div><strong>{song.title}</strong><small>{song.artist_name} / {song.platform}</small></div>
+                    <div>
+                      <strong>{song.title}</strong>
+                      <small>
+                        {song.artist_name} /{" "}
+                        {displayPlatform[song.platform] ?? song.platform}
+                        {displayPlatform[song.platform]
+                          ? ` / ${compactClassificationLabel(displayPlatform[song.platform])}`
+                          : ""}
+                      </small>
+                    </div>
                     <span>
                       {song.approval_status === "pending"
                           ? "Pending long-form approval"
@@ -672,6 +730,108 @@ export function AdminPanel({
                           Apply change
                         </button>
                       </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {section === "economy" && isSuper && (
+            <>
+              <h2>External Content Pricing</h2>
+              <p className="admin-section-copy">
+                Schedule token pricing without a future deployment. Existing
+                submissions keep the token cost recorded when they were
+                created.
+              </p>
+              <div className="admin-pricing-grid">
+                {externalSettings.map((setting) => {
+                  const draft = pricingDrafts[setting.platform];
+                  const label =
+                    displayPlatform[setting.platform] ?? setting.platform;
+                  return (
+                    <article key={setting.platform}>
+                      <div className="admin-pricing-heading">
+                        <span><Link2 size={15} /> {label}</span>
+                        <strong>
+                          Effective now: {setting.effective_token_cost} tokens
+                        </strong>
+                      </div>
+                      <small>
+                        {setting.compatibility_status} / External Content
+                      </small>
+                      <label>
+                        Current price
+                        <input
+                          min={1}
+                          onChange={(event) =>
+                            setPricingDrafts((current) => ({
+                              ...current,
+                              [setting.platform]: {
+                                ...current[setting.platform],
+                                currentCost: Number(event.target.value),
+                              },
+                            }))
+                          }
+                          type="number"
+                          value={draft?.currentCost ?? 1}
+                        />
+                      </label>
+                      <label>
+                        Scheduled price
+                        <input
+                          min={1}
+                          onChange={(event) =>
+                            setPricingDrafts((current) => ({
+                              ...current,
+                              [setting.platform]: {
+                                ...current[setting.platform],
+                                scheduledCost: Number(event.target.value),
+                              },
+                            }))
+                          }
+                          type="number"
+                          value={draft?.scheduledCost ?? 8}
+                        />
+                      </label>
+                      <label>
+                        Activation date
+                        <input
+                          onChange={(event) =>
+                            setPricingDrafts((current) => ({
+                              ...current,
+                              [setting.platform]: {
+                                ...current[setting.platform],
+                                activationAt: event.target.value,
+                              },
+                            }))
+                          }
+                          type="datetime-local"
+                          value={draft?.activationAt ?? ""}
+                        />
+                      </label>
+                      <button
+                        className="primary-button"
+                        onClick={() =>
+                          void runRpc(
+                            "admin_update_external_content_pricing",
+                            {
+                              target_platform: setting.platform,
+                              new_current_token_cost:
+                                draft?.currentCost ?? 1,
+                              new_scheduled_token_cost:
+                                draft?.scheduledCost ?? 8,
+                              new_activation_at: draft?.activationAt
+                                ? new Date(draft.activationAt).toISOString()
+                                : null,
+                            },
+                          )
+                        }
+                        type="button"
+                      >
+                        Save {label} pricing
+                      </button>
                     </article>
                   );
                 })}

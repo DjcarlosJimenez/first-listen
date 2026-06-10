@@ -24,17 +24,10 @@ import {
   type ProviderTelemetrySnapshot,
 } from "@/components/provider-player";
 import type { InterfaceLocale } from "@/lib/catalog";
+import { displayPlatform } from "@/lib/content-economy";
 import { safeCoverUrl } from "@/lib/media";
 import { createClient } from "@/lib/supabase/client";
-import type { Platform, Song } from "@/lib/types";
-
-const platformLabels: Record<string, Platform> = {
-  apple_music: "Apple Music",
-  soundcloud: "SoundCloud",
-  spotify: "Spotify",
-  youtube: "YouTube",
-  youtube_music: "YouTube Music",
-};
+import type { Song } from "@/lib/types";
 
 type GuestSession = {
   token: string;
@@ -84,7 +77,7 @@ function mapGuestSongs(rows: Array<Record<string, unknown>>): Song[] {
     artist: String(row.artist_name),
     coverUrl: safeCoverUrl(String(row.cover_image_url)),
     link: String(row.music_url),
-    platform: platformLabels[String(row.platform)] ?? "YouTube",
+    platform: displayPlatform[String(row.platform)] ?? "YouTube",
     genre: String(row.genre) as Song["genre"],
     language: String(row.song_language) as Song["language"],
     feedbackFocus: (row.feedback_focus ?? []) as Song["feedbackFocus"],

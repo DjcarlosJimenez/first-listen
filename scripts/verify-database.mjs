@@ -79,6 +79,10 @@ const { data: connectedData, error: connectedError } = await supabase.rpc(
   "connected_platforms_health_report",
 );
 if (connectedError) throw connectedError;
+const { data: economyData, error: economyError } = await supabase.rpc(
+  "content_economy_health_report",
+);
+if (economyError) throw economyError;
 
 const report = data ?? {};
 const listeningReport = listeningData ?? {};
@@ -87,12 +91,14 @@ const alphaReport = alphaData ?? {};
 const networkReport = networkData ?? {};
 const guestReport = guestData ?? {};
 const connectedReport = connectedData ?? {};
+const economyReport = economyData ?? {};
 const requiredPlatforms = [
   "youtube",
   "spotify",
   "youtube_music",
   "soundcloud",
   "apple_music",
+  "tiktok",
 ];
 
 const checks = [
@@ -328,6 +334,34 @@ const checks = [
       orphans: connectedReport.orphan_accounts,
     },
   },
+  {
+    name: "Content economy storage is complete",
+    passed:
+      economyReport.pricing_table === true &&
+      Number(economyReport.pricing_rows ?? 0) === 3 &&
+      economyReport.tiktok_enum_available === true,
+    details: {
+      pricingTable: economyReport.pricing_table,
+      pricingRows: economyReport.pricing_rows,
+      externalPlatforms: economyReport.external_platforms,
+      tiktok: economyReport.tiktok_enum_available,
+    },
+  },
+  {
+    name: "Content economy functions exist",
+    passed: Object.values(economyReport.functions ?? {}).every(Boolean),
+    details: economyReport.functions,
+  },
+  {
+    name: "Song classifications and grandfathered costs are valid",
+    passed:
+      Number(economyReport.invalid_classifications ?? -1) === 0 &&
+      Number(economyReport.invalid_submission_costs ?? -1) === 0,
+    details: {
+      invalidClassifications: economyReport.invalid_classifications,
+      invalidSubmissionCosts: economyReport.invalid_submission_costs,
+    },
+  },
 ];
 
 const passed = checks.filter((check) => check.passed).length;
@@ -338,6 +372,7 @@ const result = {
   alphaReport,
   checks,
   connectedReport,
+  economyReport,
   discoveryReport,
   guestReport,
   networkReport,

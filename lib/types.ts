@@ -5,7 +5,24 @@ export type Platform =
   | "YouTube"
   | "YouTube Music"
   | "SoundCloud"
-  | "Apple Music";
+  | "Apple Music"
+  | "TikTok";
+
+export type ContentClassification = "internal" | "external";
+
+export type ContentEconomySetting = {
+  platform: Platform;
+  classification: ContentClassification;
+  compatibilityStatus:
+    | "Partially Supported"
+    | "Discovery Only"
+    | "Not Recommended";
+  currentTokenCost: number;
+  scheduledTokenCost: number;
+  activationAt?: string;
+  effectiveTokenCost: number;
+  activationPending: boolean;
+};
 
 export type Song = {
   id: string;

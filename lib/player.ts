@@ -1,4 +1,5 @@
 import type { Platform } from "@/lib/types";
+import { isExternalPlatform } from "@/lib/content-economy";
 import { detectMusicPlatform } from "@/lib/platform";
 
 export type ProviderEmbed = {
@@ -25,12 +26,6 @@ function youtubeVideoId(url: URL) {
   return null;
 }
 
-function spotifyTrackId(url: URL) {
-  const parts = url.pathname.split("/").filter(Boolean);
-  const trackIndex = parts.findIndex((part) => part.toLowerCase() === "track");
-  return trackIndex >= 0 ? parts[trackIndex + 1] ?? null : null;
-}
-
 export function getProviderEmbed(
   rawUrl: string,
   platform: Platform,
@@ -41,6 +36,7 @@ export function getProviderEmbed(
     const url = new URL(rawUrl);
     const detection = detectMusicPlatform(rawUrl);
     if (!detection.valid || detection.platform !== platform) return null;
+    if (isExternalPlatform(platform)) return null;
 
     if (platform === "YouTube" || platform === "YouTube Music") {
       const playlistId =
@@ -74,16 +70,6 @@ export function getProviderEmbed(
       };
     }
 
-    if (platform === "Spotify") {
-      const trackId = spotifyTrackId(url);
-      if (!trackId || !/^[A-Za-z0-9]+$/.test(trackId)) return null;
-      return {
-        src: `https://open.spotify.com/embed/track/${encodeURIComponent(trackId)}?utm_source=generator&theme=0${autoPlay ? "&autoplay=1" : ""}`,
-        title: "Spotify player",
-        telemetry: "spotify_iframe_api",
-      };
-    }
-
     if (platform === "SoundCloud") {
       const params = new URLSearchParams({
         url: url.toString(),
@@ -102,15 +88,6 @@ export function getProviderEmbed(
       };
     }
 
-    if (platform === "Apple Music") {
-      url.hostname = "embed.music.apple.com";
-      url.protocol = "https:";
-      return {
-        src: url.toString(),
-        title: "Apple Music player",
-        telemetry: "apple_embed_only",
-      };
-    }
   } catch {
     return null;
   }

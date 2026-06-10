@@ -17,6 +17,7 @@ import {
   Headphones,
   MessageSquareText,
   Music2,
+  Link2,
   Play,
   Save,
   ShieldCheck,
@@ -24,6 +25,10 @@ import {
   Youtube,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
+import {
+  compactClassificationLabel,
+  displayPlatform,
+} from "@/lib/content-economy";
 import { createClient } from "@/lib/supabase/client";
 import type {
   CommunityActivity,
@@ -67,6 +72,14 @@ const platformDefinitions: Array<{
   { id: "tiktok", label: "TikTok", icon: Clapperboard },
 ];
 
+const platformCompatibility: Record<ConnectedPlatform, string> = {
+  spotify: "Discovery Only",
+  apple_music: "Discovery Only",
+  youtube: "Partially Supported",
+  soundcloud: "Not Recommended",
+  tiktok: "Discovery Only",
+};
+
 function platformStatus(status?: ConnectedPlatformAccount["connectionStatus"]) {
   if (status === "connected") return "Connected";
   if (status === "pending") return "Pending";
@@ -104,6 +117,7 @@ export function ProfilePanel({
     showExplicitContent: boolean;
     communityVisibility: "public" | "anonymous";
     autoplayNextSong: boolean;
+    externalRedirectNoticeDisabled: boolean;
   };
   songs: ProfileSong[];
   savedSongs: SavedSong[];
@@ -127,13 +141,21 @@ export function ProfilePanel({
   const [autoplayNextSong, setAutoplayNextSong] = useState(
     profile.autoplayNextSong,
   );
+  const [
+    externalRedirectNoticeDisabled,
+    setExternalRedirectNoticeDisabled,
+  ] = useState(profile.externalRedirectNoticeDisabled);
   const [message, setMessage] = useState("");
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
     const supabase = createClient();
     if (!supabase) return;
-    const [{ error: profileError }, { error: communityError }] =
+    const [
+      { error: profileError },
+      { error: communityError },
+      { error: redirectError },
+    ] =
       await Promise.all([
         supabase.rpc("update_profile_preferences", {
           profile_display_name: name,
@@ -143,9 +165,15 @@ export function ProfilePanel({
           profile_community_visibility: visibility,
           profile_autoplay_next_song: autoplayNextSong,
         }),
+        supabase.rpc("update_external_redirect_preference", {
+          notice_disabled: externalRedirectNoticeDisabled,
+        }),
       ]);
     setMessage(
-      profileError?.message ?? communityError?.message ?? "Profile saved.",
+      profileError?.message ??
+        communityError?.message ??
+        redirectError?.message ??
+        "Profile saved.",
     );
   };
 
@@ -245,7 +273,10 @@ export function ProfilePanel({
                     <span className="connected-platform-icon" aria-hidden="true">
                       <PlatformIcon size={17} />
                     </span>
-                    <strong>{platform.label}</strong>
+                    <span className="connected-platform-name">
+                      <strong>{platform.label}</strong>
+                      <small>{platformCompatibility[platform.id]}</small>
+                    </span>
                     <span
                       className={
                         status === "Connected"
@@ -283,6 +314,21 @@ export function ProfilePanel({
               <span>
                 <strong>Show Explicit Content</strong>
                 Hide explicit songs from your review queue when disabled.
+              </span>
+            </label>
+            <label className="setting-toggle">
+              <input
+                checked={!externalRedirectNoticeDisabled}
+                onChange={(event) =>
+                  setExternalRedirectNoticeDisabled(!event.target.checked)
+                }
+                type="checkbox"
+              />
+              <Link2 size={16} />
+              <span>
+                <strong>External Content Warnings</strong>
+                Confirm before Spotify, Apple Music, or TikTok opens in a new
+                tab.
               </span>
             </label>
             <fieldset className="community-visibility-card">
@@ -388,7 +434,15 @@ export function ProfilePanel({
                 <article key={song.id}>
                   <div>
                     <strong>{song.title}</strong>
-                    <span>{song.artist_name} / {song.platform.replace("_", " ")}</span>
+                    <span>
+                      {song.artist_name} /{" "}
+                      {displayPlatform[song.platform] ?? song.platform} /{" "}
+                      {displayPlatform[song.platform]
+                        ? compactClassificationLabel(
+                            displayPlatform[song.platform],
+                          )
+                        : ""}
+                    </span>
                   </div>
                   <span className={song.is_active ? "status-active" : "status-removed"}>
                     {song.is_active ? "In review queue" : "Removed"}
@@ -417,7 +471,15 @@ export function ProfilePanel({
                 <article key={song.song_id}>
                   <div>
                     <strong>{song.title}</strong>
-                    <span>{song.artist_name} / {song.platform.replace("_", " ")}</span>
+                    <span>
+                      {song.artist_name} /{" "}
+                      {displayPlatform[song.platform] ?? song.platform} /{" "}
+                      {displayPlatform[song.platform]
+                        ? compactClassificationLabel(
+                            displayPlatform[song.platform],
+                          )
+                        : ""}
+                    </span>
                   </div>
                   <Link href={`/artists/${song.artist_id}`}>Artist</Link>
                   <small>{song.genre} / {song.song_language}</small>

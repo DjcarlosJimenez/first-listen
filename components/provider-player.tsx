@@ -2,8 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { AlertTriangle, ExternalLink, LoaderCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  ExternalLink,
+  Link2,
+  LoaderCircle,
+  Play,
+  X,
+} from "lucide-react";
 import type { InterfaceLocale } from "@/lib/catalog";
+import { isExternalPlatform } from "@/lib/content-economy";
 import { getProviderEmbed } from "@/lib/player";
 import type { Platform } from "@/lib/types";
 
@@ -302,6 +310,8 @@ export function ProviderPlayer({
   onTelemetry,
   onReady,
   autoPlay = false,
+  skipExternalRedirectWarning = false,
+  onExternalRedirectPreferenceChange,
 }: {
   artist: string;
   coverUrl: string;
@@ -313,6 +323,8 @@ export function ProviderPlayer({
   onTelemetry?: (snapshot: ProviderTelemetrySnapshot) => void;
   onReady?: () => void;
   autoPlay?: boolean;
+  skipExternalRedirectWarning?: boolean;
+  onExternalRedirectPreferenceChange?: (disabled: boolean) => void;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const spotifyContainerRef = useRef<HTMLDivElement>(null);
@@ -341,11 +353,15 @@ export function ProviderPlayer({
   const [volume, setVolume] = useState<number | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [showAutoplayFallback, setShowAutoplayFallback] = useState(false);
+  const [showExternalConfirmation, setShowExternalConfirmation] =
+    useState(false);
+  const [disableFutureWarnings, setDisableFutureWarnings] = useState(false);
   const onTelemetryRef = useRef(onTelemetry);
   const onReadyRef = useRef(onReady);
   const lastInteractionAtRef = useRef(Date.now());
   const previousPlaybackStateRef = useRef<PlaybackState>("unknown");
   const spanish = locale === "es";
+  const externalContent = isExternalPlatform(platform);
 
   useEffect(() => {
     onTelemetryRef.current = onTelemetry;
@@ -473,6 +489,7 @@ export function ProviderPlayer({
   useEffect(() => {
     if (!clientOrigin) return;
     if (!embed) {
+      if (externalContent) return;
       setStatus("error");
       console.error("[First Listen player] Unsupported or invalid provider URL", {
         link,
@@ -504,6 +521,7 @@ export function ProviderPlayer({
     playerMountedAt,
     songLoadedAt,
     title,
+    externalContent,
   ]);
 
   useEffect(() => {
@@ -965,6 +983,119 @@ export function ProviderPlayer({
       title,
     });
   };
+
+  const openExternalPlatform = useCallback(() => {
+    const opened = window.open(link, "_blank", "noopener,noreferrer");
+    if (opened) opened.opener = null;
+    setShowExternalConfirmation(false);
+    emitTelemetry("unknown", 0, 0, null, null, false);
+  }, [emitTelemetry, link]);
+
+  const requestExternalPlayback = () => {
+    if (skipExternalRedirectWarning) {
+      openExternalPlatform();
+      return;
+    }
+    setDisableFutureWarnings(false);
+    setShowExternalConfirmation(true);
+  };
+
+  const continueToExternalPlatform = () => {
+    if (disableFutureWarnings) {
+      onExternalRedirectPreferenceChange?.(true);
+    }
+    openExternalPlatform();
+  };
+
+  if (externalContent) {
+    return (
+      <div
+        className={`provider-player provider-external provider-${platform.toLowerCase().replaceAll(" ", "-")}`}
+      >
+        <Image
+          alt={`${title} by ${artist} cover`}
+          className="provider-player-cover"
+          fill
+          priority
+          sizes="(max-width: 760px) 100vw, 420px"
+          src={coverUrl}
+          unoptimized
+        />
+        <div className="external-player-action">
+          <span><Link2 size={15} /> External Content</span>
+          <strong>{title}</strong>
+          <small>
+            {spanish
+              ? `Este contenido se reproduce en ${platform}.`
+              : `This content plays on ${platform}.`}
+          </small>
+          <button onClick={requestExternalPlayback} type="button">
+            <Play fill="currentColor" size={16} />
+            {spanish ? `Abrir ${platform}` : `Play on ${platform}`}
+          </button>
+        </div>
+        {showExternalConfirmation && (
+          <div
+            aria-labelledby="external-content-dialog-title"
+            aria-modal="true"
+            className="external-redirect-dialog"
+            role="dialog"
+          >
+            <div>
+              <button
+                aria-label={spanish ? "Cerrar" : "Close"}
+                className="external-dialog-close"
+                onClick={() => setShowExternalConfirmation(false)}
+                type="button"
+              >
+                <X size={17} />
+              </button>
+              <span className="eyebrow"><Link2 size={13} /> External Content</span>
+              <h3 id="external-content-dialog-title">
+                {spanish
+                  ? `Este contenido esta alojado en ${platform}.`
+                  : `This content is hosted on ${platform}.`}
+              </h3>
+              <p>
+                {spanish
+                  ? `Reproducir este contenido abrira ${platform} en una nueva pestaña y saldra temporalmente de First Listen. La actividad externa no cuenta como escucha valida.`
+                  : `Playing this content will open ${platform} in a new tab and temporarily leave First Listen. External activity does not count as a valid listen.`}
+              </p>
+              <label>
+                <input
+                  checked={disableFutureWarnings}
+                  onChange={(event) =>
+                    setDisableFutureWarnings(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                {spanish ? "No volver a mostrar" : "Don't show again"}
+              </label>
+              <div>
+                <button
+                  className="primary-button"
+                  onClick={continueToExternalPlatform}
+                  type="button"
+                >
+                  {spanish
+                    ? `Continuar a ${platform}`
+                    : `Continue to ${platform}`}
+                  <ExternalLink size={14} />
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={() => setShowExternalConfirmation(false)}
+                  type="button"
+                >
+                  {spanish ? "Permanecer en First Listen" : "Stay on First Listen"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={`provider-player provider-${platform.toLowerCase().replaceAll(" ", "-")}`}>

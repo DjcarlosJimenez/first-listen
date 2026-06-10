@@ -21,6 +21,7 @@ import {
   Youtube,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { compactClassificationLabel } from "@/lib/content-economy";
 import { getDiscoveryLinks } from "@/lib/discovery";
 import { createClient } from "@/lib/supabase/client";
 import type {
@@ -242,7 +243,10 @@ export function PublicArtistProfile({
             <article key={song.id}>
               <Image alt={`${song.title} cover`} height={500} src={song.coverUrl} unoptimized width={500} />
               <div className="artist-song-copy">
-                <span className="eyebrow">{song.platform} / {song.genre} / {song.language}</span>
+                <span className="eyebrow">
+                  {song.platform} / {compactClassificationLabel(song.platform)} /{" "}
+                  {song.genre} / {song.language}
+                </span>
                 <h2>{song.title}</h2>
                 <div className="artist-song-metrics">
                   <span><Headphones size={13} /> {song.reviewsReceived} reviews</span>

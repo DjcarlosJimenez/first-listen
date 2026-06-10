@@ -24,7 +24,7 @@ export async function AdminPageContent({
   initialSection = "users",
   allowModerator = false,
 }: {
-  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics";
+  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "economy" | "discovery" | "statistics";
   allowModerator?: boolean;
 }) {
   const supabase = await createClient();
@@ -65,6 +65,7 @@ export async function AdminPageContent({
     { data: listeningRows },
     { data: spotlightSlots },
     { data: boosts },
+    { data: contentEconomy },
   ] = await Promise.all([
     supabase.rpc("admin_list_users", { result_limit: 1000 }),
     supabase
@@ -103,6 +104,7 @@ export async function AdminPageContent({
       )
       .order("requested_at", { ascending: false })
       .limit(100),
+    supabase.rpc("get_content_economy_settings"),
   ]);
 
   const profileById = new Map(
@@ -131,7 +133,7 @@ export async function AdminPageContent({
 
   return (
     <AdminPanel
-      initialSection={effectiveInitialSection as "users" | "songs" | "reports" | "credits" | "listening" | "discovery" | "statistics"}
+      initialSection={effectiveInitialSection as "users" | "songs" | "reports" | "credits" | "listening" | "economy" | "discovery" | "statistics"}
       listeningSettings={{
         minutes_per_credit: Number(listeningRows?.minutes_per_credit ?? 120),
         daily_cap_minutes: Number(listeningRows?.daily_cap_minutes ?? 180),
@@ -141,6 +143,7 @@ export async function AdminPageContent({
       commentReports={(commentReports ?? []) as never}
       spotlightSlots={(spotlightSlots ?? []) as never}
       boosts={(boosts ?? []) as never}
+      contentEconomy={(contentEconomy ?? []) as never}
       role={profile.role}
       songs={enrichedSongs}
       statistics={(statistics as {
