@@ -17946,3 +17946,15 @@ revoke all on function public.convert_guest_to_account(uuid)
   from public, anon, authenticated;
 grant execute on function public.convert_guest_to_account(uuid)
   to authenticated;
+
+-- ============================================================
+-- 20260610012000_repair_spotlight_spanish_text.sql
+-- ============================================================
+
+-- Use an ASCII-only Unicode escape so management-shell encoding cannot
+-- corrupt the accented character during migration application.
+
+update public.daily_missions
+set description_es =
+  U&'Completa escuchas v\00E1lidas de dos canciones Spotlight diferentes hoy.'
+where mission_key = 'review_spotlight_songs';
