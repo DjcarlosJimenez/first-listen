@@ -424,7 +424,7 @@ export function GuestExperience() {
         : "You have already helped several artists. Join to start building your own audience.";
     }
     return spanish
-      ? "Estas explorando como invitado. Escucha musica real y descubre como funciona la comunidad."
+      ? "Estás explorando como invitado. Escucha música real y descubre cómo funciona la comunidad."
       : "You are exploring as a guest. Listen to real music and see how the community works.";
   }, [expiresIn, guest?.validListens, spanish]);
 
@@ -448,7 +448,7 @@ export function GuestExperience() {
             {expired ? "Expired" : formatRemaining(expiresIn)}
           </span>
           <Link className="guest-login-link" href="/login">
-            {spanish ? "Iniciar sesion" : "Log In"}
+            {spanish ? "Iniciar sesión" : "Log In"}
           </Link>
           <Link className="guest-join-link" href="/signup">
             {spanish ? "Crear cuenta gratis" : "Create Free Account"}
@@ -522,8 +522,8 @@ export function GuestExperience() {
                 />
                 {countdown !== null && (
                   <div className="auto-advance-overlay" role="status">
-                    <strong>{spanish ? "Cancion terminada" : "Song Finished"}</strong>
-                    <span>{spanish ? "Siguiente cancion en" : "Starting next song in"}</span>
+                    <strong>{spanish ? "Canción terminada" : "Song Finished"}</strong>
+                    <span>{spanish ? "Siguiente canción en" : "Starting next song in"}</span>
                     <b>{countdown}</b>
                   </div>
                 )}
@@ -560,7 +560,7 @@ export function GuestExperience() {
 
             <div className="guest-player-controls">
               <button onClick={() => void nextSong()} type="button">
-                <SkipForward size={15} /> {spanish ? "Siguiente cancion" : "Next Song"}
+                <SkipForward size={15} /> {spanish ? "Siguiente canción" : "Next Song"}
               </button>
               <button
                 className={autoPlay ? "active" : ""}
@@ -584,7 +584,7 @@ export function GuestExperience() {
               <h2>{spanish ? "Apoya sin crear una cuenta" : "Support before signing up"}</h2>
               <p>
                 {spanish
-                  ? "Una escucha valida avisa al artista como Anonymous Listener. No recibes tokens ni ventajas de ranking."
+                  ? "Una escucha válida avisa al artista como Anonymous Listener. No recibes tokens ni ventajas de ranking."
                   : "A valid listen notifies the artist as Anonymous Listener. You receive no tokens or ranking advantage."}
               </p>
             </section>
@@ -625,7 +625,7 @@ export function GuestExperience() {
         <section className="guest-message">
           <CheckCircle2 size={22} />
           <div>
-            <strong>{spanish ? "Estas al dia" : "You are all caught up"}</strong>
+            <strong>{spanish ? "Estás al día" : "You are all caught up"}</strong>
             <p>{spanish ? "Explora perfiles mientras llegan nuevas canciones." : "Explore artist profiles while new songs arrive."}</p>
             <Link href="/signup">{spanish ? "Unirme a la comunidad" : "Join the community"}</Link>
           </div>

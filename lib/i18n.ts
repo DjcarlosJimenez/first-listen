@@ -347,7 +347,7 @@ export const translations = {
         eyebrow: "Lista de espera",
         title: "Sé de los primeros en escuchar lo que oyen tus listeners.",
         body: "Únete para recibir notas de lanzamiento y disponibilidad Founder.",
-        successTitle: "Ya estás en la lista.",
+        successTitle: "¡Ya estás en la lista!",
         successBody: "Mantendremos el ruido bajo.",
         email: "Correo electrónico",
       },

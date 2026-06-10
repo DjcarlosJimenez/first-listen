@@ -16,6 +16,8 @@
     "discovery:verify": "node scripts/verify-discovery-community.mjs",
     "community:verify": "node scripts/verify-community-retention.mjs",
     "guest:verify": "node scripts/verify-guest-experience.mjs",
+    "i18n:verify": "node scripts/verify-localization-encoding.mjs",
+    "i18n:verify:production": "node scripts/verify-localization-encoding.mjs --production",
     "songs:verify": "node scripts/verify-song-management.mjs",
     "db:schema:sync": "node scripts/sync-schema.mjs",
     "db:schema:check": "node scripts/sync-schema.mjs --check",

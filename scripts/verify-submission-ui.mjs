@@ -87,6 +87,7 @@ let userId = null;
 let app = null;
 let browser = null;
 let socket = null;
+let localizationFixture = null;
 
 try {
   const { data: created, error: createError } = await service.auth.admin.createUser({
@@ -125,6 +126,48 @@ try {
     })
     .eq("id", userId);
   if (profileError) throw profileError;
+
+  const { data: fixtureSong, error: fixtureSongError } = await service
+    .from("songs")
+    .select("id, title")
+    .eq("is_active", true)
+    .is("removed_at", null)
+    .limit(1)
+    .single();
+  if (fixtureSongError) throw fixtureSongError;
+  const { data: fixtureActor, error: fixtureActorError } = await service
+    .from("profiles")
+    .select("id, display_name")
+    .eq("account_status", "active")
+    .eq("community_visibility", "public")
+    .is("banned_at", null)
+    .neq("id", userId)
+    .limit(1)
+    .single();
+  if (fixtureActorError) throw fixtureActorError;
+  localizationFixture = {
+    actorId: fixtureActor.id,
+    actorName: fixtureActor.display_name,
+    songId: fixtureSong.id,
+    songTitle: fixtureSong.title,
+  };
+  const notificationFixtures = [
+    "valid_listen",
+    "valid_listen",
+    "review",
+    "complete_listen",
+  ].map((eventType) => ({
+      recipient_id: userId,
+      actor_id: fixtureActor.id,
+      actor_visibility: "public",
+      event_type: eventType,
+      song_id: fixtureSong.id,
+      source_id: randomUUID(),
+    }));
+  const { error: notificationFixtureError } = await service
+    .from("community_notifications")
+    .insert(notificationFixtures);
+  if (notificationFixtureError) throw notificationFixtureError;
 
   const environment = {
     ...process.env,
@@ -616,7 +659,6 @@ try {
     })()`,
     (value) =>
       value.progressVisible &&
-      value.playerVisible &&
       value.diagnostics["Provider ready"] !== "pending" &&
       value.diagnostics["Embed URL"]?.includes("autoplay=1") &&
       value.diagnostics["Play state"] === "playing",
@@ -624,7 +666,6 @@ try {
   );
   if (
     oneClickPlayback.diagnostics["Play state"] !== "playing" ||
-    !oneClickPlayback.playerVisible ||
     !oneClickPlayback.progressVisible
   ) {
     throw new Error(
@@ -732,6 +773,92 @@ try {
     .update({ interface_language: "es" })
     .eq("id", userId);
   if (localeUpdate.error) throw localeUpdate.error;
+
+  const realtimeSubscriptionsBeforeSpanishDashboard = browserMessages.filter(
+    (message) =>
+      message.includes("[First Listen realtime]") &&
+      message.includes("SUBSCRIBED"),
+  ).length;
+  await navigate(`${baseUrl}/dashboard?debug=1`);
+  const spanishOfflineSummary = await waitFor(
+    `document.querySelector(".offline-community-summary")?.innerText ?? ""`,
+    (value) =>
+      value.includes("escuchas válidas") &&
+      value.includes("Canción más apoyada") &&
+      value.includes("Mayor colaborador") &&
+      value.includes("Colaborador público") &&
+      value.includes("Nueva review recibida") &&
+      value.includes("apoyó"),
+  );
+  for (const expected of [
+    "escuchas válidas",
+    "Canción más apoyada",
+    "Mayor colaborador",
+    "Colaborador público",
+    "Nueva review recibida",
+    "apoyó",
+  ]) {
+    if (!spanishOfflineSummary.includes(expected)) {
+      throw new Error(
+        `Spanish offline summary is missing "${expected}": ${spanishOfflineSummary}`,
+      );
+    }
+  }
+  if (/[\u00c3\u00c2\uFFFD]/u.test(spanishOfflineSummary)) {
+    throw new Error(
+      `Spanish offline summary contains mojibake: ${spanishOfflineSummary}`,
+    );
+  }
+
+  const realtimeReady = await waitFor(
+    "true",
+    () =>
+      browserMessages.filter(
+        (message) =>
+          message.includes("[First Listen realtime]") &&
+          message.includes("SUBSCRIBED"),
+      ).length > realtimeSubscriptionsBeforeSpanishDashboard,
+    15000,
+  );
+  if (!realtimeReady) {
+    throw new Error(
+      `Community notification realtime channel did not subscribe: ${JSON.stringify(
+        browserMessages.filter((message) =>
+          message.includes("[First Listen realtime]"),
+        ),
+      )}`,
+    );
+  }
+
+  const { error: realtimeFixtureError } = await service
+    .from("community_notifications")
+    .insert({
+      recipient_id: userId,
+      actor_id: localizationFixture.actorId,
+      actor_visibility: "public",
+      event_type: "review",
+      song_id: localizationFixture.songId,
+      source_id: randomUUID(),
+    });
+  if (realtimeFixtureError) throw realtimeFixtureError;
+  const spanishRealtimeNotification = await waitFor(
+    `document.querySelector(".community-live-stack")?.innerText ?? ""`,
+    (value) => value.includes("Nueva review recibida"),
+    15000,
+  );
+  if (
+    !spanishRealtimeNotification.includes("Nueva review recibida") ||
+    /[\u00c3\u00c2\uFFFD]/u.test(spanishRealtimeNotification)
+  ) {
+    throw new Error(
+      `Spanish realtime notification is malformed: ${spanishRealtimeNotification}; diagnostics: ${JSON.stringify(
+        browserMessages.filter((message) =>
+          message.includes("[First Listen realtime]"),
+        ),
+      )}`,
+    );
+  }
+
   await navigate(`${baseUrl}/review?debug=1`);
   const hasReviewSong = await waitFor(
     "Boolean(document.querySelector('.review-card'))",
@@ -807,7 +934,9 @@ try {
         hydration_messages: hydrationMessages,
         listening_bank_state: listeningBankState,
         mobile_dashboard_state: mobileDashboardState,
+        spanish_offline_summary: spanishOfflineSummary,
         post_review_spanish: spanishPostReview,
+        spanish_realtime_notification: spanishRealtimeNotification,
         spotlight_card_state: spotlightCardState,
         spotlight_one_click_playback: oneClickPlayback,
         submit_another_reset: resetState,

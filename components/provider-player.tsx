@@ -1058,7 +1058,7 @@ export function ProviderPlayer({
               </h3>
               <p>
                 {spanish
-                  ? `Reproducir este contenido abrira ${platform} en una nueva pestaña y saldra temporalmente de First Listen. La actividad externa no cuenta como escucha valida.`
+                  ? `Reproducir este contenido abrirá ${platform} en una nueva pestaña y saldrá temporalmente de First Listen. La actividad externa no cuenta como escucha válida.`
                   : `Playing this content will open ${platform} in a new tab and temporarily leave First Listen. External activity does not count as a valid listen.`}
               </p>
               <label>
@@ -1148,7 +1148,7 @@ export function ProviderPlayer({
           <strong>{spanish ? "Reproductor no disponible" : "Player unavailable"}</strong>
           <span>
             {spanish
-              ? "La plataforma puede haber bloqueado la reproduccion integrada para esta cancion."
+              ? "La plataforma puede haber bloqueado la reproducción integrada para esta canción."
               : "This provider may have blocked embedding for this song."}
           </span>
           <a href={link} rel="noreferrer" target="_blank">
@@ -1160,7 +1160,7 @@ export function ProviderPlayer({
       {showAutoplayFallback && (
         <div className="provider-autoplay-fallback" role="status">
           <strong>
-            {spanish ? "La reproduccion necesita un toque" : "Playback needs one tap"}
+            {spanish ? "La reproducción necesita un toque" : "Playback needs one tap"}
           </strong>
           <button onClick={requestPlayback} type="button">
             {spanish ? "Toca para iniciar" : "Tap To Start Playback"}

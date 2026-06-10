@@ -159,12 +159,12 @@ export function PublicLanding({
             <h2>{locale === "es" ? "Prueba la comunidad primero." : "Try the community first."}</h2>
             <p>
               {locale === "es"
-                ? "Escucha musica real, apoya creadores y explora perfiles durante 24 horas. No necesitas una cuenta."
+                ? "Escucha música real, apoya creadores y explora perfiles durante 24 horas. No necesitas una cuenta."
                 : "Listen to real music, support creators, and explore profiles for 24 hours. No account required."}
             </p>
             <ul>
               <li><Check size={14} /> {locale === "es" ? "Escucha sin registro" : "Listen without registering"}</li>
-              <li><Check size={14} /> {locale === "es" ? "Apoyo anonimo verificado" : "Verified anonymous support"}</li>
+              <li><Check size={14} /> {locale === "es" ? "Apoyo anónimo verificado" : "Verified anonymous support"}</li>
               <li><Check size={14} /> {locale === "es" ? "Sin tokens ni ranking" : "No tokens or ranking"}</li>
             </ul>
             <button className="landing-secondary-action" onClick={onGuest}>

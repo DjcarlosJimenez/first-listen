@@ -284,13 +284,13 @@ function translatedPlatformMessage(
   fallback: string,
 ) {
   if (locale === "en") return fallback;
-  if (!rawLink.trim()) return "Pega un enlace publico de una cancion.";
+  if (!rawLink.trim()) return "Pega un enlace público de una canción.";
   if (valid && platform) return `${platform} detectado.`;
   if (platform === "Spotify") return "Usa un enlace directo de Spotify track.";
   if (platform === "YouTube") return "Usa un enlace directo de YouTube.";
   if (platform === "YouTube Music") return "Usa un enlace watch de YouTube Music.";
-  if (platform === "SoundCloud") return "Usa un enlace publico de SoundCloud.";
-  if (platform === "TikTok") return "Usa un enlace publico directo de TikTok.";
+  if (platform === "SoundCloud") return "Usa un enlace público de SoundCloud.";
+  if (platform === "TikTok") return "Usa un enlace público directo de TikTok.";
   return "Este enlace no pertenece a una plataforma compatible.";
 }
 
@@ -404,7 +404,7 @@ function EconomyNotice({
       </span>
       <p>
         {spanish
-          ? `El contenido externo cuesta actualmente ${effectiveCostLabel} ${effectiveCostLabel === "1" ? "token" : "tokens"}. La actividad en plataformas externas no cuenta como escucha valida.`
+          ? `El contenido externo cuesta actualmente ${effectiveCostLabel} ${effectiveCostLabel === "1" ? "token" : "tokens"}. La actividad en plataformas externas no cuenta como escucha válida.`
           : `External Content currently costs ${effectiveCostLabel} ${effectiveCostLabel === "1" ? "token" : "tokens"}. Activity on external platforms does not count as a valid listen.`}
       </p>
       <span className="economy-countdown">
@@ -851,16 +851,16 @@ function notificationText(
   }
   if (notification.type === "review") {
     return spanish
-      ? `Nueva review recibida para ${notification.songTitle ?? "tu canciÃ³n"}`
+      ? `Nueva review recibida para ${notification.songTitle ?? "tu canción"}`
       : `New review received for ${notification.songTitle ?? "your song"}`;
   }
   if (notification.type === "complete_listen") {
     return spanish
-      ? `${notification.actorName} completÃ³ ${notification.songTitle ?? "tu canciÃ³n"}`
+      ? `${notification.actorName} completó ${notification.songTitle ?? "tu canción"}`
       : `${notification.actorName} completed ${notification.songTitle ?? "your song"}`;
   }
   return spanish
-    ? `${notification.actorName} apoyÃ³ ${notification.songTitle ?? "tu canciÃ³n"}`
+    ? `${notification.actorName} apoyó ${notification.songTitle ?? "tu canción"}`
     : `${notification.actorName} supported ${notification.songTitle ?? "your song"}`;
 }
 
@@ -937,24 +937,69 @@ function OfflineCommunitySummary({
         </button>
       </div>
       <div className="offline-community-counts">
-        <span><strong>{summary.supportersCount}</strong> {spanish ? "personas apoyaron tu contenido" : "people supported your content"}</span>
-        <span><strong>{summary.followersCount}</strong> {spanish ? "seguidores nuevos" : "new followers"}</span>
-        <span><strong>{summary.reviewsCount}</strong> {spanish ? "reviews nuevas" : "new reviews"}</span>
-        <span><strong>{summary.validListensCount}</strong> {spanish ? "escuchas vÃ¡lidas" : "valid listens"}</span>
+        <span>
+          <strong>{summary.supportersCount}</strong>{" "}
+          {spanish
+            ? summary.supportersCount === 1
+              ? "persona apoyó tu contenido"
+              : "personas apoyaron tu contenido"
+            : summary.supportersCount === 1
+              ? "person supported your content"
+              : "people supported your content"}
+        </span>
+        <span>
+          <strong>{summary.followersCount}</strong>{" "}
+          {spanish
+            ? summary.followersCount === 1
+              ? "seguidor nuevo"
+              : "seguidores nuevos"
+            : summary.followersCount === 1
+              ? "new follower"
+              : "new followers"}
+        </span>
+        <span>
+          <strong>{summary.reviewsCount}</strong>{" "}
+          {spanish
+            ? summary.reviewsCount === 1
+              ? "review nueva"
+              : "reviews nuevas"
+            : summary.reviewsCount === 1
+              ? "new review"
+              : "new reviews"}
+        </span>
+        <span>
+          <strong>{summary.validListensCount}</strong>{" "}
+          {spanish
+            ? summary.validListensCount === 1
+              ? "escucha válida"
+              : "escuchas válidas"
+            : summary.validListensCount === 1
+              ? "valid listen"
+              : "valid listens"}
+        </span>
       </div>
       <div className="offline-community-details">
         {summary.mostSupportedSongTitle && (
           <div>
-            <small>{spanish ? "CanciÃ³n mÃ¡s apoyada" : "Most Supported Song"}</small>
+            <small>{spanish ? "Canción más apoyada" : "Most Supported Song"}</small>
             <strong>{summary.mostSupportedSongTitle}</strong>
-            <span>{summary.mostSupportedSongValidListens} {spanish ? "escuchas" : "listens"}</span>
+            <span>
+              {summary.mostSupportedSongValidListens}{" "}
+              {spanish
+                ? summary.mostSupportedSongValidListens === 1
+                  ? "escucha"
+                  : "escuchas"
+                : summary.mostSupportedSongValidListens === 1
+                  ? "listen"
+                  : "listens"}
+            </span>
           </div>
         )}
         {summary.topSupporterName && (
           <div>
             <small>{spanish ? "Mayor colaborador" : "Top Supporter"}</small>
             <strong>{summary.topSupporterName}</strong>
-            <span>{spanish ? "Colaborador pÃºblico" : "Public supporter"}</span>
+            <span>{spanish ? "Colaborador público" : "Public supporter"}</span>
           </div>
         )}
       </div>
@@ -1004,18 +1049,18 @@ function EmptyQueueRetention({
         <span className="eyebrow">
           {spanish ? "Apoyo completado" : "Community support complete"}
         </span>
-        <h2>{spanish ? "Estas al dia" : "You’re All Caught Up"}</h2>
+        <h2>{spanish ? "Estás al día" : "You’re All Caught Up"}</h2>
         <p>
           {spanish
             ? "Has apoyado a cada creador disponible actualmente en tu cola."
             : "You have supported every available creator currently in the queue."}
         </p>
         <button className="primary-button" onClick={onSubmit}>
-          {spanish ? "Enviar una cancion" : "Submit a Song"} <ArrowRight size={17} />
+          {spanish ? "Enviar una canción" : "Submit a Song"} <ArrowRight size={17} />
         </button>
       </section>
 
-      <section className="queue-retention-stats" aria-label={spanish ? "Estadisticas de hoy" : "Today’s support"}>
+      <section className="queue-retention-stats" aria-label={spanish ? "Estadísticas de hoy" : "Today’s support"}>
         <div><strong>{todaySupport.songsReviewed}</strong><span>{spanish ? "Canciones revisadas hoy" : "Songs Reviewed Today"}</span></div>
         <div><strong>{todaySupport.creatorsSupported}</strong><span>{spanish ? "Creadores apoyados" : "Creators Supported"}</span></div>
         <div><strong>{formatDuration(todaySupport.listeningSeconds)}</strong><span>{spanish ? "Tiempo de escucha ganado" : "Listening Time Earned"}</span></div>
@@ -1030,9 +1075,9 @@ function EmptyQueueRetention({
           </div>
         </div>
         <div className="queue-retention-stats compact">
-          <div><strong>{todaySupport.validListens}</strong><span>{spanish ? "Escuchas validas" : "Valid Listens"}</span></div>
+          <div><strong>{todaySupport.validListens}</strong><span>{spanish ? "Escuchas válidas" : "Valid Listens"}</span></div>
           <div><strong>{todaySupport.completeListens}</strong><span>{spanish ? "Escuchas completas" : "Complete Listens"}</span></div>
-          <div><strong>{Math.round(todaySupport.averageCompletionRate)}%</strong><span>{spanish ? "Finalizacion promedio" : "Average Completion Rate"}</span></div>
+          <div><strong>{Math.round(todaySupport.averageCompletionRate)}%</strong><span>{spanish ? "Finalización promedio" : "Average Completion Rate"}</span></div>
         </div>
       </section>
 
@@ -1049,7 +1094,7 @@ function EmptyQueueRetention({
                 <ArrowRight size={14} />
               </Link>
             ))}
-            {!featuredArtists.length && <p className="discovery-empty">{spanish ? "Los artistas destacados apareceran aqui." : "Featured artists will appear here."}</p>}
+            {!featuredArtists.length && <p className="discovery-empty">{spanish ? "Los artistas destacados aparecerán aquí." : "Featured artists will appear here."}</p>}
           </div>
         </div>
 
@@ -1065,7 +1110,7 @@ function EmptyQueueRetention({
                 <ArrowRight size={14} />
               </Link>
             ))}
-            {!followedArtists.length && <p className="discovery-empty">{spanish ? "Sigue artistas para encontrarlos aqui." : "Follow artists to find them here."}</p>}
+            {!followedArtists.length && <p className="discovery-empty">{spanish ? "Sigue artistas para encontrarlos aquí." : "Follow artists to find them here."}</p>}
           </div>
         </div>
       </section>
@@ -1082,7 +1127,7 @@ function EmptyQueueRetention({
               <ExternalLink size={14} />
             </a>
           ))}
-          {!topTenSongs.length && <p className="discovery-empty">{spanish ? "El ranking aparecera cuando haya suficientes reviews." : "Rankings will appear after enough verified reviews."}</p>}
+          {!topTenSongs.length && <p className="discovery-empty">{spanish ? "El ranking aparecerá cuando haya suficientes reviews." : "Rankings will appear after enough verified reviews."}</p>}
         </div>
       </section>
 
@@ -1098,7 +1143,7 @@ function EmptyQueueRetention({
               <ExternalLink size={14} />
             </a>
           ))}
-          {!previouslySupportedSongs.length && <p className="discovery-empty">{spanish ? "Tus canciones apoyadas apareceran aqui." : "Songs you support will appear here."}</p>}
+          {!previouslySupportedSongs.length && <p className="discovery-empty">{spanish ? "Tus canciones apoyadas aparecerán aquí." : "Songs you support will appear here."}</p>}
         </div>
       </section>
     </main>
@@ -1603,7 +1648,7 @@ function ReviewView({
             <div className="success-orbit"><Headphones size={34} /></div>
             <span className="eyebrow">{locale === "es" ? "Preparando cola" : "Preparing queue"}</span>
             <h2>{locale === "es" ? "Buscando la mejor coincidencia..." : "Finding the best match..."}</h2>
-            <p>{locale === "es" ? "Estamos comparando idioma, genero y equidad de cola." : "We’re matching language, genre, and queue fairness."}</p>
+            <p>{locale === "es" ? "Estamos comparando idioma, género y equidad de cola." : "We’re matching language, genre, and queue fairness."}</p>
           </section>
         </main>
       );
@@ -1645,11 +1690,11 @@ function ReviewView({
               {autoAdvanceCountdown !== null && (
                 <div className="auto-advance-overlay" role="status">
                   <strong>
-                    {locale === "es" ? "CanciÃ³n terminada" : "Song Finished"}
+                    {locale === "es" ? "Canción terminada" : "Song Finished"}
                   </strong>
                   <span>
                     {locale === "es"
-                      ? "La siguiente canciÃ³n comienza en"
+                      ? "La siguiente canción comienza en"
                       : "Starting next song in"}
                   </span>
                   <b>{autoAdvanceCountdown}</b>
@@ -1683,7 +1728,7 @@ function ReviewView({
                 <span>
                   <strong>External Content</strong>
                   {locale === "es"
-                    ? `Reproducir abrira ${song.platform}. No se verifican escuchas ni recompensas externas.`
+                    ? `Reproducir abrirá ${song.platform}. No se verifican escuchas ni recompensas externas.`
                     : `Playing this content opens ${song.platform}. External listening and rewards are not verified.`}
                 </span>
               </div>
@@ -1756,7 +1801,7 @@ function ReviewView({
                 type="button"
               >
                 <SkipForward size={15} />
-                {locale === "es" ? "Siguiente canciÃ³n" : "Next Song"}
+                {locale === "es" ? "Siguiente canción" : "Next Song"}
               </button>
               <button
                 className={autoPlayNextSong ? "active" : ""}
@@ -1970,11 +2015,11 @@ function ReviewView({
           <p>
             {externalContent
               ? locale === "es"
-                ? "El contenido externo no gana minutos, escuchas validas ni recompensas."
+                ? "El contenido externo no gana minutos, escuchas válidas ni recompensas."
                 : "External Content does not earn minutes, valid listens, or rewards."
               : listeningSession.earningEligible === false
               ? locale === "es"
-                ? "La reproduccion esta disponible, pero este proveedor no puede ganar minutos verificados."
+                ? "La reproducción está disponible, pero este proveedor no puede ganar minutos verificados."
                 : "Playback is available, but this provider cannot earn verified minutes."
               : locale === "es"
                 ? "Cada segundo verificado se agrega al banco sin redondear. La review es opcional."
@@ -2019,7 +2064,7 @@ function ReviewView({
         <div className="side-note">
           <MessageSquareText size={20} />
           <div>
-            <strong>{locale === "es" ? "Que hace una buena review?" : "What makes a good review?"}</strong>
+            <strong>{locale === "es" ? "¿Qué hace una buena review?" : "What makes a good review?"}</strong>
             <p>{locale === "es" ? "Escucha primero. Responde con instinto. Se constructivo." : "Listen first. Answer instinctively. Keep comments constructive."}</p>
           </div>
         </div>
@@ -2136,7 +2181,7 @@ function ListeningBankPanel({
       </div>
       <div className="today-support-strip">
         <span>{spanish ? "Apoyo de hoy" : "Today’s Support"}</span>
-        <strong>{status.todayValidListens} {spanish ? "validas" : "valid"}</strong>
+        <strong>{status.todayValidListens} {spanish ? "válidas" : "valid"}</strong>
         <strong>{status.todayCompleteListens} {spanish ? "completas" : "complete"}</strong>
         <strong>{Math.round(status.todayAverageCompletionRate)}% {spanish ? "promedio" : "average completion"}</strong>
       </div>
@@ -2154,7 +2199,7 @@ function ListeningBankPanel({
         </div>
         <small>
           {status.minutesPerCredit} {spanish ? "minutos de escucha" : "listening minutes"} = 1{" "}
-          {spanish ? "token" : "token"} / {spanish ? "Limite diario" : "Daily cap"}{" "}
+          {spanish ? "token" : "token"} / {spanish ? "Límite diario" : "Daily cap"}{" "}
           {status.dailyCapMinutes} min
         </small>
       </div>
@@ -2339,7 +2384,7 @@ function DiscoverySongCard({
             warning:
               error?.message ??
               (spanish
-                ? "Esta cancion no es elegible para otra escucha verificada."
+                ? "Esta canción no es elegible para otra escucha verificada."
                 : "This song is not eligible for another verified listen."),
           }));
           return;
@@ -2445,7 +2490,7 @@ function DiscoverySongCard({
           {topTen ? <Trophy size={13} /> : <Sparkles size={13} />}
           {topTen
             ? spanish
-              ? "Ranking organico"
+              ? "Ranking orgánico"
               : "Organic ranking"
             : spanish
               ? "Seleccion editorial"
@@ -2494,7 +2539,7 @@ function DiscoverySongCard({
           type="button"
         >
           <BarChart3 size={14} />
-          {spanish ? "Estadisticas" : "Statistics"}
+          {spanish ? "Estadísticas" : "Statistics"}
         </button>
       </div>
       {active && (
@@ -2558,12 +2603,12 @@ function DiscoverySongCard({
               </div>
               <div>
                 <strong>{Math.round(song.completionRate)}%</strong>
-                <span>{spanish ? "Finalizacion" : "Completion"}</span>
+                <span>{spanish ? "Finalización" : "Completion"}</span>
               </div>
               {topTen && (
                 <div>
                   <strong>{song.rankingScore?.toFixed(1) ?? "0.0"}</strong>
-                  <span>{spanish ? "Score organico" : "Organic score"}</span>
+                  <span>{spanish ? "Score orgánico" : "Organic score"}</span>
                 </div>
               )}
             </>
@@ -2643,7 +2688,7 @@ function DiscoverySections({
         ) : (
           <p className="discovery-empty">
             {spanish
-              ? "Los proximos Spotlight apareceran aqui."
+              ? "Los próximos Spotlight aparecerán aquí."
               : "The next Spotlight selections will appear here."}
           </p>
         )}
@@ -2692,7 +2737,7 @@ function DiscoverySections({
         ) : (
           <p className="discovery-empty">
             {spanish
-              ? "El Top 10 aparecera cuando haya suficientes reviews verificadas."
+              ? "El Top 10 aparecerá cuando haya suficientes reviews verificadas."
               : "Top 10 will appear after songs receive verified reviews."}
           </p>
         )}
@@ -2730,7 +2775,7 @@ function DailyMissionPanel({
       </div>
       <div>
         <span className="eyebrow">
-          {spanish ? "Mision diaria" : "Daily Mission"}
+          {spanish ? "Misión diaria" : "Daily Mission"}
         </span>
         <h3>{spanish ? mission.titleEs : mission.titleEn}</h3>
         <p>{spanish ? mission.descriptionEs : mission.descriptionEn}</p>
@@ -3065,7 +3110,7 @@ function DashboardView({
             icon={Headphones}
           />
           <StatCard
-            label={locale === "es" ? "Tasa de finalizacion" : "Completion Rate"}
+            label={locale === "es" ? "Tasa de finalización" : "Completion Rate"}
             value={`${Math.round(latestSummary?.completionRate ?? 0)}%`}
             detail={locale === "es" ? "Alcanzo al menos 90%" : "Reached at least 90%"}
             icon={CheckCircle2}
@@ -3085,7 +3130,7 @@ function DashboardView({
                 {locale === "es" ? "Rendimiento" : "Song performance"}
               </span>
               <h3>
-                {locale === "es" ? "Cada cancion enviada" : "Every submitted song"}
+                {locale === "es" ? "Cada canción enviada" : "Every submitted song"}
               </h3>
             </div>
             <span>{songSummaries.length} {locale === "es" ? "total" : "total"}</span>
@@ -3127,7 +3172,7 @@ function DashboardView({
                         ? "Boost activo"
                         : "Boost active"
                       : locale === "es"
-                        ? "Impulsar cancion"
+                        ? "Impulsar canción"
                         : "Boost Song"}
                 </button>
               </article>
@@ -3311,19 +3356,19 @@ function SubmitView({
       );
     }
     if (!songTitle.trim()) {
-      failures.push(locale === "es" ? "Escribe el titulo de la cancion." : "Enter the song title.");
+      failures.push(locale === "es" ? "Escribe el título de la canción." : "Enter the song title.");
     }
     if (!artistName.trim()) {
       failures.push(locale === "es" ? "Escribe el nombre del artista." : "Enter the artist name.");
     }
     if (!genre) {
-      failures.push(locale === "es" ? "Selecciona un genero." : "Select a genre.");
+      failures.push(locale === "es" ? "Selecciona un género." : "Select a genre.");
     }
     if (!songLanguage) {
-      failures.push(locale === "es" ? "Selecciona el idioma de la cancion." : "Select the song language.");
+      failures.push(locale === "es" ? "Selecciona el idioma de la canción." : "Select the song language.");
     }
     if (!country) {
-      failures.push(locale === "es" ? "Selecciona un pais." : "Select a country.");
+      failures.push(locale === "es" ? "Selecciona un país." : "Select a country.");
     }
     if (feedbackFocus.length === 0) {
       failures.push(
@@ -3335,7 +3380,7 @@ function SubmitView({
     if (explicitContent === null) {
       failures.push(
         locale === "es"
-          ? "Indica si la cancion contiene contenido explicito."
+          ? "Indica si la canción contiene contenido explícito."
           : "Choose whether the song contains explicit content.",
       );
     }
@@ -3361,7 +3406,7 @@ function SubmitView({
     if (exactDuplicate) {
       failures.push(
         locale === "es"
-          ? "Cancion ya enviada."
+          ? "Canción ya enviada."
           : "Song already submitted.",
       );
     } else if (
@@ -3370,7 +3415,7 @@ function SubmitView({
     ) {
       failures.push(
         locale === "es"
-          ? "Revisa la posible cancion duplicada antes de continuar."
+          ? "Revisa la posible canción duplicada antes de continuar."
           : "Review the possible duplicate before continuing.",
       );
     }
@@ -3548,7 +3593,7 @@ function SubmitView({
       reportedDurationSeconds > 480 || contentKind === "long_form",
     );
     setSubmitted(true);
-    notify(locale === "es" ? "Cancion enviada. Ya entra a la cola de reviews." : "Song submitted. It is now entering the review queue.");
+    notify(locale === "es" ? "Canción enviada. Ya entra a la cola de reviews." : "Song submitted. It is now entering the review queue.");
   };
 
   const resetSubmissionForm = () => {
@@ -3647,7 +3692,7 @@ function SubmitView({
             </strong>
             <p>
               {locale === "es"
-                ? "Redirige fuera de First Listen. No ofrece verificacion de reproduccion interna ni recompensas por actividad externa."
+                ? "Redirige fuera de First Listen. No ofrece verificación de reproducción interna ni recompensas por actividad externa."
                 : "Redirects outside First Listen. No internal playback verification or rewards are provided for external activity."}
             </p>
             <small>Spotify / Apple Music / TikTok</small>
@@ -3741,7 +3786,7 @@ function SubmitView({
                 value={genre}
               >
                 <option disabled value="">
-                  {locale === "es" ? "Selecciona un genero" : "Select a genre"}
+                  {locale === "es" ? "Selecciona un género" : "Select a genre"}
                 </option>
                 {genreOptions.map((genre) => (
                   <option key={genre} value={genre}>{optionLabel(locale, genre)}</option>
@@ -3777,7 +3822,7 @@ function SubmitView({
                 value={country}
               >
                 <option disabled value="">
-                  {locale === "es" ? "Selecciona un pais" : "Select a country"}
+                  {locale === "es" ? "Selecciona un país" : "Select a country"}
                 </option>
                 <option>United States</option>
                 <option>Canada</option>
@@ -3861,7 +3906,7 @@ function SubmitView({
                     ? "Buscando portada y metadatos..."
                     : "Looking up cover art and metadata..."
                   : locale === "es"
-                    ? "Se completa automaticamente cuando el proveedor lo permite."
+                    ? "Se completa automáticamente cuando el proveedor lo permite."
                     : "Filled automatically when the provider exposes it."}
               </small>
             </div>
@@ -3934,7 +3979,7 @@ function SubmitView({
                     : "Checking your song library"}
                 </strong>
                 {locale === "es"
-                  ? "Estamos comparando el enlace y el titulo."
+                  ? "Estamos comparando el enlace y el título."
                   : "Comparing this link and title with your submissions."}
               </span>
             </div>
@@ -3946,7 +3991,7 @@ function SubmitView({
               <span>
                 <strong>
                   {locale === "es"
-                    ? "Cancion ya enviada"
+                    ? "Canción ya enviada"
                     : "Song already submitted"}
                 </strong>
                 {exactDuplicate.existing_title} /{" "}
@@ -4058,10 +4103,10 @@ function SubmitView({
       <aside className="submission-side">
         <ReviewProgress count={reviewCount} copy={copy} founderFree={founderFree} unlimited={unlimitedCredits} />
         <div className="expect-card">
-          <span className="eyebrow">{locale === "es" ? "Que sigue" : "What happens next"}</span>
+          <span className="eyebrow">{locale === "es" ? "Qué sigue" : "What happens next"}</span>
           {[
             ["01", locale === "es" ? "Tu enlace entra a la cola de escucha." : "Your link enters the listening queue."],
-            ["02", locale === "es" ? "Reviewers ven idioma, genero y foco de feedback." : "Reviewers see the song language, genre, and feedback focus."],
+            ["02", locale === "es" ? "Reviewers ven idioma, género y foco de feedback." : "Reviewers see the song language, genre, and feedback focus."],
             ["03", locale === "es" ? "Los resultados aparecen en tu dashboard privado." : "Results appear privately in your dashboard."],
           ].map(([number, text]) => (
             <div key={number}><span>{number}</span><p>{text}</p></div>
@@ -4219,43 +4264,68 @@ export function FirstListenApp({
     const supabase = createClient();
     if (!supabase) return;
 
-    const channel = supabase
-      .channel(`community-notifications:${account.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "community_notifications",
-          filter: `recipient_id=eq.${account.id}`,
-        },
-        async () => {
-          const { data: rows } = await supabase.rpc(
-            "get_my_community_notifications",
-            { notification_limit: 20 },
+    let active = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      if (data.session?.access_token) {
+        supabase.realtime.setAuth(data.session.access_token);
+      }
+
+      channel = supabase
+        .channel(`community-notifications:${account.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "community_notifications",
+            filter: `recipient_id=eq.${account.id}`,
+          },
+          async (payload) => {
+            console.info(
+              "[First Listen realtime] Community notification received",
+              payload.new.id,
+            );
+            const { data: rows, error } = await supabase.rpc(
+              "get_my_community_notifications",
+              { notification_limit: 20 },
+            );
+            const mapped = mapNotificationRows(
+              (rows ?? []) as Array<Record<string, unknown>>,
+            );
+            console.info(
+              "[First Listen realtime] Community notifications refreshed",
+              error?.message ?? "ok",
+              mapped.length,
+            );
+            setNotifications(mapped);
+            const newest = mapped[0];
+            if (newest) {
+              setLiveNotifications((current) => [
+                newest,
+                ...current.filter((item) => item.id !== newest.id),
+              ].slice(0, 3));
+              window.setTimeout(() => {
+                setLiveNotifications((current) =>
+                  current.filter((item) => item.id !== newest.id),
+                );
+              }, 6500);
+            }
+          },
+        )
+        .subscribe((status) => {
+          console.info(
+            "[First Listen realtime] Community notifications",
+            status,
           );
-          const mapped = mapNotificationRows(
-            (rows ?? []) as Array<Record<string, unknown>>,
-          );
-          setNotifications(mapped);
-          const newest = mapped[0];
-          if (newest) {
-            setLiveNotifications((current) => [
-              newest,
-              ...current.filter((item) => item.id !== newest.id),
-            ].slice(0, 3));
-            window.setTimeout(() => {
-              setLiveNotifications((current) =>
-                current.filter((item) => item.id !== newest.id),
-              );
-            }, 6500);
-          }
-        },
-      )
-      .subscribe();
+        });
+    });
 
     return () => {
-      void supabase.removeChannel(channel);
+      active = false;
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [account.id]);
 
@@ -4630,7 +4700,7 @@ export function FirstListenApp({
       notify(
         error?.message ??
           (locale === "es"
-            ? "No se pudo reclamar la mision."
+            ? "No se pudo reclamar la misión."
             : "Mission reward could not be claimed."),
       );
       return;
@@ -4651,7 +4721,7 @@ export function FirstListenApp({
     }));
     notify(
       locale === "es"
-        ? "Recompensa de mision agregada."
+        ? "Recompensa de misión agregada."
         : "Daily mission reward added.",
     );
   };
