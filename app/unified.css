@@ -239,7 +239,14 @@
   gap: 30px;
   margin: 34px auto 0;
   max-width: 1180px;
+  min-width: 0;
   width: calc(100% - 40px);
+}
+
+.guest-discovery-shelf {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .guest-discovery-heading {
@@ -261,6 +268,8 @@
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 100%;
+  min-width: 0;
 }
 
 .guest-discovery-grid article {
@@ -666,7 +675,7 @@
 
   .guest-discovery-grid {
     display: flex;
-    margin-right: -12px;
+    margin-right: 0;
     overflow-x: auto;
     padding-bottom: 8px;
     scroll-snap-type: x mandatory;

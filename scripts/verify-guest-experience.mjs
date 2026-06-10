@@ -919,7 +919,24 @@ try {
     `(() => ({
       guestPage: Boolean(document.querySelector(".guest-page")),
       overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
-      width: window.innerWidth
+      width: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      offenders: [...document.querySelectorAll("body *")]
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            tag: element.tagName.toLowerCase(),
+            className: String(element.className || "").slice(0, 120),
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+            width: Math.round(rect.width)
+          };
+        })
+        .filter((element) =>
+          element.width > 0 &&
+          (element.right > window.innerWidth + 1 || element.left < -1)
+        )
+        .slice(0, 12)
     }))()`,
     (value) => value.guestPage,
   );
