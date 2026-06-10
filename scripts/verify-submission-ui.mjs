@@ -347,7 +347,7 @@ try {
   );
   if (
     !adminSongState.search.includes("platform") ||
-    !["all songs", "active", "paused", "archived", "spotlight", "founder", "reported"]
+    !["all songs", "active", "paused", "archived", "removed", "merged", "duplicates", "spotlight", "founder", "reported"]
       .every((filter) =>
         adminSongState.filters.map((label) => label.toLowerCase()).includes(filter),
       ) ||
@@ -410,6 +410,7 @@ try {
     !playlistState.linkMessage.toLowerCase().includes("playlist") ||
     trackState.buttonDisabled !== false ||
     trackState.coverRequired !== false ||
+    !trackState.debug.includes("Duplicate check") ||
     trackState.validation
   ) {
     throw new Error("Submission UI state did not match the expected validation behavior.");
@@ -472,6 +473,31 @@ try {
     .limit(1)
     .single();
   if (submittedSong.error) throw submittedSong.error;
+
+  await navigate(`${baseUrl}/profile`);
+  const profileSongState = await waitFor(
+    `(() => {
+      const song = [...document.querySelectorAll(".song-table article")]
+        .find((item) => item.innerText.includes("Submission UI Check"));
+      return {
+        activity: song?.querySelector(".song-activity-summary")?.innerText ?? "",
+        deleteVisible: [...(song?.querySelectorAll("button") ?? [])]
+          .some((button) => button.innerText.includes("Delete Song")),
+        status: song?.innerText ?? ""
+      };
+    })()`,
+    (value) => value.deleteVisible,
+  );
+  if (
+    !profileSongState.deleteVisible ||
+    !profileSongState.activity.includes("0 reviews") ||
+    !profileSongState.status.toLowerCase().includes("in review queue")
+  ) {
+    throw new Error(
+      `Creator song management controls are incomplete: ${JSON.stringify(profileSongState)}`,
+    );
+  }
+
   const bankFixture = await service
     .from("profiles")
     .update({
@@ -562,6 +588,10 @@ try {
     Boolean,
   );
   if (!inlinePlayerVisible) throw new Error("Spotlight inline player did not open.");
+  await evaluate(
+    `document.querySelector(".discovery-song-card .discovery-inline-player")
+      ?.scrollIntoView({ behavior: "instant", block: "center" })`,
+  );
   const oneClickPlayback = await waitFor(
     `(() => {
       const player = document.querySelector(".discovery-inline-player");
@@ -768,6 +798,7 @@ try {
         cover_url_optional: true,
         admin_song_search: adminSongState,
         admin_user_search: adminState,
+        creator_song_management: profileSongState,
         direct_track_submit_enabled: true,
         playlist_error_visible: playlistState.linkMessage,
         playlist_submit_disabled: true,
