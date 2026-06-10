@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -321,6 +321,8 @@ export function AdminPanel({
   const [announcementDraft, setAnnouncementDraft] = useState<
     Omit<AdminAnnouncement, "id"> & { id?: string }
   >(emptyAnnouncement);
+  const [healthSnapshot, setHealthSnapshot] =
+    useState<CommunityHealth | null>(communityHealth);
   const externalSettings = contentEconomy.filter(
     (setting) => setting.classification === "external",
   );
@@ -359,6 +361,23 @@ export function AdminPanel({
   );
   const isSuper = role === "super_admin";
   const supabase = createClient();
+
+  useEffect(() => {
+    if (section !== "health") return;
+    let active = true;
+    const refreshHealth = async () => {
+      const client = createClient();
+      if (!client) return;
+      const { data, error } = await client.rpc("admin_get_community_health");
+      if (active && !error) setHealthSnapshot(data as CommunityHealth);
+    };
+    void refreshHealth();
+    const interval = window.setInterval(() => void refreshHealth(), 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [section]);
   const filteredUsers = useMemo(() => {
     const query = userSearch.trim().toLowerCase();
     return users.filter((user) => {
@@ -1517,21 +1536,27 @@ export function AdminPanel({
                     and members.
                   </span>
                 </div>
+                <span className="admin-health-updated">
+                  Auto-refreshes every 30 seconds
+                  {healthSnapshot?.generated_at
+                    ? ` / ${new Date(healthSnapshot.generated_at).toLocaleTimeString()}`
+                    : ""}
+                </span>
               </div>
               <div className="admin-health-grid">
                 {[
-                  ["Active guests", communityHealth?.active_guests ?? 0],
-                  ["Active members", communityHealth?.active_members ?? 0],
-                  ["Valid listens today", communityHealth?.valid_listens_today ?? 0],
-                  ["Listening hours today", communityHealth?.listening_hours_today ?? 0],
-                  ["Comments today", communityHealth?.comments_today ?? 0],
-                  ["Likes today", communityHealth?.likes_today ?? 0],
-                  ["Followers today", communityHealth?.followers_today ?? 0],
-                  ["Shares today", communityHealth?.shares_today ?? 0],
-                  ["Songs submitted", communityHealth?.songs_submitted_today ?? 0],
-                  ["Songs archived", communityHealth?.songs_archived_today ?? 0],
-                  ["New guest profiles", communityHealth?.new_guest_profiles_today ?? 0],
-                  ["New accounts", communityHealth?.new_accounts_today ?? 0],
+                  ["Active guests", healthSnapshot?.active_guests ?? 0],
+                  ["Active members", healthSnapshot?.active_members ?? 0],
+                  ["Valid listens today", healthSnapshot?.valid_listens_today ?? 0],
+                  ["Listening hours today", healthSnapshot?.listening_hours_today ?? 0],
+                  ["Comments today", healthSnapshot?.comments_today ?? 0],
+                  ["Likes today", healthSnapshot?.likes_today ?? 0],
+                  ["Followers today", healthSnapshot?.followers_today ?? 0],
+                  ["Shares today", healthSnapshot?.shares_today ?? 0],
+                  ["Songs submitted", healthSnapshot?.songs_submitted_today ?? 0],
+                  ["Songs archived", healthSnapshot?.songs_archived_today ?? 0],
+                  ["New guest profiles", healthSnapshot?.new_guest_profiles_today ?? 0],
+                  ["New accounts", healthSnapshot?.new_accounts_today ?? 0],
                 ].map(([label, value]) => (
                   <article key={label}>
                     <strong>{value}</strong>
@@ -1543,12 +1568,12 @@ export function AdminPanel({
                 <div>
                   <span className="eyebrow">Guest conversion</span>
                   <strong>
-                    {communityHealth?.guest_to_member_conversion_rate ?? 0}%
+                    {healthSnapshot?.guest_to_member_conversion_rate ?? 0}%
                   </strong>
                 </div>
                 <p>
-                  {communityHealth?.converted_guest_profiles ?? 0} of{" "}
-                  {communityHealth?.total_guest_profiles ?? 0} guest identities
+                  {healthSnapshot?.converted_guest_profiles ?? 0} of{" "}
+                  {healthSnapshot?.total_guest_profiles ?? 0} guest identities
                   have converted to member accounts.
                 </p>
               </section>

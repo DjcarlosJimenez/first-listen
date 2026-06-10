@@ -580,6 +580,11 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.admin-health-updated {
+  color: var(--muted);
+  font-size: 9px;
+}
+
 .admin-health-grid article {
   background: var(--surface-strong);
   border: 1px solid var(--line);
