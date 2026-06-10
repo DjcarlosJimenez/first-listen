@@ -15,6 +15,7 @@ type PublicArtistRow = {
   artist_id: string;
   artist_name: string;
   followers: number;
+  following: number;
   songs_submitted: number;
   genres: string[];
   languages: string[];
@@ -78,6 +79,7 @@ export default async function ArtistPage({
         id: artist.artist_id,
         name: artist.artist_name,
         followers: Number(artist.followers ?? 0),
+        following: Number(artist.following ?? 0),
         songsSubmitted: Number(artist.songs_submitted ?? 0),
         genres: artist.genres ?? [],
         languages: artist.languages ?? [],

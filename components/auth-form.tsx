@@ -66,6 +66,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               full_name: name,
               legal_accepted: true,
               explicit_content_acknowledged: true,
+              guest_access_token:
+                window.localStorage.getItem("first-listen-guest-token"),
             },
             emailRedirectTo: `${window.location.origin}/auth/callback`,
           },

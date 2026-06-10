@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Image from "next/image";
 import {
   AlertTriangle,
@@ -44,6 +51,7 @@ type YouTubePlayer = {
   getPlayerState: () => number;
   getVolume: () => number;
   isMuted: () => boolean;
+  pauseVideo: () => void;
   playVideo: () => void;
 };
 
@@ -68,6 +76,7 @@ type YouTubeApi = {
 type SoundCloudWidget = {
   bind: (event: string, listener: () => void) => void;
   unbind: (event: string) => void;
+  pause: () => void;
   play: () => void;
   getDuration: (callback: (duration: number) => void) => void;
   getPosition: (callback: (position: number) => void) => void;
@@ -102,6 +111,7 @@ type SpotifyController = {
     listener: (event: SpotifyPlaybackEvent) => void,
   ) => void;
   destroy: () => void;
+  pause: () => void;
   play: () => void;
 };
 
@@ -126,6 +136,7 @@ const YOUTUBE_API_SRC = "https://www.youtube.com/iframe_api";
 const SOUNDCLOUD_API_SRC = "https://w.soundcloud.com/player/api.js";
 const SPOTIFY_API_SRC = "https://open.spotify.com/embed/iframe-api/v1";
 const MAX_INITIALIZATION_ATTEMPTS = 3;
+const ACTIVE_PLAYBACK_EVENT = "first-listen:active-playback";
 let youtubeApiPromise: Promise<YouTubeApi> | null = null;
 let soundCloudApiPromise: Promise<SoundCloudApi> | null = null;
 let spotifyApiPromise: Promise<SpotifyIframeApi> | null = null;
@@ -326,6 +337,7 @@ export function ProviderPlayer({
   skipExternalRedirectWarning?: boolean;
   onExternalRedirectPreferenceChange?: (disabled: boolean) => void;
 }) {
+  const playbackInstanceId = useId();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const spotifyContainerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YouTubePlayer | null>(null);
@@ -405,6 +417,11 @@ export function ProviderPlayer({
         previousPlaybackStateRef.current !== "playing"
       ) {
         lastInteractionAtRef.current = Date.now();
+        window.dispatchEvent(
+          new CustomEvent(ACTIVE_PLAYBACK_EVENT, {
+            detail: { playerId: playbackInstanceId },
+          }),
+        );
       }
       previousPlaybackStateRef.current = nextState;
       onTelemetryRef.current?.({
@@ -419,7 +436,7 @@ export function ProviderPlayer({
         lastInteractionAt: lastInteractionAtRef.current,
       });
     },
-    [],
+    [playbackInstanceId],
   );
 
   useEffect(() => {
@@ -485,6 +502,34 @@ export function ProviderPlayer({
       console.info("[First Listen player] Playback request was deferred", error);
     }
   }, []);
+
+  useEffect(() => {
+    const pauseForAnotherPlayer = (event: Event) => {
+      const playerId = (event as CustomEvent<{ playerId?: string }>).detail
+        ?.playerId;
+      if (!playerId || playerId === playbackInstanceId) return;
+      try {
+        youtubePlayerRef.current?.pauseVideo();
+        spotifyControllerRef.current?.pause();
+        soundCloudWidgetRef.current?.pause();
+        setPlaybackState((current) =>
+          current === "playing" ? "paused" : current,
+        );
+      } catch (error) {
+        console.info(
+          "[First Listen player] Another player became active",
+          error,
+        );
+      }
+    };
+
+    window.addEventListener(ACTIVE_PLAYBACK_EVENT, pauseForAnotherPlayer);
+    return () =>
+      window.removeEventListener(
+        ACTIVE_PLAYBACK_EVENT,
+        pauseForAnotherPlayer,
+      );
+  }, [playbackInstanceId]);
 
   useEffect(() => {
     if (!clientOrigin) return;

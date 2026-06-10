@@ -3,9 +3,9 @@
 import {
   ArrowRight,
   CheckCircle2,
-  Clock3,
+  Copy,
   Headphones,
-  LockKeyhole,
+  KeyRound,
   Music2,
   Pause,
   Play,
@@ -16,13 +16,21 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { LanguageSelector } from "@/components/language-selector";
 import { Logo } from "@/components/logo";
 import {
   ProviderPlayer,
   type ProviderTelemetrySnapshot,
 } from "@/components/provider-player";
+import { SongActionBar } from "@/components/song-action-bar";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { displayPlatform } from "@/lib/content-economy";
 import { safeCoverUrl } from "@/lib/media";
@@ -31,7 +39,10 @@ import type { Song } from "@/lib/types";
 
 type GuestSession = {
   token: string;
-  expiresAt: string;
+  listenerId: string;
+  recoveryCode: string;
+  nickname: string;
+  locale: InterfaceLocale;
   validListens: number;
 };
 
@@ -62,13 +73,6 @@ function formatClock(seconds: number) {
   ).padStart(2, "0")}`;
 }
 
-function formatRemaining(milliseconds: number) {
-  const totalMinutes = Math.max(0, Math.ceil(milliseconds / 60000));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${hours}h ${minutes}m`;
-}
-
 function mapGuestSongs(rows: Array<Record<string, unknown>>): Song[] {
   return rows.map((row) => ({
     id: String(row.song_id),
@@ -88,9 +92,39 @@ function mapGuestSongs(rows: Array<Record<string, unknown>>): Song[] {
   }));
 }
 
+function mapGuestIdentity(
+  row: Record<string, unknown>,
+  token?: string,
+): GuestSession {
+  return {
+    token: token ?? String(row.guest_access_token),
+    listenerId: String(row.guest_listener_id),
+    recoveryCode: String(row.recovery_code),
+    nickname: String(row.nickname),
+    locale: row.interface_language === "es" ? "es" : "en",
+    validListens: Number(row.valid_listens ?? 0),
+  };
+}
+
+function persistGuest(guest: GuestSession) {
+  window.localStorage.setItem("first-listen-guest-token", guest.token);
+  window.localStorage.setItem(
+    "first-listen-guest-recovery-code",
+    guest.recoveryCode,
+  );
+  window.localStorage.setItem("first-listen-locale", guest.locale);
+  document.cookie = `first-listen-guest-token=${guest.token}; Max-Age=31536000; Path=/; SameSite=Lax; Secure`;
+}
+
 export function GuestExperience() {
   const [locale, setLocale] = useState<InterfaceLocale>("en");
   const [guest, setGuest] = useState<GuestSession | null>(null);
+  const [nickname, setNickname] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoverMode, setRecoverMode] = useState(false);
+  const [identityBusy, setIdentityBusy] = useState(false);
+  const [identityMessage, setIdentityMessage] = useState("");
+  const [showCredentials, setShowCredentials] = useState(false);
   const [songs, setSongs] = useState<Song[]>([]);
   const [songIndex, setSongIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -98,7 +132,6 @@ export function GuestExperience() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [fatalError, setFatalError] = useState("");
-  const [now, setNow] = useState(Date.now());
   const [listening, setListening] =
     useState<GuestListeningState>(emptyListeningState);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -116,10 +149,6 @@ export function GuestExperience() {
     [currentSong],
   );
   const spanish = locale === "es";
-  const expiresIn = guest
-    ? new Date(guest.expiresAt).getTime() - now
-    : 24 * 60 * 60 * 1000;
-  const expired = expiresIn <= 0;
 
   const loadQueue = useCallback(async (token: string) => {
     const supabase = createClient();
@@ -134,63 +163,113 @@ export function GuestExperience() {
   }, []);
 
   useEffect(() => {
-    const storedLocale = window.localStorage.getItem("first-listen-locale");
-    if (storedLocale === "en" || storedLocale === "es") {
-      setLocale(storedLocale);
-      document.documentElement.lang = storedLocale;
-    }
-
     let active = true;
     const initialize = async () => {
+      const browserLocale: InterfaceLocale =
+        navigator.language.toLowerCase().startsWith("es") ? "es" : "en";
+      const storedLocale = window.localStorage.getItem("first-listen-locale");
+      const preferredLocale =
+        storedLocale === "en" || storedLocale === "es"
+          ? storedLocale
+          : browserLocale;
+      setLocale(preferredLocale);
+      document.documentElement.lang = preferredLocale;
+
+      const token = window.localStorage.getItem("first-listen-guest-token");
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       const supabase = createClient();
       if (!supabase) {
         setFatalError("First Listen is not configured.");
         setLoading(false);
         return;
       }
-      const storedToken = window.localStorage.getItem(
-        "first-listen-guest-token",
-      );
-      let result = await supabase.rpc("start_guest_session", {
-        existing_access_token: storedToken || null,
+      const { data, error } = await supabase.rpc("get_guest_identity", {
+        guest_access_token: token,
       });
-      if (result.error && storedToken) {
-        window.localStorage.removeItem("first-listen-guest-token");
-        result = await supabase.rpc("start_guest_session", {
-          existing_access_token: null,
-        });
-      }
-      const row = Array.isArray(result.data) ? result.data[0] : result.data;
+      const row = Array.isArray(data) ? data[0] : data;
       if (!active) return;
-      if (result.error || !row?.guest_access_token) {
-        setFatalError(result.error?.message ?? "Guest access is unavailable.");
+      if (error || !row) {
+        window.localStorage.removeItem("first-listen-guest-token");
         setLoading(false);
         return;
       }
-      const nextGuest = {
-        token: String(row.guest_access_token),
-        expiresAt: String(row.expires_at),
-        validListens: Number(row.valid_listens ?? 0),
-      };
-      window.localStorage.setItem("first-listen-guest-token", nextGuest.token);
-      setGuest(nextGuest);
+
+      const returningGuest = mapGuestIdentity(
+        row as Record<string, unknown>,
+        token,
+      );
+      persistGuest(returningGuest);
+      setGuest(returningGuest);
+      setLocale(returningGuest.locale);
+      document.documentElement.lang = returningGuest.locale;
       try {
-        await loadQueue(nextGuest.token);
-      } catch (error) {
+        await loadQueue(token);
+      } catch (queueError) {
         setFatalError(
-          error instanceof Error ? error.message : "Music could not be loaded.",
+          queueError instanceof Error
+            ? queueError.message
+            : "Music could not be loaded.",
         );
       } finally {
         setLoading(false);
       }
     };
     void initialize();
-    const clock = window.setInterval(() => setNow(Date.now()), 30000);
     return () => {
       active = false;
-      window.clearInterval(clock);
     };
   }, [loadQueue]);
+
+  const completeIdentity = async (
+    event: FormEvent<HTMLFormElement>,
+    mode: "create" | "recover",
+  ) => {
+    event.preventDefault();
+    const supabase = createClient();
+    if (!supabase) return;
+    setIdentityMessage("");
+    setIdentityBusy(true);
+    const result =
+      mode === "create"
+        ? await supabase.rpc("create_guest_identity", {
+            guest_nickname: nickname.trim(),
+            guest_language: locale,
+          })
+        : await supabase.rpc("recover_guest_identity", {
+            submitted_recovery_code: recoveryCode.trim(),
+          });
+    setIdentityBusy(false);
+    const row = Array.isArray(result.data) ? result.data[0] : result.data;
+    if (result.error || !row) {
+      setIdentityMessage(
+        result.error?.message ??
+          (spanish
+            ? "No encontramos ese perfil de invitado."
+            : "We could not find that guest profile."),
+      );
+      return;
+    }
+
+    const nextGuest = mapGuestIdentity(row as Record<string, unknown>);
+    persistGuest(nextGuest);
+    setGuest(nextGuest);
+    setLocale(nextGuest.locale);
+    document.documentElement.lang = nextGuest.locale;
+    setShowCredentials(mode === "create");
+    try {
+      await loadQueue(nextGuest.token);
+    } catch (queueError) {
+      setFatalError(
+        queueError instanceof Error
+          ? queueError.message
+          : "Music could not be loaded.",
+      );
+    }
+  };
 
   useEffect(() => {
     listeningSessionRef.current = null;
@@ -200,10 +279,10 @@ export function GuestExperience() {
     autoAdvanceStartedRef.current = false;
     setCountdown(null);
     setListening(emptyListeningState);
-  }, [currentSong?.id]);
+  }, [currentSong]);
 
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || !currentSong) return;
     const frame = window.requestAnimationFrame(() => {
       playerRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -211,10 +290,10 @@ export function GuestExperience() {
       });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [currentSong?.id, playing]);
+  }, [currentSong, playing]);
 
   const startCurrentSong = useCallback(async () => {
-    if (!guest || !currentSong || expired) return;
+    if (!guest || !currentSong) return;
     setPlaying(true);
     const supabase = createClient();
     if (!supabase) return;
@@ -239,7 +318,12 @@ export function GuestExperience() {
       sessionId: String(row.listening_session_id),
       validRequirementSeconds: Number(row.valid_requirement_seconds ?? 30),
     }));
-  }, [currentSong, expired, guest]);
+
+    await supabase.rpc("record_song_view", {
+      target_song_id: currentSong.id,
+      guest_access_token: guest.token,
+    });
+  }, [currentSong, guest]);
 
   const finishCurrentSession = useCallback(async () => {
     if (!guest || !listeningSessionRef.current) return;
@@ -410,29 +494,127 @@ export function GuestExperience() {
     setLocale(nextLocale);
     window.localStorage.setItem("first-listen-locale", nextLocale);
     document.documentElement.lang = nextLocale;
+    setGuest((current) =>
+      current ? { ...current, locale: nextLocale } : current,
+    );
+    if (guest) {
+      const supabase = createClient();
+      if (supabase) {
+        void supabase.rpc("update_guest_language", {
+          guest_access_token: guest.token,
+          guest_language: nextLocale,
+        });
+      }
+    }
   };
-
-  const reminder = useMemo(() => {
-    if (expiresIn <= 60 * 60 * 1000) {
-      return spanish
-        ? "Tu acceso de invitado termina en menos de una hora. Crea una cuenta para seguir explorando."
-        : "Guest access expires in under one hour. Create an account to keep exploring.";
-    }
-    if ((guest?.validListens ?? 0) >= 2) {
-      return spanish
-        ? "Ya ayudaste a varios artistas. Unete para empezar a construir tu propia audiencia."
-        : "You have already helped several artists. Join to start building your own audience.";
-    }
-    return spanish
-      ? "Estás explorando como invitado. Escucha música real y descubre cómo funciona la comunidad."
-      : "You are exploring as a guest. Listen to real music and see how the community works.";
-  }, [expiresIn, guest?.validListens, spanish]);
 
   if (loading) {
     return (
       <main className="guest-page guest-loading">
         <Logo />
-        <span><Headphones size={22} /> Preparing your guest session...</span>
+        <span><Headphones size={22} /> Preparing your guest profile...</span>
+      </main>
+    );
+  }
+
+  if (!guest) {
+    return (
+      <main className="guest-page guest-identity-page">
+        <header className="guest-header">
+          <Link href="/"><Logo /></Link>
+          <LanguageSelector compact locale={locale} onChange={changeLocale} />
+        </header>
+        <section className="guest-identity-card">
+          <span className="eyebrow">
+            <Headphones size={14} />
+            {spanish ? "Visita para escuchar" : "Guest Listener"}
+          </span>
+          <h1>
+            {spanish
+              ? "Elige un nombre para participar en la comunidad."
+              : "Choose a nickname to join the community."}
+          </h1>
+          <p>
+            {spanish
+              ? "Tu nombre será visible cuando des like, comentes, sigas artistas o guardes canciones."
+              : "Your nickname appears when you like, comment, follow artists, or save songs."}
+          </p>
+
+          {!recoverMode ? (
+            <form onSubmit={(event) => void completeIdentity(event, "create")}>
+              <label htmlFor="guest-nickname">
+                {spanish ? "Nickname" : "Nickname"}
+              </label>
+              <input
+                autoComplete="nickname"
+                id="guest-nickname"
+                maxLength={30}
+                minLength={2}
+                onChange={(event) => setNickname(event.target.value)}
+                placeholder={spanish ? "Tu nombre en la comunidad" : "Your community name"}
+                required
+                value={nickname}
+              />
+              <button disabled={identityBusy || nickname.trim().length < 2} type="submit">
+                {identityBusy
+                  ? spanish
+                    ? "Preparando..."
+                    : "Preparing..."
+                  : spanish
+                    ? "Continuar"
+                    : "Continue"}{" "}
+                <ArrowRight size={15} />
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={(event) => void completeIdentity(event, "recover")}>
+              <label htmlFor="guest-recovery-code">
+                {spanish ? "Código de recuperación" : "Recovery Code"}
+              </label>
+              <input
+                id="guest-recovery-code"
+                onChange={(event) => setRecoveryCode(event.target.value)}
+                placeholder="MUSIC-RIVER-4821"
+                required
+                value={recoveryCode}
+              />
+              <button disabled={identityBusy || !recoveryCode.trim()} type="submit">
+                {identityBusy
+                  ? spanish
+                    ? "Recuperando..."
+                    : "Recovering..."
+                  : spanish
+                    ? "Recuperar perfil"
+                    : "Recover Profile"}{" "}
+                <KeyRound size={15} />
+              </button>
+            </form>
+          )}
+
+          <button
+            className="guest-recovery-toggle"
+            onClick={() => {
+              setRecoverMode((current) => !current);
+              setIdentityMessage("");
+            }}
+            type="button"
+          >
+            {recoverMode
+              ? spanish
+                ? "Crear un perfil nuevo"
+                : "Create a new profile"
+              : spanish
+                ? "¿Ya tienes un perfil de invitado? Recuperar perfil"
+                : "Already have a guest profile? Recover Profile"}
+          </button>
+          {identityMessage && <p className="guest-identity-error" role="alert">{identityMessage}</p>}
+          <small>
+            <ShieldCheck size={13} />
+            {spanish
+              ? "Sin email, contraseña ni fecha de vencimiento."
+              : "No email, password, or expiration date."}
+          </small>
+        </section>
       </main>
     );
   }
@@ -443,47 +625,79 @@ export function GuestExperience() {
         <Link href="/"><Logo /></Link>
         <div>
           <LanguageSelector compact locale={locale} onChange={changeLocale} />
-          <span className="guest-time-pill">
-            <Clock3 size={14} />
-            {expired ? "Expired" : formatRemaining(expiresIn)}
+          <span className="guest-listener-pill">
+            <Headphones size={14} />
+            <strong>{guest.nickname}</strong>
+            <small>{guest.listenerId}</small>
           </span>
           <Link className="guest-login-link" href="/login">
             {spanish ? "Iniciar sesión" : "Log In"}
           </Link>
           <Link className="guest-join-link" href="/signup">
-            {spanish ? "Crear cuenta gratis" : "Create Free Account"}
+            {spanish ? "Convertir en cuenta gratis" : "Convert to Free Account"}
           </Link>
         </div>
       </header>
 
+      {showCredentials && (
+        <section className="guest-credentials" role="status">
+          <div>
+            <span className="eyebrow">
+              <KeyRound size={13} />
+              {spanish ? "Guarda tu código de recuperación" : "Save your recovery code"}
+            </span>
+            <strong>{guest.recoveryCode}</strong>
+            <p>
+              {spanish
+                ? "Úsalo para recuperar tus likes, comentarios, artistas seguidos, canciones guardadas e historial en otro dispositivo."
+                : "Use it to recover your likes, comments, follows, saved songs, and history on another device."}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              void navigator.clipboard.writeText(guest.recoveryCode);
+              setIdentityMessage(spanish ? "Código copiado." : "Code copied.");
+            }}
+            type="button"
+          >
+            <Copy size={14} /> {spanish ? "Copiar" : "Copy"}
+          </button>
+          <button onClick={() => setShowCredentials(false)} type="button">
+            {spanish ? "Listo" : "Done"}
+          </button>
+        </section>
+      )}
+
       <section className="guest-welcome">
-        <span className="eyebrow"><Sparkles size={13} /> Guest Experience</span>
+        <span className="eyebrow"><Sparkles size={13} /> {spanish ? "Oyente invitado" : "Guest Listener"}</span>
         <h1>
           {spanish
-            ? "Descubre artistas reales antes de unirte."
-            : "Discover real artists before you join."}
+            ? `Bienvenido, ${guest.nickname}.`
+            : `Welcome, ${guest.nickname}.`}
         </h1>
-        <p>{reminder}</p>
+        <p>
+          {spanish
+            ? "Escucha música, descubre artistas y participa en la comunidad. Tu acceso siempre es gratis y nunca vence."
+            : "Listen to music, discover artists, and join the community. Guest access is always free and never expires."}
+        </p>
         <div>
-          <span><CheckCircle2 size={14} /> {guest?.validListens ?? 0} {spanish ? "artistas apoyados" : "artists supported"}</span>
+          <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "escuchas válidas" : "valid listens"}</span>
           <span><ShieldCheck size={14} /> {spanish ? "Sin recompensas ni ranking" : "No rewards or ranking"}</span>
-          <span><Clock3 size={14} /> {spanish ? "Acceso por 24 horas" : "24-hour access"}</span>
+          <span><Headphones size={14} /> {spanish ? "Acceso permanente" : "Permanent guest access"}</span>
         </div>
       </section>
 
       {fatalError && (
         <section className="guest-message" role="alert">
-          <LockKeyhole size={20} />
+          <ShieldCheck size={20} />
           <div>
             <strong>{fatalError}</strong>
-            <Link href="/signup">
-              {spanish ? "Crear una cuenta" : "Create an account"} <ArrowRight size={14} />
-            </Link>
+            <Link href="/">{spanish ? "Volver al inicio" : "Return home"} <ArrowRight size={14} /></Link>
           </div>
         </section>
       )}
 
-      {!fatalError && !expired && currentSong && (
+      {!fatalError && currentSong && (
         <section className="guest-listening-layout">
           <div className="guest-player-column">
             <div className="guest-now-playing">
@@ -532,11 +746,11 @@ export function GuestExperience() {
 
             <div className="guest-listening-progress">
               <div>
-                <span><Headphones size={14} /> {spanish ? "Tiempo en vivo" : "Listening Time (Live)"}</span>
+                <span><Headphones size={14} /> {spanish ? "Tiempo escuchado" : "Listening Time"}</span>
                 <strong>{formatClock(listening.liveSeconds)}</strong>
               </div>
               <div>
-                <span><CheckCircle2 size={14} /> {spanish ? "Escucha valida" : "Valid Listen"}</span>
+                <span><CheckCircle2 size={14} /> {spanish ? "Escucha válida" : "Valid Listen"}</span>
                 <strong>
                   {listening.validListenRecorded
                     ? spanish ? "Completada" : "Completed"
@@ -557,6 +771,17 @@ export function GuestExperience() {
               </div>
               {listening.warning && <small>{listening.warning}</small>}
             </div>
+
+            <SongActionBar
+              artist={currentSong.artist}
+              artistId={currentSong.artistId}
+              guestToken={guest.token}
+              link={currentSong.link}
+              locale={locale}
+              platform={currentSong.platform}
+              songId={currentSong.id}
+              title={currentSong.title}
+            />
 
             <div className="guest-player-controls">
               <button onClick={() => void nextSong()} type="button">
@@ -581,11 +806,11 @@ export function GuestExperience() {
           <aside className="guest-side">
             <section>
               <span className="eyebrow"><Users size={13} /> {spanish ? "Comunidad real" : "Real community"}</span>
-              <h2>{spanish ? "Apoya sin crear una cuenta" : "Support before signing up"}</h2>
+              <h2>{spanish ? "Participa sin crear una cuenta" : "Participate without signing up"}</h2>
               <p>
                 {spanish
-                  ? "Una escucha válida avisa al artista como Anonymous Listener. No recibes tokens ni ventajas de ranking."
-                  : "A valid listen notifies the artist as Anonymous Listener. You receive no tokens or ranking advantage."}
+                  ? "Tu nickname aparece cuando apoyas artistas. Las escuchas válidas siguen protegidas: máximo una por canción cada 24 horas."
+                  : "Your nickname appears when you support artists. Valid listens remain protected: one per song every 24 hours."}
               </p>
             </section>
             <section>
@@ -607,44 +832,28 @@ export function GuestExperience() {
             </section>
             <section className="guest-conversion-card">
               <UserPlus size={22} />
-              <h2>{spanish ? "Listo para unirte?" : "Ready to join?"}</h2>
+              <h2>{spanish ? "¿También creas música?" : "Do you create music too?"}</h2>
               <p>
                 {spanish
-                  ? "Los Artistas Fundadores reciben tres envios de canciones gratis, ademas de sus beneficios actuales."
-                  : "Founding Artists receive three free song submissions, plus their current founder benefits."}
+                  ? "Convierte este perfil en una cuenta gratuita. Conservaremos tu actividad, likes, comentarios, artistas seguidos y canciones guardadas."
+                  : "Convert this profile into a free account. We will preserve your activity, likes, comments, follows, and saved songs."}
               </p>
               <Link href="/signup">
-                {spanish ? "Crear cuenta gratis" : "Create Free Account"} <ArrowRight size={14} />
+                {spanish ? "Convertir en cuenta gratis" : "Convert to Free Account"} <ArrowRight size={14} />
               </Link>
             </section>
           </aside>
         </section>
       )}
 
-      {!fatalError && !expired && songs.length === 0 && (
+      {!fatalError && songs.length === 0 && (
         <section className="guest-message">
           <CheckCircle2 size={22} />
           <div>
             <strong>{spanish ? "Estás al día" : "You are all caught up"}</strong>
             <p>{spanish ? "Explora perfiles mientras llegan nuevas canciones." : "Explore artist profiles while new songs arrive."}</p>
-            <Link href="/signup">{spanish ? "Unirme a la comunidad" : "Join the community"}</Link>
+            <Link href="/">{spanish ? "Explorar First Listen" : "Explore First Listen"}</Link>
           </div>
-        </section>
-      )}
-
-      {expired && (
-        <section className="guest-expired">
-          <Clock3 size={30} />
-          <span className="eyebrow">24-hour guest access</span>
-          <h1>{spanish ? "Tu experiencia de invitado termino." : "Your guest experience has ended."}</h1>
-          <p>
-            {spanish
-              ? "Crea una cuenta gratuita para seguir descubriendo artistas y desbloquear herramientas para creadores."
-              : "Create a free account to keep discovering artists and unlock creator tools."}
-          </p>
-          <Link href="/signup">
-            {spanish ? "Crear cuenta gratis" : "Create Free Account"} <ArrowRight size={15} />
-          </Link>
         </section>
       )}
     </main>

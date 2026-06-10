@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FirstListenApp, type View } from "@/components/first-listen-app";
 import { Onboarding, type OnboardingPreferences } from "@/components/onboarding";
 import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
@@ -65,6 +65,26 @@ export function ProtectedAppEntry({
   const [onboarded, setOnboarded] = useState(profile.onboardingCompleted);
   const [languages, setLanguages] = useState(profile.languages);
   const [genres, setGenres] = useState(profile.genres);
+
+  useEffect(() => {
+    const guestToken = window.localStorage.getItem(
+      "first-listen-guest-token",
+    );
+    if (!guestToken) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    void supabase
+      .rpc("convert_guest_to_account", {
+        guest_access_token: guestToken,
+      })
+      .then(({ error }) => {
+        if (error) return;
+        window.localStorage.removeItem("first-listen-guest-token");
+        window.localStorage.removeItem("first-listen-guest-recovery-code");
+        document.cookie =
+          "first-listen-guest-token=; Max-Age=0; Path=/; SameSite=Lax; Secure";
+      });
+  }, []);
 
   const changeLocale = (nextLocale: InterfaceLocale) => {
     setLocale(nextLocale);

@@ -66,7 +66,7 @@ const [
   supabase
     .from("listening_sessions")
     .select(
-      "id, user_id, song_id, reward_eligible, engaged_seconds, valid_listen_at, complete_listen_at",
+      "id, user_id, song_id, reward_eligible, engaged_seconds, valid_listen_at, complete_listen_at, started_at",
     ),
   supabase
     .from("creator_activity_reminders")
@@ -89,11 +89,26 @@ for (const result of [
 
 const profiles = profilesResult.data ?? [];
 const sessions = sessionsResult.data ?? [];
-const rewardLedgerKeys = sessions
-  .filter((session) => session.reward_eligible)
-  .map((session) => `${session.user_id}:${session.song_id}`);
-const duplicateRewardLedgers =
-  rewardLedgerKeys.length - new Set(rewardLedgerKeys).size;
+const validListenGroups = new Map();
+for (const session of sessions.filter((item) => item.valid_listen_at)) {
+  const key = `${session.user_id}:${session.song_id}`;
+  const entries = validListenGroups.get(key) ?? [];
+  entries.push(new Date(session.valid_listen_at).getTime());
+  validListenGroups.set(key, entries);
+}
+const validListenWindowViolations = [...validListenGroups.values()].reduce(
+  (total, entries) => {
+    const sorted = entries.sort((left, right) => left - right);
+    return (
+      total +
+      sorted.slice(1).filter(
+        (timestamp, index) =>
+          timestamp - sorted[index] < 24 * 60 * 60 * 1000,
+      ).length
+    );
+  },
+  0,
+);
 const invalidActivityStatuses = profiles.filter(
   (profile) =>
     !["active", "paused", "archived"].includes(
@@ -147,11 +162,11 @@ const checks = [
     details: profiles.filter((profile) => !profile.last_contribution_at).length,
   },
   {
-    name: "One reward ledger exists per listener and song",
-    passed: duplicateRewardLedgers === 0,
+    name: "Valid listens respect the 24-hour listener/song limit",
+    passed: validListenWindowViolations === 0,
     details: {
-      eligibleLedgers: rewardLedgerKeys.length,
-      duplicateRewardLedgers,
+      validListenGroups: validListenGroups.size,
+      validListenWindowViolations,
     },
   },
   {

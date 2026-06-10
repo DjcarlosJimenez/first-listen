@@ -68,6 +68,7 @@ import {
   ProviderPlayer,
   type ProviderTelemetrySnapshot,
 } from "@/components/provider-player";
+import { SongActionBar } from "@/components/song-action-bar";
 import {
   feedbackFocusOptions,
   genreOptions,
@@ -1795,6 +1796,16 @@ function ReviewView({
               )}
             </div>
             )}
+            <SongActionBar
+              artist={song.artist}
+              artistId={song.artistId}
+              compact
+              link={song.link}
+              locale={locale}
+              platform={song.platform}
+              songId={song.id}
+              title={song.title}
+            />
             <div className="continuous-listening-controls">
               <button
                 onClick={() => void advanceToNextSong(autoPlayNextSong)}
@@ -2465,7 +2476,16 @@ function DiscoverySongCard({
         });
       }
     }
-    if (!active) setDetails(null);
+    if (!active) {
+      setDetails(null);
+      const supabase = createClient();
+      if (supabase) {
+        void supabase.rpc("record_song_view", {
+          target_song_id: song.id,
+          guest_access_token: null,
+        });
+      }
+    }
     onPlay();
   };
 
@@ -2578,6 +2598,16 @@ function DiscoverySongCard({
           </div>
         </div>
       )}
+      <SongActionBar
+        artist={song.artist}
+        artistId={song.artistId}
+        compact
+        link={song.link}
+        locale={locale}
+        platform={song.platform}
+        songId={song.id}
+        title={song.title}
+      />
       {details && (
         <div className="discovery-song-details" role="status">
           {details === "reviews" ? (
@@ -2641,6 +2671,10 @@ function DiscoverySections({
 }) {
   const [activeSongId, setActiveSongId] = useState<string | null>(null);
   const spanish = locale === "es";
+  const spotlightIds = new Set(spotlightSongs.map((song) => song.id));
+  const visibleTopTenSongs = topTenSongs.filter(
+    (song) => !spotlightIds.has(song.id),
+  );
 
   return (
     <div className="dashboard-discovery">
@@ -2710,9 +2744,9 @@ function DiscoverySections({
               : "No sponsorship or editorial control"}
           </small>
         </div>
-        {topTenSongs.length ? (
+        {visibleTopTenSongs.length ? (
           <div className="discovery-song-grid top-ten-grid">
-            {topTenSongs.map((song) => (
+            {visibleTopTenSongs.map((song) => (
               <DiscoverySongCard
                 active={activeSongId === song.id}
                 key={`top-${song.id}`}

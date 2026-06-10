@@ -300,14 +300,24 @@ try {
       page_focused: true,
       interaction_recent: true,
     },
-    "Reject replayed section",
+    "Accept actively replayed section",
   );
-  assert(replay.seconds_counted === 0, "Replayed section earned listening time");
   assert(
-    replay.session_verified_seconds === active.session_verified_seconds,
-    "Looped playback changed verified listening time",
+    replay.seconds_counted >= 8,
+    "Actively replayed audio did not earn listening time",
   );
-  record("Rewound and replayed sections never earn twice", replay.warning);
+  assert(
+    replay.session_verified_seconds > active.session_verified_seconds,
+    "Replay did not increase accumulated listening time",
+  );
+  assert(
+    replay.valid_listen_recorded === false,
+    "Replay granted a valid listen before the threshold",
+  );
+  record(
+    "Actually played replay time accumulates while valid listens stay separate",
+    replay,
+  );
 
   let validHeartbeat = replay;
   for (const position of [31, 41]) {

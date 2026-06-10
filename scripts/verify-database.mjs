@@ -86,6 +86,10 @@ if (economyError) throw economyError;
 const { data: songManagementData, error: songManagementError } =
   await supabase.rpc("song_management_health_report");
 if (songManagementError) throw songManagementError;
+const { data: engagementData, error: engagementError } = await supabase.rpc(
+  "community_engagement_health_report",
+);
+if (engagementError) throw engagementError;
 
 const report = data ?? {};
 const listeningReport = listeningData ?? {};
@@ -96,6 +100,7 @@ const guestReport = guestData ?? {};
 const connectedReport = connectedData ?? {};
 const economyReport = economyData ?? {};
 const songManagementReport = songManagementData ?? {};
+const engagementReport = engagementData ?? {};
 const requiredPlatforms = [
   "youtube",
   "spotify",
@@ -316,6 +321,32 @@ const checks = [
     details: guestReport.orphan_listens,
   },
   {
+    name: "Community engagement storage exists",
+    passed: Object.values(engagementReport.tables ?? {}).every(Boolean),
+    details: engagementReport.tables,
+  },
+  {
+    name: "Persistent guest identities are valid",
+    passed: Number(engagementReport.invalid_guest_identity ?? -1) === 0,
+    details: {
+      persistentGuests: engagementReport.persistent_guests,
+      invalidGuestIdentity: engagementReport.invalid_guest_identity,
+    },
+  },
+  {
+    name: "Likes and valid listens satisfy fairness limits",
+    passed:
+      Number(engagementReport.duplicate_user_likes ?? -1) === 0 &&
+      Number(engagementReport.duplicate_guest_likes ?? -1) === 0 &&
+      Number(engagementReport.valid_listen_window_violations ?? -1) === 0,
+    details: {
+      duplicateUserLikes: engagementReport.duplicate_user_likes,
+      duplicateGuestLikes: engagementReport.duplicate_guest_likes,
+      validListenWindowViolations:
+        engagementReport.valid_listen_window_violations,
+    },
+  },
+  {
     name: "Connected platform account storage exists",
     passed: connectedReport.table_exists === true,
     details: connectedReport.table_exists,
@@ -412,6 +443,7 @@ const result = {
   checks,
   connectedReport,
   economyReport,
+  engagementReport,
   songManagementReport,
   discoveryReport,
   guestReport,

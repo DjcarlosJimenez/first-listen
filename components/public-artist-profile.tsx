@@ -3,38 +3,46 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Bookmark,
   Disc3,
-  ExternalLink,
   Globe2,
   Headphones,
   Music2,
+  Play,
   Radio,
   Star,
   Trophy,
   UserPlus,
   Users,
-  Youtube,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
+import {
+  ProviderPlayer,
+  type ProviderTelemetrySnapshot,
+} from "@/components/provider-player";
+import { SongActionBar } from "@/components/song-action-bar";
+import type { InterfaceLocale } from "@/lib/catalog";
 import { compactClassificationLabel } from "@/lib/content-economy";
-import { getDiscoveryLinks } from "@/lib/discovery";
 import { createClient } from "@/lib/supabase/client";
 import type {
   ArtistCommunityActivity,
   ArtistTopSupporter,
   Platform,
-  Song,
 } from "@/lib/types";
 
 type PublicArtist = {
   id: string;
   name: string;
   followers: number;
+  following: number;
   songsSubmitted: number;
   genres: string[];
   languages: string[];
@@ -63,6 +71,230 @@ type PublicSong = {
   hookScore: number;
 };
 
+function ProfileSong({
+  song,
+  locale,
+  active,
+  onPlay,
+}: {
+  song: PublicSong;
+  locale: InterfaceLocale;
+  active: boolean;
+  onPlay: () => void;
+}) {
+  const [platformsRevealed, setPlatformsRevealed] = useState(false);
+  const sessionRef = useRef<{
+    kind: "user" | "guest";
+    id: string;
+    token?: string;
+  } | null>(null);
+  const startingRef = useRef(false);
+  const heartbeatRef = useRef(false);
+  const lastHeartbeatRef = useRef(0);
+  const spanish = locale === "es";
+
+  useEffect(() => {
+    if (active) return;
+    sessionRef.current = null;
+    startingRef.current = false;
+    heartbeatRef.current = false;
+    lastHeartbeatRef.current = 0;
+  }, [active]);
+
+  const handleTelemetry = useCallback(
+    async (snapshot: ProviderTelemetrySnapshot) => {
+      if (
+        snapshot.duration > 0 &&
+        snapshot.currentTime / snapshot.duration >= 0.5
+      ) {
+        setPlatformsRevealed(true);
+      }
+
+      if (
+        !active ||
+        !snapshot.supported ||
+        !["playing", "ended"].includes(snapshot.playbackState)
+      ) {
+        return;
+      }
+
+      const supabase = createClient();
+      if (!supabase) return;
+
+      if (!sessionRef.current && !startingRef.current) {
+        startingRef.current = true;
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          const { data } = await supabase.rpc("start_listening_session", {
+            target_song_id: song.id,
+          });
+          const row = Array.isArray(data) ? data[0] : data;
+          if (row?.session_id) {
+            sessionRef.current = {
+              kind: "user",
+              id: String(row.session_id),
+            };
+          }
+        } else {
+          const token = window.localStorage.getItem(
+            "first-listen-guest-token",
+          );
+          if (token) {
+            const { data } = await supabase.rpc(
+              "start_guest_listening_session",
+              {
+                guest_access_token: token,
+                target_song_id: song.id,
+              },
+            );
+            const row = Array.isArray(data) ? data[0] : data;
+            if (row?.listening_session_id) {
+              sessionRef.current = {
+                kind: "guest",
+                id: String(row.listening_session_id),
+                token,
+              };
+            }
+          }
+        }
+        startingRef.current = false;
+        await supabase.rpc("record_song_view", {
+          target_song_id: song.id,
+          guest_access_token:
+            sessionRef.current?.kind === "guest"
+              ? sessionRef.current.token
+              : null,
+        });
+      }
+
+      const session = sessionRef.current;
+      if (
+        !session ||
+        heartbeatRef.current ||
+        Date.now() - lastHeartbeatRef.current < 10000
+      ) {
+        return;
+      }
+
+      heartbeatRef.current = true;
+      lastHeartbeatRef.current = Date.now();
+      const params = {
+        playback_position_seconds: snapshot.currentTime,
+        playback_duration_seconds: snapshot.duration,
+        playback_state: snapshot.playbackState,
+        playback_muted: snapshot.muted,
+        playback_volume: snapshot.volume,
+        page_visible: snapshot.pageVisible,
+        page_focused: snapshot.pageFocused,
+        interaction_recent:
+          Date.now() - snapshot.lastInteractionAt <= 5 * 60 * 1000,
+      };
+      const result =
+        session.kind === "user"
+          ? await supabase.rpc("record_listening_heartbeat", {
+              target_session_id: session.id,
+              ...params,
+            })
+          : await supabase.rpc("record_guest_listening_heartbeat", {
+              guest_access_token: session.token,
+              target_session_id: session.id,
+              ...params,
+            });
+      heartbeatRef.current = false;
+      const row = Array.isArray(result.data) ? result.data[0] : result.data;
+      if (row?.valid_listen_recorded) setPlatformsRevealed(true);
+    },
+    [active, song.id],
+  );
+
+  return (
+    <article>
+      <Image
+        alt={`${song.title} cover`}
+        height={500}
+        src={song.coverUrl}
+        unoptimized
+        width={500}
+      />
+      <div className="artist-song-copy">
+        <span className="eyebrow">
+          {song.platform} / {compactClassificationLabel(song.platform)} /{" "}
+          {song.genre} / {song.language}
+        </span>
+        <h2>{song.title}</h2>
+        <div className="artist-song-metrics">
+          <span><Headphones size={13} /> {song.reviewsReceived} reviews</span>
+          <span><Star size={13} /> {song.averageRating.toFixed(1)}</span>
+          <strong>Hook {song.hookScore}</strong>
+        </div>
+
+        <button className="artist-play-button" onClick={onPlay} type="button">
+          <Play fill="currentColor" size={15} />
+          {active
+            ? spanish
+              ? "Ocultar reproductor"
+              : "Hide Player"
+            : spanish
+              ? "Reproducir ahora"
+              : "Play Now"}
+        </button>
+
+        {active && (
+          <div className="artist-profile-player">
+            <ProviderPlayer
+              artist={song.artist}
+              autoPlay
+              coverUrl={song.coverUrl}
+              link={song.link}
+              locale={locale}
+              onTelemetry={handleTelemetry}
+              platform={song.platform}
+              songLoadedAt={null}
+              title={song.title}
+            />
+          </div>
+        )}
+
+        <SongActionBar
+          artist={song.artist}
+          artistId={song.artistId}
+          link={song.link}
+          locale={locale}
+          platform={song.platform}
+          songId={song.id}
+          title={song.title}
+        />
+
+        {platformsRevealed && (
+          <section className="artist-platform-reveal">
+            <span className="eyebrow">
+              <Globe2 size={13} />
+              {spanish ? "También disponible en" : "Also Available On"}
+            </span>
+            <p>
+              {spanish
+                ? "Gracias por escuchar. ¿Quieres seguir apoyando a este artista?"
+                : "Thanks for listening. Want to continue supporting this artist?"}
+            </p>
+            <a href={song.link} rel="noreferrer" target="_blank">
+              {song.platform === "Apple Music" ? (
+                <Radio size={14} />
+              ) : song.platform === "Spotify" ? (
+                <Disc3 size={14} />
+              ) : (
+                <Play size={14} />
+              )}
+              {song.platform}
+            </a>
+          </section>
+        )}
+      </div>
+    </article>
+  );
+}
+
 export function PublicArtistProfile({
   artist,
   songs,
@@ -75,54 +307,66 @@ export function PublicArtistProfile({
   activity: ArtistCommunityActivity[];
 }) {
   const router = useRouter();
+  const [locale, setLocale] = useState<InterfaceLocale>("en");
   const [following, setFollowing] = useState(artist.isFollowing);
   const [followerCount, setFollowerCount] = useState(artist.followers);
-  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [activeSongId, setActiveSongId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const spanish = locale === "es";
 
-  const requireClient = async () => {
+  useEffect(() => {
+    const stored = window.localStorage.getItem("first-listen-locale");
+    const next =
+      stored === "es" || stored === "en"
+        ? stored
+        : navigator.language.toLowerCase().startsWith("es")
+          ? "es"
+          : "en";
+    setLocale(next);
+    document.documentElement.lang = next;
+  }, []);
+
+  const toggleFollow = async () => {
     const supabase = createClient();
-    if (!supabase) return null;
+    if (!supabase) return;
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) {
-      router.push(`/login?next=/artists/${artist.id}`);
-      return null;
-    }
-    return { supabase, userId: user.id };
-  };
-
-  const toggleFollow = async () => {
-    const client = await requireClient();
-    if (!client) return;
-    if (client.userId === artist.id) {
-      setMessage("This is your public artist profile.");
+    const guestToken = window.localStorage.getItem(
+      "first-listen-guest-token",
+    );
+    if (!user && !guestToken) {
+      router.push("/guest");
       return;
     }
-    const rpc = following ? "unfollow_artist" : "follow_artist";
-    const { error } = await client.supabase.rpc(rpc, { target_artist_id: artist.id });
-    if (error) {
-      setMessage(error.message);
+    if (user?.id === artist.id) {
+      setMessage(
+        spanish
+          ? "Este es tu perfil público."
+          : "This is your public artist profile.",
+      );
       return;
     }
-    setFollowing((current) => !current);
-    setFollowerCount((current) => current + (following ? -1 : 1));
-    setMessage(following ? "Artist unfollowed." : "Artist followed.");
-  };
-
-  const saveSong = async (songId: string) => {
-    const client = await requireClient();
-    if (!client) return;
-    const { error } = await client.supabase.rpc("save_song_for_later", {
-      target_song_id: songId,
+    const { data, error } = await supabase.rpc("toggle_follow_artist", {
+      target_artist_id: artist.id,
+      guest_access_token: user ? null : guestToken,
     });
     if (error) {
       setMessage(error.message);
       return;
     }
-    setSavedIds((current) => current.includes(songId) ? current : [...current, songId]);
-    setMessage("Song saved for later.");
+    const next = Boolean(data);
+    setFollowing(next);
+    setFollowerCount((current) => Math.max(0, current + (next ? 1 : -1)));
+    setMessage(
+      next
+        ? spanish
+          ? "Ahora sigues a este artista."
+          : "Artist followed."
+        : spanish
+          ? "Dejaste de seguir a este artista."
+          : "Artist unfollowed.",
+    );
   };
 
   return (
@@ -135,22 +379,25 @@ export function PublicArtistProfile({
       <section className="artist-profile-hero">
         <div className="artist-avatar">{artist.name.slice(0, 2).toUpperCase()}</div>
         <div>
-          <span className="eyebrow">Public artist profile</span>
+          <span className="eyebrow">
+            {spanish ? "Perfil público del artista" : "Public artist profile"}
+          </span>
           <h1>{artist.name}</h1>
           <span className={`artist-activity-badge ${artist.activityStatus}`}>
             {artist.activityStatus === "active"
-              ? "Active creator"
+              ? spanish ? "Creador activo" : "Active creator"
               : artist.activityStatus === "paused"
-                ? "Paused creator"
-                : "Archived creator"}
+                ? spanish ? "Creador en pausa" : "Paused creator"
+                : spanish ? "Creador archivado" : "Archived creator"}
           </span>
           <div className="artist-profile-stats">
-            <span><Users size={14} /> {followerCount} followers</span>
-            <span><Music2 size={14} /> {artist.songsSubmitted} songs submitted</span>
-            <span><Star size={14} /> {artist.averageRating.toFixed(1)} average rating</span>
-            <span><Headphones size={14} /> {artist.listeningHoursReceived.toFixed(1)} listening hours received</span>
-            <span><Radio size={14} /> {artist.validListensReceived} valid listens received</span>
-            <span><Disc3 size={14} /> {artist.completeListensReceived} complete listens</span>
+            <span><Users size={14} /> {followerCount} {spanish ? "seguidores" : "followers"}</span>
+            <span><UserPlus size={14} /> {artist.following} {spanish ? "siguiendo" : "following"}</span>
+            <span><Music2 size={14} /> {artist.songsSubmitted} {spanish ? "canciones" : "songs submitted"}</span>
+            <span><Star size={14} /> {artist.averageRating.toFixed(1)} {spanish ? "rating promedio" : "average rating"}</span>
+            <span><Headphones size={14} /> {artist.listeningHoursReceived.toFixed(1)} {spanish ? "horas escuchadas" : "listening hours received"}</span>
+            <span><Radio size={14} /> {artist.validListensReceived} {spanish ? "escuchas válidas" : "valid listens received"}</span>
+            <span><Disc3 size={14} /> {artist.completeListensReceived} {spanish ? "escuchas completas" : "complete listens"}</span>
             <span><Trophy size={14} /> {artist.communityRank}</span>
           </div>
           <div className="artist-profile-tags">
@@ -159,7 +406,14 @@ export function PublicArtistProfile({
           </div>
         </div>
         <button className={following ? "following" : ""} onClick={toggleFollow}>
-          <UserPlus size={16} /> {following ? "Following" : "Follow Artist"}
+          <UserPlus size={16} />{" "}
+          {following
+            ? spanish
+              ? "Siguiendo"
+              : "Following"
+            : spanish
+              ? "Seguir artista"
+              : "Follow Artist"}
         </button>
       </section>
 
@@ -167,8 +421,8 @@ export function PublicArtistProfile({
 
       <section className="artist-community-grid">
         <div className="artist-community-panel">
-          <span className="eyebrow"><Users size={13} /> Top Supporters</span>
-          <h2>Creator relationships</h2>
+          <span className="eyebrow"><Users size={13} /> {spanish ? "Mayores colaboradores" : "Top Supporters"}</span>
+          <h2>{spanish ? "Relaciones del creador" : "Creator relationships"}</h2>
           <div className="top-supporter-list">
             {topSupporters.map((supporter) => (
               <Link href={`/artists/${supporter.id}`} key={supporter.id}>
@@ -178,11 +432,11 @@ export function PublicArtistProfile({
                 <span>
                   <strong>{supporter.name}</strong>
                   <small>
-                    {supporter.supportsGiven} supports /{" "}
-                    {supporter.songsSupported} songs supported
+                    {supporter.supportsGiven} {spanish ? "apoyos" : "supports"} /{" "}
+                    {supporter.songsSupported} {spanish ? "canciones" : "songs supported"}
                   </small>
                   {supporter.mutualFollowing && (
-                    <em><UserPlus size={11} /> Following each other</em>
+                    <em><UserPlus size={11} /> {spanish ? "Se siguen mutuamente" : "Following each other"}</em>
                   )}
                 </span>
                 <ArrowRight size={14} />
@@ -190,15 +444,17 @@ export function PublicArtistProfile({
             ))}
             {!topSupporters.length && (
               <p className="discovery-empty">
-                Public supporters will appear here after supporting this artist.
+                {spanish
+                  ? "Los colaboradores públicos aparecerán aquí."
+                  : "Public supporters will appear here after supporting this artist."}
               </p>
             )}
           </div>
         </div>
 
         <div className="artist-community-panel">
-          <span className="eyebrow"><Radio size={13} /> Recent Activity</span>
-          <h2>Community activity</h2>
+          <span className="eyebrow"><Radio size={13} /> {spanish ? "Actividad reciente" : "Recent Activity"}</span>
+          <h2>{spanish ? "Actividad comunitaria" : "Community activity"}</h2>
           <div className="artist-activity-list">
             {activity.map((item) => (
               <article key={item.id}>
@@ -214,21 +470,25 @@ export function PublicArtistProfile({
                 <div>
                   <strong>
                     {item.type === "follow"
-                      ? `${item.actorName} followed this artist`
+                      ? `${item.actorName} ${spanish ? "siguió a este artista" : "followed this artist"}`
                       : item.type === "review"
-                        ? `${item.actorName} reviewed ${item.songTitle ?? "a song"}`
-                        : `${item.actorName} listened to ${item.songTitle ?? "a song"}`}
+                        ? `${item.actorName} ${spanish ? "dejó una review de" : "reviewed"} ${item.songTitle ?? (spanish ? "una canción" : "a song")}`
+                        : `${item.actorName} ${spanish ? "escuchó" : "listened to"} ${item.songTitle ?? (spanish ? "una canción" : "a song")}`}
                   </strong>
                   <small>{new Date(item.createdAt).toLocaleDateString()}</small>
                 </div>
                 {item.actorId && (
-                  <Link href={`/artists/${item.actorId}`}>Profile</Link>
+                  <Link href={`/artists/${item.actorId}`}>
+                    {spanish ? "Perfil" : "Profile"}
+                  </Link>
                 )}
               </article>
             ))}
             {!activity.length && (
               <p className="discovery-empty">
-                Listening, reviews, and follows will appear here.
+                {spanish
+                  ? "Las escuchas, reviews y seguidores aparecerán aquí."
+                  : "Listening, reviews, and follows will appear here."}
               </p>
             )}
           </div>
@@ -236,43 +496,27 @@ export function PublicArtistProfile({
       </section>
 
       <section className="artist-song-grid">
-        {songs.map((song) => {
-          const discoverySong: Pick<Song, "artist" | "title" | "link" | "platform"> = song;
-          const links = getDiscoveryLinks(discoverySong);
-          return (
-            <article key={song.id}>
-              <Image alt={`${song.title} cover`} height={500} src={song.coverUrl} unoptimized width={500} />
-              <div className="artist-song-copy">
-                <span className="eyebrow">
-                  {song.platform} / {compactClassificationLabel(song.platform)} /{" "}
-                  {song.genre} / {song.language}
-                </span>
-                <h2>{song.title}</h2>
-                <div className="artist-song-metrics">
-                  <span><Headphones size={13} /> {song.reviewsReceived} reviews</span>
-                  <span><Star size={13} /> {song.averageRating.toFixed(1)}</span>
-                  <strong>Hook {song.hookScore}</strong>
-                </div>
-                <div className="artist-song-links">
-                  <a href={links.spotify} rel="noreferrer" target="_blank"><Disc3 size={14} /> Spotify</a>
-                  <a href={links.youtube} rel="noreferrer" target="_blank"><Youtube size={14} /> YouTube</a>
-                  <a href={links.apple} rel="noreferrer" target="_blank"><Radio size={14} /> Apple Music</a>
-                </div>
-                <button disabled={savedIds.includes(song.id)} onClick={() => saveSong(song.id)}>
-                  <Bookmark size={14} />
-                  {savedIds.includes(song.id) ? "Saved" : "Save For Later"}
-                </button>
-                <a className="original-link" href={song.link} rel="noreferrer" target="_blank">
-                  Open original link <ExternalLink size={13} />
-                </a>
-              </div>
-            </article>
-          );
-        })}
+        {songs.map((song) => (
+          <ProfileSong
+            active={activeSongId === song.id}
+            key={song.id}
+            locale={locale}
+            onPlay={() =>
+              setActiveSongId((current) =>
+                current === song.id ? null : song.id,
+              )
+            }
+            song={song}
+          />
+        ))}
         {songs.length === 0 && (
           <div className="empty-state">
-            <p>This artist has no active public songs yet.</p>
-            <Link href="/">Explore First Listen <ArrowRight size={13} /></Link>
+            <p>
+              {spanish
+                ? "Este artista todavía no tiene canciones públicas activas."
+                : "This artist has no active public songs yet."}
+            </p>
+            <Link href="/">{spanish ? "Explorar First Listen" : "Explore First Listen"} <ArrowRight size={13} /></Link>
           </div>
         )}
       </section>

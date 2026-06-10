@@ -75,16 +75,17 @@ async function listRpc(client, name, params, context) {
 }
 
 async function startGuest(anon) {
+  const nickname = `Listener ${Date.now().toString(36).slice(-6)}`;
   const row = await singleRpc(
     anon,
-    "start_guest_session",
-    { existing_access_token: null },
-    "Start guest session",
+    "create_guest_identity",
+    { guest_nickname: nickname, guest_language: "en" },
+    "Create persistent guest identity",
   );
   assert(row?.guest_access_token, "Guest token was not returned");
   const guest = await service
     .from("guest_sessions")
-    .select("id")
+    .select("id, nickname, guest_listener_id, recovery_code, expires_at")
     .eq("access_token", row.guest_access_token)
     .single();
   assertNoError(guest.error, "Resolve guest fixture");
@@ -92,7 +93,10 @@ async function startGuest(anon) {
   return {
     id: guest.data.id,
     token: String(row.guest_access_token),
-    expiresAt: String(row.expires_at),
+    nickname: String(guest.data.nickname),
+    listenerId: String(guest.data.guest_listener_id),
+    recoveryCode: String(guest.data.recovery_code),
+    expiresAt: guest.data.expires_at,
   };
 }
 
@@ -207,9 +211,21 @@ try {
 
   const databaseGuest = await startGuest(anon);
   assert(
-    new Date(databaseGuest.expiresAt).getTime() - Date.now() >
-      23 * 60 * 60 * 1000,
-    "Guest session did not receive a 24-hour window",
+    databaseGuest.expiresAt === null &&
+      databaseGuest.listenerId.startsWith("FL-") &&
+      databaseGuest.recoveryCode.startsWith("MUSIC-"),
+    "Guest identity was not created as a permanent recoverable profile",
+  );
+  const recoveredGuest = await singleRpc(
+    anon,
+    "recover_guest_identity",
+    { submitted_recovery_code: databaseGuest.recoveryCode },
+    "Recover persistent guest identity",
+  );
+  assert(
+    recoveredGuest.guest_access_token === databaseGuest.token &&
+      recoveredGuest.nickname === databaseGuest.nickname,
+    "Recovery code did not restore the existing guest identity",
   );
   const databaseQueue = await listRpc(
     anon,
@@ -221,6 +237,105 @@ try {
     ["youtube", "youtube_music", "soundcloud"].includes(song.platform),
   );
   assert(eligibleSong, "Guest queue has no telemetry-supported song");
+
+  const liked = await singleRpc(
+    anon,
+    "toggle_song_like",
+    {
+      target_song_id: eligibleSong.song_id,
+      guest_access_token: databaseGuest.token,
+    },
+    "Like song as guest",
+  );
+  const saved = await singleRpc(
+    anon,
+    "toggle_save_song",
+    {
+      target_song_id: eligibleSong.song_id,
+      guest_access_token: databaseGuest.token,
+    },
+    "Save song as guest",
+  );
+  const followed = await singleRpc(
+    anon,
+    "toggle_follow_artist",
+    {
+      target_artist_id: eligibleSong.artist_id,
+      guest_access_token: databaseGuest.token,
+    },
+    "Follow artist as guest",
+  );
+  const commentId = await singleRpc(
+    anon,
+    "add_song_comment",
+    {
+      target_song_id: eligibleSong.song_id,
+      comment_body: "Production guest community action verification.",
+      guest_access_token: databaseGuest.token,
+    },
+    "Comment as guest",
+  );
+  assert(commentId, "Guest comment ID was not returned");
+  await singleRpc(
+    anon,
+    "record_song_share",
+    {
+      target_song_id: eligibleSong.song_id,
+      share_kind_value: "community",
+      share_platform: null,
+      guest_access_token: databaseGuest.token,
+    },
+    "Record community share",
+  );
+  await singleRpc(
+    anon,
+    "record_song_share",
+    {
+      target_song_id: eligibleSong.song_id,
+      share_kind_value: "original_platform",
+      share_platform: eligibleSong.platform,
+      guest_access_token: databaseGuest.token,
+    },
+    "Record original-platform share",
+  );
+  await singleRpc(
+    anon,
+    "record_song_view",
+    {
+      target_song_id: eligibleSong.song_id,
+      guest_access_token: databaseGuest.token,
+    },
+    "Record guest song view",
+  );
+  const engagement = await singleRpc(
+    anon,
+    "get_song_engagement",
+    {
+      target_song_id: eligibleSong.song_id,
+      guest_access_token: databaseGuest.token,
+    },
+    "Read guest song engagement",
+  );
+  assert(
+    liked === true &&
+      saved === true &&
+      followed === true &&
+      engagement.liked === true &&
+      engagement.saved === true &&
+      engagement.following === true &&
+      Number(engagement.comment_count) >= 1 &&
+      Number(engagement.community_share_count) >= 1 &&
+      Number(engagement.original_share_count) >= 1,
+    "Guest social actions were not stored or reported correctly",
+  );
+  record("Guest social action layer persists and reports engagement", {
+    liked: engagement.liked,
+    saved: engagement.saved,
+    following: engagement.following,
+    comments: engagement.comment_count,
+    communityShares: engagement.community_share_count,
+    originalShares: engagement.original_share_count,
+  });
 
   const profileBefore = await singleRpc(
     anon,
@@ -283,16 +398,17 @@ try {
   );
   const notification = await service
     .from("community_notifications")
-    .select("actor_id, actor_visibility, event_type, recipient_id")
+    .select("actor_id, actor_visibility, actor_display_name, event_type, recipient_id")
     .eq("source_id", started.listening_session_id)
     .single();
   assertNoError(notification.error, "Read guest support notification");
   assert(
     notification.data.actor_id === null &&
-      notification.data.actor_visibility === "anonymous" &&
+      notification.data.actor_visibility === "public" &&
+      notification.data.actor_display_name === databaseGuest.nickname &&
       notification.data.event_type === "valid_listen" &&
       notification.data.recipient_id === eligibleSong.artist_id,
-    "Guest support notification exposed identity or targeted the wrong artist",
+    "Guest support notification did not preserve the public nickname",
   );
   const profileAfter = await singleRpc(
     anon,
@@ -305,7 +421,7 @@ try {
       Number(profileBefore.valid_listens_received) + 1,
     "Guest valid listen was not reflected in artist metrics",
   );
-  record("Guest listening creates anonymous verified artist support", {
+  record("Guest listening creates nickname-attributed verified artist support", {
     artistId: eligibleSong.artist_id,
     verifiedSeconds: verifiedGuestListen.data.verified_seconds,
   });
@@ -448,8 +564,8 @@ try {
   await navigate(baseUrl);
   const landing = await waitFor(
     `(() => ({
-      guest: [...document.querySelectorAll("button")].some((button) => button.innerText.includes("Continue as Guest")),
-      join: document.body.innerText.includes("Create Free Account"),
+      guest: [...document.querySelectorAll("button")].some((button) => button.innerText.includes("Enter Now")),
+      join: document.body.innerText.includes("Create Account"),
       paths: document.querySelectorAll(".landing-path-card").length
     }))()`,
     (value) => value.guest && value.join && value.paths === 2,
@@ -461,7 +577,7 @@ try {
     )});
     sessionStorage.setItem("first-listen-player-debug", "1");
     const button = [...document.querySelectorAll("button")]
-      .find((item) => item.innerText.includes("Continue as Guest"));
+      .find((item) => item.innerText.includes("Enter Now"));
     button?.click();
   })()`);
   const guestUrl = await waitFor(
@@ -480,7 +596,7 @@ try {
     (value) =>
       value.listen.includes("Listen Now") &&
       value.title === expectedFirstTitle &&
-      value.text.includes("24-hour access"),
+      value.text.includes("Permanent guest access"),
     25000,
   );
   assert(
@@ -603,6 +719,12 @@ try {
       .join(", ");
     await managementQuery(`
       begin;
+      delete from public.song_comments
+      where guest_session_id in (${guestIds});
+      delete from public.song_shares
+      where guest_session_id in (${guestIds});
+      delete from public.song_views
+      where guest_session_id in (${guestIds});
       delete from public.community_notifications
       where source_id in (
         select id
