@@ -63,6 +63,7 @@ import {
   useState,
 } from "react";
 import { LanguageSelector } from "@/components/language-selector";
+import { CommunityPulse } from "@/components/community-pulse";
 import { Logo } from "@/components/logo";
 import {
   ProviderPlayer,
@@ -1668,6 +1669,7 @@ function ReviewView({
   }
 
   return (
+    <>
     <main className="content review-layout">
       <section className="review-card">
         <div className="song-hero">
@@ -2097,6 +2099,20 @@ function ReviewView({
         </div>
       </aside>
     </main>
+    <section className="content review-community-hub">
+      <DiscoverySections
+        externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
+        locale={locale}
+        onListeningCredited={onListeningCredited}
+        onExternalRedirectPreferenceChange={
+          onExternalRedirectPreferenceChange
+        }
+        spotlightSongs={spotlightSongs}
+        topTenSongs={topTenSongs}
+      />
+      <CommunityPulse locale={locale} />
+    </section>
+    </>
   );
 }
 

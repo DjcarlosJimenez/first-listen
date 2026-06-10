@@ -93,6 +93,9 @@ if (engagementError) throw engagementError;
 const { data: guestIdentityData, error: guestIdentityError } =
   await supabase.rpc("true_guest_identity_health_report");
 if (guestIdentityError) throw guestIdentityError;
+const { data: unifiedLandingData, error: unifiedLandingError } =
+  await supabase.rpc("unified_landing_health_report");
+if (unifiedLandingError) throw unifiedLandingError;
 
 const report = data ?? {};
 const listeningReport = listeningData ?? {};
@@ -105,6 +108,7 @@ const economyReport = economyData ?? {};
 const songManagementReport = songManagementData ?? {};
 const engagementReport = engagementData ?? {};
 const guestIdentityReport = guestIdentityData ?? {};
+const unifiedLandingReport = unifiedLandingData ?? {};
 const requiredPlatforms = [
   "youtube",
   "spotify",
@@ -445,6 +449,18 @@ const checks = [
       removedInActiveCatalog: songManagementReport.removed_in_active_catalog,
     },
   },
+  {
+    name: "Unified landing controls are healthy",
+    passed:
+      unifiedLandingReport.theme_row_present === true &&
+      unifiedLandingReport.announcement_table_present === true &&
+      unifiedLandingReport.theme_rls_enabled === true &&
+      unifiedLandingReport.announcements_rls_enabled === true &&
+      unifiedLandingReport.public_discovery_function_present === true &&
+      unifiedLandingReport.public_activity_function_present === true &&
+      unifiedLandingReport.admin_health_function_present === true,
+    details: unifiedLandingReport,
+  },
 ];
 
 const passed = checks.filter((check) => check.passed).length;
@@ -464,6 +480,7 @@ const result = {
   networkReport,
   report,
   listeningReport,
+  unifiedLandingReport,
 };
 
 console.log(JSON.stringify(result, null, 2));

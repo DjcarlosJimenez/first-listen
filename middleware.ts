@@ -83,12 +83,12 @@ export async function middleware(request: NextRequest) {
         ? ["super_admin", "admin", "moderator"].includes(role)
         : ["super_admin", "admin"].includes(role);
       if (!allowed) {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
+        return NextResponse.redirect(new URL("/review", request.url));
       }
     }
 
     if (authPaths.includes(path) && !profile?.force_password_change) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return NextResponse.redirect(new URL("/review", request.url));
     }
   }
 

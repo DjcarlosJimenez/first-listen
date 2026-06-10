@@ -38,7 +38,7 @@ export function ChangePasswordForm() {
     if (!passwordError) {
       const { error: profileError } = await supabase.rpc("complete_forced_password_change");
       if (!profileError) {
-        router.replace("/dashboard");
+        router.replace("/review");
         router.refresh();
         return;
       }

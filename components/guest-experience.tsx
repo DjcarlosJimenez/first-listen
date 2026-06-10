@@ -19,6 +19,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   FormEvent,
@@ -29,6 +30,7 @@ import {
   useState,
 } from "react";
 import { LanguageSelector } from "@/components/language-selector";
+import { CommunityPulse } from "@/components/community-pulse";
 import { Logo } from "@/components/logo";
 import {
   ProviderPlayer,
@@ -58,6 +60,19 @@ type GuestListeningState = {
   validListenRecorded: boolean;
   completeListenRecorded: boolean;
   warning: string;
+};
+
+type GuestDiscoveryItem = {
+  feedKind: "spotlight" | "top" | "recent";
+  position: number;
+  badge: string;
+  song: Song;
+  reviewsReceived: number;
+  averageRating: number;
+  hookScore: number;
+  commentsCount: number;
+  likesCount: number;
+  followersCount: number;
 };
 
 const emptyListeningState: GuestListeningState = {
@@ -110,6 +125,23 @@ function mapGuestIdentity(
   };
 }
 
+function mapGuestDiscovery(
+  rows: Array<Record<string, unknown>>,
+): GuestDiscoveryItem[] {
+  return rows.map((row) => ({
+    feedKind: String(row.feed_kind) as GuestDiscoveryItem["feedKind"],
+    position: Number(row.feed_position ?? 0),
+    badge: String(row.badge ?? ""),
+    song: mapGuestSongs([row])[0],
+    reviewsReceived: Number(row.reviews_received ?? 0),
+    averageRating: Number(row.average_rating ?? 0),
+    hookScore: Number(row.hook_score ?? 0),
+    commentsCount: Number(row.comments_count ?? 0),
+    likesCount: Number(row.likes_count ?? 0),
+    followersCount: Number(row.followers_count ?? 0),
+  }));
+}
+
 function persistGuest(guest: GuestSession) {
   window.localStorage.setItem("first-listen-guest-token", guest.token);
   window.localStorage.setItem(
@@ -130,6 +162,7 @@ export function GuestExperience() {
   const [identityMessage, setIdentityMessage] = useState("");
   const [showCredentials, setShowCredentials] = useState(false);
   const [songs, setSongs] = useState<Song[]>([]);
+  const [discoveryFeed, setDiscoveryFeed] = useState<GuestDiscoveryItem[]>([]);
   const [songIndex, setSongIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [autoPlay, setAutoPlay] = useState(true);
@@ -164,6 +197,31 @@ export function GuestExperience() {
     if (error) throw error;
     setSongs(mapGuestSongs((data ?? []) as Array<Record<string, unknown>>));
     setSongIndex(0);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadDiscovery = async () => {
+      const supabase = createClient();
+      if (!supabase) return;
+      const { data, error } = await supabase.rpc(
+        "get_public_discovery_feed",
+        { feed_limit: 8 },
+      );
+      if (active && !error) {
+        setDiscoveryFeed(
+          mapGuestDiscovery(
+            (data ?? []) as Array<Record<string, unknown>>,
+          ),
+        );
+      }
+    };
+    void loadDiscovery();
+    const interval = window.setInterval(() => void loadDiscovery(), 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -357,6 +415,27 @@ export function GuestExperience() {
       );
     }
   }, [finishCurrentSession, guest, loadQueue, songIndex, songs.length]);
+
+  const playDiscoverySong = useCallback(
+    async (item: GuestDiscoveryItem) => {
+      await finishCurrentSession();
+      const existingIndex = songs.findIndex(
+        (candidate) => candidate.id === item.song.id,
+      );
+      if (existingIndex >= 0) {
+        setSongIndex(existingIndex);
+      } else {
+        setSongs((current) => [
+          item.song,
+          ...current.filter((candidate) => candidate.id !== item.song.id),
+        ]);
+        setSongIndex(0);
+      }
+      setPlaying(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [finishCurrentSession, songs],
+  );
 
   useEffect(() => {
     if (!playing || !currentSong || listeningSessionRef.current) return;
@@ -682,17 +761,17 @@ export function GuestExperience() {
         </section>
       )}
 
-      <section className="guest-welcome">
-        <span className="eyebrow"><Sparkles size={13} /> {spanish ? "Oyente invitado" : "Guest Listener"}</span>
+      <section className="guest-welcome guest-welcome-compact">
+        <span className="eyebrow"><Sparkles size={13} /> Review Songs</span>
         <h1>
           {spanish
-            ? `Bienvenido, ${guest.nickname}.`
-            : `Welcome, ${guest.nickname}.`}
+            ? `Escucha, reacciona y descubre, ${guest.nickname}.`
+            : `Listen, react, and discover, ${guest.nickname}.`}
         </h1>
         <p>
           {spanish
-            ? "Escucha música, descubre artistas y participa en la comunidad. Tu acceso siempre es gratis y nunca vence."
-            : "Listen to music, discover artists, and join the community. Guest access is always free and never expires."}
+            ? "La música empieza aquí. Tus reacciones ayudan a artistas reales."
+            : "The music starts here. Your reactions help real artists."}
         </p>
         <div>
           <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "escuchas válidas" : "valid listens"}</span>
@@ -870,6 +949,95 @@ export function GuestExperience() {
           </div>
         </section>
       )}
+
+      {discoveryFeed.length > 0 && (
+        <section className="guest-discovery-hub">
+          {(
+            [
+              ["spotlight", "Spotlight"],
+              [
+                "top",
+                spanish ? "Top 10 de la comunidad" : "Community Top 10",
+              ],
+              [
+                "recent",
+                spanish ? "Actividad reciente" : "Recently Active",
+              ],
+            ] as const
+          ).map(([kind, title]) => {
+            const items = discoveryFeed.filter(
+              (item) => item.feedKind === kind,
+            );
+            if (!items.length) return null;
+            return (
+              <section className="guest-discovery-shelf" key={kind}>
+                <div className="guest-discovery-heading">
+                  <span className="eyebrow">
+                    {kind === "spotlight" ? (
+                      <Sparkles size={13} />
+                    ) : (
+                      <Users size={13} />
+                    )}
+                    {title}
+                  </span>
+                  <h2>
+                    {kind === "spotlight"
+                      ? spanish
+                        ? "Artistas para descubrir ahora"
+                        : "Artists to discover now"
+                      : spanish
+                        ? "Impulsado por escuchas y reacciones reales"
+                        : "Powered by real listens and reactions"}
+                  </h2>
+                </div>
+                <div className="guest-discovery-grid">
+                  {items.map((item) => (
+                    <article key={`${kind}-${item.song.id}`}>
+                      <div className="guest-discovery-cover">
+                        <Image
+                          alt={`${item.song.title} cover`}
+                          fill
+                          sizes="(max-width: 700px) 42vw, 180px"
+                          src={item.song.coverUrl}
+                          unoptimized
+                        />
+                        <span>
+                          {kind === "top" ? `#${item.position}` : item.badge}
+                        </span>
+                      </div>
+                      <div className="guest-discovery-copy">
+                        <strong>{item.song.title}</strong>
+                        <Link href={`/artists/${item.song.artistId}`}>
+                          {item.song.artist}
+                        </Link>
+                        <small>
+                          {item.reviewsReceived} reviews /{" "}
+                          {item.averageRating.toFixed(1)} rating / Hook{" "}
+                          {Math.round(item.hookScore)}
+                        </small>
+                        <div>
+                          <span><Heart size={12} /> {item.likesCount}</span>
+                          <span><MessageSquareText size={12} /> {item.commentsCount}</span>
+                          <span><Users size={12} /> {item.followersCount}</span>
+                        </div>
+                        <button
+                          onClick={() => void playDiscoverySong(item)}
+                          type="button"
+                        >
+                          <Play fill="currentColor" size={13} />
+                          {spanish ? "Escuchar y reaccionar" : "Listen and react"}
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </section>
+      )}
+
+      <CommunityPulse locale={locale} />
     </main>
   );
 }

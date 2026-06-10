@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AdminPanel } from "@/components/admin-panel";
+import { mapPlatformThemeRow } from "@/lib/platform-theme";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -20,11 +21,24 @@ type AdminDirectoryUser = {
   created_at: string;
 };
 
+type AdminSection =
+  | "users"
+  | "songs"
+  | "reports"
+  | "credits"
+  | "listening"
+  | "economy"
+  | "discovery"
+  | "appearance"
+  | "announcements"
+  | "health"
+  | "statistics";
+
 export async function AdminPageContent({
   initialSection = "users",
   allowModerator = false,
 }: {
-  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "economy" | "discovery" | "statistics";
+  initialSection?: AdminSection;
   allowModerator?: boolean;
 }) {
   const supabase = await createClient();
@@ -42,7 +56,7 @@ export async function AdminPageContent({
     ? ["super_admin", "admin", "moderator"]
     : ["super_admin", "admin"];
   if (!profile || !allowedRoles.includes(profile.role)) {
-    redirect("/dashboard");
+    redirect("/review");
   }
   await supabase.rpc("refresh_creator_activity_status", {
     target_user_id: null,
@@ -51,7 +65,15 @@ export async function AdminPageContent({
     profile.role === "super_admin"
       ? initialSection
       : profile.role === "admin"
-        ? ["songs", "reports", "discovery", "statistics"].includes(initialSection)
+        ? [
+            "songs",
+            "reports",
+            "discovery",
+            "appearance",
+            "announcements",
+            "health",
+            "statistics",
+          ].includes(initialSection)
           ? initialSection
           : "songs"
         : "reports";
@@ -68,6 +90,9 @@ export async function AdminPageContent({
     { data: contentEconomy },
     { data: duplicateCandidates },
     { data: duplicateStatistics },
+    { data: themeRows },
+    { data: announcements },
+    { data: communityHealth },
   ] = await Promise.all([
     supabase.rpc("admin_list_users", { result_limit: 1000 }),
     supabase
@@ -109,6 +134,9 @@ export async function AdminPageContent({
     supabase.rpc("get_content_economy_settings"),
     supabase.rpc("admin_get_duplicate_song_candidates"),
     supabase.rpc("admin_get_duplicate_statistics"),
+    supabase.rpc("get_platform_theme"),
+    supabase.rpc("admin_list_platform_announcements"),
+    supabase.rpc("admin_get_community_health"),
   ]);
 
   const profileById = new Map(
@@ -137,7 +165,7 @@ export async function AdminPageContent({
 
   return (
     <AdminPanel
-      initialSection={effectiveInitialSection as "users" | "songs" | "reports" | "credits" | "listening" | "economy" | "discovery" | "statistics"}
+      initialSection={effectiveInitialSection as AdminSection}
       listeningSettings={{
         minutes_per_credit: Number(listeningRows?.minutes_per_credit ?? 120),
         daily_cap_minutes: Number(listeningRows?.daily_cap_minutes ?? 180),
@@ -150,6 +178,13 @@ export async function AdminPageContent({
       contentEconomy={(contentEconomy ?? []) as never}
       duplicateCandidates={(duplicateCandidates ?? []) as never}
       duplicateStatistics={(duplicateStatistics ?? {}) as never}
+      theme={mapPlatformThemeRow(
+        (Array.isArray(themeRows) ? themeRows[0] : themeRows) as
+          | Record<string, unknown>
+          | null,
+      )}
+      announcements={(announcements ?? []) as never}
+      communityHealth={(communityHealth ?? null) as never}
       role={profile.role}
       songs={enrichedSongs}
       statistics={(statistics as {

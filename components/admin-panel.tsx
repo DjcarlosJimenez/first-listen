@@ -3,14 +3,20 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  Activity,
   ArrowLeft,
   BarChart3,
   CopyCheck,
+  Eye,
   Flag,
   Headphones,
   Link2,
+  Megaphone,
   Music2,
+  Palette,
+  RotateCcw,
   Rocket,
+  Save,
   Search,
   ShieldCheck,
   Sparkles,
@@ -22,7 +28,26 @@ import {
   compactClassificationLabel,
   displayPlatform,
 } from "@/lib/content-economy";
+import {
+  platformThemePresetLabels,
+  platformThemePresets,
+  type PlatformTheme,
+  type PlatformThemePreset,
+} from "@/lib/platform-theme";
 import { createClient } from "@/lib/supabase/client";
+
+type AdminSection =
+  | "users"
+  | "songs"
+  | "reports"
+  | "credits"
+  | "listening"
+  | "economy"
+  | "discovery"
+  | "appearance"
+  | "announcements"
+  | "health"
+  | "statistics";
 
 type AdminUser = {
   id: string;
@@ -158,6 +183,54 @@ type ExternalPricingDraft = {
   activationAt: string;
 };
 
+type AdminAnnouncement = {
+  id: string;
+  announcement_type:
+    | "platform_update"
+    | "scheduled_change"
+    | "contest"
+    | "community_news"
+    | "maintenance"
+    | "special_event";
+  title: string;
+  message: string;
+  starts_at: string;
+  ends_at: string | null;
+  priority: number;
+  audience: "guests" | "members" | "creators" | "everyone";
+  is_active: boolean;
+};
+
+type CommunityHealth = {
+  generated_at?: string;
+  active_guests?: number;
+  active_members?: number;
+  valid_listens_today?: number;
+  listening_hours_today?: number;
+  comments_today?: number;
+  likes_today?: number;
+  followers_today?: number;
+  shares_today?: number;
+  songs_submitted_today?: number;
+  songs_archived_today?: number;
+  new_guest_profiles_today?: number;
+  new_accounts_today?: number;
+  total_guest_profiles?: number;
+  converted_guest_profiles?: number;
+  guest_to_member_conversion_rate?: number;
+};
+
+const emptyAnnouncement: Omit<AdminAnnouncement, "id"> = {
+  announcement_type: "platform_update",
+  title: "",
+  message: "",
+  starts_at: "",
+  ends_at: null,
+  priority: 3,
+  audience: "everyone",
+  is_active: true,
+};
+
 function localDateTimeValue(value: string | null) {
   if (!value) return "";
   const date = new Date(value);
@@ -179,13 +252,16 @@ export function AdminPanel({
   duplicateCandidates,
   duplicateStatistics,
   statistics,
+  theme,
+  announcements,
+  communityHealth,
 }: {
   role: "super_admin" | "admin" | "moderator";
   users: AdminUser[];
   songs: AdminSong[];
   reports: AdminReport[];
   commentReports: AdminCommentReport[];
-  initialSection?: "users" | "songs" | "reports" | "credits" | "listening" | "economy" | "discovery" | "statistics";
+  initialSection?: AdminSection;
   listeningSettings: {
     minutes_per_credit: number;
     daily_cap_minutes: number;
@@ -204,8 +280,11 @@ export function AdminPanel({
     reviews: number;
     listening_minutes?: number;
   } | null;
+  theme: PlatformTheme;
+  announcements: AdminAnnouncement[];
+  communityHealth: CommunityHealth | null;
 }) {
-  const [section, setSection] = useState<"users" | "songs" | "reports" | "credits" | "listening" | "economy" | "discovery" | "statistics">(initialSection);
+  const [section, setSection] = useState<AdminSection>(initialSection);
   const [notice, setNotice] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [userFilter, setUserFilter] = useState<
@@ -238,6 +317,10 @@ export function AdminPanel({
   const [rewardsEnabled, setRewardsEnabled] = useState(
     listeningSettings.enabled,
   );
+  const [themeDraft, setThemeDraft] = useState<PlatformTheme>(theme);
+  const [announcementDraft, setAnnouncementDraft] = useState<
+    Omit<AdminAnnouncement, "id"> & { id?: string }
+  >(emptyAnnouncement);
   const externalSettings = contentEconomy.filter(
     (setting) => setting.classification === "external",
   );
@@ -360,6 +443,58 @@ export function AdminPanel({
     );
   };
 
+  const updateThemeColor = (
+    field: keyof Pick<
+      PlatformTheme,
+      | "backgroundColor"
+      | "cardColor"
+      | "textColor"
+      | "accentColor"
+      | "buttonColor"
+      | "linkColor"
+      | "borderColor"
+    >,
+    value: string,
+  ) => {
+    setThemeDraft((current) => ({
+      ...current,
+      preset: "custom",
+      [field]: value.toUpperCase(),
+    }));
+  };
+
+  const saveTheme = () =>
+    runRpc("admin_update_platform_theme", {
+      target_preset: themeDraft.preset,
+      target_background_color: themeDraft.backgroundColor,
+      target_card_color: themeDraft.cardColor,
+      target_text_color: themeDraft.textColor,
+      target_accent_color: themeDraft.accentColor,
+      target_button_color: themeDraft.buttonColor,
+      target_link_color: themeDraft.linkColor,
+      target_border_color: themeDraft.borderColor,
+    });
+
+  const saveAnnouncement = () => {
+    const startsAt = announcementDraft.starts_at
+      ? new Date(announcementDraft.starts_at).toISOString()
+      : new Date().toISOString();
+    const endsAt = announcementDraft.ends_at
+      ? new Date(announcementDraft.ends_at).toISOString()
+      : null;
+    return runRpc("admin_save_platform_announcement", {
+      target_id: announcementDraft.id ?? null,
+      target_type: announcementDraft.announcement_type,
+      target_title: announcementDraft.title,
+      target_message: announcementDraft.message,
+      target_starts_at: startsAt,
+      target_ends_at: endsAt,
+      target_priority: announcementDraft.priority,
+      target_audience: announcementDraft.audience,
+      target_is_active: announcementDraft.is_active,
+    });
+  };
+
   const allSections = [
     ["users", "Users", Users],
     ["songs", "Songs", Music2],
@@ -368,6 +503,9 @@ export function AdminPanel({
     ["listening", "Listening", Headphones],
     ["economy", "Economy", Link2],
     ["discovery", "Discovery", Sparkles],
+    ["appearance", "Appearance", Palette],
+    ["announcements", "Announcements", Megaphone],
+    ["health", "Community Health", Activity],
     ["statistics", "Statistics", BarChart3],
   ] as const;
   const sections = allSections.filter(([id]) => {
@@ -380,7 +518,7 @@ export function AdminPanel({
     <main className="admin-page">
       <header className="account-header">
         <Logo />
-        <Link href="/dashboard"><ArrowLeft size={16} /> Dashboard</Link>
+        <Link href="/review"><ArrowLeft size={16} /> Review Songs</Link>
       </header>
       <div className="admin-shell">
         <aside className="admin-nav">
@@ -1022,6 +1160,398 @@ export function AdminPanel({
                   );
                 })}
               </div>
+            </>
+          )}
+
+          {section === "appearance" && role !== "moderator" && (
+            <>
+              <div className="admin-section-heading">
+                <div>
+                  <h2>Appearance</h2>
+                  <span>Manage the site-wide visual theme without a deployment.</span>
+                </div>
+              </div>
+              <div className="admin-theme-layout">
+                <section className="admin-theme-controls">
+                  <div className="admin-theme-presets">
+                    {(
+                      Object.keys(platformThemePresetLabels) as PlatformThemePreset[]
+                    ).map((preset) => (
+                      <button
+                        className={themeDraft.preset === preset ? "active" : ""}
+                        disabled={preset === "custom"}
+                        key={preset}
+                        onClick={() => {
+                          if (preset === "custom") return;
+                          setThemeDraft(platformThemePresets[preset]);
+                        }}
+                        type="button"
+                      >
+                        {platformThemePresetLabels[preset]}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="admin-theme-color-grid">
+                    {[
+                      ["backgroundColor", "Background"],
+                      ["cardColor", "Cards"],
+                      ["textColor", "Text"],
+                      ["accentColor", "Accent"],
+                      ["buttonColor", "Buttons"],
+                      ["linkColor", "Links"],
+                      ["borderColor", "Borders"],
+                    ].map(([field, label]) => (
+                      <label key={field}>
+                        <span>{label}</span>
+                        <input
+                          aria-label={`${label} color`}
+                          onChange={(event) =>
+                            updateThemeColor(
+                              field as keyof Pick<
+                                PlatformTheme,
+                                | "backgroundColor"
+                                | "cardColor"
+                                | "textColor"
+                                | "accentColor"
+                                | "buttonColor"
+                                | "linkColor"
+                                | "borderColor"
+                              >,
+                              event.target.value,
+                            )
+                          }
+                          type="color"
+                          value={String(themeDraft[field as keyof PlatformTheme])}
+                        />
+                        <input
+                          maxLength={7}
+                          onChange={(event) =>
+                            updateThemeColor(
+                              field as keyof Pick<
+                                PlatformTheme,
+                                | "backgroundColor"
+                                | "cardColor"
+                                | "textColor"
+                                | "accentColor"
+                                | "buttonColor"
+                                | "linkColor"
+                                | "borderColor"
+                              >,
+                              event.target.value,
+                            )
+                          }
+                          pattern="^#[0-9A-Fa-f]{6}$"
+                          value={String(themeDraft[field as keyof PlatformTheme])}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <div className="admin-theme-actions">
+                    <button
+                      className="primary-button"
+                      onClick={() => void saveTheme()}
+                      type="button"
+                    >
+                      <Save size={15} /> Save theme
+                    </button>
+                    <button
+                      className="secondary-button"
+                      onClick={() =>
+                        void runRpc("admin_restore_platform_theme", {})
+                      }
+                      type="button"
+                    >
+                      <RotateCcw size={15} /> Restore default
+                    </button>
+                  </div>
+                </section>
+                <section
+                  className="admin-theme-preview"
+                  style={
+                    {
+                      "--preview-bg": themeDraft.backgroundColor,
+                      "--preview-card": themeDraft.cardColor,
+                      "--preview-text": themeDraft.textColor,
+                      "--preview-accent": themeDraft.accentColor,
+                      "--preview-button": themeDraft.buttonColor,
+                      "--preview-link": themeDraft.linkColor,
+                      "--preview-border": themeDraft.borderColor,
+                    } as React.CSSProperties
+                  }
+                >
+                  <span className="eyebrow"><Eye size={13} /> Live Preview</span>
+                  <div className="theme-preview-brand">
+                    <Logo />
+                    <span>Public Beta</span>
+                  </div>
+                  <article className="theme-preview-song">
+                    <div className="theme-preview-cover"><Music2 size={22} /></div>
+                    <div>
+                      <strong>Community spotlight song</strong>
+                      <a href="#appearance">View artist profile</a>
+                      <small>128 listens / 14 comments / Hook Score 84</small>
+                    </div>
+                  </article>
+                  <blockquote>
+                    “The first 30 seconds pulled me in. The vocal and hook feel
+                    ready for another listen.”
+                  </blockquote>
+                  <div className="theme-preview-stats">
+                    <span><strong>92%</strong> Listen full</span>
+                    <span><strong>84</strong> Hook Score</span>
+                    <span><strong>37</strong> Followers</span>
+                  </div>
+                  <button type="button">Review this song</button>
+                </section>
+              </div>
+            </>
+          )}
+
+          {section === "announcements" && role !== "moderator" && (
+            <>
+              <div className="admin-section-heading">
+                <div>
+                  <h2>Announcements</h2>
+                  <span>Schedule targeted platform messages for the community.</span>
+                </div>
+                {announcementDraft.id && (
+                  <button
+                    className="secondary-button"
+                    onClick={() => setAnnouncementDraft(emptyAnnouncement)}
+                    type="button"
+                  >
+                    New announcement
+                  </button>
+                )}
+              </div>
+              <section className="admin-announcement-editor">
+                <label>
+                  Type
+                  <select
+                    onChange={(event) =>
+                      setAnnouncementDraft((current) => ({
+                        ...current,
+                        announcement_type: event.target
+                          .value as AdminAnnouncement["announcement_type"],
+                      }))
+                    }
+                    value={announcementDraft.announcement_type}
+                  >
+                    <option value="platform_update">Platform update</option>
+                    <option value="scheduled_change">Scheduled change</option>
+                    <option value="contest">Contest</option>
+                    <option value="community_news">Community news</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="special_event">Special event</option>
+                  </select>
+                </label>
+                <label>
+                  Audience
+                  <select
+                    onChange={(event) =>
+                      setAnnouncementDraft((current) => ({
+                        ...current,
+                        audience: event.target
+                          .value as AdminAnnouncement["audience"],
+                      }))
+                    }
+                    value={announcementDraft.audience}
+                  >
+                    <option value="everyone">Everyone</option>
+                    <option value="guests">Guests</option>
+                    <option value="members">Members</option>
+                    <option value="creators">Creators</option>
+                  </select>
+                </label>
+                <label>
+                  Priority
+                  <select
+                    onChange={(event) =>
+                      setAnnouncementDraft((current) => ({
+                        ...current,
+                        priority: Number(event.target.value),
+                      }))
+                    }
+                    value={announcementDraft.priority}
+                  >
+                    {[1, 2, 3, 4, 5].map((priority) => (
+                      <option key={priority} value={priority}>
+                        {priority}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="admin-announcement-wide">
+                  Title
+                  <input
+                    maxLength={120}
+                    onChange={(event) =>
+                      setAnnouncementDraft((current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
+                    }
+                    value={announcementDraft.title}
+                  />
+                </label>
+                <label className="admin-announcement-wide">
+                  Message
+                  <textarea
+                    maxLength={1000}
+                    onChange={(event) =>
+                      setAnnouncementDraft((current) => ({
+                        ...current,
+                        message: event.target.value,
+                      }))
+                    }
+                    rows={4}
+                    value={announcementDraft.message}
+                  />
+                </label>
+                <label>
+                  Start
+                  <input
+                    onChange={(event) =>
+                      setAnnouncementDraft((current) => ({
+                        ...current,
+                        starts_at: event.target.value,
+                      }))
+                    }
+                    type="datetime-local"
+                    value={localDateTimeValue(announcementDraft.starts_at)}
+                  />
+                </label>
+                <label>
+                  End
+                  <input
+                    onChange={(event) =>
+                      setAnnouncementDraft((current) => ({
+                        ...current,
+                        ends_at: event.target.value || null,
+                      }))
+                    }
+                    type="datetime-local"
+                    value={localDateTimeValue(announcementDraft.ends_at)}
+                  />
+                </label>
+                <label className="admin-setting-toggle">
+                  <input
+                    checked={announcementDraft.is_active}
+                    onChange={(event) =>
+                      setAnnouncementDraft((current) => ({
+                        ...current,
+                        is_active: event.target.checked,
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  Active
+                </label>
+                <button
+                  className="primary-button"
+                  disabled={
+                    announcementDraft.title.trim().length < 3 ||
+                    announcementDraft.message.trim().length < 3
+                  }
+                  onClick={() => void saveAnnouncement()}
+                  type="button"
+                >
+                  <Megaphone size={15} />
+                  {announcementDraft.id ? "Update announcement" : "Publish announcement"}
+                </button>
+              </section>
+              <div className="admin-table admin-announcement-list">
+                {announcements.map((announcement) => (
+                  <article key={announcement.id}>
+                    <div>
+                      <strong>{announcement.title}</strong>
+                      <small>
+                        {announcement.announcement_type.replaceAll("_", " ")} /{" "}
+                        {announcement.audience} / priority {announcement.priority}
+                      </small>
+                    </div>
+                    <span>{announcement.message}</span>
+                    <div className="admin-actions">
+                      <button
+                        onClick={() =>
+                          setAnnouncementDraft({
+                            ...announcement,
+                            starts_at: announcement.starts_at,
+                            ends_at: announcement.ends_at,
+                          })
+                        }
+                        type="button"
+                      >
+                        Edit
+                      </button>
+                      {announcement.is_active && (
+                        <button
+                          onClick={() =>
+                            void runRpc(
+                              "admin_remove_platform_announcement",
+                              { target_id: announcement.id },
+                            )
+                          }
+                          type="button"
+                        >
+                          Deactivate
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                ))}
+                {!announcements.length && (
+                  <div className="empty-state">No announcements have been created.</div>
+                )}
+              </div>
+            </>
+          )}
+
+          {section === "health" && role !== "moderator" && (
+            <>
+              <div className="admin-section-heading">
+                <div>
+                  <h2>Community Health</h2>
+                  <span>
+                    Live activity and today&apos;s participation across guests
+                    and members.
+                  </span>
+                </div>
+              </div>
+              <div className="admin-health-grid">
+                {[
+                  ["Active guests", communityHealth?.active_guests ?? 0],
+                  ["Active members", communityHealth?.active_members ?? 0],
+                  ["Valid listens today", communityHealth?.valid_listens_today ?? 0],
+                  ["Listening hours today", communityHealth?.listening_hours_today ?? 0],
+                  ["Comments today", communityHealth?.comments_today ?? 0],
+                  ["Likes today", communityHealth?.likes_today ?? 0],
+                  ["Followers today", communityHealth?.followers_today ?? 0],
+                  ["Shares today", communityHealth?.shares_today ?? 0],
+                  ["Songs submitted", communityHealth?.songs_submitted_today ?? 0],
+                  ["Songs archived", communityHealth?.songs_archived_today ?? 0],
+                  ["New guest profiles", communityHealth?.new_guest_profiles_today ?? 0],
+                  ["New accounts", communityHealth?.new_accounts_today ?? 0],
+                ].map(([label, value]) => (
+                  <article key={label}>
+                    <strong>{value}</strong>
+                    <span>{label}</span>
+                  </article>
+                ))}
+              </div>
+              <section className="admin-conversion-card">
+                <div>
+                  <span className="eyebrow">Guest conversion</span>
+                  <strong>
+                    {communityHealth?.guest_to_member_conversion_rate ?? 0}%
+                  </strong>
+                </div>
+                <p>
+                  {communityHealth?.converted_guest_profiles ?? 0} of{" "}
+                  {communityHealth?.total_guest_profiles ?? 0} guest identities
+                  have converted to member accounts.
+                </p>
+              </section>
             </>
           )}
 

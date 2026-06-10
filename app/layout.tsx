@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
+import { PlatformRuntime } from "@/components/platform-runtime";
+import {
+  defaultPlatformTheme,
+  mapPlatformThemeRow,
+} from "@/lib/platform-theme";
+import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
+import "./unified.css";
 
 export const metadata: Metadata = {
   title: "First Listen - Real Listeners. Real Viewers. Real Reactions.",
@@ -35,14 +42,34 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let initialTheme = defaultPlatformTheme;
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("platform_theme_settings")
+      .select(
+        "preset, background_color, card_color, text_color, accent_color, button_color, link_color, border_color, updated_at",
+      )
+      .eq("id", true)
+      .maybeSingle();
+    initialTheme = mapPlatformThemeRow(
+      data as Record<string, unknown> | null,
+    );
+  } catch {
+    initialTheme = defaultPlatformTheme;
+  }
+
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <PlatformRuntime initialTheme={initialTheme} />
+        {children}
+      </body>
     </html>
   );
 }

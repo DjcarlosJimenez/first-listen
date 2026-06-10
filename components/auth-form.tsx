@@ -22,7 +22,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [accepted, setAccepted] = useState(false);
   const [unconfirmedEmail, setUnconfirmedEmail] = useState("");
   const isSignup = mode === "signup";
-  const nextPath = useMemo(() => searchParams.get("next") || "/dashboard", [searchParams]);
+  const nextPath = useMemo(() => searchParams.get("next") || "/review", [searchParams]);
   const resetMessage =
     searchParams.get("message") === "password-reset"
       ? "Password updated. Log in with your new password."
@@ -90,7 +90,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       return;
     }
 
-    router.replace(isSignup ? "/dashboard" : nextPath);
+    router.replace(isSignup ? "/review" : nextPath);
     router.refresh();
   };
 
