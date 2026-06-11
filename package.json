@@ -38,6 +38,8 @@
     "owner-control:verify": "node scripts/verify-owner-control-center.mjs",
     "owner-control:email-fix:dry-run": "node scripts/apply-owner-control-email-fix.mjs",
     "owner-control:email-fix:apply": "node scripts/apply-owner-control-email-fix.mjs --apply",
+    "owner-control:expansion:dry-run": "node scripts/apply-owner-control-expansion.mjs",
+    "owner-control:expansion:apply": "node scripts/apply-owner-control-expansion.mjs --apply",
     "control-center:verify": "node scripts/verify-super-admin-control-center.mjs",
     "priority25:verify:production": "node scripts/verify-priority25-production.mjs",
     "db:schema:sync": "node scripts/sync-schema.mjs",

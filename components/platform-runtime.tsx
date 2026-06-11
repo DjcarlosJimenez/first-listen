@@ -46,7 +46,37 @@ function applyControlConfig(config: PlatformControlConfig) {
   root.style.setProperty("--primary-color", config.theme.primaryColor);
   root.style.setProperty("--secondary-color", config.theme.secondaryColor);
   root.style.setProperty("--hover-color", config.theme.hoverColor);
-  for (const [index, module] of config.homepage.order.entries()) {
+  root.dataset.reviewLayoutDensity = config.homepage.reviewLayoutDensity;
+  root.dataset.actionLayoutDesktop = config.homepage.actionButtonLayout.desktop;
+  root.dataset.actionLayoutMobile = config.homepage.actionButtonLayout.mobile;
+  root.dataset.reviewFormLayout = config.homepage.reviewFormLayout;
+  root.dataset.defaultLandingPlayback =
+    config.homepage.autoplay.defaultLandingPlayback;
+  root.dataset.autoPlayOnLogin = String(
+    config.homepage.autoplay.autoPlayOnLoginDefault,
+  );
+  root.dataset.artistProfileLayout = config.artistProfile.layout;
+  root.dataset.externalContentVisibility =
+    config.discovery.externalContent.visibility;
+  root.dataset.externalSongBehavior = config.discovery.externalContent.behavior;
+
+  const priorityModule: Partial<
+    Record<PlatformControlConfig["homepage"]["firstVisibleSection"], HomepageModuleKey>
+  > = {
+    review_queue: "review_queue",
+    spotlight: "spotlight",
+    discovery: "external_discovery",
+    rankings: "top_results",
+    community_activity: "community_activity",
+  };
+  const promotedModule =
+    priorityModule[config.homepage.firstVisibleSection] ?? "review_queue";
+  const orderedModules = [
+    promotedModule,
+    ...config.homepage.order.filter((module) => module !== promotedModule),
+  ];
+
+  for (const [index, module] of orderedModules.entries()) {
     root.style.setProperty(`--module-order-${module}`, String(index + 1));
     root.style.setProperty(
       `--module-display-${module}`,
@@ -80,6 +110,21 @@ function applyControlConfig(config: PlatformControlConfig) {
   )) {
     root.style.setProperty(
       `--artist-field-${field}`,
+      visible ? "" : "none",
+    );
+  }
+  for (const [field, enabled] of Object.entries(
+    config.homepage.community.features,
+  )) {
+    root.style.setProperty(`--community-feature-${field}`, enabled ? "" : "none");
+    root.dataset[`communityFeature${field[0].toUpperCase()}${field.slice(1)}`] =
+      String(enabled);
+  }
+  for (const [field, visible] of Object.entries(
+    config.homepage.community.visibility,
+  )) {
+    root.style.setProperty(
+      `--community-visibility-${field}`,
       visible ? "" : "none",
     );
   }

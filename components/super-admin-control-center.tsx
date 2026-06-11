@@ -21,6 +21,7 @@ import {
   Save,
   Send,
   Shield,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   Upload,
@@ -141,11 +142,13 @@ type DirectorySong = {
 
 type ControlTab =
   | "overview"
+  | "interface"
   | "appearance"
   | "homepage"
   | "discovery"
   | "content"
   | "profiles"
+  | "community"
   | "tokens"
   | "announcements"
   | "health"
@@ -155,11 +158,13 @@ type ControlTab =
 
 const tabs: Array<[ControlTab, string, typeof Gauge]> = [
   ["overview", "Publish", Gauge],
+  ["interface", "Interface", SlidersHorizontal],
   ["appearance", "Appearance", Palette],
   ["homepage", "Page Builder", LayoutDashboard],
   ["discovery", "Discovery", Sparkles],
   ["content", "Content", Music2],
   ["profiles", "Artist Profiles", Users],
+  ["community", "Community", Users],
   ["tokens", "Token Economy", WalletCards],
   ["announcements", "Announcements", Bell],
   ["health", "Live Health", Activity],
@@ -195,6 +200,83 @@ const discoveryLabels: Record<
   newestSongs: "New Releases",
 };
 
+const homepagePriorityLabels: Record<
+  PlatformControlConfig["homepage"]["firstVisibleSection"],
+  string
+> = {
+  review_queue: "Review Queue",
+  spotlight: "Spotlight",
+  discovery: "Discovery",
+  rankings: "Rankings",
+  community_activity: "Community Activity",
+};
+
+const reviewDensityLabels: Record<
+  PlatformControlConfig["homepage"]["reviewLayoutDensity"],
+  string
+> = {
+  compact: "Compact View",
+  standard: "Standard View",
+  expanded: "Expanded View",
+};
+
+const actionDesktopLabels: Record<
+  PlatformControlConfig["homepage"]["actionButtonLayout"]["desktop"],
+  string
+> = {
+  vertical_stack: "Vertical Stack",
+  grid_2x3: "2x3 Grid",
+  single_row: "Single Row",
+};
+
+const actionMobileLabels: Record<
+  PlatformControlConfig["homepage"]["actionButtonLayout"]["mobile"],
+  string
+> = {
+  icons_only: "Icons Only",
+  icons_labels: "Icons + Labels",
+  two_row_grid: "Two Row Grid",
+};
+
+const reviewFormLabels: Record<
+  PlatformControlConfig["homepage"]["reviewFormLayout"],
+  string
+> = {
+  compact: "Compact",
+  standard: "Standard",
+  detailed: "Detailed",
+};
+
+const landingPlaybackLabels: Record<
+  PlatformControlConfig["homepage"]["autoplay"]["defaultLandingPlayback"],
+  string
+> = {
+  review_queue: "Review Queue",
+  spotlight: "Spotlight",
+  discovery: "Discovery",
+  top_results: "Top Results",
+};
+
+const externalVisibilityLabels: Record<
+  PlatformControlConfig["discovery"]["externalContent"]["visibility"],
+  string
+> = {
+  mixed_with_queue: "Mixed With Queue",
+  separate_section: "Separate Section",
+  both: "Both",
+  hidden: "Hidden",
+};
+
+const externalBehaviorLabels: Record<
+  PlatformControlConfig["discovery"]["externalContent"]["behavior"],
+  string
+> = {
+  mix_normally: "Mix Normally",
+  ask_user: "Ask User",
+  skip_automatically: "Skip Automatically",
+  internal_content_only: "Internal Content Only",
+};
+
 const artistVisibilityLabels: Record<
   keyof PlatformControlConfig["artistProfile"]["visibility"],
   string
@@ -208,6 +290,67 @@ const artistVisibilityLabels: Record<
   supporters: "Supporters",
   giftTokens: "Gift Tokens",
 };
+
+const artistPremiumLabels: Record<
+  keyof PlatformControlConfig["artistProfile"]["premium"],
+  string
+> = {
+  enabled: "Enable Premium Artist Accounts",
+  customBanner: "Custom Banner",
+  customProfileImage: "Custom Profile Image",
+  biography: "Artist Biography",
+  customTheme: "Custom Theme",
+  pinnedSong: "Pinned Song",
+  socialLinks: "Social Media Links",
+  featuredVideo: "Featured Video",
+  customSections: "Custom Sections",
+  premiumBadge: "Premium Badge",
+};
+
+const communityFeatureLabels: Record<
+  keyof PlatformControlConfig["homepage"]["community"]["features"],
+  string
+> = {
+  likes: "Likes",
+  comments: "Comments",
+  followers: "Followers",
+  shares: "Shares",
+  savedSongs: "Saved Songs",
+  reviews: "Reviews",
+};
+
+const communityVisibilityLabels: Record<
+  keyof PlatformControlConfig["homepage"]["community"]["visibility"],
+  string
+> = {
+  communityActivity: "Community Activity",
+  whileYouWereAway: "While You Were Away",
+  topSupporters: "Top Supporters",
+  recentSupporters: "Recent Supporters",
+};
+
+const experimentMetricLabels: Record<
+  keyof PlatformControlConfig["experiments"]["metrics"],
+  string
+> = {
+  listeningTime: "Listening Time",
+  reviewsCompleted: "Reviews Completed",
+  followersGained: "Followers Gained",
+  shares: "Shares",
+  comments: "Comments",
+  artistVisits: "Artist Visits",
+};
+
+const experimentFlagLabels: Array<
+  [keyof Omit<PlatformControlConfig["experiments"], "metrics" | "layoutA" | "layoutB" | "activeVariant">, string]
+> = [
+  ["experimentalFeatures", "Experimental Features"],
+  ["abTesting", "A/B Testing"],
+  ["layoutTesting", "Layout Testing"],
+  ["themeTesting", "Theme Testing"],
+  ["newDiscoveryModules", "New Discovery Modules"],
+  ["betaFeatures", "Beta Features"],
+];
 
 function cloneConfig(value: unknown) {
   return structuredClone(normalizePlatformControlConfig(value));
@@ -752,6 +895,186 @@ export function SuperAdminControlCenter({
         </div>
       )}
 
+      {tab === "interface" && (
+        <div className="control-grid">
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Interface density</span>
+                <h3>Review screen spacing and readability</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("homepage")}
+                type="button"
+              >
+                <Save size={15} /> Save Draft
+              </button>
+            </div>
+            <div className="control-number-grid">
+              <label>
+                Review layout
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      homepage: {
+                        ...current.homepage,
+                        reviewLayoutDensity: event.target
+                          .value as PlatformControlConfig["homepage"]["reviewLayoutDensity"],
+                      },
+                    }))
+                  }
+                  value={config.homepage.reviewLayoutDensity}
+                >
+                  {Object.entries(reviewDensityLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Review form layout
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      homepage: {
+                        ...current.homepage,
+                        reviewFormLayout: event.target
+                          .value as PlatformControlConfig["homepage"]["reviewFormLayout"],
+                      },
+                    }))
+                  }
+                  value={config.homepage.reviewFormLayout}
+                >
+                  {Object.entries(reviewFormLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p>
+              Compact reduces whitespace and card height. Standard keeps the
+              current balance. Expanded increases spacing for readability.
+            </p>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Action button layout</span>
+            <h3>Desktop and mobile controls</h3>
+            <label>
+              Desktop
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    homepage: {
+                      ...current.homepage,
+                      actionButtonLayout: {
+                        ...current.homepage.actionButtonLayout,
+                        desktop: event.target
+                          .value as PlatformControlConfig["homepage"]["actionButtonLayout"]["desktop"],
+                      },
+                    },
+                  }))
+                }
+                value={config.homepage.actionButtonLayout.desktop}
+              >
+                {Object.entries(actionDesktopLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Mobile
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    homepage: {
+                      ...current.homepage,
+                      actionButtonLayout: {
+                        ...current.homepage.actionButtonLayout,
+                        mobile: event.target
+                          .value as PlatformControlConfig["homepage"]["actionButtonLayout"]["mobile"],
+                      },
+                    },
+                  }))
+                }
+                value={config.homepage.actionButtonLayout.mobile}
+              >
+                {Object.entries(actionMobileLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p>Defaults: desktop 2x3 grid and mobile icons only.</p>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Auto play settings</span>
+            <h3>Default landing playback</h3>
+            <label className="control-switch">
+              <input
+                checked={config.homepage.autoplay.autoPlayOnLoginDefault}
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    homepage: {
+                      ...current.homepage,
+                      autoplay: {
+                        ...current.homepage.autoplay,
+                        autoPlayOnLoginDefault: event.target.checked,
+                      },
+                    },
+                  }))
+                }
+                type="checkbox"
+              />
+              <span>
+                {config.homepage.autoplay.autoPlayOnLoginDefault
+                  ? "Auto Play On Login enabled"
+                  : "Auto Play On Login disabled"}
+              </span>
+            </label>
+            <label>
+              Start playback from
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    homepage: {
+                      ...current.homepage,
+                      autoplay: {
+                        ...current.homepage.autoplay,
+                        defaultLandingPlayback: event.target
+                          .value as PlatformControlConfig["homepage"]["autoplay"]["defaultLandingPlayback"],
+                      },
+                    },
+                  }))
+                }
+                value={config.homepage.autoplay.defaultLandingPlayback}
+              >
+                {Object.entries(landingPlaybackLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </article>
+        </div>
+      )}
+
       {tab === "appearance" && (
         <div className="control-grid control-appearance">
           <article className="control-card control-card-wide">
@@ -962,6 +1285,28 @@ export function SuperAdminControlCenter({
             Key public sections include Spotlight, Top 10, Trending, New
             Releases, and Community Picks.
           </p>
+          <label className="control-priority-select">
+            Choose first visible section
+            <select
+              onChange={(event) =>
+                setConfig((current) => ({
+                  ...current,
+                  homepage: {
+                    ...current.homepage,
+                    firstVisibleSection: event.target
+                      .value as PlatformControlConfig["homepage"]["firstVisibleSection"],
+                  },
+                }))
+              }
+              value={config.homepage.firstVisibleSection}
+            >
+              {Object.entries(homepagePriorityLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="control-module-list">
             {config.homepage.order.map((module, index) => (
               <article
@@ -1089,6 +1434,107 @@ export function SuperAdminControlCenter({
                 </label>
               ))}
             </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">External content control</span>
+            <h3>Discovery and queue behavior</h3>
+            <label>
+              External content visibility
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    discovery: {
+                      ...current.discovery,
+                      externalContent: {
+                        ...current.discovery.externalContent,
+                        visibility: event.target
+                          .value as PlatformControlConfig["discovery"]["externalContent"]["visibility"],
+                      },
+                    },
+                  }))
+                }
+                value={config.discovery.externalContent.visibility}
+              >
+                {Object.entries(externalVisibilityLabels).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+            <label>
+              External content ratio
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    discovery: {
+                      ...current.discovery,
+                      externalContent: {
+                        ...current.discovery.externalContent,
+                        ratio: Number(event.target.value) as
+                          PlatformControlConfig["discovery"]["externalContent"]["ratio"],
+                      },
+                    },
+                  }))
+                }
+                value={config.discovery.externalContent.ratio}
+              >
+                {[0, 10, 20, 30, 50].map((value) => (
+                  <option key={value} value={value}>
+                    {value}%
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              External song behavior
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    discovery: {
+                      ...current.discovery,
+                      externalContent: {
+                        ...current.discovery.externalContent,
+                        behavior: event.target
+                          .value as PlatformControlConfig["discovery"]["externalContent"]["behavior"],
+                      },
+                    },
+                  }))
+                }
+                value={config.discovery.externalContent.behavior}
+              >
+                {Object.entries(externalBehaviorLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="control-switch">
+              <input
+                checked={config.discovery.externalContent.userSkipExternalDefault}
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    discovery: {
+                      ...current.discovery,
+                      externalContent: {
+                        ...current.discovery.externalContent,
+                        userSkipExternalDefault: event.target.checked,
+                      },
+                    },
+                  }))
+                }
+                type="checkbox"
+              />
+              <span>Automatically skip external songs by default</span>
+            </label>
           </article>
 
           <article className="control-card control-card-wide">
@@ -1386,104 +1832,266 @@ export function SuperAdminControlCenter({
       )}
 
       {tab === "profiles" && (
-        <article className="control-card">
-          <div className="control-heading">
-            <div>
-              <span className="eyebrow">Public artist profiles</span>
-              <h3>Visibility and section order</h3>
-            </div>
-            <button
-              className="primary-button"
-              disabled={busy}
-              onClick={() => void saveSection("artistProfile")}
-              type="button"
-            >
-              <Save size={15} /> Save Draft
-            </button>
-          </div>
-          <div className="control-toggle-grid">
-            {(
-              Object.keys(config.artistProfile.visibility) as Array<
-                keyof PlatformControlConfig["artistProfile"]["visibility"]
+        <div className="control-grid">
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Public artist profiles</span>
+                <h3>Visibility, layout, and section order</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("artistProfile")}
+                type="button"
               >
-            ).map((field) => (
-              <label key={field}>
-                <input
-                  checked={config.artistProfile.visibility[field]}
-                  onChange={(event) =>
-                    setConfig((current) => ({
-                      ...current,
-                      artistProfile: {
-                        ...current.artistProfile,
-                        visibility: {
-                          ...current.artistProfile.visibility,
-                          [field]: event.target.checked,
+                <Save size={15} /> Save Draft
+              </button>
+            </div>
+            <label>
+              Profile layout
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    artistProfile: {
+                      ...current.artistProfile,
+                      layout: event.target
+                        .value as PlatformControlConfig["artistProfile"]["layout"],
+                    },
+                  }))
+                }
+                value={config.artistProfile.layout}
+              >
+                <option value="compact">Compact</option>
+                <option value="standard">Standard</option>
+                <option value="premium_showcase">Premium Showcase</option>
+              </select>
+            </label>
+            <div className="control-toggle-grid">
+              {(
+                Object.keys(config.artistProfile.visibility) as Array<
+                  keyof PlatformControlConfig["artistProfile"]["visibility"]
+                >
+              ).map((field) => (
+                <label key={field}>
+                  <input
+                    checked={config.artistProfile.visibility[field]}
+                    onChange={(event) =>
+                      setConfig((current) => ({
+                        ...current,
+                        artistProfile: {
+                          ...current.artistProfile,
+                          visibility: {
+                            ...current.artistProfile.visibility,
+                            [field]: event.target.checked,
+                          },
                         },
-                      },
-                    }))
-                  }
-                  type="checkbox"
-                />
-                {artistVisibilityLabels[field]}
-              </label>
-            ))}
-          </div>
-          <div className="control-module-list">
-            {config.artistProfile.order.map((section, index) => (
-              <article key={section}>
-                <Blocks size={17} />
-                <div>
-                  <strong>{section.replace(/([A-Z])/g, " $1")}</strong>
-                  <small>Position {index + 1}</small>
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  {artistVisibilityLabels[field]}
+                </label>
+              ))}
+            </div>
+            <div className="control-module-list">
+              {config.artistProfile.order.map((section, index) => (
+                <article key={section}>
+                  <Blocks size={17} />
+                  <div>
+                    <strong>{section.replace(/([A-Z])/g, " $1")}</strong>
+                    <small>Position {index + 1}</small>
+                  </div>
+                  <button
+                    disabled={index === 0}
+                    onClick={() =>
+                      setConfig((current) => {
+                        const order = [...current.artistProfile.order];
+                        [order[index - 1], order[index]] = [
+                          order[index],
+                          order[index - 1],
+                        ];
+                        return {
+                          ...current,
+                          artistProfile: {
+                            ...current.artistProfile,
+                            order,
+                          },
+                        };
+                      })
+                    }
+                    type="button"
+                  >
+                    <ArrowUp size={15} />
+                  </button>
+                  <button
+                    disabled={index === config.artistProfile.order.length - 1}
+                    onClick={() =>
+                      setConfig((current) => {
+                        const order = [...current.artistProfile.order];
+                        [order[index], order[index + 1]] = [
+                          order[index + 1],
+                          order[index],
+                        ];
+                        return {
+                          ...current,
+                          artistProfile: {
+                            ...current.artistProfile,
+                            order,
+                          },
+                        };
+                      })
+                    }
+                    type="button"
+                  >
+                    <ArrowDown size={15} />
+                  </button>
+                </article>
+              ))}
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Artist premium features</span>
+            <h3>Customization only</h3>
+            <p>
+              Premium options do not affect valid listens, rankings, reviews,
+              followers, or queue fairness.
+            </p>
+            <div className="control-toggle-grid">
+              {(
+                Object.keys(config.artistProfile.premium) as Array<
+                  keyof PlatformControlConfig["artistProfile"]["premium"]
+                >
+              ).map((field) => (
+                <label key={field}>
+                  <input
+                    checked={config.artistProfile.premium[field]}
+                    onChange={(event) =>
+                      setConfig((current) => ({
+                        ...current,
+                        artistProfile: {
+                          ...current.artistProfile,
+                          premium: {
+                            ...current.artistProfile.premium,
+                            [field]: event.target.checked,
+                          },
+                        },
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  {artistPremiumLabels[field]}
+                </label>
+              ))}
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Artist profile system</span>
+            <h3>Top artist preview</h3>
+            <div className="control-ranking-list">
+              {data.top_artists.map((artist, index) => (
+                <div key={artist.id}>
+                  <span>{index + 1}</span>
+                  <strong>{artist.display_name}</strong>
+                  <small>
+                    Artist verified / {artist.followers} followers /{" "}
+                    {artist.songs} songs
+                  </small>
                 </div>
-                <button
-                  disabled={index === 0}
-                  onClick={() =>
-                    setConfig((current) => {
-                      const order = [...current.artistProfile.order];
-                      [order[index - 1], order[index]] = [
-                        order[index],
-                        order[index - 1],
-                      ];
-                      return {
-                        ...current,
-                        artistProfile: {
-                          ...current.artistProfile,
-                          order,
-                        },
-                      };
-                    })
-                  }
-                  type="button"
+              ))}
+              {!data.top_artists.length && <p>No artist activity yet.</p>}
+            </div>
+          </article>
+        </div>
+      )}
+
+      {tab === "community" && (
+        <div className="control-grid">
+          <article className="control-card">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Community control</span>
+                <h3>Enable or disable participation</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("homepage")}
+                type="button"
+              >
+                <Save size={15} /> Save Draft
+              </button>
+            </div>
+            <div className="control-toggle-grid">
+              {(
+                Object.keys(config.homepage.community.features) as Array<
+                  keyof PlatformControlConfig["homepage"]["community"]["features"]
                 >
-                  <ArrowUp size={15} />
-                </button>
-                <button
-                  disabled={index === config.artistProfile.order.length - 1}
-                  onClick={() =>
-                    setConfig((current) => {
-                      const order = [...current.artistProfile.order];
-                      [order[index], order[index + 1]] = [
-                        order[index + 1],
-                        order[index],
-                      ];
-                      return {
+              ).map((field) => (
+                <label key={field}>
+                  <input
+                    checked={config.homepage.community.features[field]}
+                    onChange={(event) =>
+                      setConfig((current) => ({
                         ...current,
-                        artistProfile: {
-                          ...current.artistProfile,
-                          order,
+                        homepage: {
+                          ...current.homepage,
+                          community: {
+                            ...current.homepage.community,
+                            features: {
+                              ...current.homepage.community.features,
+                              [field]: event.target.checked,
+                            },
+                          },
                         },
-                      };
-                    })
-                  }
-                  type="button"
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  {communityFeatureLabels[field]}
+                </label>
+              ))}
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Community visibility</span>
+            <h3>Activity surfaces</h3>
+            <div className="control-toggle-grid">
+              {(
+                Object.keys(config.homepage.community.visibility) as Array<
+                  keyof PlatformControlConfig["homepage"]["community"]["visibility"]
                 >
-                  <ArrowDown size={15} />
-                </button>
-              </article>
-            ))}
-          </div>
-        </article>
+              ).map((field) => (
+                <label key={field}>
+                  <input
+                    checked={config.homepage.community.visibility[field]}
+                    onChange={(event) =>
+                      setConfig((current) => ({
+                        ...current,
+                        homepage: {
+                          ...current.homepage,
+                          community: {
+                            ...current.homepage.community,
+                            visibility: {
+                              ...current.homepage.community.visibility,
+                              [field]: event.target.checked,
+                            },
+                          },
+                        },
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  {communityVisibilityLabels[field]}
+                </label>
+              ))}
+            </div>
+          </article>
+        </div>
       )}
 
       {tab === "tokens" && (
@@ -2218,11 +2826,7 @@ export function SuperAdminControlCenter({
             unfinished product features by themselves.
           </p>
           <div className="control-toggle-grid">
-            {(
-              Object.keys(config.experiments) as Array<
-                keyof PlatformControlConfig["experiments"]
-              >
-            ).map((field) => (
+            {experimentFlagLabels.map(([field, label]) => (
               <label key={field}>
                 <input
                   checked={config.experiments[field]}
@@ -2237,7 +2841,90 @@ export function SuperAdminControlCenter({
                   }
                   type="checkbox"
                 />
-                {field.replace(/([A-Z])/g, " $1")}
+                {label}
+              </label>
+            ))}
+          </div>
+          <h4>A/B layout variants</h4>
+          <div className="control-number-grid">
+            <label>
+              Layout A
+              <input
+                maxLength={120}
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    experiments: {
+                      ...current.experiments,
+                      layoutA: event.target.value,
+                    },
+                  }))
+                }
+                value={config.experiments.layoutA}
+              />
+            </label>
+            <label>
+              Layout B
+              <input
+                maxLength={120}
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    experiments: {
+                      ...current.experiments,
+                      layoutB: event.target.value,
+                    },
+                  }))
+                }
+                value={config.experiments.layoutB}
+              />
+            </label>
+            <label>
+              Active variant
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    experiments: {
+                      ...current.experiments,
+                      activeVariant: event.target
+                        .value as PlatformControlConfig["experiments"]["activeVariant"],
+                    },
+                  }))
+                }
+                value={config.experiments.activeVariant}
+              >
+                <option value="none">No active test</option>
+                <option value="layout_a">Layout A</option>
+                <option value="layout_b">Layout B</option>
+              </select>
+            </label>
+          </div>
+          <h4>Track experiment metrics</h4>
+          <div className="control-toggle-grid">
+            {(
+              Object.keys(config.experiments.metrics) as Array<
+                keyof PlatformControlConfig["experiments"]["metrics"]
+              >
+            ).map((field) => (
+              <label key={field}>
+                <input
+                  checked={config.experiments.metrics[field]}
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      experiments: {
+                        ...current.experiments,
+                        metrics: {
+                          ...current.experiments.metrics,
+                          [field]: event.target.checked,
+                        },
+                      },
+                    }))
+                  }
+                  type="checkbox"
+                />
+                {experimentMetricLabels[field]}
               </label>
             ))}
           </div>

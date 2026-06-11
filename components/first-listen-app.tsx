@@ -2866,6 +2866,32 @@ function DiscoverySections({
           </p>
         )}
       </section>
+
+      <section
+        className="panel discovery-section external-discovery-section"
+        data-platform-module="external_discovery"
+      >
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">
+              <ExternalLink size={13} /> External Discovery
+            </span>
+            <h3>
+              {spanish
+                ? "Explora plataformas conectadas"
+                : "Explore connected platforms"}
+            </h3>
+          </div>
+          <small>
+            {spanish ? "Spotify / Apple / TikTok / SoundCloud" : "Spotify / Apple / TikTok / SoundCloud"}
+          </small>
+        </div>
+        <p className="discovery-empty">
+          {spanish
+            ? "El Founder puede controlar si el contenido externo se mezcla con la cola, aparece separado o permanece oculto."
+            : "The Founder can control whether external content is mixed with the queue, shown separately, or hidden."}
+        </p>
+      </section>
     </div>
   );
 }

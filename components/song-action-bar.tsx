@@ -260,6 +260,7 @@ export function SongActionBar({
       <div className="song-action-bar" aria-label={spanish ? "Acciones de canción" : "Song actions"}>
         <button
           className={engagement.liked ? "active" : ""}
+          data-community-action="like"
           disabled={busy === "like"}
           onClick={() =>
             void runToggle("like", "toggle_song_like", {
@@ -273,6 +274,7 @@ export function SongActionBar({
         </button>
         <button
           className={panel === "comments" ? "active" : ""}
+          data-community-action="comment"
           onClick={() => {
             const next = panel === "comments" ? null : "comments";
             setPanel(next);
@@ -285,6 +287,7 @@ export function SongActionBar({
         </button>
         <button
           className={engagement.following ? "active" : ""}
+          data-community-action="follow"
           disabled={!artistId || busy === "follow"}
           onClick={() =>
             artistId &&
@@ -305,6 +308,7 @@ export function SongActionBar({
         </button>
         <button
           className={engagement.saved ? "active" : ""}
+          data-community-action="save"
           disabled={busy === "save"}
           onClick={() =>
             void runToggle("save", "toggle_save_song", {
@@ -324,6 +328,7 @@ export function SongActionBar({
         </button>
         <button
           className={panel === "share" ? "active" : ""}
+          data-community-action="share"
           onClick={() => setPanel(panel === "share" ? null : "share")}
           type="button"
         >

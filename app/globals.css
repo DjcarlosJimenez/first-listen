@@ -3176,6 +3176,29 @@ button {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  html[data-action-layout-mobile="icons_only"] .song-action-bar {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  html[data-action-layout-mobile="icons_only"] .song-action-bar button {
+    font-size: 0;
+    gap: 0;
+    min-height: 42px;
+  }
+
+  html[data-action-layout-mobile="icons_only"] .song-action-bar button svg {
+    height: 17px;
+    width: 17px;
+  }
+
+  html[data-action-layout-mobile="icons_labels"] .song-action-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  html[data-action-layout-mobile="two_row_grid"] .song-action-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .song-action-bar button {
     justify-content: center;
     padding-left: 7px;
@@ -8609,7 +8632,7 @@ button {
 }
 
 [data-platform-module="away_summary"] {
-  display: var(--module-display-away_summary, block);
+  display: var(--community-visibility-whileYouWereAway, var(--module-display-away_summary, block));
   order: var(--module-order-away_summary, 1);
 }
 
@@ -8629,7 +8652,7 @@ button {
 }
 
 [data-platform-module="community_activity"] {
-  display: var(--module-display-community_activity, block);
+  display: var(--community-visibility-communityActivity, var(--module-display-community_activity, block));
   order: var(--module-order-community_activity, 5);
 }
 
@@ -8643,24 +8666,157 @@ button {
   order: var(--module-order-artist_spotlight, 7);
 }
 
+[data-platform-module="external_discovery"] {
+  display: var(--module-display-external_discovery, block);
+  order: var(--module-order-external_discovery, 8);
+}
+
 [data-platform-module="trending"] {
   display: var(--module-display-trending, block);
-  order: var(--module-order-trending, 8);
+  order: var(--module-order-trending, 9);
 }
 
 [data-platform-module="most_shared"] {
   display: var(--module-display-most_shared, block);
-  order: var(--module-order-most_shared, 9);
+  order: var(--module-order-most_shared, 10);
 }
 
 [data-platform-module="most_supported"] {
   display: var(--module-display-most_supported, block);
-  order: var(--module-order-most_supported, 10);
+  order: var(--module-order-most_supported, 11);
 }
 
 [data-platform-module="newest_songs"] {
   display: var(--module-display-newest_songs, block);
-  order: var(--module-order-newest_songs, 11);
+  order: var(--module-order-newest_songs, 12);
+}
+
+html[data-review-layout-density="compact"] .content {
+  padding-top: 20px;
+}
+
+html[data-review-layout-density="compact"] .review-layout {
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 230px;
+}
+
+html[data-review-layout-density="compact"] .song-hero,
+html[data-review-layout-density="compact"] .review-form,
+html[data-review-layout-density="compact"] .review-progress,
+html[data-review-layout-density="compact"] .listening-session-card,
+html[data-review-layout-density="compact"] .side-note,
+html[data-review-layout-density="compact"] .queue-card,
+html[data-review-layout-density="compact"] .expect-card {
+  padding: 14px;
+}
+
+html[data-review-layout-density="compact"] .song-hero {
+  gap: 18px;
+  grid-template-columns: 190px minmax(0, 1fr);
+}
+
+html[data-review-layout-density="compact"] .question-row {
+  padding: 9px 0;
+}
+
+html[data-review-layout-density="compact"] .rating-block,
+html[data-review-layout-density="compact"] .comment-field {
+  margin-top: 12px;
+}
+
+html[data-review-layout-density="expanded"] .review-layout {
+  gap: 34px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+html[data-review-layout-density="expanded"] .song-hero,
+html[data-review-layout-density="expanded"] .review-form,
+html[data-review-layout-density="expanded"] .review-progress,
+html[data-review-layout-density="expanded"] .listening-session-card,
+html[data-review-layout-density="expanded"] .side-note,
+html[data-review-layout-density="expanded"] .queue-card,
+html[data-review-layout-density="expanded"] .expect-card {
+  padding: 34px;
+}
+
+html[data-review-layout-density="expanded"] .question-row {
+  padding: 22px 0;
+}
+
+html[data-action-layout-desktop="grid_2x3"] .song-action-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+html[data-action-layout-desktop="vertical_stack"] .song-action-bar {
+  align-items: stretch;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+html[data-action-layout-desktop="single_row"] .song-action-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+html[data-review-form-layout="compact"] .question-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 9px 0;
+}
+
+html[data-review-form-layout="compact"] .binary-choice button {
+  padding: 7px 10px;
+}
+
+html[data-review-form-layout="compact"] .comment-field textarea {
+  height: 66px;
+}
+
+html[data-review-form-layout="detailed"] .review-form {
+  padding: 34px;
+}
+
+html[data-review-form-layout="detailed"] .question-row {
+  align-items: flex-start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+
+html[data-review-form-layout="detailed"] .binary-choice {
+  justify-content: flex-start;
+}
+
+html[data-review-form-layout="detailed"] .comment-field textarea {
+  height: 120px;
+}
+
+html[data-external-content-visibility="hidden"] [data-platform-module="external_discovery"] {
+  display: none;
+}
+
+.offline-community-summary {
+  display: var(--community-visibility-whileYouWereAway, block);
+}
+
+.top-supporters-card {
+  display: var(--community-visibility-topSupporters, block);
+}
+
+.recent-supporters-card {
+  display: var(--community-visibility-recentSupporters, block);
+}
+
+html[data-community-feature-likes="false"] [data-community-action="like"],
+html[data-community-feature-comments="false"] [data-community-action="comment"],
+html[data-community-feature-followers="false"] [data-community-action="follow"],
+html[data-community-feature-shares="false"] [data-community-action="share"],
+html[data-community-feature-saved-songs="false"] [data-community-action="save"],
+html[data-community-feature-reviews="false"] .review-form {
+  display: none;
 }
 
 [data-artist-profile-section="statistics"] {

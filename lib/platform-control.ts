@@ -11,6 +11,7 @@ export const homepageModuleLabels = {
   community_activity: "Community Activity",
   review_queue: "Review Queue",
   artist_spotlight: "Artist Spotlight",
+  external_discovery: "External Discovery",
   trending: "Trending",
   most_shared: "Most Shared",
   most_supported: "Community Picks",
@@ -59,6 +60,42 @@ export type PlatformControlConfig = {
   homepage: {
     order: HomepageModuleKey[];
     visibility: Record<HomepageModuleKey, boolean>;
+    firstVisibleSection:
+      | "review_queue"
+      | "spotlight"
+      | "discovery"
+      | "rankings"
+      | "community_activity";
+    reviewLayoutDensity: "compact" | "standard" | "expanded";
+    actionButtonLayout: {
+      desktop: "vertical_stack" | "grid_2x3" | "single_row";
+      mobile: "icons_only" | "icons_labels" | "two_row_grid";
+    };
+    reviewFormLayout: "compact" | "standard" | "detailed";
+    autoplay: {
+      autoPlayOnLoginDefault: boolean;
+      defaultLandingPlayback:
+        | "review_queue"
+        | "spotlight"
+        | "discovery"
+        | "top_results";
+    };
+    community: {
+      features: {
+        likes: boolean;
+        comments: boolean;
+        followers: boolean;
+        shares: boolean;
+        savedSongs: boolean;
+        reviews: boolean;
+      };
+      visibility: {
+        communityActivity: boolean;
+        whileYouWereAway: boolean;
+        topSupporters: boolean;
+        recentSupporters: boolean;
+      };
+    };
   };
   discovery: {
     songsPerPage: 10 | 20 | 50 | 100;
@@ -73,6 +110,16 @@ export type PlatformControlConfig = {
       | "newestSongs",
       boolean
     >;
+    externalContent: {
+      visibility: "mixed_with_queue" | "separate_section" | "both" | "hidden";
+      ratio: 0 | 10 | 20 | 30 | 50;
+      behavior:
+        | "mix_normally"
+        | "ask_user"
+        | "skip_automatically"
+        | "internal_content_only";
+      userSkipExternalDefault: boolean;
+    };
   };
   spotlight: Array<{
     slot: 1 | 2 | 3;
@@ -90,6 +137,7 @@ export type PlatformControlConfig = {
     endsAt: string | null;
   }>;
   artistProfile: {
+    layout: "compact" | "standard" | "premium_showcase";
     order: string[];
     visibility: {
       followers: boolean;
@@ -100,6 +148,18 @@ export type PlatformControlConfig = {
       statistics: boolean;
       supporters: boolean;
       giftTokens: boolean;
+    };
+    premium: {
+      enabled: boolean;
+      customBanner: boolean;
+      customProfileImage: boolean;
+      biography: boolean;
+      customTheme: boolean;
+      pinnedSong: boolean;
+      socialLinks: boolean;
+      featuredVideo: boolean;
+      customSections: boolean;
+      premiumBadge: boolean;
     };
   };
   tokens: {
@@ -150,6 +210,17 @@ export type PlatformControlConfig = {
     themeTesting: boolean;
     newDiscoveryModules: boolean;
     betaFeatures: boolean;
+    layoutA: string;
+    layoutB: string;
+    activeVariant: "none" | "layout_a" | "layout_b";
+    metrics: {
+      listeningTime: boolean;
+      reviewsCompleted: boolean;
+      followersGained: boolean;
+      shares: boolean;
+      comments: boolean;
+      artistVisits: boolean;
+    };
   };
   announcements: ControlAnnouncement[];
 };
@@ -179,6 +250,33 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
     visibility: Object.fromEntries(
       moduleOrder.map((module) => [module, true]),
     ) as Record<HomepageModuleKey, boolean>,
+    firstVisibleSection: "review_queue",
+    reviewLayoutDensity: "standard",
+    actionButtonLayout: {
+      desktop: "grid_2x3",
+      mobile: "icons_only",
+    },
+    reviewFormLayout: "standard",
+    autoplay: {
+      autoPlayOnLoginDefault: true,
+      defaultLandingPlayback: "review_queue",
+    },
+    community: {
+      features: {
+        likes: true,
+        comments: true,
+        followers: true,
+        shares: true,
+        savedSongs: true,
+        reviews: true,
+      },
+      visibility: {
+        communityActivity: true,
+        whileYouWereAway: true,
+        topSupporters: true,
+        recentSupporters: true,
+      },
+    },
   },
   discovery: {
     songsPerPage: 20,
@@ -192,6 +290,12 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       mostSupported: true,
       newestSongs: true,
     },
+    externalContent: {
+      visibility: "separate_section",
+      ratio: 10,
+      behavior: "ask_user",
+      userSkipExternalDefault: false,
+    },
   },
   spotlight: [1, 2, 3].map((slot) => ({
     slot: slot as 1 | 2 | 3,
@@ -203,7 +307,9 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
     endsAt: null,
   })),
   artistProfile: {
+    layout: "standard",
     order: [
+      "profileHeader",
       "statistics",
       "supporters",
       "recentActivity",
@@ -218,6 +324,18 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       statistics: true,
       supporters: true,
       giftTokens: false,
+    },
+    premium: {
+      enabled: false,
+      customBanner: false,
+      customProfileImage: false,
+      biography: false,
+      customTheme: false,
+      pinnedSong: false,
+      socialLinks: false,
+      featuredVideo: false,
+      customSections: false,
+      premiumBadge: false,
     },
   },
   tokens: {
@@ -302,6 +420,17 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
     themeTesting: false,
     newDiscoveryModules: false,
     betaFeatures: false,
+    layoutA: "Control layout",
+    layoutB: "Variant layout",
+    activeVariant: "none",
+    metrics: {
+      listeningTime: true,
+      reviewsCompleted: true,
+      followersGained: true,
+      shares: true,
+      comments: true,
+      artistVisits: true,
+    },
   },
   announcements: [],
 };
