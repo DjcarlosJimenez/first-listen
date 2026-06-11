@@ -135,7 +135,71 @@ const rollbackApply = await query(`
   rollback;
 `);
 
+const founderPayload = await query(`
+  do $$
+  declare
+    founder_id uuid;
+    payload jsonb;
+  begin
+    select id
+    into founder_id
+    from public.profiles
+    where role::text = 'super_admin'
+      and founder_number = 1
+      and account_status = 'active'
+      and banned_at is null
+    limit 1;
+
+    if founder_id is null then
+      raise exception 'Founder #1 super_admin profile was not found.';
+    end if;
+
+    perform set_config('request.jwt.claim.sub', founder_id::text, true);
+    perform set_config('request.jwt.claim.role', 'authenticated', true);
+    payload := public.admin_get_control_center();
+
+    if payload ? 'state' is false
+      or payload ? 'snapshots' is false
+      or payload ? 'preview_access' is false
+      or payload ? 'health' is false
+      or payload ? 'token_analytics' is false
+    then
+      raise exception 'Owner Control Center payload is incomplete.';
+    end if;
+  end;
+  $$;
+  with payload as (
+    select public.admin_get_control_center() as data
+  )
+  select jsonb_build_object(
+    'founder_rpc_loads', true,
+    'profile_email_reference_removed',
+      position(
+        'profile.email'
+        in pg_get_functiondef('public.admin_get_control_center()'::regprocedure)
+      ) = 0,
+    'auth_email_reference_present',
+      position(
+        'auth_user.email'
+        in pg_get_functiondef('public.admin_get_control_center()'::regprocedure)
+      ) > 0,
+    'sections', jsonb_build_object(
+      'theme_manager', payload.data#>'{state,draft_config,theme}' is not null,
+      'homepage_builder', payload.data#>'{state,draft_config,homepage}' is not null,
+      'token_economy', payload.data#>'{state,draft_config,tokens}' is not null,
+      'announcements', payload.data#>'{state,draft_config,announcements}' is not null,
+      'snapshots', jsonb_typeof(payload.data->'snapshots') = 'array',
+      'preview_mode', payload.data ? 'preview_enabled',
+      'rollback', payload.data#>'{state,stable_config}' is not null,
+      'import_export', payload.data#>'{state,draft_config}' is not null,
+      'community_health', payload.data ? 'health'
+    )
+  ) as verification
+  from payload;
+`);
+
 console.log(JSON.stringify({
   ...report[0]?.report,
   rollback_apply: rollbackApply.at(-1)?.verification ?? null,
+  founder_payload: founderPayload.at(-1)?.verification ?? null,
 }, null, 2));
