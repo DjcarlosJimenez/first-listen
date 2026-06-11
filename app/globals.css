@@ -3199,6 +3199,136 @@ button {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  html[data-action-layout-mobile="grid"] .song-action-bar,
+  html[data-action-layout-mobile="custom"] .song-action-bar,
+  html[data-mobile-action-layout="grid"] .song-action-bar,
+  html[data-mobile-action-layout="custom"] .song-action-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  html[data-action-layout-mobile="single_row"] .song-action-bar,
+  html[data-mobile-action-layout="single_row"] .song-action-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  html[data-action-layout-mobile="compact_row"] .song-action-bar,
+  html[data-mobile-action-layout="compact_row"] .song-action-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    overflow-x: auto;
+  }
+
+  html[data-mobile-action-layout="icons_only"] .song-action-bar {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  html[data-mobile-action-layout="icons_only"] .song-action-bar button {
+    font-size: 0 !important;
+    gap: 0;
+    min-height: 42px;
+  }
+
+  [data-ui-component="artistProfileButton"] {
+    --ui-component-button-size: var(--ui-artist-profile-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-artist-profile-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-artist-profile-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="likeButton"] {
+    --ui-component-button-size: var(--ui-like-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-like-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-like-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="commentsButton"] {
+    --ui-component-button-size: var(--ui-comments-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-comments-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-comments-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="followButton"] {
+    --ui-component-button-size: var(--ui-follow-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-follow-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-follow-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="saveButton"] {
+    --ui-component-button-size: var(--ui-save-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-save-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-save-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="shareButton"] {
+    --ui-component-button-size: var(--ui-share-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-share-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-share-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="statisticsButton"] {
+    --ui-component-button-size: var(--ui-statistics-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-statistics-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-statistics-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="reviewButton"] {
+    --ui-component-button-size: var(--ui-review-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-review-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-review-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="playNowButton"] {
+    --ui-component-button-size: var(--ui-play-now-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-play-now-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-play-now-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="nextSongButton"] {
+    --ui-component-button-size: var(--ui-next-song-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-next-song-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-next-song-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="pauseAutoplayButton"] {
+    --ui-component-button-size: var(--ui-pause-autoplay-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-pause-autoplay-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-pause-autoplay-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="openPlatformButton"] {
+    --ui-component-button-size: var(--ui-open-platform-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-open-platform-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-open-platform-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="supportArtistButton"] {
+    --ui-component-button-size: var(--ui-support-artist-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-support-artist-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-support-artist-button-text-mobile, 11px);
+  }
+
+  [data-ui-component="giftTokensButton"] {
+    --ui-component-button-size: var(--ui-gift-tokens-button-button-mobile, 8px 10px);
+    --ui-component-icon-size: var(--ui-gift-tokens-button-icon-mobile, 15px);
+    --ui-component-text-size: var(--ui-gift-tokens-button-text-mobile, 11px);
+  }
+
+  html[data-mobile-card-layout="compact"] .review-card,
+  html[data-mobile-card-layout="compact"] .discovery-song-card,
+  html[data-mobile-card-layout="compact"] .artist-profile-hero,
+  html[data-mobile-card-layout="compact"] .artist-song-grid article {
+    padding: 12px;
+  }
+
+  html[data-mobile-card-layout="expanded"] .review-card,
+  html[data-mobile-card-layout="expanded"] .discovery-song-card,
+  html[data-mobile-card-layout="expanded"] .artist-profile-hero,
+  html[data-mobile-card-layout="expanded"] .artist-song-grid article {
+    padding: 24px;
+  }
+
   .song-action-bar button {
     justify-content: center;
     padding-left: 7px;
@@ -8760,6 +8890,179 @@ html[data-action-layout-desktop="single_row"] .song-action-bar {
   overflow-x: auto;
 }
 
+html[data-action-layout-desktop="compact_row"] .song-action-bar,
+html[data-desktop-action-layout="compact_row"] .song-action-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+html[data-action-layout-desktop="icons_only"] .song-action-bar,
+html[data-desktop-action-layout="icons_only"] .song-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+html[data-action-layout-desktop="grid_2x3"] .song-action-bar,
+html[data-action-layout-desktop="custom"] .song-action-bar,
+html[data-desktop-action-layout="grid"] .song-action-bar,
+html[data-desktop-action-layout="custom"] .song-action-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+[data-ui-component] {
+  --ui-component-button-size: 9px 11px;
+  --ui-component-icon-size: 15px;
+  --ui-component-text-size: 12px;
+  font-size: var(--ui-component-text-size) !important;
+  padding: var(--ui-component-button-size);
+}
+
+[data-ui-component] svg {
+  height: var(--ui-component-icon-size);
+  width: var(--ui-component-icon-size);
+}
+
+[data-ui-component="artistProfileButton"] {
+  --ui-component-button-size: var(--ui-artist-profile-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-artist-profile-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-artist-profile-button-text-desktop, 12px);
+}
+
+[data-ui-component="likeButton"] {
+  --ui-component-button-size: var(--ui-like-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-like-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-like-button-text-desktop, 12px);
+}
+
+[data-ui-component="commentsButton"] {
+  --ui-component-button-size: var(--ui-comments-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-comments-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-comments-button-text-desktop, 12px);
+}
+
+[data-ui-component="followButton"] {
+  --ui-component-button-size: var(--ui-follow-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-follow-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-follow-button-text-desktop, 12px);
+}
+
+[data-ui-component="saveButton"] {
+  --ui-component-button-size: var(--ui-save-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-save-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-save-button-text-desktop, 12px);
+}
+
+[data-ui-component="shareButton"] {
+  --ui-component-button-size: var(--ui-share-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-share-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-share-button-text-desktop, 12px);
+}
+
+[data-ui-component="statisticsButton"] {
+  --ui-component-button-size: var(--ui-statistics-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-statistics-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-statistics-button-text-desktop, 12px);
+}
+
+[data-ui-component="reviewButton"] {
+  --ui-component-button-size: var(--ui-review-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-review-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-review-button-text-desktop, 12px);
+}
+
+[data-ui-component="playNowButton"] {
+  --ui-component-button-size: var(--ui-play-now-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-play-now-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-play-now-button-text-desktop, 12px);
+}
+
+[data-ui-component="nextSongButton"] {
+  --ui-component-button-size: var(--ui-next-song-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-next-song-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-next-song-button-text-desktop, 12px);
+}
+
+[data-ui-component="pauseAutoplayButton"] {
+  --ui-component-button-size: var(--ui-pause-autoplay-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-pause-autoplay-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-pause-autoplay-button-text-desktop, 12px);
+}
+
+[data-ui-component="openPlatformButton"] {
+  --ui-component-button-size: var(--ui-open-platform-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-open-platform-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-open-platform-button-text-desktop, 12px);
+}
+
+[data-ui-component="supportArtistButton"] {
+  --ui-component-button-size: var(--ui-support-artist-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-support-artist-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-support-artist-button-text-desktop, 12px);
+}
+
+[data-ui-component="giftTokensButton"] {
+  --ui-component-button-size: var(--ui-gift-tokens-button-button-desktop, 9px 11px);
+  --ui-component-icon-size: var(--ui-gift-tokens-button-icon-desktop, 15px);
+  --ui-component-text-size: var(--ui-gift-tokens-button-text-desktop, 12px);
+}
+
+html[data-ui-artist-profile-button-mode="hidden"] [data-ui-component="artistProfileButton"],
+html[data-ui-like-button-mode="hidden"] [data-ui-component="likeButton"],
+html[data-ui-comments-button-mode="hidden"] [data-ui-component="commentsButton"],
+html[data-ui-follow-button-mode="hidden"] [data-ui-component="followButton"],
+html[data-ui-save-button-mode="hidden"] [data-ui-component="saveButton"],
+html[data-ui-share-button-mode="hidden"] [data-ui-component="shareButton"],
+html[data-ui-statistics-button-mode="hidden"] [data-ui-component="statisticsButton"],
+html[data-ui-review-button-mode="hidden"] [data-ui-component="reviewButton"],
+html[data-ui-play-now-button-mode="hidden"] [data-ui-component="playNowButton"],
+html[data-ui-next-song-button-mode="hidden"] [data-ui-component="nextSongButton"],
+html[data-ui-pause-autoplay-button-mode="hidden"] [data-ui-component="pauseAutoplayButton"],
+html[data-ui-open-platform-button-mode="hidden"] [data-ui-component="openPlatformButton"],
+html[data-ui-support-artist-button-mode="hidden"] [data-ui-component="supportArtistButton"],
+html[data-ui-gift-tokens-button-mode="hidden"] [data-ui-component="giftTokensButton"] {
+  display: none !important;
+}
+
+html[data-ui-artist-profile-button-mode="icon_only"] [data-ui-component="artistProfileButton"],
+html[data-ui-like-button-mode="icon_only"] [data-ui-component="likeButton"],
+html[data-ui-comments-button-mode="icon_only"] [data-ui-component="commentsButton"],
+html[data-ui-follow-button-mode="icon_only"] [data-ui-component="followButton"],
+html[data-ui-save-button-mode="icon_only"] [data-ui-component="saveButton"],
+html[data-ui-share-button-mode="icon_only"] [data-ui-component="shareButton"],
+html[data-ui-statistics-button-mode="icon_only"] [data-ui-component="statisticsButton"],
+html[data-ui-review-button-mode="icon_only"] [data-ui-component="reviewButton"],
+html[data-ui-play-now-button-mode="icon_only"] [data-ui-component="playNowButton"],
+html[data-ui-next-song-button-mode="icon_only"] [data-ui-component="nextSongButton"],
+html[data-ui-pause-autoplay-button-mode="icon_only"] [data-ui-component="pauseAutoplayButton"],
+html[data-ui-open-platform-button-mode="icon_only"] [data-ui-component="openPlatformButton"],
+html[data-ui-support-artist-button-mode="icon_only"] [data-ui-component="supportArtistButton"],
+html[data-ui-gift-tokens-button-mode="icon_only"] [data-ui-component="giftTokensButton"],
+html[data-action-layout-desktop="icons_only"] .song-action-bar button,
+html[data-desktop-action-layout="icons_only"] .song-action-bar button {
+  font-size: 0 !important;
+  gap: 0;
+}
+
+html[data-ui-artist-profile-button-mode="text_only"] [data-ui-component="artistProfileButton"] svg,
+html[data-ui-like-button-mode="text_only"] [data-ui-component="likeButton"] svg,
+html[data-ui-comments-button-mode="text_only"] [data-ui-component="commentsButton"] svg,
+html[data-ui-follow-button-mode="text_only"] [data-ui-component="followButton"] svg,
+html[data-ui-save-button-mode="text_only"] [data-ui-component="saveButton"] svg,
+html[data-ui-share-button-mode="text_only"] [data-ui-component="shareButton"] svg,
+html[data-ui-statistics-button-mode="text_only"] [data-ui-component="statisticsButton"] svg,
+html[data-ui-review-button-mode="text_only"] [data-ui-component="reviewButton"] svg,
+html[data-ui-play-now-button-mode="text_only"] [data-ui-component="playNowButton"] svg,
+html[data-ui-next-song-button-mode="text_only"] [data-ui-component="nextSongButton"] svg,
+html[data-ui-pause-autoplay-button-mode="text_only"] [data-ui-component="pauseAutoplayButton"] svg,
+html[data-ui-open-platform-button-mode="text_only"] [data-ui-component="openPlatformButton"] svg,
+html[data-ui-support-artist-button-mode="text_only"] [data-ui-component="supportArtistButton"] svg,
+html[data-ui-gift-tokens-button-mode="text_only"] [data-ui-component="giftTokensButton"] svg {
+  display: none;
+}
+
 html[data-review-form-layout="compact"] .question-row {
   display: grid;
   gap: 10px;
@@ -8798,6 +9101,22 @@ html[data-external-content-visibility="hidden"] [data-platform-module="external_
   display: none;
 }
 
+html[data-external-discovery-placement="top"] [data-platform-module="external_discovery"] {
+  order: 1;
+}
+
+html[data-external-discovery-placement="middle"] [data-platform-module="external_discovery"] {
+  order: 6;
+}
+
+html[data-external-discovery-placement="bottom"] [data-platform-module="external_discovery"] {
+  order: 99;
+}
+
+html[data-external-discovery-placement="hidden"] [data-platform-module="external_discovery"] {
+  display: none;
+}
+
 .offline-community-summary {
   display: var(--community-visibility-whileYouWereAway, block);
 }
@@ -8815,8 +9134,27 @@ html[data-community-feature-comments="false"] [data-community-action="comment"],
 html[data-community-feature-followers="false"] [data-community-action="follow"],
 html[data-community-feature-shares="false"] [data-community-action="share"],
 html[data-community-feature-saved-songs="false"] [data-community-action="save"],
+html[data-community-feature-supporters="false"] [data-artist-profile-section="supporters"],
+html[data-community-feature-supporters="false"] .top-supporters-card,
+html[data-community-feature-statistics="false"] [data-ui-component="statisticsButton"],
+html[data-community-feature-statistics="false"] .review-secondary-stats,
 html[data-community-feature-reviews="false"] .review-form {
   display: none;
+}
+
+html[data-community-homepage-likes="false"] [data-platform-module="community_activity"] [data-community-action="like"],
+html[data-community-homepage-comments="false"] [data-platform-module="community_activity"] [data-community-action="comment"],
+html[data-community-homepage-followers="false"] [data-platform-module="community_activity"] [data-community-action="follow"],
+html[data-community-homepage-shares="false"] [data-platform-module="community_activity"] [data-community-action="share"],
+html[data-community-homepage-saved-songs="false"] [data-platform-module="community_activity"] [data-community-action="save"],
+html[data-community-artist-profile-statistics="false"] [data-artist-profile-section="statistics"],
+html[data-community-artist-profile-supporters="false"] [data-artist-profile-section="supporters"],
+html[data-community-artist-profile-community-activity="false"] [data-artist-profile-section="recentActivity"],
+html[data-community-review-queue-reviews="false"] .review-form,
+html[data-community-review-queue-statistics="false"] .review-secondary-stats,
+html[data-community-discovery-statistics="false"] .discovery-song-actions [data-ui-component="statisticsButton"],
+html[data-community-rankings-statistics="false"] [data-platform-module="top_results"] [data-ui-component="statisticsButton"] {
+  display: none !important;
 }
 
 [data-artist-profile-section="statistics"] {
@@ -8840,6 +9178,56 @@ html[data-community-feature-reviews="false"] .review-form {
 
 [data-artist-profile-field="followers"] {
   display: var(--artist-field-followers, inline-flex);
+}
+
+html[data-artist-header-layout="compact"] .artist-profile-hero {
+  gap: 14px;
+  padding: 18px;
+}
+
+html[data-artist-header-layout="expanded"] .artist-profile-hero {
+  gap: 30px;
+  padding: 34px;
+}
+
+html[data-review-queue-card-density="compact"] .queue-card,
+html[data-review-queue-card-density="compact"] .song-hero,
+html[data-spotlight-card-density="compact"] [data-platform-module="spotlight"] .discovery-song-card,
+html[data-discovery-card-density="compact"] .discovery-card,
+html[data-discovery-card-density="compact"] [data-platform-module="external_discovery"],
+html[data-ranking-card-density="compact"] [data-platform-module="top_results"] .discovery-song-card,
+html[data-ranking-card-density="compact"] [data-platform-module="organic_rankings"] .discovery-song-card,
+html[data-artist-card-density="compact"] .artist-profile-hero,
+html[data-profile-card-density="compact"] .artist-song-grid article,
+html[data-desktop-card-layout="compact"] .review-card,
+html[data-desktop-card-layout="compact"] .discovery-song-card {
+  padding: 12px;
+}
+
+html[data-review-queue-card-density="expanded"] .queue-card,
+html[data-review-queue-card-density="expanded"] .song-hero,
+html[data-spotlight-card-density="expanded"] [data-platform-module="spotlight"] .discovery-song-card,
+html[data-discovery-card-density="expanded"] .discovery-card,
+html[data-discovery-card-density="expanded"] [data-platform-module="external_discovery"],
+html[data-ranking-card-density="expanded"] [data-platform-module="top_results"] .discovery-song-card,
+html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankings"] .discovery-song-card,
+html[data-artist-card-density="expanded"] .artist-profile-hero,
+html[data-profile-card-density="expanded"] .artist-song-grid article,
+html[data-desktop-card-layout="expanded"] .review-card,
+html[data-desktop-card-layout="expanded"] .discovery-song-card {
+  padding: 28px;
+}
+
+html[data-spotlight-card-density="compact"] [data-platform-module="spotlight"] .discovery-song-card,
+html[data-ranking-card-density="compact"] [data-platform-module="top_results"] .discovery-song-card,
+html[data-ranking-card-density="compact"] [data-platform-module="organic_rankings"] .discovery-song-card {
+  gap: 12px;
+}
+
+html[data-spotlight-card-density="expanded"] [data-platform-module="spotlight"] .discovery-song-card,
+html[data-ranking-card-density="expanded"] [data-platform-module="top_results"] .discovery-song-card,
+html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankings"] .discovery-song-card {
+  gap: 24px;
 }
 
 .control-center {
@@ -9085,6 +9473,60 @@ html[data-community-feature-reviews="false"] .review-form {
 .control-preset-row button.active {
   background: var(--acid);
   border-color: #a6d536;
+}
+
+.control-preset-grid,
+.control-component-grid,
+.control-section-visibility-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.control-preset-grid button,
+.control-component-grid > section,
+.control-section-visibility-grid > section {
+  background: #f7f8f4;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.control-preset-grid button {
+  align-items: center;
+  color: var(--ink);
+  font-weight: 900;
+  grid-template-columns: auto minmax(0, 1fr);
+  text-align: left;
+}
+
+.control-preset-grid button.active {
+  background: #eafdba;
+  border-color: #b8dc6f;
+}
+
+.control-component-grid > section > strong,
+.control-section-visibility-grid > section > strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.control-size-grid {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-top: 10px;
+}
+
+.control-size-grid > span {
+  color: var(--secondary-color, #4f7110);
+  font-size: 9px;
+  font-weight: 900;
+  grid-column: 1 / -1;
+  text-transform: uppercase;
 }
 
 .control-color-grid,
@@ -9423,6 +9865,9 @@ html[data-community-feature-reviews="false"] .review-form {
 .theme-dark .control-card input,
 .theme-dark .control-card select,
 .theme-dark .control-card textarea,
+.theme-dark .control-preset-grid button,
+.theme-dark .control-component-grid > section,
+.theme-dark .control-section-visibility-grid > section,
 .theme-dark .control-module-list > article,
 .theme-dark .control-toggle-grid label,
 .theme-dark .control-spotlight-grid section,
@@ -9467,6 +9912,9 @@ html[data-community-feature-reviews="false"] .review-form {
   .control-color-grid,
   .control-number-grid,
   .control-announcement-grid,
+  .control-preset-grid,
+  .control-component-grid,
+  .control-section-visibility-grid,
   .control-toggle-grid,
   .control-permission-grid,
   .control-spotlight-grid,
@@ -9490,6 +9938,10 @@ html[data-community-feature-reviews="false"] .review-form {
 
   .control-color-grid label {
     grid-template-columns: minmax(80px, 1fr) 38px 90px;
+  }
+
+  .control-size-grid {
+    grid-template-columns: 1fr;
   }
 
   .control-actions > button,

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -258,7 +259,12 @@ function ProfileSong({
           <strong>Hook {song.hookScore}</strong>
         </div>
 
-        <button className="artist-play-button" onClick={onPlay} type="button">
+        <button
+          className="artist-play-button"
+          data-ui-component="playNowButton"
+          onClick={onPlay}
+          type="button"
+        >
           <Play fill="currentColor" size={15} />
           {active
             ? spanish
@@ -317,6 +323,7 @@ function ProfileSong({
                 )
                 .map((platformLink) => (
                   <a
+                    data-ui-component="openPlatformButton"
                     href={platformLink.url}
                     key={`${song.id}-${platformLink.platform}`}
                     rel="noreferrer"
@@ -350,6 +357,7 @@ export function PublicArtistProfile({
   const [following, setFollowing] = useState(artist.isFollowing);
   const [followerCount, setFollowerCount] = useState(artist.followers);
   const [activeSongId, setActiveSongId] = useState<string | null>(null);
+  const [songSortOrder, setSongSortOrder] = useState("newest");
   const [message, setMessage] = useState("");
   const spanish = locale === "es";
 
@@ -364,6 +372,40 @@ export function PublicArtistProfile({
     setLocale(next);
     document.documentElement.lang = next;
   }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const readSortOrder = () =>
+      setSongSortOrder(root.dataset.artistSongSortOrder ?? "newest");
+    readSortOrder();
+    const observer = new MutationObserver(readSortOrder);
+    observer.observe(root, {
+      attributeFilter: ["data-artist-song-sort-order"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const sortedSongs = useMemo(() => {
+    const next = [...songs];
+    if (songSortOrder === "highest_rated") {
+      next.sort((left, right) => right.averageRating - left.averageRating);
+    } else if (songSortOrder === "most_played") {
+      next.sort((left, right) => right.reviewsReceived - left.reviewsReceived);
+    } else if (songSortOrder === "most_supported") {
+      next.sort((left, right) => right.hookScore - left.hookScore);
+    } else if (songSortOrder === "most_shared") {
+      next.sort((left, right) =>
+        right.platformLinks.length - left.platformLinks.length ||
+        right.reviewsReceived - left.reviewsReceived,
+      );
+    } else {
+      next.sort(
+        (left, right) =>
+          Date.parse(right.submittedAt) - Date.parse(left.submittedAt),
+      );
+    }
+    return next;
+  }, [songSortOrder, songs]);
 
   const toggleFollow = async () => {
     const supabase = createClient();
@@ -447,7 +489,11 @@ export function PublicArtistProfile({
             {artist.languages.map((language) => <span key={language}><Globe2 size={11} /> {language}</span>)}
           </div>
         </div>
-        <button className={following ? "following" : ""} onClick={toggleFollow}>
+        <button
+          className={following ? "following" : ""}
+          data-ui-component="followButton"
+          onClick={toggleFollow}
+        >
           <UserPlus size={16} />{" "}
           {following
             ? spanish
@@ -559,7 +605,7 @@ export function PublicArtistProfile({
         className="artist-song-grid"
         data-artist-profile-section="songs"
       >
-        {songs.map((song) => (
+        {sortedSongs.map((song) => (
           <ProfileSong
             active={activeSongId === song.id}
             key={song.id}
@@ -572,7 +618,7 @@ export function PublicArtistProfile({
             song={song}
           />
         ))}
-        {songs.length === 0 && (
+        {sortedSongs.length === 0 && (
           <div className="empty-state">
             <p>
               {spanish

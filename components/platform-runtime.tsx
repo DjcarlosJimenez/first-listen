@@ -8,10 +8,13 @@ import {
 } from "@/lib/platform-theme";
 import {
   defaultPlatformControlConfig,
+  uiComponentLabels,
   mapPlatformControlState,
   type HomepageModuleKey,
   type PlatformControlConfig,
   type PlatformControlState,
+  type UiResponsiveSize,
+  type UiSizePreset,
 } from "@/lib/platform-control";
 import { createClient } from "@/lib/supabase/client";
 
@@ -40,6 +43,54 @@ function applyTheme(theme: PlatformTheme) {
   root.dataset.platformTheme = theme.preset;
 }
 
+function kebabCase(value: string) {
+  return value.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+}
+
+function cssSize(size: UiSizePreset, customPx: number, kind: "icon" | "text") {
+  if (size === "custom") return `${Math.max(6, Math.min(48, customPx))}px`;
+  const scale =
+    kind === "icon"
+      ? { xs: 12, small: 14, medium: 15, large: 18 }
+      : { xs: 10, small: 11, medium: 12, large: 14 };
+  return `${scale[size]}px`;
+}
+
+function cssPadding(size: UiSizePreset, customPx: number) {
+  if (size === "custom") {
+    const value = Math.max(4, Math.min(28, customPx));
+    return `${value}px ${Math.round(value * 1.25)}px`;
+  }
+  const scale = {
+    xs: "6px 8px",
+    small: "8px 10px",
+    medium: "9px 11px",
+    large: "12px 15px",
+  };
+  return scale[size];
+}
+
+function applyComponentSizing(
+  root: HTMLElement,
+  component: string,
+  device: "desktop" | "mobile",
+  size: UiResponsiveSize,
+) {
+  const prefix = `--ui-${kebabCase(component)}`;
+  root.style.setProperty(
+    `${prefix}-icon-${device}`,
+    cssSize(size.iconSize, size.iconCustomPx, "icon"),
+  );
+  root.style.setProperty(
+    `${prefix}-text-${device}`,
+    cssSize(size.textSize, size.textCustomPx, "text"),
+  );
+  root.style.setProperty(
+    `${prefix}-button-${device}`,
+    cssPadding(size.buttonSize, size.buttonCustomPx),
+  );
+}
+
 function applyControlConfig(config: PlatformControlConfig) {
   applyTheme(config.theme);
   const root = document.documentElement;
@@ -55,10 +106,36 @@ function applyControlConfig(config: PlatformControlConfig) {
   root.dataset.autoPlayOnLogin = String(
     config.homepage.autoplay.autoPlayOnLoginDefault,
   );
+  root.dataset.autoPlayNextSongDefault = String(
+    config.homepage.autoplay.autoPlayNextSongDefault,
+  );
   root.dataset.artistProfileLayout = config.artistProfile.layout;
+  root.dataset.artistHeaderLayout = config.artistProfile.headerLayout;
+  root.dataset.artistSongSortOrder = config.artistProfile.songSortOrder;
   root.dataset.externalContentVisibility =
     config.discovery.externalContent.visibility;
   root.dataset.externalSongBehavior = config.discovery.externalContent.behavior;
+  root.dataset.externalDiscoveryPlacement =
+    config.discovery.externalContent.placement;
+  root.dataset.desktopActionLayout = config.ui.desktop.actionLayout;
+  root.dataset.mobileActionLayout = config.ui.mobile.actionLayout;
+  root.dataset.desktopCardLayout = config.ui.desktop.cardLayout;
+  root.dataset.mobileCardLayout = config.ui.mobile.cardLayout;
+  root.dataset.previewTarget = config.ui.preview.target;
+  root.dataset.previewSection = config.ui.preview.section;
+
+  for (const component of Object.keys(uiComponentLabels)) {
+    const control =
+      config.ui.components[component as keyof typeof config.ui.components];
+    const dataKey = `ui${component[0].toUpperCase()}${component.slice(1)}Mode`;
+    root.dataset[dataKey] = control.display;
+    applyComponentSizing(root, component, "desktop", control.desktop);
+    applyComponentSizing(root, component, "mobile", control.mobile);
+  }
+
+  for (const [card, density] of Object.entries(config.ui.cardDensity)) {
+    root.dataset[`${card}CardDensity`] = density;
+  }
 
   const priorityModule: Partial<
     Record<PlatformControlConfig["homepage"]["firstVisibleSection"], HomepageModuleKey>
@@ -68,6 +145,8 @@ function applyControlConfig(config: PlatformControlConfig) {
     discovery: "external_discovery",
     rankings: "top_results",
     community_activity: "community_activity",
+    artist_spotlight: "artist_spotlight",
+    custom: "review_queue",
   };
   const promotedModule =
     priorityModule[config.homepage.firstVisibleSection] ?? "review_queue";
@@ -127,6 +206,15 @@ function applyControlConfig(config: PlatformControlConfig) {
       `--community-visibility-${field}`,
       visible ? "" : "none",
     );
+  }
+  for (const [section, visibility] of Object.entries(
+    config.homepage.community.sectionVisibility,
+  )) {
+    for (const [field, visible] of Object.entries(visibility)) {
+      root.dataset[
+        `community${section[0].toUpperCase()}${section.slice(1)}${field[0].toUpperCase()}${field.slice(1)}`
+      ] = String(visible);
+    }
   }
   for (const [index, section] of config.artistProfile.order.entries()) {
     root.style.setProperty(`--artist-order-${section}`, String(index + 1));

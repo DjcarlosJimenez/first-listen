@@ -261,6 +261,7 @@ export function SongActionBar({
         <button
           className={engagement.liked ? "active" : ""}
           data-community-action="like"
+          data-ui-component="likeButton"
           disabled={busy === "like"}
           onClick={() =>
             void runToggle("like", "toggle_song_like", {
@@ -275,6 +276,7 @@ export function SongActionBar({
         <button
           className={panel === "comments" ? "active" : ""}
           data-community-action="comment"
+          data-ui-component="commentsButton"
           onClick={() => {
             const next = panel === "comments" ? null : "comments";
             setPanel(next);
@@ -288,6 +290,7 @@ export function SongActionBar({
         <button
           className={engagement.following ? "active" : ""}
           data-community-action="follow"
+          data-ui-component="followButton"
           disabled={!artistId || busy === "follow"}
           onClick={() =>
             artistId &&
@@ -309,6 +312,7 @@ export function SongActionBar({
         <button
           className={engagement.saved ? "active" : ""}
           data-community-action="save"
+          data-ui-component="saveButton"
           disabled={busy === "save"}
           onClick={() =>
             void runToggle("save", "toggle_save_song", {
@@ -329,6 +333,7 @@ export function SongActionBar({
         <button
           className={panel === "share" ? "active" : ""}
           data-community-action="share"
+          data-ui-component="shareButton"
           onClick={() => setPanel(panel === "share" ? null : "share")}
           type="button"
         >
@@ -337,6 +342,7 @@ export function SongActionBar({
         </button>
         <button
           className={panel === "stats" ? "active" : ""}
+          data-ui-component="statisticsButton"
           onClick={() => setPanel(panel === "stats" ? null : "stats")}
           type="button"
         >
@@ -392,14 +398,22 @@ export function SongActionBar({
             <>
               <h4>{spanish ? "Compartir esta canción" : "Share This Song"}</h4>
               <div className="song-share-options">
-                <button onClick={() => void share("community")} type="button">
+                <button
+                  data-ui-component="shareButton"
+                  onClick={() => void share("community")}
+                  type="button"
+                >
                   <Share2 size={16} />
                   <span>
                     <strong>{spanish ? "Compartir First Listen" : "Share First Listen"}</strong>
                     <small>{spanish ? "Ayuda a crecer la comunidad" : "Help grow the community"}</small>
                   </span>
                 </button>
-                <button onClick={() => void share("original_platform")} type="button">
+                <button
+                  data-ui-component="openPlatformButton"
+                  onClick={() => void share("original_platform")}
+                  type="button"
+                >
                   <ExternalLink size={16} />
                   <span>
                     <strong>{spanish ? "Compartir lanzamiento original" : "Share Original Release"}</strong>

@@ -729,6 +729,23 @@ export function GuestExperience() {
   );
   const spanish = locale === "es";
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const applyOwnerAutoplayDefault = () => {
+      const value = root.dataset.autoPlayOnLogin;
+      if (value === "true" || value === "false") {
+        setAutoPlay(value === "true");
+        if (value === "false") setCountdown(null);
+      }
+    };
+    applyOwnerAutoplayDefault();
+    const observer = new MutationObserver(applyOwnerAutoplayDefault);
+    observer.observe(root, {
+      attributeFilter: ["data-auto-play-on-login"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
   const loadSummary = useCallback(
     async (token: string, markActivitySeen = false) => {
       const supabase = createClient();
@@ -1471,6 +1488,7 @@ export function GuestExperience() {
             {!playing ? (
               <button
                 className="guest-listen-button"
+                data-ui-component="playNowButton"
                 onClick={() => setPlaying(true)}
                 type="button"
               >
@@ -1551,6 +1569,7 @@ export function GuestExperience() {
                   : "Use like, comment, follow, save, or share to leave a real signal of listener interest."}
               </p>
               <button
+                data-ui-component="reviewButton"
                 onClick={() =>
                   setGateFeature(spanish ? "Review completa" : "Full Review")
                 }
@@ -1562,11 +1581,16 @@ export function GuestExperience() {
             </section>
 
             <div className="guest-player-controls">
-              <button onClick={() => void nextSong()} type="button">
+              <button
+                data-ui-component="nextSongButton"
+                onClick={() => void nextSong()}
+                type="button"
+              >
                 <SkipForward size={15} /> {spanish ? "Siguiente canción" : "Next Song"}
               </button>
               <button
                 className={autoPlay ? "active" : ""}
+                data-ui-component="pauseAutoplayButton"
                 onClick={() => {
                   setAutoPlay((current) => !current);
                   setCountdown(null);

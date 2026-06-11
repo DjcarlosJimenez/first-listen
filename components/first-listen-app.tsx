@@ -752,10 +752,19 @@ function PostReviewDiscovery({
           : "Your review was submitted. Finish the song or move on when you are ready."}
       </p>
       <div className="post-review-choice">
-        <button onClick={onContinueListening} type="button">
+        <button
+          data-ui-component="playNowButton"
+          onClick={onContinueListening}
+          type="button"
+        >
           <Play size={14} /> {spanish ? "Continuar escuchando" : "Continue Listening"}
         </button>
-        <button className="primary-button" onClick={onNextSong} type="button">
+        <button
+          className="primary-button"
+          data-ui-component="nextSongButton"
+          onClick={onNextSong}
+          type="button"
+        >
           <ArrowRight size={14} /> {spanish ? "Siguiente canción" : "Next Song"}
         </button>
       </div>
@@ -806,21 +815,41 @@ function PostReviewDiscovery({
         </div>
       </section>
       <div className="discovery-links">
-        <a href={links.spotify} rel="noreferrer" target="_blank">
+        <a
+          data-ui-component="openPlatformButton"
+          href={links.spotify}
+          rel="noreferrer"
+          target="_blank"
+        >
           <Disc3 size={15} />{" "}
           {spanish ? "Escuchar completa en Spotify" : "Listen Full Song on Spotify"}
         </a>
-        <a href={links.youtube} rel="noreferrer" target="_blank">
+        <a
+          data-ui-component="openPlatformButton"
+          href={links.youtube}
+          rel="noreferrer"
+          target="_blank"
+        >
           <Youtube size={15} />{" "}
           {spanish ? "Escuchar completa en YouTube" : "Listen Full Song on YouTube"}
         </a>
-        <a href={links.apple} rel="noreferrer" target="_blank">
+        <a
+          data-ui-component="openPlatformButton"
+          href={links.apple}
+          rel="noreferrer"
+          target="_blank"
+        >
           <Radio size={15} />{" "}
           {spanish ? "Escuchar completa en Apple Music" : "Listen Full Song on Apple Music"}
         </a>
       </div>
       <div className="discovery-actions">
-        <button disabled={following || !song.artistId} onClick={followArtist} type="button">
+        <button
+          data-ui-component="followButton"
+          disabled={following || !song.artistId}
+          onClick={followArtist}
+          type="button"
+        >
           <UserPlus size={14} />{" "}
           {following
             ? spanish
@@ -830,7 +859,12 @@ function PostReviewDiscovery({
               ? "Seguir artista"
               : "Follow Artist"}
         </button>
-        <button disabled={saved} onClick={saveForLater} type="button">
+        <button
+          data-ui-component="saveButton"
+          disabled={saved}
+          onClick={saveForLater}
+          type="button"
+        >
           <Bookmark size={14} />{" "}
           {saved
             ? spanish
@@ -842,7 +876,10 @@ function PostReviewDiscovery({
         </button>
       </div>
       {song.artistId && (
-        <Link href={`/artists/${song.artistId}`}>
+        <Link
+          data-ui-component="artistProfileButton"
+          href={`/artists/${song.artistId}`}
+        >
           {spanish ? `Ver perfil de ${song.artist}` : `View ${song.artist}'s profile`}{" "}
           <ArrowRight size={13} />
         </Link>
@@ -1712,6 +1749,7 @@ function ReviewView({
                   </span>
                   <b>{autoAdvanceCountdown}</b>
                   <button
+                    data-ui-component="pauseAutoplayButton"
                     onClick={() => {
                       autoAdvanceStartedRef.current = false;
                       setAutoAdvanceCountdown(null);
@@ -1808,6 +1846,7 @@ function ReviewView({
                       : "Valid Listen Recorded"}
                   </strong>
                   <button
+                    data-ui-component="nextSongButton"
                     onClick={() => void advanceToNextSong(autoPlayNextSong)}
                     type="button"
                   >
@@ -1820,6 +1859,7 @@ function ReviewView({
             )}
             <div className="continuous-listening-controls">
               <button
+                data-ui-component="nextSongButton"
                 onClick={() => void advanceToNextSong(autoPlayNextSong)}
                 type="button"
               >
@@ -1828,6 +1868,7 @@ function ReviewView({
               </button>
               <button
                 className={autoPlayNextSong ? "active" : ""}
+                data-ui-component="pauseAutoplayButton"
                 onClick={() => onAutoPlayChange(!autoPlayNextSong)}
                 type="button"
               >
@@ -1876,7 +1917,12 @@ function ReviewView({
                   : `Playback, progress, volume, and duration are controlled by ${song.platform}.`}
             </p>
             {!externalContent && (
-              <a href={song.link} target="_blank" rel="noreferrer">
+              <a
+                data-ui-component="openPlatformButton"
+                href={song.link}
+                target="_blank"
+                rel="noreferrer"
+              >
                 Open on {song.platform} <ExternalLink size={14} />
               </a>
             )}
@@ -2004,6 +2050,7 @@ function ReviewView({
 
           <button
             className="submit-review-button"
+            data-ui-component="reviewButton"
             disabled={!complete || submitting || reviewSubmitted}
             onClick={submitReview}
           >
@@ -2609,7 +2656,12 @@ function DiscoverySongCard({
         </small>
       </div>
       <div className="discovery-song-actions">
-        <button className="primary-button" onClick={() => void togglePlayer()} type="button">
+        <button
+          className="primary-button"
+          data-ui-component="playNowButton"
+          onClick={() => void togglePlayer()}
+          type="button"
+        >
           <Play size={14} fill="currentColor" />
           {active
             ? spanish
@@ -2619,12 +2671,18 @@ function DiscoverySongCard({
               ? "Escuchar ahora"
               : "Listen Now"}
         </button>
-        <a href={song.link} rel="noreferrer" target="_blank">
+        <a
+          data-ui-component="openPlatformButton"
+          href={song.link}
+          rel="noreferrer"
+          target="_blank"
+        >
           <ExternalLink size={14} />
           {spanish ? "Abrir plataforma" : "Open Platform"}
         </a>
         <button
           className={details === "reviews" ? "active" : ""}
+          data-ui-component="reviewButton"
           onClick={() =>
             setDetails((current) => (current === "reviews" ? null : "reviews"))
           }
@@ -2635,6 +2693,7 @@ function DiscoverySongCard({
         </button>
         <button
           className={details === "statistics" ? "active" : ""}
+          data-ui-component="statisticsButton"
           onClick={() =>
             setDetails((current) =>
               current === "statistics" ? null : "statistics",
@@ -4392,6 +4451,22 @@ export function FirstListenApp({
     const storedComments = window.localStorage.getItem("first-listen-prior-comments");
     if (storedComments) setPriorComments(JSON.parse(storedComments));
     setDarkMode(window.localStorage.getItem("first-listen-theme") === "dark");
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const applyOwnerAutoplayDefault = () => {
+      const value = root.dataset.autoPlayNextSongDefault;
+      if (value === "true" || value === "false") {
+        setAutoPlayNextSong(value === "true");
+      }
+    };
+    applyOwnerAutoplayDefault();
+    const observer = new MutationObserver(applyOwnerAutoplayDefault);
+    observer.observe(root, {
+      attributeFilter: ["data-auto-play-next-song-default"],
+    });
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {

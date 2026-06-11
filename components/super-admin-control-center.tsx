@@ -29,12 +29,18 @@ import {
   WalletCards,
 } from "lucide-react";
 import {
+  cardDensityLabels,
   defaultPlatformControlConfig,
   homepageModuleLabels,
   normalizePlatformControlConfig,
+  uiComponentLabels,
+  type CardDensityKey,
   type ControlAnnouncement,
   type HomepageModuleKey,
   type PlatformControlConfig,
+  type UiComponentKey,
+  type UiResponsiveSize,
+  type UiSizePreset,
 } from "@/lib/platform-control";
 import {
   platformThemePresetLabels,
@@ -140,6 +146,8 @@ type DirectorySong = {
   created_at?: string;
 };
 
+type ConfigSectionKey = Exclude<keyof PlatformControlConfig, "schemaVersion">;
+
 type ControlTab =
   | "overview"
   | "interface"
@@ -154,6 +162,7 @@ type ControlTab =
   | "health"
   | "permissions"
   | "experiments"
+  | "presets"
   | "history";
 
 const tabs: Array<[ControlTab, string, typeof Gauge]> = [
@@ -170,6 +179,7 @@ const tabs: Array<[ControlTab, string, typeof Gauge]> = [
   ["health", "Live Health", Activity],
   ["permissions", "Permissions", Shield],
   ["experiments", "Experiment Lab", FlaskConical],
+  ["presets", "Presets", Blocks],
   ["history", "Snapshots", History],
 ];
 
@@ -185,6 +195,19 @@ const themeFields = [
   ["secondaryColor", "Secondary"],
   ["hoverColor", "Hover"],
 ] as const;
+
+const configSectionLabels: Record<ConfigSectionKey, string> = {
+  theme: "Theme",
+  homepage: "Homepage",
+  ui: "UI Controls",
+  discovery: "Discovery",
+  spotlight: "Spotlight",
+  artistProfile: "Artist Profiles",
+  tokens: "Tokens",
+  permissions: "Permissions",
+  experiments: "Experiments",
+  announcements: "Announcements",
+};
 
 const discoveryLabels: Record<
   keyof PlatformControlConfig["discovery"]["modules"],
@@ -209,6 +232,8 @@ const homepagePriorityLabels: Record<
   discovery: "Discovery",
   rankings: "Rankings",
   community_activity: "Community Activity",
+  artist_spotlight: "Artist Spotlight",
+  custom: "Custom",
 };
 
 const reviewDensityLabels: Record<
@@ -218,6 +243,7 @@ const reviewDensityLabels: Record<
   compact: "Compact View",
   standard: "Standard View",
   expanded: "Expanded View",
+  custom: "Custom View",
 };
 
 const actionDesktopLabels: Record<
@@ -227,6 +253,9 @@ const actionDesktopLabels: Record<
   vertical_stack: "Vertical Stack",
   grid_2x3: "2x3 Grid",
   single_row: "Single Row",
+  compact_row: "Compact Row",
+  icons_only: "Icons Only",
+  custom: "Custom",
 };
 
 const actionMobileLabels: Record<
@@ -236,6 +265,10 @@ const actionMobileLabels: Record<
   icons_only: "Icons Only",
   icons_labels: "Icons + Labels",
   two_row_grid: "Two Row Grid",
+  grid: "Grid",
+  single_row: "Single Row",
+  compact_row: "Compact Row",
+  custom: "Custom",
 };
 
 const reviewFormLabels: Record<
@@ -245,6 +278,7 @@ const reviewFormLabels: Record<
   compact: "Compact",
   standard: "Standard",
   detailed: "Detailed",
+  custom: "Custom",
 };
 
 const landingPlaybackLabels: Record<
@@ -255,6 +289,7 @@ const landingPlaybackLabels: Record<
   spotlight: "Spotlight",
   discovery: "Discovery",
   top_results: "Top Results",
+  custom: "Custom",
 };
 
 const externalVisibilityLabels: Record<
@@ -262,7 +297,7 @@ const externalVisibilityLabels: Record<
   string
 > = {
   mixed_with_queue: "Mixed With Queue",
-  separate_section: "Separate Section",
+  separate_section: "Separate Page / Section",
   both: "Both",
   hidden: "Hidden",
 };
@@ -277,6 +312,16 @@ const externalBehaviorLabels: Record<
   internal_content_only: "Internal Content Only",
 };
 
+const externalPlacementLabels: Record<
+  PlatformControlConfig["discovery"]["externalContent"]["placement"],
+  string
+> = {
+  top: "Top",
+  middle: "Middle",
+  bottom: "Bottom",
+  hidden: "Hidden",
+};
+
 const artistVisibilityLabels: Record<
   keyof PlatformControlConfig["artistProfile"]["visibility"],
   string
@@ -285,6 +330,8 @@ const artistVisibilityLabels: Record<
   likes: "Likes",
   comments: "Comments",
   shares: "Shares",
+  savedCount: "Saved Count",
+  communityActivity: "Community Activity",
   recentActivity: "Recent Activity",
   statistics: "Statistics",
   supporters: "Supporters",
@@ -316,6 +363,8 @@ const communityFeatureLabels: Record<
   followers: "Followers",
   shares: "Shares",
   savedSongs: "Saved Songs",
+  supporters: "Supporters",
+  statistics: "Statistics",
   reviews: "Reviews",
 };
 
@@ -328,6 +377,109 @@ const communityVisibilityLabels: Record<
   topSupporters: "Top Supporters",
   recentSupporters: "Recent Supporters",
 };
+
+const uiDisplayLabels: Record<
+  PlatformControlConfig["ui"]["components"][UiComponentKey]["display"],
+  string
+> = {
+  hidden: "Hidden",
+  icon_only: "Icon Only",
+  text_only: "Text Only",
+  icon_text: "Icon + Text",
+};
+
+const uiSizeLabels: Record<UiSizePreset, string> = {
+  xs: "XS",
+  small: "Small",
+  medium: "Medium",
+  large: "Large",
+  custom: "Custom",
+};
+
+const uiDensityLabels = {
+  compact: "Compact",
+  standard: "Standard",
+  expanded: "Expanded",
+  custom: "Custom",
+} satisfies Record<PlatformControlConfig["ui"]["desktop"]["cardLayout"], string>;
+
+const uiActionLayoutLabels: Record<
+  PlatformControlConfig["ui"]["desktop"]["actionLayout"],
+  string
+> = {
+  grid: "Grid",
+  single_row: "Single Row",
+  compact_row: "Compact Row",
+  icons_only: "Icons Only",
+  custom: "Custom",
+};
+
+const artistHeaderLabels: Record<
+  PlatformControlConfig["artistProfile"]["headerLayout"],
+  string
+> = {
+  compact: "Compact",
+  standard: "Standard",
+  expanded: "Expanded",
+};
+
+const artistSongSortLabels: Record<
+  PlatformControlConfig["artistProfile"]["songSortOrder"],
+  string
+> = {
+  newest: "Newest",
+  most_played: "Most Played",
+  most_supported: "Most Supported",
+  most_shared: "Most Shared",
+  highest_rated: "Highest Rated",
+};
+
+const communitySectionLabels: Record<
+  keyof PlatformControlConfig["homepage"]["community"]["sectionVisibility"],
+  string
+> = {
+  homepage: "Homepage",
+  artistProfile: "Artist Profile",
+  reviewQueue: "Review Queue",
+  discovery: "Discovery",
+  rankings: "Rankings",
+};
+
+const communitySectionFieldLabels: Record<
+  keyof PlatformControlConfig["homepage"]["community"]["sectionVisibility"]["homepage"],
+  string
+> = {
+  likes: "Likes",
+  comments: "Comments",
+  followers: "Followers",
+  shares: "Shares",
+  savedSongs: "Saved Songs",
+  supporters: "Supporters",
+  communityActivity: "Community Activity",
+  reviews: "Reviews",
+  statistics: "Statistics",
+};
+
+const announcementBannerLabels: Record<
+  ControlAnnouncement["bannerPlacement"],
+  string
+> = {
+  standard: "Standard",
+  homepage: "Homepage Banner",
+  artist: "Artist Banner",
+  contest: "Contest Banner",
+  emergency: "Emergency Banner",
+};
+
+const ownerPresetLabels = {
+  compact_desktop: "Compact Desktop",
+  mobile_first: "Mobile First",
+  artist_focused: "Artist Focused",
+  discovery_focused: "Discovery Focused",
+  minimal: "Minimal",
+  community_focused: "Community Focused",
+  contest_mode: "Contest Mode",
+} as const;
 
 const experimentMetricLabels: Record<
   keyof PlatformControlConfig["experiments"]["metrics"],
@@ -366,6 +518,8 @@ function emptyAnnouncement(): ControlAnnouncement {
     audience: "everyone",
     startsAt: new Date().toISOString(),
     endsAt: null,
+    pinned: false,
+    bannerPlacement: "standard",
     active: true,
   };
 }
@@ -409,6 +563,11 @@ export function SuperAdminControlCenter({
   const [busy, setBusy] = useState(false);
   const [description, setDescription] = useState("");
   const [snapshotName, setSnapshotName] = useState("");
+  const [presetName, setPresetName] = useState("");
+  const [exportSection, setExportSection] =
+    useState<ConfigSectionKey | "all">("all");
+  const [importSection, setImportSection] =
+    useState<ConfigSectionKey>("theme");
   const [previewUserId, setPreviewUserId] = useState("");
   const [draggedModule, setDraggedModule] =
     useState<HomepageModuleKey | null>(null);
@@ -417,6 +576,7 @@ export function SuperAdminControlCenter({
   const [songDirectory, setSongDirectory] = useState(songs);
   const [contentSearch, setContentSearch] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
+  const sectionImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setSongDirectory(songs);
@@ -464,7 +624,7 @@ export function SuperAdminControlCenter({
     }
   };
 
-  const saveSection = async (section: keyof PlatformControlConfig) => {
+  const saveSection = async (section: ConfigSectionKey) => {
     await run(
       "admin_update_control_draft",
       {
@@ -484,6 +644,201 @@ export function SuperAdminControlCenter({
       ...current,
       theme: { ...current.theme, [field]: value, preset: "custom" },
     }));
+  };
+
+  const updateUiComponent = (
+    component: UiComponentKey,
+    updater: (
+      current: PlatformControlConfig["ui"]["components"][UiComponentKey],
+    ) => PlatformControlConfig["ui"]["components"][UiComponentKey],
+  ) => {
+    setConfig((current) => ({
+      ...current,
+      ui: {
+        ...current.ui,
+        components: {
+          ...current.ui.components,
+          [component]: updater(current.ui.components[component]),
+        },
+      },
+    }));
+  };
+
+  const updateComponentSize = (
+    component: UiComponentKey,
+    device: "desktop" | "mobile",
+    field: keyof UiResponsiveSize,
+    value: string | number,
+  ) => {
+    updateUiComponent(component, (current) => ({
+      ...current,
+      [device]: {
+        ...current[device],
+        [field]: value,
+      } as UiResponsiveSize,
+    }));
+  };
+
+  const updateCardDensity = (
+    card: CardDensityKey,
+    density: PlatformControlConfig["ui"]["cardDensity"][CardDensityKey],
+  ) => {
+    setConfig((current) => ({
+      ...current,
+      ui: {
+        ...current.ui,
+        cardDensity: {
+          ...current.ui.cardDensity,
+          [card]: density,
+        },
+      },
+    }));
+  };
+
+  const uiPresetSnapshot = (source: PlatformControlConfig) => {
+    return {
+      theme: source.theme,
+      homepage: source.homepage,
+      ui: {
+        components: source.ui.components,
+        cardDensity: source.ui.cardDensity,
+        desktop: source.ui.desktop,
+        mobile: source.ui.mobile,
+        preview: source.ui.preview,
+      },
+      discovery: source.discovery,
+      artistProfile: source.artistProfile,
+      tokens: source.tokens,
+      announcements: source.announcements,
+    };
+  };
+
+  const saveCurrentUiPreset = () => {
+    const name = presetName.trim();
+    if (name.length < 3) {
+      setNotice("Preset name must be at least 3 characters.");
+      return;
+    }
+    setConfig((current) => ({
+      ...current,
+      ui: {
+        ...current.ui,
+        presets: {
+          ...current.ui.presets,
+          active: name,
+          custom: [
+            ...current.ui.presets.custom,
+            {
+              id: crypto.randomUUID(),
+              name,
+              description,
+              snapshot: uiPresetSnapshot(current),
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        },
+      },
+    }));
+    setPresetName("");
+    setNotice("UI preset saved in this draft. Save the UI Controls draft when ready.");
+  };
+
+  const applyCustomPreset = (
+    preset: PlatformControlConfig["ui"]["presets"]["custom"][number],
+  ) => {
+    setConfig((current) => {
+      const snapshot = preset.snapshot as Partial<PlatformControlConfig>;
+      const next = normalizePlatformControlConfig({
+        ...current,
+        ...snapshot,
+        ui: {
+          ...current.ui,
+          ...(snapshot.ui && typeof snapshot.ui === "object"
+            ? snapshot.ui
+            : {}),
+          presets: {
+            ...current.ui.presets,
+            active: preset.name,
+          },
+        },
+      });
+      return next;
+    });
+    setNotice(`${preset.name} applied to the draft.`);
+  };
+
+  const applyBuiltInPreset = (preset: keyof typeof ownerPresetLabels) => {
+    setConfig((current) => {
+      const next = structuredClone(current);
+      next.ui.presets.active = preset;
+      if (preset === "compact_desktop") {
+        next.homepage.reviewLayoutDensity = "compact";
+        next.homepage.reviewFormLayout = "compact";
+        next.ui.desktop.actionLayout = "compact_row";
+        next.homepage.actionButtonLayout.desktop = "compact_row";
+        for (const card of Object.keys(next.ui.cardDensity) as CardDensityKey[]) {
+          next.ui.cardDensity[card] = "compact";
+        }
+      }
+      if (preset === "mobile_first") {
+        next.ui.mobile.actionLayout = "icons_only";
+        next.homepage.actionButtonLayout.mobile = "icons_only";
+        next.ui.mobile.cardLayout = "compact";
+        next.homepage.firstVisibleSection = "review_queue";
+      }
+      if (preset === "artist_focused") {
+        next.homepage.firstVisibleSection = "artist_spotlight";
+        next.artistProfile.layout = "premium_showcase";
+        next.artistProfile.headerLayout = "expanded";
+        next.artistProfile.songSortOrder = "most_supported";
+        next.artistProfile.visibility.supporters = true;
+        next.artistProfile.visibility.communityActivity = true;
+      }
+      if (preset === "discovery_focused") {
+        next.homepage.firstVisibleSection = "discovery";
+        next.discovery.externalContent.visibility = "both";
+        next.discovery.externalContent.placement = "top";
+        next.ui.cardDensity.discovery = "expanded";
+      }
+      if (preset === "minimal") {
+        next.homepage.reviewLayoutDensity = "compact";
+        next.ui.desktop.actionLayout = "icons_only";
+        next.ui.mobile.actionLayout = "icons_only";
+        next.ui.components.commentsButton.display = "hidden";
+        next.ui.components.statisticsButton.display = "hidden";
+      }
+      if (preset === "community_focused") {
+        for (const section of Object.keys(
+          next.homepage.community.sectionVisibility,
+        ) as Array<keyof PlatformControlConfig["homepage"]["community"]["sectionVisibility"]>) {
+          for (const field of Object.keys(
+            next.homepage.community.sectionVisibility[section],
+          ) as Array<
+            keyof PlatformControlConfig["homepage"]["community"]["sectionVisibility"]["homepage"]
+          >) {
+            next.homepage.community.sectionVisibility[section][field] = true;
+          }
+        }
+        next.homepage.firstVisibleSection = "community_activity";
+      }
+      if (preset === "contest_mode") {
+        next.tokens.rewardMultipliers.contest = 2;
+        next.homepage.firstVisibleSection = "spotlight";
+        next.announcements = [
+          ...next.announcements,
+          {
+            ...emptyAnnouncement(),
+            type: "contest_banner",
+            title: "Contest Mode Active",
+            message: "Featured contests and community events are highlighted.",
+            pinned: true,
+            bannerPlacement: "contest",
+          },
+        ];
+      }
+      return next;
+    });
+    setNotice(`${ownerPresetLabels[preset]} preset applied to the draft.`);
   };
 
   const moveModule = (module: HomepageModuleKey, direction: -1 | 1) => {
@@ -638,6 +993,27 @@ export function SuperAdminControlCenter({
     URL.revokeObjectURL(url);
   };
 
+  const exportSelectedConfig = () => {
+    if (exportSection === "all") {
+      exportConfig();
+      return;
+    }
+    const payload = {
+      section: exportSection,
+      value: config[exportSection],
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `first-listen-${exportSection}-draft.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const importConfig = async (file: File) => {
     try {
       const parsed = JSON.parse(await file.text()) as unknown;
@@ -651,6 +1027,31 @@ export function SuperAdminControlCenter({
       );
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Import failed.");
+    }
+  };
+
+  const importSelectedSection = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const value =
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        "value" in parsed
+          ? (parsed as { value: unknown }).value
+          : parsed;
+      const next = normalizePlatformControlConfig({
+        ...config,
+        [importSection]: value,
+      });
+      setConfig(next);
+      setNotice(
+        `${configSectionLabels[importSection]} imported into this draft. Save the section when ready.`,
+      );
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Section import failed.",
+      );
     }
   };
 
@@ -759,6 +1160,58 @@ export function SuperAdminControlCenter({
                 value={description}
               />
             </label>
+            <div className="control-number-grid">
+              <label>
+                Preview target
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      ui: {
+                        ...current.ui,
+                        preview: {
+                          ...current.ui.preview,
+                          target: event.target
+                            .value as PlatformControlConfig["ui"]["preview"]["target"],
+                        },
+                      },
+                    }))
+                  }
+                  value={config.ui.preview.target}
+                >
+                  <option value="section">Individual Section</option>
+                  <option value="homepage">Entire Homepage</option>
+                  <option value="mobile">Mobile Preview</option>
+                  <option value="desktop">Desktop Preview</option>
+                </select>
+              </label>
+              <label>
+                Preview section
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      ui: {
+                        ...current.ui,
+                        preview: {
+                          ...current.ui.preview,
+                          section: event.target
+                            .value as PlatformControlConfig["ui"]["preview"]["section"],
+                        },
+                      },
+                    }))
+                  }
+                  value={config.ui.preview.section}
+                >
+                  {Object.entries(homepageModuleLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                  <option value="artist_profile">Artist Profile</option>
+                </select>
+              </label>
+            </div>
             <div className="control-actions">
               <button
                 className="secondary-button"
@@ -780,7 +1233,16 @@ export function SuperAdminControlCenter({
               <button
                 className="secondary-button"
                 disabled={busy}
-                onClick={() => window.open("/", "_blank", "noopener,noreferrer")}
+                onClick={() => {
+                  const target =
+                    config.ui.preview.section === "artist_profile"
+                      ? "/"
+                      : config.ui.preview.target === "section" &&
+                          config.ui.preview.section === "review_queue"
+                        ? "/review"
+                        : "/";
+                  window.open(target, "_blank", "noopener,noreferrer");
+                }}
                 type="button"
               >
                 <Eye size={15} /> Open Site Preview
@@ -864,20 +1326,55 @@ export function SuperAdminControlCenter({
               Imports are validated and remain unpublished until reviewed.
             </p>
             <div className="control-actions">
+              <select
+                aria-label="Export section"
+                onChange={(event) =>
+                  setExportSection(event.target.value as typeof exportSection)
+                }
+                value={exportSection}
+              >
+                <option value="all">Entire Configuration</option>
+                {Object.entries(configSectionLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
               <button
                 className="secondary-button"
-                onClick={exportConfig}
+                onClick={exportSelectedConfig}
                 type="button"
               >
                 <Download size={15} /> Export JSON
               </button>
+              <select
+                aria-label="Import section"
+                onChange={(event) =>
+                  setImportSection(event.target.value as ConfigSectionKey)
+                }
+                value={importSection}
+              >
+                {Object.entries(configSectionLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
               <button
                 className="secondary-button"
                 disabled={!data.founder_controller}
                 onClick={() => importRef.current?.click()}
                 type="button"
               >
-                <Upload size={15} /> Import JSON
+                <Upload size={15} /> Import Full JSON
+              </button>
+              <button
+                className="secondary-button"
+                disabled={!data.founder_controller}
+                onClick={() => sectionImportRef.current?.click()}
+                type="button"
+              >
+                <Upload size={15} /> Import Section
               </button>
               <input
                 accept="application/json,.json"
@@ -888,6 +1385,17 @@ export function SuperAdminControlCenter({
                   event.target.value = "";
                 }}
                 ref={importRef}
+                type="file"
+              />
+              <input
+                accept="application/json,.json"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void importSelectedSection(file);
+                  event.target.value = "";
+                }}
+                ref={sectionImportRef}
                 type="file"
               />
             </div>
@@ -1071,6 +1579,300 @@ export function SuperAdminControlCenter({
                 ))}
               </select>
             </label>
+            <label className="control-switch">
+              <input
+                checked={config.homepage.autoplay.autoPlayNextSongDefault}
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    homepage: {
+                      ...current.homepage,
+                      autoplay: {
+                        ...current.homepage.autoplay,
+                        autoPlayNextSongDefault: event.target.checked,
+                      },
+                    },
+                  }))
+                }
+                type="checkbox"
+              />
+              <span>
+                {config.homepage.autoplay.autoPlayNextSongDefault
+                  ? "Auto Play Next Song enabled"
+                  : "Auto Play Next Song disabled"}
+              </span>
+            </label>
+          </article>
+
+          <article className="control-card">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Desktop / mobile layout</span>
+                <h3>Advanced action and card layout</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("ui")}
+                type="button"
+              >
+                <Save size={15} /> Save UI
+              </button>
+            </div>
+            <div className="control-number-grid">
+              <label>
+                Desktop action layout
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      ui: {
+                        ...current.ui,
+                        desktop: {
+                          ...current.ui.desktop,
+                          actionLayout: event.target
+                            .value as PlatformControlConfig["ui"]["desktop"]["actionLayout"],
+                        },
+                      },
+                    }))
+                  }
+                  value={config.ui.desktop.actionLayout}
+                >
+                  {Object.entries(uiActionLayoutLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Desktop card layout
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      ui: {
+                        ...current.ui,
+                        desktop: {
+                          ...current.ui.desktop,
+                          cardLayout: event.target
+                            .value as PlatformControlConfig["ui"]["desktop"]["cardLayout"],
+                        },
+                      },
+                    }))
+                  }
+                  value={config.ui.desktop.cardLayout}
+                >
+                  {Object.entries(uiDensityLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Mobile action layout
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      ui: {
+                        ...current.ui,
+                        mobile: {
+                          ...current.ui.mobile,
+                          actionLayout: event.target
+                            .value as PlatformControlConfig["ui"]["mobile"]["actionLayout"],
+                        },
+                      },
+                    }))
+                  }
+                  value={config.ui.mobile.actionLayout}
+                >
+                  {Object.entries(uiActionLayoutLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Mobile card layout
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      ui: {
+                        ...current.ui,
+                        mobile: {
+                          ...current.ui.mobile,
+                          cardLayout: event.target
+                            .value as PlatformControlConfig["ui"]["mobile"]["cardLayout"],
+                        },
+                      },
+                    }))
+                  }
+                  value={config.ui.mobile.cardLayout}
+                >
+                  {Object.entries(uiDensityLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </article>
+
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Card density control</span>
+                <h3>Set density by card type</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("ui")}
+                type="button"
+              >
+                <Save size={15} /> Save UI
+              </button>
+            </div>
+            <div className="control-number-grid">
+              {(
+                Object.keys(config.ui.cardDensity) as CardDensityKey[]
+              ).map((card) => (
+                <label key={card}>
+                  {cardDensityLabels[card]}
+                  <select
+                    onChange={(event) =>
+                      updateCardDensity(
+                        card,
+                        event.target
+                          .value as PlatformControlConfig["ui"]["cardDensity"][CardDensityKey],
+                      )
+                    }
+                    value={config.ui.cardDensity[card]}
+                  >
+                    {Object.entries(uiDensityLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          </article>
+
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">UI component control</span>
+                <h3>Visibility, display mode, and responsive sizes</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("ui")}
+                type="button"
+              >
+                <Save size={15} /> Save UI
+              </button>
+            </div>
+            <div className="control-component-grid">
+              {(Object.keys(config.ui.components) as UiComponentKey[]).map(
+                (component) => {
+                  const control = config.ui.components[component];
+                  return (
+                    <section key={component}>
+                      <strong>{uiComponentLabels[component]}</strong>
+                      <label>
+                        Display
+                        <select
+                          onChange={(event) =>
+                            updateUiComponent(component, (current) => ({
+                              ...current,
+                              display: event.target
+                                .value as typeof current.display,
+                            }))
+                          }
+                          value={control.display}
+                        >
+                          {Object.entries(uiDisplayLabels).map(
+                            ([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </label>
+                      {(["desktop", "mobile"] as const).map((device) => (
+                        <div className="control-size-grid" key={device}>
+                          <span>{device}</span>
+                          {(
+                            [
+                              ["iconSize", "Icon"],
+                              ["textSize", "Text"],
+                              ["buttonSize", "Button"],
+                            ] as const
+                          ).map(([field, label]) => (
+                            <label key={`${device}-${field}`}>
+                              {label}
+                              <select
+                                onChange={(event) =>
+                                  updateComponentSize(
+                                    component,
+                                    device,
+                                    field,
+                                    event.target.value as UiSizePreset,
+                                  )
+                                }
+                                value={control[device][field]}
+                              >
+                                {Object.entries(uiSizeLabels).map(
+                                  ([value, sizeLabel]) => (
+                                    <option key={value} value={value}>
+                                      {sizeLabel}
+                                    </option>
+                                  ),
+                                )}
+                              </select>
+                            </label>
+                          ))}
+                          {(
+                            [
+                              ["iconCustomPx", "Icon px"],
+                              ["textCustomPx", "Text px"],
+                              ["buttonCustomPx", "Button px"],
+                            ] as const
+                          ).map(([field, label]) => (
+                            <label key={`${device}-${field}`}>
+                              {label}
+                              <input
+                                min={field === "buttonCustomPx" ? 4 : 6}
+                                max={field === "buttonCustomPx" ? 28 : 48}
+                                onChange={(event) =>
+                                  updateComponentSize(
+                                    component,
+                                    device,
+                                    field,
+                                    Number(event.target.value),
+                                  )
+                                }
+                                type="number"
+                                value={control[device][field]}
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      ))}
+                    </section>
+                  );
+                },
+              )}
+            </div>
           </article>
         </div>
       )}
@@ -1516,6 +2318,33 @@ export function SuperAdminControlCenter({
                 ))}
               </select>
             </label>
+            <label>
+              External Discovery placement
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    discovery: {
+                      ...current.discovery,
+                      externalContent: {
+                        ...current.discovery.externalContent,
+                        placement: event.target
+                          .value as PlatformControlConfig["discovery"]["externalContent"]["placement"],
+                      },
+                    },
+                  }))
+                }
+                value={config.discovery.externalContent.placement}
+              >
+                {Object.entries(externalPlacementLabels).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
             <label className="control-switch">
               <input
                 checked={config.discovery.externalContent.userSkipExternalDefault}
@@ -1868,6 +2697,54 @@ export function SuperAdminControlCenter({
                 <option value="premium_showcase">Premium Showcase</option>
               </select>
             </label>
+            <div className="control-number-grid">
+              <label>
+                Artist header layout
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      artistProfile: {
+                        ...current.artistProfile,
+                        headerLayout: event.target
+                          .value as PlatformControlConfig["artistProfile"]["headerLayout"],
+                      },
+                    }))
+                  }
+                  value={config.artistProfile.headerLayout}
+                >
+                  {Object.entries(artistHeaderLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Artist song sort order
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      artistProfile: {
+                        ...current.artistProfile,
+                        songSortOrder: event.target
+                          .value as PlatformControlConfig["artistProfile"]["songSortOrder"],
+                      },
+                    }))
+                  }
+                  value={config.artistProfile.songSortOrder}
+                >
+                  {Object.entries(artistSongSortLabels).map(
+                    ([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+            </div>
             <div className="control-toggle-grid">
               {(
                 Object.keys(config.artistProfile.visibility) as Array<
@@ -2091,6 +2968,65 @@ export function SuperAdminControlCenter({
               ))}
             </div>
           </article>
+
+          <article className="control-card control-card-wide">
+            <span className="eyebrow">Per-section visibility</span>
+            <h3>Choose which community signals appear in each area</h3>
+            <div className="control-section-visibility-grid">
+              {(
+                Object.keys(
+                  config.homepage.community.sectionVisibility,
+                ) as Array<
+                  keyof PlatformControlConfig["homepage"]["community"]["sectionVisibility"]
+                >
+              ).map((section) => (
+                <section key={section}>
+                  <strong>{communitySectionLabels[section]}</strong>
+                  <div className="control-toggle-grid">
+                    {(
+                      Object.keys(
+                        config.homepage.community.sectionVisibility[section],
+                      ) as Array<
+                        keyof PlatformControlConfig["homepage"]["community"]["sectionVisibility"]["homepage"]
+                      >
+                    ).map((field) => (
+                      <label key={`${section}-${field}`}>
+                        <input
+                          checked={
+                            config.homepage.community.sectionVisibility[
+                              section
+                            ][field]
+                          }
+                          onChange={(event) =>
+                            setConfig((current) => ({
+                              ...current,
+                              homepage: {
+                                ...current.homepage,
+                                community: {
+                                  ...current.homepage.community,
+                                  sectionVisibility: {
+                                    ...current.homepage.community
+                                      .sectionVisibility,
+                                    [section]: {
+                                      ...current.homepage.community
+                                        .sectionVisibility[section],
+                                      [field]: event.target.checked,
+                                    },
+                                  },
+                                },
+                              },
+                            }))
+                          }
+                          type="checkbox"
+                        />
+                        {communitySectionFieldLabels[field]}
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </article>
         </div>
       )}
 
@@ -2144,6 +3080,37 @@ export function SuperAdminControlCenter({
                         >
                       ],
                     )}
+                  />
+                </label>
+              ))}
+            </div>
+
+            <h4>Submission cost by content type</h4>
+            <div className="control-number-grid">
+              {(
+                Object.keys(config.tokens.contentTypeCosts) as Array<
+                  keyof PlatformControlConfig["tokens"]["contentTypeCosts"]
+                >
+              ).map((field) => (
+                <label key={field}>
+                  {field.replace(/([A-Z])/g, " $1")}
+                  <input
+                    min={0}
+                    max={100}
+                    onChange={(event) =>
+                      setConfig((current) => ({
+                        ...current,
+                        tokens: {
+                          ...current.tokens,
+                          contentTypeCosts: {
+                            ...current.tokens.contentTypeCosts,
+                            [field]: Number(event.target.value),
+                          },
+                        },
+                      }))
+                    }
+                    type="number"
+                    value={config.tokens.contentTypeCosts[field]}
                   />
                 </label>
               ))}
@@ -2226,6 +3193,38 @@ export function SuperAdminControlCenter({
                     }
                     type="number"
                     value={config.tokens.bonuses[field]}
+                  />
+                </label>
+              ))}
+            </div>
+
+            <h4>Reward multipliers</h4>
+            <div className="control-number-grid">
+              {(
+                Object.keys(config.tokens.rewardMultipliers) as Array<
+                  keyof PlatformControlConfig["tokens"]["rewardMultipliers"]
+                >
+              ).map((field) => (
+                <label key={field}>
+                  {field.replace(/([A-Z])/g, " $1")}
+                  <input
+                    min={0}
+                    max={10}
+                    step={0.1}
+                    onChange={(event) =>
+                      setConfig((current) => ({
+                        ...current,
+                        tokens: {
+                          ...current.tokens,
+                          rewardMultipliers: {
+                            ...current.tokens.rewardMultipliers,
+                            [field]: Number(event.target.value),
+                          },
+                        },
+                      }))
+                    }
+                    type="number"
+                    value={config.tokens.rewardMultipliers[field]}
                   />
                 </label>
               ))}
@@ -2429,6 +3428,10 @@ export function SuperAdminControlCenter({
                       <option value="maintenance">Maintenance</option>
                       <option value="community_news">Community News</option>
                       <option value="special_event">Special Event</option>
+                      <option value="homepage_banner">Homepage Banner</option>
+                      <option value="artist_banner">Artist Banner</option>
+                      <option value="contest_banner">Contest Banner</option>
+                      <option value="emergency_banner">Emergency Banner</option>
                       <option value="founder_message">Founder Message</option>
                     </select>
                   </label>
@@ -2499,6 +3502,53 @@ export function SuperAdminControlCenter({
                       }
                       type="checkbox"
                     />
+                  </label>
+                  <label>
+                    Pinned
+                    <input
+                      checked={announcement.pinned}
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          announcements: current.announcements.map(
+                            (item, itemIndex) =>
+                              itemIndex === index
+                                ? { ...item, pinned: event.target.checked }
+                                : item,
+                          ),
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                  </label>
+                  <label>
+                    Banner placement
+                    <select
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          announcements: current.announcements.map(
+                            (item, itemIndex) =>
+                              itemIndex === index
+                                ? {
+                                    ...item,
+                                    bannerPlacement: event.target
+                                      .value as ControlAnnouncement["bannerPlacement"],
+                                  }
+                                : item,
+                          ),
+                        }))
+                      }
+                      value={announcement.bannerPlacement}
+                    >
+                      {Object.entries(announcementBannerLabels).map(
+                        ([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </select>
                   </label>
                   <label className="control-field-wide">
                     Title
@@ -2929,6 +3979,98 @@ export function SuperAdminControlCenter({
             ))}
           </div>
         </article>
+      )}
+
+      {tab === "presets" && (
+        <div className="control-grid">
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">No-code presets</span>
+                <h3>Apply complete UI configurations in one click</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("ui")}
+                type="button"
+              >
+                <Save size={15} /> Save UI Presets
+              </button>
+            </div>
+            <p>
+              Presets update layout, spacing, component visibility, discovery
+              emphasis, and related UI controls in the draft. Publish only after
+              previewing.
+            </p>
+            <div className="control-preset-grid">
+              {Object.entries(ownerPresetLabels).map(([preset, label]) => (
+                <button
+                  className={
+                    config.ui.presets.active === preset ? "active" : ""
+                  }
+                  key={preset}
+                  onClick={() =>
+                    applyBuiltInPreset(preset as keyof typeof ownerPresetLabels)
+                  }
+                  type="button"
+                >
+                  <Sparkles size={15} />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Save current draft</span>
+            <h3>Create a custom UI preset</h3>
+            <label>
+              Preset name
+              <input
+                maxLength={80}
+                onChange={(event) => setPresetName(event.target.value)}
+                placeholder="Weekend contest layout"
+                value={presetName}
+              />
+            </label>
+            <button
+              className="secondary-button"
+              disabled={presetName.trim().length < 3}
+              onClick={saveCurrentUiPreset}
+              type="button"
+            >
+              <Save size={15} /> Save Preset
+            </button>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Custom presets</span>
+            <h3>Apply saved owner layouts</h3>
+            <div className="control-saved-list">
+              {config.ui.presets.custom.map((preset) => (
+                <div key={preset.id}>
+                  <span>
+                    <strong>{preset.name}</strong>
+                    <small>
+                      {new Date(preset.createdAt).toLocaleString()}
+                      {preset.description ? ` / ${preset.description}` : ""}
+                    </small>
+                  </span>
+                  <button
+                    onClick={() => applyCustomPreset(preset)}
+                    type="button"
+                  >
+                    Apply
+                  </button>
+                </div>
+              ))}
+              {!config.ui.presets.custom.length && (
+                <p>No custom presets saved in this draft.</p>
+              )}
+            </div>
+          </article>
+        </div>
       )}
 
       {tab === "history" && (

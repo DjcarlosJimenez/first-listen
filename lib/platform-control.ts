@@ -20,6 +20,60 @@ export const homepageModuleLabels = {
 
 export type HomepageModuleKey = keyof typeof homepageModuleLabels;
 
+export const uiComponentLabels = {
+  artistProfileButton: "Artist Profile Button",
+  likeButton: "Like Button",
+  commentsButton: "Comments Button",
+  followButton: "Follow Button",
+  saveButton: "Save Button",
+  shareButton: "Share Button",
+  statisticsButton: "Statistics Button",
+  reviewButton: "Review Button",
+  playNowButton: "Play Now Button",
+  nextSongButton: "Next Song Button",
+  pauseAutoplayButton: "Pause Autoplay Button",
+  openPlatformButton: "Open Platform Button",
+  supportArtistButton: "Support Artist Button",
+  giftTokensButton: "Gift Tokens Button",
+} as const;
+
+export type UiComponentKey = keyof typeof uiComponentLabels;
+export type UiComponentDisplay = "hidden" | "icon_only" | "text_only" | "icon_text";
+export type UiSizePreset = "xs" | "small" | "medium" | "large" | "custom";
+export type UiDensity = "compact" | "standard" | "expanded" | "custom";
+export type UiActionLayout =
+  | "grid"
+  | "single_row"
+  | "compact_row"
+  | "icons_only"
+  | "custom";
+
+export const cardDensityLabels = {
+  reviewQueue: "Review Queue Cards",
+  spotlight: "Spotlight Cards",
+  discovery: "Discovery Cards",
+  ranking: "Ranking Cards",
+  artist: "Artist Cards",
+  profile: "Profile Cards",
+} as const;
+
+export type CardDensityKey = keyof typeof cardDensityLabels;
+
+export type UiResponsiveSize = {
+  iconSize: UiSizePreset;
+  iconCustomPx: number;
+  textSize: UiSizePreset;
+  textCustomPx: number;
+  buttonSize: UiSizePreset;
+  buttonCustomPx: number;
+};
+
+export type UiComponentControl = {
+  display: UiComponentDisplay;
+  desktop: UiResponsiveSize;
+  mobile: UiResponsiveSize;
+};
+
 export type ControlTheme = PlatformTheme & {
   primaryColor: string;
   secondaryColor: string;
@@ -39,6 +93,10 @@ export type ControlAnnouncement = {
     | "maintenance"
     | "community_news"
     | "special_event"
+    | "homepage_banner"
+    | "artist_banner"
+    | "contest_banner"
+    | "emergency_banner"
     | "founder_message";
   title: string;
   message: string;
@@ -51,6 +109,13 @@ export type ControlAnnouncement = {
     | "everyone";
   startsAt: string;
   endsAt: string | null;
+  pinned: boolean;
+  bannerPlacement:
+    | "standard"
+    | "homepage"
+    | "artist"
+    | "contest"
+    | "emergency";
   active: boolean;
 };
 
@@ -65,20 +130,37 @@ export type PlatformControlConfig = {
       | "spotlight"
       | "discovery"
       | "rankings"
-      | "community_activity";
-    reviewLayoutDensity: "compact" | "standard" | "expanded";
+      | "community_activity"
+      | "artist_spotlight"
+      | "custom";
+    reviewLayoutDensity: UiDensity;
     actionButtonLayout: {
-      desktop: "vertical_stack" | "grid_2x3" | "single_row";
-      mobile: "icons_only" | "icons_labels" | "two_row_grid";
+      desktop:
+        | "vertical_stack"
+        | "grid_2x3"
+        | "single_row"
+        | "compact_row"
+        | "icons_only"
+        | "custom";
+      mobile:
+        | "icons_only"
+        | "icons_labels"
+        | "two_row_grid"
+        | "grid"
+        | "single_row"
+        | "compact_row"
+        | "custom";
     };
-    reviewFormLayout: "compact" | "standard" | "detailed";
+    reviewFormLayout: "compact" | "standard" | "detailed" | "custom";
     autoplay: {
       autoPlayOnLoginDefault: boolean;
+      autoPlayNextSongDefault: boolean;
       defaultLandingPlayback:
         | "review_queue"
         | "spotlight"
         | "discovery"
-        | "top_results";
+        | "top_results"
+        | "custom";
     };
     community: {
       features: {
@@ -87,6 +169,8 @@ export type PlatformControlConfig = {
         followers: boolean;
         shares: boolean;
         savedSongs: boolean;
+        supporters: boolean;
+        statistics: boolean;
         reviews: boolean;
       };
       visibility: {
@@ -95,6 +179,46 @@ export type PlatformControlConfig = {
         topSupporters: boolean;
         recentSupporters: boolean;
       };
+      sectionVisibility: Record<
+        "homepage" | "artistProfile" | "reviewQueue" | "discovery" | "rankings",
+        {
+          likes: boolean;
+          comments: boolean;
+          followers: boolean;
+          shares: boolean;
+          savedSongs: boolean;
+          supporters: boolean;
+          communityActivity: boolean;
+          reviews: boolean;
+          statistics: boolean;
+        }
+      >;
+    };
+  };
+  ui: {
+    components: Record<UiComponentKey, UiComponentControl>;
+    cardDensity: Record<CardDensityKey, UiDensity>;
+    desktop: {
+      actionLayout: UiActionLayout;
+      cardLayout: UiDensity;
+    };
+    mobile: {
+      actionLayout: UiActionLayout;
+      cardLayout: UiDensity;
+    };
+    preview: {
+      target: "section" | "homepage" | "mobile" | "desktop";
+      section: HomepageModuleKey | "artist_profile" | "review_queue";
+    };
+    presets: {
+      active: string;
+      custom: Array<{
+        id: string;
+        name: string;
+        description: string;
+        snapshot: Record<string, unknown>;
+        createdAt: string;
+      }>;
     };
   };
   discovery: {
@@ -118,6 +242,7 @@ export type PlatformControlConfig = {
         | "ask_user"
         | "skip_automatically"
         | "internal_content_only";
+      placement: "top" | "middle" | "bottom" | "hidden";
       userSkipExternalDefault: boolean;
     };
   };
@@ -138,12 +263,21 @@ export type PlatformControlConfig = {
   }>;
   artistProfile: {
     layout: "compact" | "standard" | "premium_showcase";
+    headerLayout: "compact" | "standard" | "expanded";
+    songSortOrder:
+      | "newest"
+      | "most_played"
+      | "most_supported"
+      | "most_shared"
+      | "highest_rated";
     order: string[];
     visibility: {
       followers: boolean;
       likes: boolean;
       comments: boolean;
       shares: boolean;
+      savedCount: boolean;
+      communityActivity: boolean;
       recentActivity: boolean;
       statistics: boolean;
       supporters: boolean;
@@ -180,6 +314,17 @@ export type PlatformControlConfig = {
       spotlight: number;
       contest: number;
       referral: number;
+    };
+    contentTypeCosts: {
+      internalSong: number;
+      externalSong: number;
+      video: number;
+      audio: number;
+    };
+    rewardMultipliers: {
+      mission: number;
+      contest: number;
+      communityEvent: number;
     };
     engagement: {
       enabled: boolean;
@@ -236,6 +381,43 @@ const moduleOrder = Object.keys(
   homepageModuleLabels,
 ) as HomepageModuleKey[];
 
+const uiComponentKeys = Object.keys(uiComponentLabels) as UiComponentKey[];
+const cardDensityKeys = Object.keys(cardDensityLabels) as CardDensityKey[];
+
+const defaultUiSize: UiResponsiveSize = {
+  iconSize: "medium",
+  iconCustomPx: 15,
+  textSize: "medium",
+  textCustomPx: 12,
+  buttonSize: "medium",
+  buttonCustomPx: 10,
+};
+
+const defaultUiComponentControl: UiComponentControl = {
+  display: "icon_text",
+  desktop: defaultUiSize,
+  mobile: {
+    iconSize: "medium",
+    iconCustomPx: 15,
+    textSize: "small",
+    textCustomPx: 11,
+    buttonSize: "small",
+    buttonCustomPx: 8,
+  },
+};
+
+const communitySectionDefaults = {
+  likes: true,
+  comments: true,
+  followers: true,
+  shares: true,
+  savedSongs: true,
+  supporters: true,
+  communityActivity: true,
+  reviews: true,
+  statistics: true,
+};
+
 export const defaultPlatformControlConfig: PlatformControlConfig = {
   schemaVersion: 1,
   theme: {
@@ -259,6 +441,7 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
     reviewFormLayout: "standard",
     autoplay: {
       autoPlayOnLoginDefault: true,
+      autoPlayNextSongDefault: true,
       defaultLandingPlayback: "review_queue",
     },
     community: {
@@ -268,6 +451,8 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
         followers: true,
         shares: true,
         savedSongs: true,
+        supporters: true,
+        statistics: true,
         reviews: true,
       },
       visibility: {
@@ -276,6 +461,44 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
         topSupporters: true,
         recentSupporters: true,
       },
+      sectionVisibility: {
+        homepage: { ...communitySectionDefaults },
+        artistProfile: { ...communitySectionDefaults },
+        reviewQueue: { ...communitySectionDefaults },
+        discovery: { ...communitySectionDefaults },
+        rankings: { ...communitySectionDefaults },
+      },
+    },
+  },
+  ui: {
+    components: Object.fromEntries(
+      uiComponentKeys.map((component) => [
+        component,
+        {
+          ...defaultUiComponentControl,
+          desktop: { ...defaultUiComponentControl.desktop },
+          mobile: { ...defaultUiComponentControl.mobile },
+        },
+      ]),
+    ) as Record<UiComponentKey, UiComponentControl>,
+    cardDensity: Object.fromEntries(
+      cardDensityKeys.map((card) => [card, "standard"]),
+    ) as Record<CardDensityKey, UiDensity>,
+    desktop: {
+      actionLayout: "grid",
+      cardLayout: "standard",
+    },
+    mobile: {
+      actionLayout: "icons_only",
+      cardLayout: "standard",
+    },
+    preview: {
+      target: "homepage",
+      section: "review_queue",
+    },
+    presets: {
+      active: "standard",
+      custom: [],
     },
   },
   discovery: {
@@ -294,6 +517,7 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       visibility: "separate_section",
       ratio: 10,
       behavior: "ask_user",
+      placement: "middle",
       userSkipExternalDefault: false,
     },
   },
@@ -308,6 +532,8 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
   })),
   artistProfile: {
     layout: "standard",
+    headerLayout: "standard",
+    songSortOrder: "newest",
     order: [
       "profileHeader",
       "statistics",
@@ -320,6 +546,8 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       likes: true,
       comments: true,
       shares: true,
+      savedCount: true,
+      communityActivity: true,
       recentActivity: true,
       statistics: true,
       supporters: true,
@@ -356,6 +584,17 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       spotlight: 0,
       contest: 0,
       referral: 0,
+    },
+    contentTypeCosts: {
+      internalSong: 1,
+      externalSong: 1,
+      video: 1,
+      audio: 1,
+    },
+    rewardMultipliers: {
+      mission: 1,
+      contest: 1,
+      communityEvent: 1,
     },
     engagement: {
       enabled: false,
