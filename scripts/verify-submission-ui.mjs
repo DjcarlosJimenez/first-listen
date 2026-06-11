@@ -626,7 +626,7 @@ try {
     const openLink = card?.querySelector(".discovery-song-actions a");
     return {
       actionText: card?.querySelector(".discovery-song-actions")?.innerText ?? "",
-      count: document.querySelectorAll(".discovery-section:first-child .discovery-song-card").length,
+      count: document.querySelectorAll(".discovery-song-card").length,
       imageSrc: card?.querySelector(".discovery-song-cover img")?.getAttribute("src") ?? "",
       openTarget: openLink?.getAttribute("target") ?? ""
     };
