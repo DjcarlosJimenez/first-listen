@@ -716,6 +716,24 @@ button {
   gap: 15px;
 }
 
+.review-primary-flow {
+  display: grid;
+  gap: 22px;
+}
+
+.review-secondary-stats {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.6fr);
+  padding-top: 22px;
+}
+
+.review-layout-content-first > .review-side > .listening-session-card,
+.review-layout-content-first > .review-side > .review-progress {
+  display: none;
+}
+
 .review-progress,
 .listening-session-card,
 .side-note,
@@ -6938,9 +6956,12 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .review-side,
   .submission-side {
     grid-row: 1;
+  }
+
+  .review-side {
+    grid-row: 2;
   }
 
   .review-side .side-note,
@@ -6950,7 +6971,11 @@ button {
   }
 
   .review-card {
-    grid-row: 2;
+    grid-row: 1;
+  }
+
+  .review-secondary-stats {
+    grid-template-columns: 1fr;
   }
 
   .song-hero {

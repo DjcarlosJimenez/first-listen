@@ -1680,8 +1680,8 @@ function ReviewView({
 
   return (
     <>
-    <main className="content review-layout">
-      <section className="review-card">
+    <main className="content review-layout review-layout-content-first">
+      <section className="review-card review-primary-flow">
         <div className="song-hero">
           <div className="player-listening-column">
             <div className="cover-wrap">
@@ -1732,9 +1732,19 @@ function ReviewView({
                     : "External platform"
                   : locale === "es"
                     ? "Reproductor oficial"
-                    : "Provider player"}
+                  : "Provider player"}
               </span>
             </div>
+            <SongActionBar
+              artist={song.artist}
+              artistId={song.artistId}
+              compact
+              link={song.link}
+              locale={locale}
+              platform={song.platform}
+              songId={song.id}
+              title={song.title}
+            />
             {externalContent ? (
               <div className="external-content-notice" aria-live="polite">
                 <Link2 size={17} />
@@ -1808,16 +1818,6 @@ function ReviewView({
               )}
             </div>
             )}
-            <SongActionBar
-              artist={song.artist}
-              artistId={song.artistId}
-              compact
-              link={song.link}
-              locale={locale}
-              platform={song.platform}
-              songId={song.id}
-              title={song.title}
-            />
             <div className="continuous-listening-controls">
               <button
                 onClick={() => void advanceToNextSong(autoPlayNextSong)}
@@ -2016,6 +2016,62 @@ function ReviewView({
                 : copy.app.review.submitReview}{" "}
             <Send size={17} />
           </button>
+        </div>
+        <div className="review-secondary-stats">
+          <div className="listening-session-card">
+            <span className="eyebrow">
+              <Headphones size={13} />{" "}
+              {locale === "es" ? "Banco de escucha" : "Listening Bank"}
+            </span>
+            <div className="listening-validation-totals">
+              <div>
+                <span>
+                  {locale === "es" ? "SesiÃ³n verificada" : "Verified Session"}
+                </span>
+                <strong>{formatClock(listeningSession.liveSeconds)}</strong>
+              </div>
+              <div>
+                <span>
+                  {locale === "es" ? "Banco aprobado" : "Approved Bank"}
+                </span>
+                <strong>{formatPreciseMinutes(approvedListeningSeconds)}</strong>
+              </div>
+            </div>
+            <p>
+              {externalContent
+                ? locale === "es"
+                  ? "El contenido externo no gana minutos, escuchas vÃ¡lidas ni recompensas."
+                  : "External Content does not earn minutes, valid listens, or rewards."
+                : listeningSession.earningEligible === false
+                  ? locale === "es"
+                    ? "La reproducciÃ³n estÃ¡ disponible, pero este proveedor no puede ganar minutos verificados."
+                    : "Playback is available, but this provider cannot earn verified minutes."
+                  : locale === "es"
+                    ? "Cada segundo verificado se agrega al banco sin redondear. La review es opcional."
+                    : "Every verified second is banked without rounding. The review is optional."}
+            </p>
+            <div className="progress-track">
+              <i
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (listeningSession.verifiedSeconds /
+                      Math.max(1, listeningSession.validRequirementSeconds)) *
+                      100,
+                  )}%`,
+                }}
+              />
+            </div>
+            {listeningSession.warning && (
+              <small>{listeningSession.warning}</small>
+            )}
+          </div>
+          <ReviewProgress
+            count={reviewCount}
+            copy={copy}
+            founderFree={founderFree}
+            unlimited={unlimitedCredits}
+          />
         </div>
       </section>
 
