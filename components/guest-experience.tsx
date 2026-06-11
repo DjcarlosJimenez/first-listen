@@ -43,6 +43,10 @@ import {
   useState,
 } from "react";
 import { LanguageSelector } from "@/components/language-selector";
+import {
+  ArtistNameLink,
+  ArtistProfileButton,
+} from "@/components/artist-profile-link";
 import { CommunityPulse } from "@/components/community-pulse";
 import { Logo } from "@/components/logo";
 import {
@@ -615,7 +619,10 @@ function GuestDiscoveryShelves({
                   </div>
                   <div className="guest-discovery-copy">
                     <strong>{item.song.title}</strong>
-                    <Link href={`/artists/${item.song.artistId}`}>{item.song.artist}</Link>
+                    <ArtistNameLink
+                      artistId={item.song.artistId}
+                      name={item.song.artist}
+                    />
                     <small>
                       {item.reviewsReceived} reviews / {item.averageRating.toFixed(1)} rating / Hook {Math.round(item.hookScore)}
                     </small>
@@ -628,6 +635,12 @@ function GuestDiscoveryShelves({
                       <Play fill="currentColor" size={13} />
                       {spanish ? "Escuchar y reaccionar" : "Listen and react"}
                     </button>
+                    <ArtistProfileButton
+                      artistId={item.song.artistId}
+                      artistName={item.song.artist}
+                      compact
+                      locale={locale}
+                    />
                   </div>
                 </article>
               ))}
@@ -676,13 +689,22 @@ function GuestRankings({
             <Image alt="" height={58} src={item.song.coverUrl} unoptimized width={58} />
             <div>
               <h3>{item.song.title}</h3>
-              <Link href={`/artists/${item.song.artistId}`}>{item.song.artist}</Link>
+              <ArtistNameLink
+                artistId={item.song.artistId}
+                name={item.song.artist}
+              />
               <small>{item.song.genre} / {item.song.language}</small>
             </div>
             <span><b>{Math.round(item.hookScore)}</b> Hook</span>
             <span><Heart size={13} /> {item.likesCount}</span>
             <span><Users size={13} /> {item.followersCount}</span>
             <button onClick={() => onPlay(item)} type="button"><Play size={14} /> {spanish ? "Escuchar" : "Listen"}</button>
+            <ArtistProfileButton
+              artistId={item.song.artistId}
+              artistName={item.song.artist}
+              compact
+              locale={locale}
+            />
           </article>
         ))}
       </div>
@@ -1476,9 +1498,12 @@ export function GuestExperience() {
             <div className="guest-now-playing">
               <span className="eyebrow"><Headphones size={13} /> {spanish ? "Ahora escuchando" : "Now Listening"}</span>
               <h2>{currentSong.title}</h2>
-              <Link href={`/artists/${currentSong.artistId}`}>
+              <ArtistNameLink
+                artistId={currentSong.artistId}
+                name={currentSong.artist}
+              >
                 {currentSong.artist} <ArrowRight size={13} />
-              </Link>
+              </ArtistNameLink>
               <p>
                 {currentSong.platform} / {currentSong.genre} /{" "}
                 {currentSong.language}
@@ -1517,6 +1542,12 @@ export function GuestExperience() {
                 )}
               </div>
             )}
+
+            <ArtistProfileButton
+              artistId={currentSong.artistId}
+              artistName={currentSong.artist}
+              locale={locale}
+            />
 
             <SongActionBar
               artist={currentSong.artist}

@@ -1587,7 +1587,8 @@ button {
 }
 
 .discovery-links a,
-.discovery-actions button {
+.discovery-actions button,
+.artist-profile-link-button {
   align-items: center;
   background: #f6f7f3;
   border: 1px solid var(--line);
@@ -1601,6 +1602,13 @@ button {
   text-decoration: none;
 }
 
+.artist-profile-link-button {
+  color: #5f8314;
+  justify-content: center;
+  margin-top: 10px;
+  width: fit-content;
+}
+
 .discovery-actions {
   grid-template-columns: 1fr;
   margin-top: 8px;
@@ -1611,7 +1619,8 @@ button {
   opacity: 0.62;
 }
 
-.discovery-card > a {
+.discovery-card > a,
+.post-review-artist-profile {
   align-items: center;
   color: #5f8314;
   display: inline-flex;
@@ -5952,7 +5961,14 @@ button {
   color: #697067;
 }
 
-.artist-profile-hero > button,
+.artist-profile-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: stretch;
+  min-width: 170px;
+}
+
+.artist-profile-actions button,
 .artist-song-copy button {
   align-items: center;
   background: var(--dark);
@@ -5967,10 +5983,22 @@ button {
   padding: 13px 15px;
 }
 
-.artist-profile-hero > button.following,
+.artist-profile-actions button.following,
 .artist-song-copy button:disabled {
   background: var(--acid);
   color: #151815;
+}
+
+.artist-profile-actions button:nth-child(2) {
+  background: #f6f7f3;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.artist-profile-actions button:nth-child(3) {
+  background: #fff4d6;
+  border: 1px solid #efd28e;
+  color: #765813;
 }
 
 .artist-profile-notice {
@@ -5986,6 +6014,41 @@ button {
 
 .artist-song-grid {
   grid-template-columns: 1fr;
+}
+
+.artist-catalog-toolbar {
+  align-items: flex-end;
+  display: flex;
+  justify-content: space-between;
+  margin: 18px auto 0;
+  max-width: 1180px;
+  gap: 16px;
+}
+
+.artist-catalog-toolbar h2 {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(28px, 4vw, 44px);
+  letter-spacing: -0.055em;
+  margin: 8px 0 0;
+}
+
+.artist-catalog-toolbar label {
+  color: var(--muted);
+  display: grid;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 6px;
+  min-width: 210px;
+  text-transform: uppercase;
+}
+
+.artist-catalog-toolbar select {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  font: inherit;
+  padding: 10px 12px;
 }
 
 .artist-song-grid article {
@@ -6120,9 +6183,18 @@ button {
     grid-template-columns: auto 1fr;
   }
 
-  .artist-profile-hero > button {
+  .artist-profile-actions {
     grid-column: 1 / -1;
     width: 100%;
+  }
+
+  .artist-catalog-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .artist-catalog-toolbar label {
+    min-width: 0;
   }
 
   .landing-nav {
@@ -6630,7 +6702,7 @@ button {
   display: grid;
   gap: 6px;
   grid-column: 1 / -1;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
 }
 
 .discovery-song-actions button,
@@ -7854,7 +7926,8 @@ button {
 }
 
 .retention-link-list > a,
-.retention-song-grid > a {
+.retention-song-grid > a,
+.retention-song-grid > article {
   align-items: center;
   background: #f8f9f5;
   border: 1px solid var(--line);
@@ -7865,6 +7938,24 @@ button {
   grid-template-columns: auto minmax(0, 1fr) auto;
   padding: 10px;
   text-decoration: none;
+}
+
+.retention-song-grid > article {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.retention-song-grid > article > a {
+  align-items: center;
+  color: var(--ink);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  text-decoration: none;
+}
+
+.retention-song-grid .artist-profile-link-button {
+  margin-top: 2px;
+  width: 100%;
 }
 
 .retention-link-list strong,
@@ -7912,7 +8003,8 @@ button {
 }
 
 .theme-dark .retention-link-list > a,
-.theme-dark .retention-song-grid > a {
+.theme-dark .retention-song-grid > a,
+.theme-dark .retention-song-grid > article {
   background: #242a25;
   border-color: #353d36;
   color: #eef2eb;
@@ -9026,6 +9118,22 @@ html[data-ui-gift-tokens-button-mode="hidden"] [data-ui-component="giftTokensBut
   display: none !important;
 }
 
+html[data-artist-name-links="false"] [data-artist-name-link] {
+  color: inherit !important;
+  cursor: default;
+  pointer-events: none;
+  text-decoration: none !important;
+}
+
+html[data-artist-profile-buttons="false"] [data-artist-profile-button],
+html[data-artist-follow-buttons="false"] [data-artist-follow-button],
+html[data-artist-share-buttons="false"] [data-artist-share-button],
+html[data-artist-support-buttons="false"] [data-artist-support-button],
+html[data-artist-discovery-statistics="false"] [data-artist-profile-section="statistics"],
+html[data-artist-discovery-statistics="false"] [data-artist-discovery-statistics] {
+  display: none !important;
+}
+
 html[data-ui-artist-profile-button-mode="icon_only"] [data-ui-component="artistProfileButton"],
 html[data-ui-like-button-mode="icon_only"] [data-ui-component="likeButton"],
 html[data-ui-comments-button-mode="icon_only"] [data-ui-component="commentsButton"],
@@ -9416,6 +9524,18 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .control-heading h3 {
   margin-top: 5px;
+}
+
+.control-section-heading {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 5px;
+  padding-top: 14px;
+}
+
+.control-section-heading h4 {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .control-actions {

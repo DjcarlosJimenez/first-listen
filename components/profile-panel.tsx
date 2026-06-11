@@ -351,7 +351,12 @@ export function ProfilePanel({
             <div><strong>{network.visibleSupports}</strong><span>Visible Supports</span></div>
             <div><strong>{network.anonymousSupports}</strong><span>Anonymous Supports</span></div>
           </div>
-          <Link className="public-profile-link" href={`/artists/${profile.id}`}>
+          <Link
+            className="public-profile-link"
+            data-artist-profile-button
+            data-ui-component="artistProfileButton"
+            href={`/artists/${profile.id}`}
+          >
             View public artist profile <ExternalLink size={14} />
           </Link>
           <section
@@ -516,7 +521,13 @@ export function ProfilePanel({
                       : "Anonymous support"}
                   </small>
                 </div>
-                <Link href={`/artists/${item.artistId}`}>Artist</Link>
+                <Link
+                  data-artist-profile-button
+                  data-ui-component="artistProfileButton"
+                  href={`/artists/${item.artistId}`}
+                >
+                  View Artist
+                </Link>
               </article>
             ))}
             {!activity.length && (
@@ -591,6 +602,13 @@ export function ProfilePanel({
                     <a href={song.music_url} rel="noreferrer" target="_blank" aria-label={`Open ${song.title}`}>
                       <ExternalLink size={15} />
                     </a>
+                    <Link
+                      data-artist-profile-button
+                      data-ui-component="artistProfileButton"
+                      href={`/artists/${profile.id}`}
+                    >
+                      Artist Profile
+                    </Link>
                   </div>
                 </article>
               ))}
@@ -663,7 +681,13 @@ export function ProfilePanel({
                         : ""}
                     </span>
                   </div>
-                  <Link href={`/artists/${song.artist_id}`}>Artist</Link>
+                  <Link
+                    data-artist-profile-button
+                    data-ui-component="artistProfileButton"
+                    href={`/artists/${song.artist_id}`}
+                  >
+                    View Artist
+                  </Link>
                   <small>{song.genre} / {song.song_language}</small>
                   <a href={song.music_url} rel="noreferrer" target="_blank" aria-label={`Open ${song.title}`}>
                     <ExternalLink size={15} />

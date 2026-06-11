@@ -338,6 +338,18 @@ const artistVisibilityLabels: Record<
   giftTokens: "Gift Tokens",
 };
 
+const artistDiscoveryLabels: Record<
+  keyof PlatformControlConfig["artistProfile"]["discovery"],
+  string
+> = {
+  showArtistNameLinks: "Show Artist Name Links",
+  showArtistProfileButtons: "Show Artist Profile Buttons",
+  showFollowArtistButton: "Show Follow Artist Button",
+  showShareArtistButton: "Show Share Artist Button",
+  showSupportArtistButton: "Show Support Artist Button",
+  showArtistStatistics: "Show Artist Statistics",
+};
+
 const artistPremiumLabels: Record<
   keyof PlatformControlConfig["artistProfile"]["premium"],
   string
@@ -2744,6 +2756,41 @@ export function SuperAdminControlCenter({
                   )}
                 </select>
               </label>
+            </div>
+            <div className="control-section-heading">
+              <span className="eyebrow">Artist Discovery Settings</span>
+              <h4>One-click profile entry points</h4>
+              <p>
+                Control how visible artist profiles are across review,
+                discovery, rankings, search, and community surfaces.
+              </p>
+            </div>
+            <div className="control-toggle-grid">
+              {(
+                Object.keys(config.artistProfile.discovery) as Array<
+                  keyof PlatformControlConfig["artistProfile"]["discovery"]
+                >
+              ).map((field) => (
+                <label key={field}>
+                  <input
+                    checked={config.artistProfile.discovery[field]}
+                    onChange={(event) =>
+                      setConfig((current) => ({
+                        ...current,
+                        artistProfile: {
+                          ...current.artistProfile,
+                          discovery: {
+                            ...current.artistProfile.discovery,
+                            [field]: event.target.checked,
+                          },
+                        },
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  {artistDiscoveryLabels[field]}
+                </label>
+              ))}
             </div>
             <div className="control-toggle-grid">
               {(

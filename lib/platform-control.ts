@@ -283,6 +283,14 @@ export type PlatformControlConfig = {
       supporters: boolean;
       giftTokens: boolean;
     };
+    discovery: {
+      showArtistNameLinks: boolean;
+      showArtistProfileButtons: boolean;
+      showFollowArtistButton: boolean;
+      showShareArtistButton: boolean;
+      showSupportArtistButton: boolean;
+      showArtistStatistics: boolean;
+    };
     premium: {
       enabled: boolean;
       customBanner: boolean;
@@ -552,6 +560,14 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       statistics: true,
       supporters: true,
       giftTokens: false,
+    },
+    discovery: {
+      showArtistNameLinks: true,
+      showArtistProfileButtons: true,
+      showFollowArtistButton: true,
+      showShareArtistButton: true,
+      showSupportArtistButton: true,
+      showArtistStatistics: true,
     },
     premium: {
       enabled: false,

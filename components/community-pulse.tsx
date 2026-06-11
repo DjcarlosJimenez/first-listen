@@ -125,8 +125,12 @@ export function CommunityPulse({
                 <strong>{activityText(item, locale)}</strong>
                 <small>{new Date(item.created_at).toLocaleString()}</small>
               </div>
-              <Link href={`/artists/${item.artist_id}`}>
-                {locale === "es" ? "Perfil" : "Profile"}
+              <Link
+                data-artist-profile-button
+                data-ui-component="artistProfileButton"
+                href={`/artists/${item.artist_id}`}
+              >
+                {locale === "es" ? "Ver artista" : "View Artist"}
               </Link>
             </article>
           );

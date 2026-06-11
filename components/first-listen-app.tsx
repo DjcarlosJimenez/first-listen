@@ -63,6 +63,10 @@ import {
   useState,
 } from "react";
 import { LanguageSelector } from "@/components/language-selector";
+import {
+  ArtistNameLink,
+  ArtistProfileButton,
+} from "@/components/artist-profile-link";
 import { CommunityPulse } from "@/components/community-pulse";
 import { Logo } from "@/components/logo";
 import {
@@ -845,6 +849,7 @@ function PostReviewDiscovery({
       </div>
       <div className="discovery-actions">
         <button
+          data-artist-follow-button
           data-ui-component="followButton"
           disabled={following || !song.artistId}
           onClick={followArtist}
@@ -876,13 +881,12 @@ function PostReviewDiscovery({
         </button>
       </div>
       {song.artistId && (
-        <Link
-          data-ui-component="artistProfileButton"
-          href={`/artists/${song.artistId}`}
-        >
-          {spanish ? `Ver perfil de ${song.artist}` : `View ${song.artist}'s profile`}{" "}
-          <ArrowRight size={13} />
-        </Link>
+        <ArtistProfileButton
+          artistId={song.artistId}
+          artistName={song.artist}
+          className="artist-profile-link-button post-review-artist-profile"
+          locale={locale}
+        />
       )}
     </div>
   );
@@ -941,10 +945,16 @@ function FloatingCommunityNotifications({
             <strong>{notificationText(notification, locale)}</strong>
             {notification.actorId && (
               <span>
-                <Link href={`/artists/${notification.actorId}`}>
-                  {locale === "es" ? "Ver perfil" : "View profile"}
+                <Link
+                  data-artist-profile-button
+                  data-ui-component="artistProfileButton"
+                  href={`/artists/${notification.actorId}`}
+                >
+                  {locale === "es" ? "Ver artista" : "View Artist"}
                 </Link>
                 <button
+                  data-artist-follow-button
+                  data-ui-component="followButton"
                   onClick={() => onFollow(notification.actorId as string)}
                   type="button"
                 >
@@ -1137,7 +1147,7 @@ function EmptyQueueRetention({
           </div>
           <div className="retention-link-list">
             {featuredArtists.map((artist) => (
-              <Link href={`/artists/${artist.id}`} key={artist.id}>
+              <Link data-artist-name-link href={`/artists/${artist.id}`} key={artist.id}>
                 <span className="retention-avatar">{artist.name.slice(0, 2).toUpperCase()}</span>
                 <span><strong>{artist.name}</strong><small>{optionLabel(locale, artist.genre)}</small></span>
                 <ArrowRight size={14} />
@@ -1153,7 +1163,7 @@ function EmptyQueueRetention({
           </div>
           <div className="retention-link-list">
             {followedArtists.map((artist) => (
-              <Link href={`/artists/${artist.id}`} key={artist.id}>
+              <Link data-artist-name-link href={`/artists/${artist.id}`} key={artist.id}>
                 <span className="retention-avatar">{artist.name.slice(0, 2).toUpperCase()}</span>
                 <span><strong>{artist.name}</strong><small>{artist.followers} {spanish ? "seguidores" : "followers"} / {artist.communityRank}</small></span>
                 <ArrowRight size={14} />
@@ -1170,11 +1180,19 @@ function EmptyQueueRetention({
         </div>
         <div className="retention-song-grid">
           {topTenSongs.slice(0, 4).map((song) => (
-            <a href={song.link} key={song.id} rel="noreferrer" target="_blank">
-              <Image alt="" height={64} src={song.coverUrl} unoptimized width={64} />
-              <span><strong>{song.title}</strong><small>{song.artist} / Hook {song.hookScore}</small></span>
-              <ExternalLink size={14} />
-            </a>
+            <article key={song.id}>
+              <a href={song.link} rel="noreferrer" target="_blank">
+                <Image alt="" height={64} src={song.coverUrl} unoptimized width={64} />
+                <span><strong>{song.title}</strong><small>{song.artist} / Hook {song.hookScore}</small></span>
+                <ExternalLink size={14} />
+              </a>
+              <ArtistProfileButton
+                artistId={song.artistId}
+                artistName={song.artist}
+                compact
+                locale={locale}
+              />
+            </article>
           ))}
           {!topTenSongs.length && <p className="discovery-empty">{spanish ? "El ranking aparecerá cuando haya suficientes reviews." : "Rankings will appear after enough verified reviews."}</p>}
         </div>
@@ -1186,11 +1204,19 @@ function EmptyQueueRetention({
         </div>
         <div className="retention-song-grid">
           {previouslySupportedSongs.map((song) => (
-            <a href={song.link} key={song.id} rel="noreferrer" target="_blank">
-              <Image alt="" height={64} src={song.coverUrl} unoptimized width={64} />
-              <span><strong>{song.title}</strong><small>{song.artist} / {song.platform}</small></span>
-              <ExternalLink size={14} />
-            </a>
+            <article key={song.id}>
+              <a href={song.link} rel="noreferrer" target="_blank">
+                <Image alt="" height={64} src={song.coverUrl} unoptimized width={64} />
+                <span><strong>{song.title}</strong><small>{song.artist} / {song.platform}</small></span>
+                <ExternalLink size={14} />
+              </a>
+              <ArtistProfileButton
+                artistId={song.artistId}
+                artistName={song.artist}
+                compact
+                locale={locale}
+              />
+            </article>
           ))}
           {!previouslySupportedSongs.length && <p className="discovery-empty">{spanish ? "Tus canciones apoyadas aparecerán aquí." : "Songs you support will appear here."}</p>}
         </div>
@@ -1894,7 +1920,9 @@ function ReviewView({
               <span>{optionLabel(locale, song.language)}</span>
             </div>
             <h2>{song.title}</h2>
-            <p className="artist-name">{song.artist}</p>
+            <p className="artist-name">
+              <ArtistNameLink artistId={song.artistId} name={song.artist} />
+            </p>
             <div className="song-context">
               <span className="genre">{optionLabel(locale, song.genre)}</span>
               <span className="match-badge">
@@ -1926,6 +1954,11 @@ function ReviewView({
                 Open on {song.platform} <ExternalLink size={14} />
               </a>
             )}
+            <ArtistProfileButton
+              artistId={song.artistId}
+              artistName={song.artist}
+              locale={locale}
+            />
             <div className="report-control">
               <select
                 aria-label="Report reason"
@@ -2648,7 +2681,7 @@ function DiscoverySongCard({
               : "Editorial selection"}
         </span>
         <h4>{song.title}</h4>
-        <Link href={`/artists/${song.artistId}`}>{song.artist}</Link>
+        <ArtistNameLink artistId={song.artistId} name={song.artist} />
         <small>
           {song.platform} / {compactClassificationLabel(song.platform)} /{" "}
           {optionLabel(locale, song.genre)} /{" "}
@@ -2680,6 +2713,12 @@ function DiscoverySongCard({
           <ExternalLink size={14} />
           {spanish ? "Abrir plataforma" : "Open Platform"}
         </a>
+        <ArtistProfileButton
+          artistId={song.artistId}
+          artistName={song.artist}
+          compact
+          locale={locale}
+        />
         <button
           className={details === "reviews" ? "active" : ""}
           data-ui-component="reviewButton"
@@ -3236,9 +3275,7 @@ function DashboardView({
             </div>
             <h3>{song.title}</h3>
             <p>
-              {song.artistId ? (
-                <Link href={`/artists/${song.artistId}`}>{song.artist}</Link>
-              ) : song.artist}
+              <ArtistNameLink artistId={song.artistId} name={song.artist} />
               {" / "}{optionLabel(locale, song.genre)} / {optionLabel(locale, song.language)}
             </p>
             <div className="active-song-tags">

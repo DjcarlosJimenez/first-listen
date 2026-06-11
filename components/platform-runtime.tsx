@@ -112,6 +112,24 @@ function applyControlConfig(config: PlatformControlConfig) {
   root.dataset.artistProfileLayout = config.artistProfile.layout;
   root.dataset.artistHeaderLayout = config.artistProfile.headerLayout;
   root.dataset.artistSongSortOrder = config.artistProfile.songSortOrder;
+  root.dataset.artistNameLinks = String(
+    config.artistProfile.discovery.showArtistNameLinks,
+  );
+  root.dataset.artistProfileButtons = String(
+    config.artistProfile.discovery.showArtistProfileButtons,
+  );
+  root.dataset.artistFollowButtons = String(
+    config.artistProfile.discovery.showFollowArtistButton,
+  );
+  root.dataset.artistShareButtons = String(
+    config.artistProfile.discovery.showShareArtistButton,
+  );
+  root.dataset.artistSupportButtons = String(
+    config.artistProfile.discovery.showSupportArtistButton,
+  );
+  root.dataset.artistDiscoveryStatistics = String(
+    config.artistProfile.discovery.showArtistStatistics,
+  );
   root.dataset.externalContentVisibility =
     config.discovery.externalContent.visibility;
   root.dataset.externalSongBehavior = config.discovery.externalContent.behavior;

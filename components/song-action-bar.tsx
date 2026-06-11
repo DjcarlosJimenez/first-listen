@@ -289,6 +289,7 @@ export function SongActionBar({
         </button>
         <button
           className={engagement.following ? "active" : ""}
+          data-artist-follow-button
           data-community-action="follow"
           data-ui-component="followButton"
           disabled={!artistId || busy === "follow"}

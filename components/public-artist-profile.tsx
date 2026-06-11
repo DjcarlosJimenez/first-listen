@@ -16,6 +16,7 @@ import {
   CirclePlay,
   Cloud,
   Disc3,
+  Gift,
   Globe2,
   Headphones,
   Heart,
@@ -450,6 +451,47 @@ export function PublicArtistProfile({
     );
   };
 
+  const shareArtist = async () => {
+    const profileUrl = `${window.location.origin}/artists/${artist.id}`;
+    const discoveryUrl = `${profileUrl}?source=artist-discovery`;
+    const text = spanish
+      ? `Descubre a ${artist.name} en First Listen.`
+      : `Discover ${artist.name} on First Listen.`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: artist.name,
+          text,
+          url: profileUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(
+          `${text}\n${profileUrl}\n${discoveryUrl}`,
+        );
+      }
+      setMessage(
+        spanish
+          ? "Enlaces del artista listos para compartir."
+          : "Artist profile and discovery links are ready to share.",
+      );
+    } catch {
+      setMessage(
+        spanish
+          ? "No se pudo compartir el perfil."
+          : "Artist profile could not be shared.",
+      );
+    }
+  };
+
+  const supportArtist = () => {
+    setMessage(
+      spanish
+        ? "El apoyo con tokens usa los controles existentes de gifting. Mientras tanto, escuchar, seguir y compartir ya apoya a este artista."
+        : "Token support uses the existing gifting controls. For now, listening, following, and sharing already support this artist.",
+    );
+  };
+
   return (
     <main className="artist-profile-page">
       <header className="account-header">
@@ -489,20 +531,39 @@ export function PublicArtistProfile({
             {artist.languages.map((language) => <span key={language}><Globe2 size={11} /> {language}</span>)}
           </div>
         </div>
-        <button
-          className={following ? "following" : ""}
-          data-ui-component="followButton"
-          onClick={toggleFollow}
-        >
-          <UserPlus size={16} />{" "}
-          {following
-            ? spanish
-              ? "Siguiendo"
-              : "Following"
-            : spanish
-              ? "Seguir artista"
-              : "Follow Artist"}
-        </button>
+        <div className="artist-profile-actions">
+          <button
+            className={following ? "following" : ""}
+            data-artist-follow-button
+            data-ui-component="followButton"
+            onClick={toggleFollow}
+          >
+            <UserPlus size={16} />{" "}
+            {following
+              ? spanish
+                ? "Siguiendo"
+                : "Following"
+              : spanish
+                ? "Seguir artista"
+                : "Follow Artist"}
+          </button>
+          <button
+            data-artist-share-button
+            data-ui-component="shareButton"
+            onClick={() => void shareArtist()}
+            type="button"
+          >
+            <Share2 size={16} /> {spanish ? "Compartir artista" : "Share Artist"}
+          </button>
+          <button
+            data-artist-support-button
+            data-ui-component="supportArtistButton"
+            onClick={supportArtist}
+            type="button"
+          >
+            <Gift size={16} /> {spanish ? "Apoyar artista" : "Support Artist"}
+          </button>
+        </div>
       </section>
 
       {message && <div className="artist-profile-notice" role="status">{message}</div>}
@@ -516,7 +577,11 @@ export function PublicArtistProfile({
           <h2>{spanish ? "Relaciones del creador" : "Creator relationships"}</h2>
           <div className="top-supporter-list">
             {topSupporters.map((supporter) => (
-              <Link href={`/artists/${supporter.id}`} key={supporter.id}>
+              <Link
+                data-artist-name-link
+                href={`/artists/${supporter.id}`}
+                key={supporter.id}
+              >
                 <span className="retention-avatar">
                   {supporter.name.slice(0, 2).toUpperCase()}
                 </span>
@@ -584,8 +649,12 @@ export function PublicArtistProfile({
                   <small>{new Date(item.createdAt).toLocaleDateString()}</small>
                 </div>
                 {item.actorId && (
-                  <Link href={`/artists/${item.actorId}`}>
-                    {spanish ? "Perfil" : "Profile"}
+                  <Link
+                    data-artist-profile-button
+                    data-ui-component="artistProfileButton"
+                    href={`/artists/${item.actorId}`}
+                  >
+                    {spanish ? "Ver artista" : "View Artist"}
                   </Link>
                 )}
               </article>
@@ -599,6 +668,28 @@ export function PublicArtistProfile({
             )}
           </div>
         </div>
+      </section>
+
+      <section className="artist-catalog-toolbar">
+        <div>
+          <span className="eyebrow">
+            <Music2 size={13} /> {spanish ? "Catálogo del artista" : "Artist Song Catalog"}
+          </span>
+          <h2>{spanish ? "Todas las canciones" : "All Songs"}</h2>
+        </div>
+        <label>
+          {spanish ? "Ordenar por" : "Sort by"}
+          <select
+            onChange={(event) => setSongSortOrder(event.target.value)}
+            value={songSortOrder}
+          >
+            <option value="newest">{spanish ? "Más recientes" : "Newest First"}</option>
+            <option value="most_played">{spanish ? "Más reproducidas" : "Most Played"}</option>
+            <option value="most_shared">{spanish ? "Más compartidas" : "Most Shared"}</option>
+            <option value="most_supported">{spanish ? "Más apoyadas" : "Most Supported"}</option>
+            <option value="highest_rated">{spanish ? "Mejor rating" : "Highest Rated"}</option>
+          </select>
+        </label>
       </section>
 
       <section
