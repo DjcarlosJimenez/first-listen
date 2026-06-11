@@ -31,6 +31,8 @@
     "control-center:claimed-at:diagnose": "node scripts/diagnose-claimed-at-production.mjs",
     "control-center:claimed-at:dry-run": "node scripts/apply-claimed-at-repair.mjs",
     "control-center:claimed-at:apply": "node scripts/apply-claimed-at-repair.mjs --apply",
+    "ux-audit:dry-run": "node scripts/apply-production-ux-audit-repairs.mjs",
+    "ux-audit:apply": "node scripts/apply-production-ux-audit-repairs.mjs --apply",
     "control-center:verify": "node scripts/verify-super-admin-control-center.mjs",
     "priority25:verify:production": "node scripts/verify-priority25-production.mjs",
     "db:schema:sync": "node scripts/sync-schema.mjs",

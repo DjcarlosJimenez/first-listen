@@ -21884,3 +21884,18 @@ $$;
 revoke all on function public.priority25_claimed_at_repair_report() from public;
 grant execute on function public.priority25_claimed_at_repair_report()
   to authenticated, service_role;
+
+-- ============================================================
+-- 20260611003000_production_ux_audit_repairs.sql
+-- ============================================================
+
+-- Production UX audit repair:
+-- Ensure every profile has a baseline activity timestamp for retention health,
+-- even before the user submits a song, review, listen, or social action.
+
+update public.profiles
+set last_contribution_at = created_at
+where last_contribution_at is null;
+
+alter table public.profiles
+  alter column last_contribution_at set default now();

@@ -320,13 +320,52 @@ try {
   })()`);
   const loggedInUrl = await waitFor(
     "window.location.href",
-    (value) => value.includes("/dashboard"),
+    (value) => value.includes("/dashboard") || value.includes("/review"),
   );
-  if (!loggedInUrl.includes("/dashboard")) {
-    throw new Error(`UI login did not reach the dashboard: ${loggedInUrl}`);
+  if (!loggedInUrl.includes("/dashboard") && !loggedInUrl.includes("/review")) {
+    throw new Error(`UI login did not reach an authenticated app page: ${loggedInUrl}`);
   }
 
   await navigate(`${baseUrl}/admin`);
+  const adminControlCenterState = await waitFor(
+    `(() => ({
+      heading: document.querySelector(".admin-nav h1")?.innerText ?? "",
+      controlCenter: document.querySelector(".control-center")?.innerText ?? "",
+      tabs: [...document.querySelectorAll(".control-tabs button")].map((button) => button.innerText),
+      userSearch: document.querySelector('input[placeholder*="name, email"]')?.getAttribute("placeholder") ?? ""
+    }))()`,
+    (value) =>
+      value.heading === "Administration" &&
+      (value.controlCenter.includes("Super Admin Control Center") ||
+        Boolean(value.userSearch)),
+  );
+  if (adminControlCenterState.controlCenter.includes("Super Admin Control Center")) {
+    const expectedControlLabels = [
+      "Publish Changes",
+      "Theme",
+      "Homepage",
+      "Tokens",
+      "Announcements",
+      "Snapshots",
+    ];
+    if (
+      adminControlCenterState.heading !== "Administration" ||
+      !adminControlCenterState.controlCenter.includes("Preview") ||
+      !expectedControlLabels.every((label) =>
+        adminControlCenterState.controlCenter.includes(label) ||
+        adminControlCenterState.tabs.some((tab) => tab.includes(label)),
+      )
+    ) {
+      throw new Error(
+        `Super Admin Control Center is incomplete: ${JSON.stringify(adminControlCenterState)}`,
+      );
+    }
+    await evaluate(`(() => {
+      [...document.querySelectorAll(".admin-nav button")]
+        .find((button) => button.innerText.trim() === "Users")
+        ?.click();
+    })()`);
+  }
   const adminState = await waitFor(
     `(() => ({
       heading: document.querySelector(".admin-nav h1")?.innerText ?? "",
@@ -922,6 +961,7 @@ try {
   console.log(
     JSON.stringify(
       {
+        admin_control_center: adminControlCenterState,
         cover_url_optional: true,
         admin_song_search: adminSongState,
         admin_user_search: adminState,

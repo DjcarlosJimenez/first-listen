@@ -2607,7 +2607,7 @@ function DiscoverySongCard({
             <span>
               <CheckCircle2 size={13} />
               {listenState.validListenRecorded
-                ? spanish ? "Escucha valida" : "Valid Listen"
+                ? spanish ? "Escucha válida" : "Valid Listen"
                 : `${formatClock(listenState.verifiedSeconds)} / ${formatClock(
                     listenState.validRequirementSeconds,
                   )}`}
@@ -3164,7 +3164,7 @@ function DashboardView({
           <StatCard
             label={locale === "es" ? "Escucha promedio" : "Average Listen"}
             value={formatDuration(latestSummary?.averageListeningSeconds ?? 0)}
-            detail={locale === "es" ? "Por review valida" : "Per qualified review"}
+            detail={locale === "es" ? "Por review válida" : "Per qualified review"}
             icon={Headphones}
           />
           <StatCard

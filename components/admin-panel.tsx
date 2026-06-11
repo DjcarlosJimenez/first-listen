@@ -368,7 +368,14 @@ export function AdminPanel({
     ),
   );
   const isSuper = role === "super_admin";
+  const hasControlCenter = isSuper && Boolean(controlCenterData);
   const supabase = createClient();
+
+  useEffect(() => {
+    if (section === "control" && !hasControlCenter) {
+      setSection(role === "moderator" ? "reports" : "users");
+    }
+  }, [hasControlCenter, role, section]);
 
   useEffect(() => {
     if (section !== "health") return;
@@ -537,7 +544,7 @@ export function AdminPanel({
     ["statistics", "Statistics", BarChart3],
   ] as const;
   const sections = allSections.filter(([id]) => {
-    if (role === "super_admin") return true;
+    if (role === "super_admin") return id !== "control" || hasControlCenter;
     if (role === "admin") return !["credits", "listening", "economy"].includes(id);
     return ["users", "reports"].includes(id);
   });

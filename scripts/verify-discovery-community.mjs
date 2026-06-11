@@ -76,6 +76,35 @@ function record(name, details = true) {
   checks.push({ name, passed: true, details });
 }
 
+async function releaseProfileReferences(profileId) {
+  const nullableReferences = [
+    ["songs", "removed_by"],
+    ["songs", "archived_by"],
+    ["songs", "merged_by"],
+    ["credit_transactions", "created_by"],
+    ["song_reports", "reviewed_by"],
+    ["discovery_settings", "updated_by"],
+    ["spotlight_slots", "updated_by"],
+    ["song_boosts", "reviewed_by"],
+  ];
+  for (const [table, column] of nullableReferences) {
+    const { error } = await service
+      .from(table)
+      .update({ [column]: null })
+      .eq(column, profileId);
+    assertNoError(error, `Release ${table}.${column}`);
+  }
+  assertNoError(
+    (await service.from("contests").delete().eq("created_by", profileId)).error,
+    "Delete profile contests",
+  );
+  assertNoError(
+    (await service.from("special_events").delete().eq("created_by", profileId))
+      .error,
+    "Delete profile special events",
+  );
+}
+
 async function createUser(label) {
   const client = clients[label];
   const email = `discovery-${label}-${runId}@example.com`;
@@ -198,16 +227,7 @@ try {
     ),
   );
   for (const fixture of staleFixtures) {
-    await service
-      .from("spotlight_slots")
-      .update({ updated_by: null })
-      .eq("updated_by", fixture.id);
-    await service.from("contests").delete().eq("created_by", fixture.id);
-    await service.from("special_events").delete().eq("created_by", fixture.id);
-    await service
-      .from("song_boosts")
-      .update({ reviewed_by: null })
-      .eq("reviewed_by", fixture.id);
+    await releaseProfileReferences(fixture.id);
     assertNoError(
       (await service.auth.admin.deleteUser(fixture.id)).error,
       "Delete stale discovery fixture",
@@ -541,6 +561,7 @@ try {
     await service.from("special_events").delete().in("id", programIds.events);
   }
   for (const userId of userIds.reverse()) {
+    await releaseProfileReferences(userId);
     const { error } = await service.auth.admin.deleteUser(userId);
     if (error) console.error(`Cleanup failed for ${userId}: ${error.message}`);
   }

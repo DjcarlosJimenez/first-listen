@@ -298,7 +298,7 @@ function GuestSidebar({
     {
       id: "review" as const,
       icon: Headphones,
-      label: spanish ? "Review canciones" : "Review Songs",
+      label: spanish ? "Revisar canciones" : "Review Songs",
     },
     {
       id: "dashboard" as const,
@@ -388,7 +388,7 @@ function GuestTopbar({
   const spanish = locale === "es";
   const titles = {
     review: {
-      title: spanish ? "Review canciones" : "Review Songs",
+      title: spanish ? "Revisar canciones" : "Review Songs",
       subtitle: spanish
         ? "Escucha, reacciona y ayuda a artistas reales."
         : "Listen, react, and help real artists.",
@@ -1214,11 +1214,11 @@ export function GuestExperience() {
               : "Choose a display name. It is optional and appears when you participate."}
           </p>
           <div className="guest-identity-benefits">
-            <span><Heart size={14} /> {spanish ? "Des Like" : "Like songs"}</span>
-            <span><MessageSquareText size={14} /> {spanish ? "Comentes" : "Comment"}</span>
-            <span><UserPlus size={14} /> {spanish ? "Sigas artistas" : "Follow artists"}</span>
-            <span><Bookmark size={14} /> {spanish ? "Guardes canciones" : "Save songs"}</span>
-            <span><Share2 size={14} /> {spanish ? "Compartas canciones" : "Share songs"}</span>
+            <span><Heart size={14} /> {spanish ? "Dar like" : "Like songs"}</span>
+            <span><MessageSquareText size={14} /> {spanish ? "Comentar" : "Comment"}</span>
+            <span><UserPlus size={14} /> {spanish ? "Seguir artistas" : "Follow artists"}</span>
+            <span><Bookmark size={14} /> {spanish ? "Guardar canciones" : "Save songs"}</span>
+            <span><Share2 size={14} /> {spanish ? "Compartir canciones" : "Share songs"}</span>
           </div>
 
           {!recoverMode ? (
@@ -1539,7 +1539,7 @@ export function GuestExperience() {
               <h2>{spanish ? "Eres parte de la escucha" : "You are part of the listening community"}</h2>
               <p>
                 {spanish
-                  ? "Tus likes, comentarios, follows y canciones guardadas aparecen junto a la actividad de todos los listeners."
+                  ? "Tus likes, comentarios, artistas seguidos y canciones guardadas aparecen junto a la actividad de todos los oyentes."
                   : "Your likes, comments, follows, and saved songs appear alongside every listener's community activity."}
               </p>
             </section>
