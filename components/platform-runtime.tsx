@@ -135,6 +135,16 @@ function applyControlConfig(config: PlatformControlConfig) {
   root.dataset.externalSongBehavior = config.discovery.externalContent.behavior;
   root.dataset.externalDiscoveryPlacement =
     config.discovery.externalContent.placement;
+  root.dataset.membershipPreviewTier = config.membership.previewTier;
+  root.dataset.membershipSupportWallEnabled = String(
+    config.membership.supportWall.enabled,
+  );
+  root.dataset.membershipDonationsEnabled = String(
+    config.membership.donations.enabled,
+  );
+  root.dataset.membershipMonthlySupportEnabled = String(
+    config.membership.donations.monthlySupportEnabled,
+  );
   root.dataset.desktopActionLayout = config.ui.desktop.actionLayout;
   root.dataset.mobileActionLayout = config.ui.mobile.actionLayout;
   root.dataset.desktopCardLayout = config.ui.desktop.cardLayout;
@@ -209,6 +219,16 @@ function applyControlConfig(config: PlatformControlConfig) {
       `--artist-field-${field}`,
       visible ? "" : "none",
     );
+  }
+  for (const [tier, tierConfig] of Object.entries(config.membership.tiers)) {
+    root.dataset[
+      `membership${tier[0].toUpperCase()}${tier.slice(1)}Enabled`
+    ] = String(tierConfig.enabled);
+    for (const [permission, enabled] of Object.entries(tierConfig.permissions)) {
+      root.dataset[
+        `membership${tier[0].toUpperCase()}${tier.slice(1)}${permission[0].toUpperCase()}${permission.slice(1)}`
+      ] = String(enabled);
+    }
   }
   for (const [field, enabled] of Object.entries(
     config.homepage.community.features,

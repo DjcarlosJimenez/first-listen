@@ -360,6 +360,12 @@ export function PublicArtistProfile({
   const [activeSongId, setActiveSongId] = useState<string | null>(null);
   const [songSortOrder, setSongSortOrder] = useState("newest");
   const [message, setMessage] = useState("");
+  const [supportPanelOpen, setSupportPanelOpen] = useState(false);
+  const [giftAmount, setGiftAmount] = useState(1);
+  const [pendingGiftAmount, setPendingGiftAmount] = useState<number | null>(
+    null,
+  );
+  const [giftBusy, setGiftBusy] = useState(false);
   const spanish = locale === "es";
 
   useEffect(() => {
@@ -485,10 +491,53 @@ export function PublicArtistProfile({
   };
 
   const supportArtist = () => {
+    setSupportPanelOpen((current) => !current);
+    setPendingGiftAmount(null);
+    setMessage("");
+  };
+
+  const prepareGift = (amount: number) => {
+    const normalized = Math.floor(amount);
+    if (!Number.isFinite(normalized) || normalized < 1) {
+      setMessage(
+        spanish
+          ? "El regalo debe ser de al menos 1 token."
+          : "The gift must be at least 1 token.",
+      );
+      return;
+    }
+    setPendingGiftAmount(normalized);
+    setGiftAmount(normalized);
+  };
+
+  const confirmGift = async () => {
+    if (!pendingGiftAmount || giftBusy) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.push(`/login?next=/artists/${artist.id}`);
+      return;
+    }
+    setGiftBusy(true);
+    const { data, error } = await supabase.rpc("gift_artist_tokens", {
+      target_artist_id: artist.id,
+      token_amount: pendingGiftAmount,
+    });
+    setGiftBusy(false);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    setSupportPanelOpen(false);
+    setPendingGiftAmount(null);
     setMessage(
       spanish
-        ? "El apoyo con tokens usa los controles existentes de gifting. Mientras tanto, escuchar, seguir y compartir ya apoya a este artista."
-        : "Token support uses the existing gifting controls. For now, listening, following, and sharing already support this artist.",
+        ? `Regalaste ${row?.gifted_tokens ?? pendingGiftAmount} tokens a ${artist.name}.`
+        : `You gifted ${row?.gifted_tokens ?? pendingGiftAmount} tokens to ${artist.name}.`,
     );
   };
 
@@ -567,6 +616,83 @@ export function PublicArtistProfile({
       </section>
 
       {message && <div className="artist-profile-notice" role="status">{message}</div>}
+
+      {supportPanelOpen && (
+        <section className="artist-token-gift-panel" aria-label="Support artist">
+          <div>
+            <span className="eyebrow">
+              <Gift size={13} /> {spanish ? "Apoyo al artista" : "Artist Support"}
+            </span>
+            <h2>{spanish ? "Regalar tokens" : "Gift Tokens"}</h2>
+            <p>
+              {spanish
+                ? "Solo los tokens ganados pueden regalarse. Los regalos son permanentes y quedan auditados."
+                : "Only earned tokens may be gifted. Gifts are permanent and fully audited."}
+            </p>
+          </div>
+          <div className="artist-token-gift-options">
+            {[1, 5, 10].map((amount) => (
+              <button
+                key={amount}
+                onClick={() => prepareGift(amount)}
+                type="button"
+              >
+                <Gift size={14} /> {spanish ? "Regalar" : "Gift"} {amount}
+              </button>
+            ))}
+            <label>
+              {spanish ? "Cantidad personalizada" : "Custom Amount"}
+              <input
+                min={1}
+                onChange={(event) => setGiftAmount(Number(event.target.value))}
+                type="number"
+                value={giftAmount}
+              />
+            </label>
+            <button onClick={() => prepareGift(giftAmount)} type="button">
+              {spanish ? "Preparar regalo" : "Prepare Gift"}
+            </button>
+          </div>
+          {pendingGiftAmount !== null && (
+            <div className="artist-token-gift-confirmation" role="status">
+              <strong>
+                {spanish
+                  ? "Estas a punto de regalar:"
+                  : "You are about to gift:"}
+              </strong>
+              <span>{pendingGiftAmount} Tokens</span>
+              <small>
+                {spanish ? "a:" : "to:"} {artist.name}.{" "}
+                {spanish
+                  ? "Estos tokens se transferiran permanentemente."
+                  : "These tokens will be permanently transferred."}
+              </small>
+              <div>
+                <button
+                  disabled={giftBusy}
+                  onClick={() => void confirmGift()}
+                  type="button"
+                >
+                  {giftBusy
+                    ? spanish
+                      ? "Enviando..."
+                      : "Sending..."
+                    : spanish
+                      ? "Confirmar regalo"
+                      : "Confirm Gift"}
+                </button>
+                <button
+                  disabled={giftBusy}
+                  onClick={() => setPendingGiftAmount(null)}
+                  type="button"
+                >
+                  {spanish ? "Cancelar" : "Cancel"}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="artist-community-grid">
         <div

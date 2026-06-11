@@ -119,6 +119,63 @@ export type ControlAnnouncement = {
   active: boolean;
 };
 
+export const membershipTierLabels = {
+  guestListener: "Guest Listener",
+  registeredMember: "Registered Member",
+  creator: "Creator",
+  communitySupporter: "Community Supporter",
+  founderCircle: "Founder Circle",
+} as const;
+
+export type MembershipTierKey = keyof typeof membershipTierLabels;
+
+export const membershipPermissionLabels = {
+  canListen: "Can Listen",
+  canComment: "Can Comment",
+  canLike: "Can Like",
+  canFollowArtists: "Can Follow Artists",
+  canSaveSongs: "Can Save Songs",
+  canShareSongs: "Can Share Songs",
+  canEarnTokens: "Can Earn Tokens",
+  canGiftTokens: "Can Gift Tokens",
+  canUploadSongs: "Can Upload Songs",
+  canCreateArtistProfiles: "Can Create Artist Profiles",
+  canReceiveFollowers: "Can Receive Followers",
+  canAccessStatistics: "Can Access Statistics",
+  canCustomizeProfile: "Can Customize Profile",
+  canCreatePlaylists: "Can Create Playlists",
+  canAppearInRankings: "Can Appear In Rankings",
+  canParticipateInContests: "Can Participate In Contests",
+  canAccessPremiumFeatures: "Can Access Premium Features",
+  canSupportArtists: "Can Support Artists",
+  canReceiveSupport: "Can Receive Support",
+  canDisplayBadges: "Can Display Badges",
+} as const;
+
+export type MembershipPermissionKey = keyof typeof membershipPermissionLabels;
+
+export type MembershipTierConfig = {
+  enabled: boolean;
+  name: string;
+  description: string;
+  visibility: "public" | "private" | "hidden";
+  badge: {
+    name: string;
+    color: string;
+    icon: string;
+    visible: boolean;
+    placement: "profile_header" | "profile_card" | "support_wall" | "hidden";
+  };
+  profileAppearance: {
+    customFrame: boolean;
+    customTheme: boolean;
+    customBanner: boolean;
+    profileAccent: string;
+    recognitionStyling: boolean;
+  };
+  permissions: Record<MembershipPermissionKey, boolean>;
+};
+
 export type PlatformControlConfig = {
   schemaVersion: number;
   theme: ControlTheme;
@@ -356,6 +413,20 @@ export type PlatformControlConfig = {
     };
   };
   permissions: Record<string, Record<string, boolean>>;
+  membership: {
+    previewTier: MembershipTierKey;
+    tiers: Record<MembershipTierKey, MembershipTierConfig>;
+    supportWall: {
+      enabled: boolean;
+      showCommunitySupporters: boolean;
+      showFounderCircleMembers: boolean;
+      showTopArtistSupporters: boolean;
+    };
+    donations: {
+      enabled: boolean;
+      monthlySupportEnabled: boolean;
+    };
+  };
   experiments: {
     experimentalFeatures: boolean;
     abTesting: boolean;
@@ -425,6 +496,82 @@ const communitySectionDefaults = {
   reviews: true,
   statistics: true,
 };
+
+const disabledMembershipPermissions = Object.fromEntries(
+  Object.keys(membershipPermissionLabels).map((permission) => [
+    permission,
+    false,
+  ]),
+) as Record<MembershipPermissionKey, boolean>;
+
+const guestMembershipPermissions: Record<MembershipPermissionKey, boolean> = {
+  ...disabledMembershipPermissions,
+  canListen: true,
+  canComment: true,
+  canLike: true,
+  canFollowArtists: true,
+  canSaveSongs: true,
+  canShareSongs: true,
+};
+
+const registeredMembershipPermissions: Record<MembershipPermissionKey, boolean> = {
+  ...guestMembershipPermissions,
+  canEarnTokens: true,
+  canGiftTokens: true,
+  canUploadSongs: true,
+  canCreateArtistProfiles: true,
+  canReceiveFollowers: true,
+  canAccessStatistics: true,
+  canSupportArtists: true,
+  canReceiveSupport: true,
+  canDisplayBadges: true,
+};
+
+const creatorMembershipPermissions: Record<MembershipPermissionKey, boolean> = {
+  ...registeredMembershipPermissions,
+  canCustomizeProfile: true,
+};
+
+const communitySupporterPermissions: Record<MembershipPermissionKey, boolean> = {
+  ...guestMembershipPermissions,
+  canSupportArtists: true,
+  canDisplayBadges: true,
+};
+
+const founderCirclePermissions: Record<MembershipPermissionKey, boolean> = {
+  ...communitySupporterPermissions,
+  canCustomizeProfile: true,
+};
+
+function membershipTier(
+  tier: MembershipTierKey,
+  enabled: boolean,
+  description: string,
+  badgeColor: string,
+  permissions: Record<MembershipPermissionKey, boolean>,
+): MembershipTierConfig {
+  return {
+    enabled,
+    name: membershipTierLabels[tier],
+    description,
+    visibility: enabled ? "public" : "hidden",
+    badge: {
+      name: membershipTierLabels[tier],
+      color: badgeColor,
+      icon: membershipTierLabels[tier],
+      visible: enabled,
+      placement: enabled ? "profile_header" : "hidden",
+    },
+    profileAppearance: {
+      customFrame: false,
+      customTheme: false,
+      customBanner: false,
+      profileAccent: badgeColor,
+      recognitionStyling: tier === "founderCircle",
+    },
+    permissions,
+  };
+}
 
 export const defaultPlatformControlConfig: PlatformControlConfig = {
   schemaVersion: 1,
@@ -588,9 +735,9 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
     maxTokensPerDay: 3,
     submissionCost: 1,
     gifting: {
-      enabled: false,
+      enabled: true,
       minimum: 1,
-      maximum: 5,
+      maximum: 10,
       dailyLimit: 10,
       cooldownMinutes: 60,
     },
@@ -666,6 +813,56 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       comment: true,
       follow: true,
       save: true,
+    },
+  },
+  membership: {
+    previewTier: "guestListener",
+    tiers: {
+      guestListener: membershipTier(
+        "guestListener",
+        true,
+        "Free listening access for guests. Guests can listen, react, follow, save, and share.",
+        "#C8FF4F",
+        guestMembershipPermissions,
+      ),
+      registeredMember: membershipTier(
+        "registeredMember",
+        true,
+        "Free member account with history, earned tokens, artist support, and song submission access.",
+        "#4F7110",
+        registeredMembershipPermissions,
+      ),
+      creator: membershipTier(
+        "creator",
+        false,
+        "Prepared future creator tier for artist profiles, song catalog tools, statistics, and customizations.",
+        "#7AA511",
+        creatorMembershipPermissions,
+      ),
+      communitySupporter: membershipTier(
+        "communitySupporter",
+        false,
+        "Prepared future recognition tier for voluntary community support with no competitive advantages.",
+        "#2F8F5B",
+        communitySupporterPermissions,
+      ),
+      founderCircle: membershipTier(
+        "founderCircle",
+        false,
+        "Prepared future monthly support tier for permanent recognition with no queue, ranking, token, or visibility advantages.",
+        "#C9A227",
+        founderCirclePermissions,
+      ),
+    },
+    supportWall: {
+      enabled: false,
+      showCommunitySupporters: true,
+      showFounderCircleMembers: true,
+      showTopArtistSupporters: true,
+    },
+    donations: {
+      enabled: false,
+      monthlySupportEnabled: false,
     },
   },
   experiments: {

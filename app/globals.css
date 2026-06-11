@@ -6012,6 +6012,105 @@ button {
   padding: 11px 12px;
 }
 
+.artist-token-gift-panel {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.8fr);
+  margin: 14px auto 0;
+  max-width: 1180px;
+  padding: 22px;
+}
+
+.artist-token-gift-panel h2 {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(28px, 4vw, 44px);
+  letter-spacing: -0.055em;
+  margin: 8px 0;
+}
+
+.artist-token-gift-panel p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.artist-token-gift-options {
+  display: grid;
+  gap: 8px;
+}
+
+.artist-token-gift-options button,
+.artist-token-gift-confirmation button {
+  align-items: center;
+  background: #f6f7f3;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  gap: 7px;
+  justify-content: center;
+  padding: 11px 13px;
+}
+
+.artist-token-gift-options button:first-child,
+.artist-token-gift-confirmation button:first-child {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: var(--acid);
+}
+
+.artist-token-gift-options label {
+  color: var(--muted);
+  display: grid;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.artist-token-gift-options input {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  padding: 10px;
+}
+
+.artist-token-gift-confirmation {
+  background: #fff4d6;
+  border: 1px solid #efd28e;
+  border-radius: 16px;
+  color: #765813;
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  padding: 16px;
+}
+
+.artist-token-gift-confirmation span {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.artist-token-gift-confirmation small {
+  font-size: 11px;
+}
+
+.artist-token-gift-confirmation div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .artist-song-grid {
   grid-template-columns: 1fr;
 }
@@ -6195,6 +6294,10 @@ button {
 
   .artist-catalog-toolbar label {
     min-width: 0;
+  }
+
+  .artist-token-gift-panel {
+    grid-template-columns: 1fr;
   }
 
   .landing-nav {
@@ -9538,6 +9641,57 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   padding-top: 0;
 }
 
+.control-inline-toggle {
+  align-items: center;
+  display: inline-flex !important;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.membership-manager {
+  align-items: start;
+}
+
+.membership-tier-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.membership-tier-summary div {
+  background: #f7f9f4;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  gap: 5px;
+  padding: 13px;
+}
+
+.membership-tier-summary div.enabled {
+  background: #effbd8;
+  border-color: #c8e889;
+}
+
+.membership-tier-summary strong {
+  font-size: 12px;
+}
+
+.membership-tier-summary span,
+.membership-tier-summary small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.membership-permission-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.membership-tier-card textarea {
+  min-height: 74px;
+}
+
 .control-actions {
   align-items: center;
   display: flex;
@@ -10010,6 +10164,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 @media (max-width: 1100px) {
   .control-toggle-grid,
+  .membership-permission-grid,
+  .membership-tier-summary,
   .control-permission-grid,
   .control-spotlight-grid,
   .control-health-grid {
@@ -10036,6 +10192,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .control-component-grid,
   .control-section-visibility-grid,
   .control-toggle-grid,
+  .membership-permission-grid,
+  .membership-tier-summary,
   .control-permission-grid,
   .control-spotlight-grid,
   .control-health-grid,

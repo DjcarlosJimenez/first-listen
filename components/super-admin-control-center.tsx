@@ -32,11 +32,16 @@ import {
   cardDensityLabels,
   defaultPlatformControlConfig,
   homepageModuleLabels,
+  membershipPermissionLabels,
+  membershipTierLabels,
   normalizePlatformControlConfig,
   uiComponentLabels,
   type CardDensityKey,
   type ControlAnnouncement,
   type HomepageModuleKey,
+  type MembershipPermissionKey,
+  type MembershipTierConfig,
+  type MembershipTierKey,
   type PlatformControlConfig,
   type UiComponentKey,
   type UiResponsiveSize,
@@ -157,6 +162,7 @@ type ControlTab =
   | "content"
   | "profiles"
   | "community"
+  | "membership"
   | "tokens"
   | "announcements"
   | "health"
@@ -174,6 +180,7 @@ const tabs: Array<[ControlTab, string, typeof Gauge]> = [
   ["content", "Content", Music2],
   ["profiles", "Artist Profiles", Users],
   ["community", "Community", Users],
+  ["membership", "Membership", WalletCards],
   ["tokens", "Token Economy", WalletCards],
   ["announcements", "Announcements", Bell],
   ["health", "Live Health", Activity],
@@ -203,6 +210,7 @@ const configSectionLabels: Record<ConfigSectionKey, string> = {
   discovery: "Discovery",
   spotlight: "Spotlight",
   artistProfile: "Artist Profiles",
+  membership: "Membership",
   tokens: "Tokens",
   permissions: "Permissions",
   experiments: "Experiments",
@@ -366,6 +374,36 @@ const artistPremiumLabels: Record<
   premiumBadge: "Premium Badge",
 };
 
+const membershipVisibilityLabels: Record<
+  PlatformControlConfig["membership"]["tiers"][MembershipTierKey]["visibility"],
+  string
+> = {
+  public: "Public",
+  private: "Private",
+  hidden: "Hidden",
+};
+
+const badgePlacementLabels: Record<
+  PlatformControlConfig["membership"]["tiers"][MembershipTierKey]["badge"]["placement"],
+  string
+> = {
+  profile_header: "Profile Header",
+  profile_card: "Profile Card",
+  support_wall: "Support Wall",
+  hidden: "Hidden",
+};
+
+const profileAppearanceLabels: Record<
+  keyof PlatformControlConfig["membership"]["tiers"][MembershipTierKey]["profileAppearance"],
+  string
+> = {
+  customFrame: "Custom Frame",
+  customTheme: "Custom Theme",
+  customBanner: "Custom Banner",
+  profileAccent: "Profile Accent",
+  recognitionStyling: "Recognition Styling",
+};
+
 const communityFeatureLabels: Record<
   keyof PlatformControlConfig["homepage"]["community"]["features"],
   string
@@ -471,6 +509,249 @@ const communitySectionFieldLabels: Record<
   reviews: "Reviews",
   statistics: "Statistics",
 };
+
+const membershipTierOrder = Object.keys(
+  membershipTierLabels,
+) as MembershipTierKey[];
+
+function MembershipTierEditor({
+  tierKey,
+  tier,
+  onChange,
+}: {
+  tierKey: MembershipTierKey;
+  tier: MembershipTierConfig;
+  onChange: (updater: (tier: MembershipTierConfig) => MembershipTierConfig) => void;
+}) {
+  return (
+    <article className="control-card control-card-wide membership-tier-card">
+      <div className="control-heading">
+        <div>
+          <span className="eyebrow">
+            {tier.enabled ? "Active tier" : "Prepared tier"}
+          </span>
+          <h3>{membershipTierLabels[tierKey]}</h3>
+          <p>{tier.description}</p>
+        </div>
+        <label className="control-inline-toggle">
+          <input
+            checked={tier.enabled}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                enabled: event.target.checked,
+                visibility: event.target.checked ? "public" : current.visibility,
+              }))
+            }
+            type="checkbox"
+          />
+          Enabled
+        </label>
+      </div>
+
+      <div className="control-number-grid">
+        <label>
+          Name
+          <input
+            maxLength={80}
+            onChange={(event) =>
+              onChange((current) => ({ ...current, name: event.target.value }))
+            }
+            value={tier.name}
+          />
+        </label>
+        <label>
+          Visibility
+          <select
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                visibility: event.target.value as MembershipTierConfig["visibility"],
+              }))
+            }
+            value={tier.visibility}
+          >
+            {Object.entries(membershipVisibilityLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label>
+        Description
+        <textarea
+          maxLength={400}
+          onChange={(event) =>
+            onChange((current) => ({
+              ...current,
+              description: event.target.value,
+            }))
+          }
+          value={tier.description}
+        />
+      </label>
+
+      <div className="control-section-heading">
+        <span className="eyebrow">Badge Manager</span>
+        <h4>Badge name, color, icon, visibility, and placement</h4>
+      </div>
+      <div className="control-number-grid">
+        <label>
+          Badge Name
+          <input
+            maxLength={80}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                badge: { ...current.badge, name: event.target.value },
+              }))
+            }
+            value={tier.badge.name}
+          />
+        </label>
+        <label>
+          Badge Icon
+          <input
+            maxLength={40}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                badge: { ...current.badge, icon: event.target.value },
+              }))
+            }
+            value={tier.badge.icon}
+          />
+        </label>
+        <label>
+          Badge Color
+          <input
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                badge: { ...current.badge, color: event.target.value },
+              }))
+            }
+            type="color"
+            value={tier.badge.color}
+          />
+        </label>
+        <label>
+          Badge Placement
+          <select
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                badge: {
+                  ...current.badge,
+                  placement:
+                    event.target.value as MembershipTierConfig["badge"]["placement"],
+                },
+              }))
+            }
+            value={tier.badge.placement}
+          >
+            {Object.entries(badgePlacementLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="control-inline-toggle">
+          <input
+            checked={tier.badge.visible}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                badge: { ...current.badge, visible: event.target.checked },
+              }))
+            }
+            type="checkbox"
+          />
+          Badge Visible
+        </label>
+      </div>
+
+      <div className="control-section-heading">
+        <span className="eyebrow">Profile Appearance Manager</span>
+        <h4>Per-tier visual recognition</h4>
+      </div>
+      <div className="control-toggle-grid">
+        {(
+          Object.keys(tier.profileAppearance) as Array<
+            keyof MembershipTierConfig["profileAppearance"]
+          >
+        ).map((field) =>
+          field === "profileAccent" ? (
+            <label key={field}>
+              {profileAppearanceLabels[field]}
+              <input
+                onChange={(event) =>
+                  onChange((current) => ({
+                    ...current,
+                    profileAppearance: {
+                      ...current.profileAppearance,
+                      profileAccent: event.target.value,
+                    },
+                  }))
+                }
+                type="color"
+                value={tier.profileAppearance.profileAccent}
+              />
+            </label>
+          ) : (
+            <label key={field}>
+              <input
+                checked={Boolean(tier.profileAppearance[field])}
+                onChange={(event) =>
+                  onChange((current) => ({
+                    ...current,
+                    profileAppearance: {
+                      ...current.profileAppearance,
+                      [field]: event.target.checked,
+                    },
+                  }))
+                }
+                type="checkbox"
+              />
+              {profileAppearanceLabels[field]}
+            </label>
+          ),
+        )}
+      </div>
+
+      <div className="control-section-heading">
+        <span className="eyebrow">Membership Permission Manager</span>
+        <h4>Individual permission controls</h4>
+      </div>
+      <div className="control-toggle-grid membership-permission-grid">
+        {(
+          Object.keys(membershipPermissionLabels) as MembershipPermissionKey[]
+        ).map((permission) => (
+          <label key={permission}>
+            <input
+              checked={tier.permissions[permission]}
+              onChange={(event) =>
+                onChange((current) => ({
+                  ...current,
+                  permissions: {
+                    ...current.permissions,
+                    [permission]: event.target.checked,
+                  },
+                }))
+              }
+              type="checkbox"
+            />
+            {membershipPermissionLabels[permission]}
+          </label>
+        ))}
+      </div>
+    </article>
+  );
+}
 
 const announcementBannerLabels: Record<
   ControlAnnouncement["bannerPlacement"],
@@ -720,6 +1001,7 @@ export function SuperAdminControlCenter({
       },
       discovery: source.discovery,
       artistProfile: source.artistProfile,
+      membership: source.membership,
       tokens: source.tokens,
       announcements: source.announcements,
     };
@@ -3074,6 +3356,165 @@ export function SuperAdminControlCenter({
               ))}
             </div>
           </article>
+        </div>
+      )}
+
+      {tab === "membership" && (
+        <div className="control-grid membership-manager">
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Membership Manager</span>
+                <h3>Tier foundation and permission manager</h3>
+                <p>
+                  Guest Listener and Registered Member are active. Creator,
+                  Community Supporter, and Founder Circle are prepared but
+                  disabled until the Founder activates them.
+                </p>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("membership")}
+                type="button"
+              >
+                <Save size={15} /> Save Draft
+              </button>
+            </div>
+            <div className="membership-tier-summary">
+              {membershipTierOrder.map((tierKey) => {
+                const tier = config.membership.tiers[tierKey];
+                return (
+                  <div
+                    className={tier.enabled ? "enabled" : "disabled"}
+                    key={tierKey}
+                  >
+                    <strong>{tier.name}</strong>
+                    <span>{tier.enabled ? "Enabled" : "Disabled"}</span>
+                    <small>{tier.badge.name}</small>
+                  </div>
+                );
+              })}
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Membership Preview</span>
+            <h3>Preview before activation</h3>
+            <label>
+              Preview tier
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    membership: {
+                      ...current.membership,
+                      previewTier: event.target.value as MembershipTierKey,
+                    },
+                  }))
+                }
+                value={config.membership.previewTier}
+              >
+                {membershipTierOrder.map((tierKey) => (
+                  <option key={tierKey} value={tierKey}>
+                    {config.membership.tiers[tierKey].name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p>
+              Preview mode stores the selected tier in the platform config. It
+              does not activate disabled tiers for public users.
+            </p>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Support Wall</span>
+            <h3>Prepared but disabled</h3>
+            <div className="control-toggle-grid">
+              {(
+                Object.keys(config.membership.supportWall) as Array<
+                  keyof PlatformControlConfig["membership"]["supportWall"]
+                >
+              ).map((field) => (
+                <label key={field}>
+                  <input
+                    checked={config.membership.supportWall[field]}
+                    onChange={(event) =>
+                      setConfig((current) => ({
+                        ...current,
+                        membership: {
+                          ...current.membership,
+                          supportWall: {
+                            ...current.membership.supportWall,
+                            [field]: event.target.checked,
+                          },
+                        },
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  {field.replace(/([A-Z])/g, " $1")}
+                </label>
+              ))}
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Donation Infrastructure</span>
+            <h3>Prepared only</h3>
+            <p>
+              Payments and subscriptions remain disabled. These switches only
+              prepare the structure for a future release.
+            </p>
+            <div className="control-toggle-grid">
+              {(
+                Object.keys(config.membership.donations) as Array<
+                  keyof PlatformControlConfig["membership"]["donations"]
+                >
+              ).map((field) => (
+                <label key={field}>
+                  <input
+                    checked={config.membership.donations[field]}
+                    onChange={(event) =>
+                      setConfig((current) => ({
+                        ...current,
+                        membership: {
+                          ...current.membership,
+                          donations: {
+                            ...current.membership.donations,
+                            [field]: event.target.checked,
+                          },
+                        },
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  {field.replace(/([A-Z])/g, " $1")}
+                </label>
+              ))}
+            </div>
+          </article>
+
+          {membershipTierOrder.map((tierKey) => (
+            <MembershipTierEditor
+              key={tierKey}
+              tier={config.membership.tiers[tierKey]}
+              tierKey={tierKey}
+              onChange={(updater) =>
+                setConfig((current) => ({
+                  ...current,
+                  membership: {
+                    ...current.membership,
+                    tiers: {
+                      ...current.membership.tiers,
+                      [tierKey]: updater(current.membership.tiers[tierKey]),
+                    },
+                  },
+                }))
+              }
+            />
+          ))}
         </div>
       )}
 
