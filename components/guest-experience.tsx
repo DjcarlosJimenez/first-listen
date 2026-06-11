@@ -706,7 +706,7 @@ export function GuestExperience() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [discoveryFeed, setDiscoveryFeed] = useState<GuestDiscoveryItem[]>([]);
   const [songIndex, setSongIndex] = useState(0);
-  const [playing, setPlaying] = useState(false);
+  const [playing, setPlaying] = useState(true);
   const [autoPlay, setAutoPlay] = useState(true);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1303,6 +1303,35 @@ export function GuestExperience() {
     );
   }
 
+  const credentialsBanner = showCredentials ? (
+    <section className="guest-credentials" role="status">
+      <div>
+        <span className="eyebrow">
+          <KeyRound size={13} />
+          {spanish ? "Guarda tu cÃ³digo de recuperaciÃ³n" : "Save your recovery code"}
+        </span>
+        <strong>{guest.recoveryCode}</strong>
+        <p>
+          {spanish
+            ? "Ãšsalo para recuperar tus likes, comentarios, artistas seguidos, canciones guardadas e historial en otro dispositivo."
+            : "Use it to recover your likes, comments, follows, saved songs, and history on another device."}
+        </p>
+      </div>
+      <button
+        onClick={() => {
+          void navigator.clipboard.writeText(guest.recoveryCode);
+          setIdentityMessage(spanish ? "CÃ³digo copiado." : "Code copied.");
+        }}
+        type="button"
+      >
+        <Copy size={14} /> {spanish ? "Copiar" : "Copy"}
+      </button>
+      <button onClick={() => setShowCredentials(false)} type="button">
+        {spanish ? "Listo" : "Done"}
+      </button>
+    </section>
+  ) : null;
+
   return (
     <div className="app-shell guest-app-shell">
       <GuestSidebar
@@ -1320,7 +1349,7 @@ export function GuestExperience() {
           view={view}
         />
         <main className="guest-page">
-      {showCredentials && (
+      {view !== "review" && showCredentials && (
         <section className="guest-credentials" role="status">
           <div>
             <span className="eyebrow">
@@ -1349,7 +1378,7 @@ export function GuestExperience() {
         </section>
       )}
 
-      {summary && (
+      {view !== "review" && summary && (
         <GuestAwaySummary
           locale={locale}
           onViewActivity={() => setView("discovery")}
@@ -1395,7 +1424,7 @@ export function GuestExperience() {
 
       {view === "review" && (
       <>
-      <section className="guest-welcome guest-welcome-compact">
+      <section className="guest-welcome guest-welcome-compact" hidden>
         <span className="eyebrow"><Sparkles size={13} /> Review Songs</span>
         <h1>
           {spanish
@@ -1452,7 +1481,7 @@ export function GuestExperience() {
               <div className="guest-player-wrap" ref={playerRef}>
                 <ProviderPlayer
                   artist={currentSong.artist}
-                  autoPlay
+                  autoPlay={playing && autoPlay}
                   coverUrl={currentSong.coverUrl}
                   link={currentSong.link}
                   locale={locale}
@@ -1470,6 +1499,17 @@ export function GuestExperience() {
                 )}
               </div>
             )}
+
+            <SongActionBar
+              artist={currentSong.artist}
+              artistId={currentSong.artistId}
+              guestToken={guest.token}
+              link={currentSong.link}
+              locale={locale}
+              platform={currentSong.platform}
+              songId={currentSong.id}
+              title={currentSong.title}
+            />
 
             <div className="guest-listening-progress">
               <div>
@@ -1499,16 +1539,27 @@ export function GuestExperience() {
               {listening.warning && <small>{listening.warning}</small>}
             </div>
 
-            <SongActionBar
-              artist={currentSong.artist}
-              artistId={currentSong.artistId}
-              guestToken={guest.token}
-              link={currentSong.link}
-              locale={locale}
-              platform={currentSong.platform}
-              songId={currentSong.id}
-              title={currentSong.title}
-            />
+            <section className="guest-review-section">
+              <span className="eyebrow">
+                <MessageSquareText size={13} />
+                {spanish ? "Tu reaccion" : "Your Reaction"}
+              </span>
+              <h3>{spanish ? "Ayuda a este artista" : "Help this artist"}</h3>
+              <p>
+                {spanish
+                  ? "Usa like, comentar, seguir, guardar o compartir para dejar una senal real de interes."
+                  : "Use like, comment, follow, save, or share to leave a real signal of listener interest."}
+              </p>
+              <button
+                onClick={() =>
+                  setGateFeature(spanish ? "Review completa" : "Full Review")
+                }
+                type="button"
+              >
+                {spanish ? "Enviar review completa" : "Submit Full Review"}{" "}
+                <ArrowRight size={14} />
+              </button>
+            </section>
 
             <div className="guest-player-controls">
               <button onClick={() => void nextSong()} type="button">
@@ -1524,8 +1575,8 @@ export function GuestExperience() {
               >
                 {autoPlay ? <Pause size={15} /> : <Play size={15} />}
                 {autoPlay
-                  ? spanish ? "Pausar auto play" : "Pause Auto Play"
-                  : spanish ? "Reanudar auto play" : "Resume Auto Play"}
+                  ? spanish ? "Auto Play al entrar: activo" : "Auto Play On Entry: On"
+                  : spanish ? "Auto Play al entrar: inactivo" : "Auto Play On Entry: Off"}
               </button>
             </div>
           </div>
@@ -1598,15 +1649,45 @@ export function GuestExperience() {
         </section>
       )}
 
+      <div data-platform-module="community_activity">
+        <CommunityPulse locale={locale} />
+      </div>
+
+      {summary && (
+        <GuestAwaySummary
+          locale={locale}
+          onViewActivity={() => setView("discovery")}
+          summary={summary}
+        />
+      )}
+
+      {credentialsBanner}
+
+      <section className="guest-welcome guest-welcome-compact">
+        <span className="eyebrow"><Sparkles size={13} /> Review Songs</span>
+        <h1>
+          {spanish
+            ? `Escucha, reacciona y descubre, ${guest.nickname}.`
+            : `Listen, react, and discover, ${guest.nickname}.`}
+        </h1>
+        <p>
+          {spanish
+            ? "La musica empieza aqui. Tus reacciones ayudan a artistas reales."
+            : "The music starts here. Your reactions help real artists."}
+        </p>
+        <div>
+          <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "escuchas validas" : "valid listens"}</span>
+          <span><Users size={14} /> {spanish ? "Comunidad completa" : "Full community access"}</span>
+          <span><Headphones size={14} /> {spanish ? "Perfil permanente" : "Permanent listener profile"}</span>
+        </div>
+      </section>
+
       <GuestDiscoveryShelves
         discoveryFeed={discoveryFeed}
         locale={locale}
         onPlay={(item) => void playDiscoverySong(item)}
       />
 
-      <div data-platform-module="community_activity">
-        <CommunityPulse locale={locale} />
-      </div>
       </>
       )}
         </main>

@@ -1208,7 +1208,7 @@ export function ProviderPlayer({
             {spanish ? "La reproducción necesita un toque" : "Playback needs one tap"}
           </strong>
           <button onClick={requestPlayback} type="button">
-            {spanish ? "Toca para iniciar" : "Tap To Start Playback"}
+            {spanish ? "▶ Toca para empezar a escuchar" : "▶ Tap To Start Listening"}
           </button>
         </div>
       )}
