@@ -2,12 +2,22 @@
 
 import {
   ArrowRight,
+  BarChart3,
+  Bell,
   Bookmark,
   CheckCircle2,
+  CircleHelp,
+  Coins,
   Copy,
+  Gauge,
   Headphones,
   Heart,
   KeyRound,
+  LayoutDashboard,
+  ListMusic,
+  LockKeyhole,
+  LogIn,
+  Menu,
   MessageSquareText,
   Music2,
   Pause,
@@ -16,8 +26,11 @@ import {
   Share2,
   SkipForward,
   Sparkles,
+  Trophy,
+  Upload,
   UserPlus,
   Users,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -73,6 +86,28 @@ type GuestDiscoveryItem = {
   commentsCount: number;
   likesCount: number;
   followersCount: number;
+};
+
+type GuestView = "review" | "dashboard" | "discovery" | "rankings";
+
+type GuestExperienceSummary = {
+  summarySince: string;
+  communityActivityCount: number;
+  communityListensCount: number;
+  communityCommentsCount: number;
+  communityLikesCount: number;
+  communityFollowsCount: number;
+  communitySharesCount: number;
+  newSongsCount: number;
+  validListens: number;
+  totalListeningSeconds: number;
+  songsExplored: number;
+  likesCount: number;
+  commentsCount: number;
+  followingCount: number;
+  savedSongsCount: number;
+  sharesCount: number;
+  queueSongCount: number;
 };
 
 const emptyListeningState: GuestListeningState = {
@@ -142,6 +177,30 @@ function mapGuestDiscovery(
   }));
 }
 
+function mapGuestSummary(
+  row: Record<string, unknown>,
+): GuestExperienceSummary {
+  return {
+    summarySince: String(row.summary_since),
+    communityActivityCount: Number(row.community_activity_count ?? 0),
+    communityListensCount: Number(row.community_listens_count ?? 0),
+    communityCommentsCount: Number(row.community_comments_count ?? 0),
+    communityLikesCount: Number(row.community_likes_count ?? 0),
+    communityFollowsCount: Number(row.community_follows_count ?? 0),
+    communitySharesCount: Number(row.community_shares_count ?? 0),
+    newSongsCount: Number(row.new_songs_count ?? 0),
+    validListens: Number(row.valid_listens ?? 0),
+    totalListeningSeconds: Number(row.total_listening_seconds ?? 0),
+    songsExplored: Number(row.songs_explored ?? 0),
+    likesCount: Number(row.likes_count ?? 0),
+    commentsCount: Number(row.comments_count ?? 0),
+    followingCount: Number(row.following_count ?? 0),
+    savedSongsCount: Number(row.saved_songs_count ?? 0),
+    sharesCount: Number(row.shares_count ?? 0),
+    queueSongCount: Number(row.queue_song_count ?? 0),
+  };
+}
+
 function persistGuest(guest: GuestSession) {
   window.localStorage.setItem("first-listen-guest-token", guest.token);
   window.localStorage.setItem(
@@ -152,9 +211,475 @@ function persistGuest(guest: GuestSession) {
   document.cookie = `first-listen-guest-token=${guest.token}; Max-Age=31536000; Path=/; SameSite=Lax; Secure`;
 }
 
+function GuestRegistrationGate({
+  feature,
+  locale,
+  onClose,
+}: {
+  feature: string | null;
+  locale: InterfaceLocale;
+  onClose: () => void;
+}) {
+  if (!feature) return null;
+  const spanish = locale === "es";
+  return (
+    <div
+      aria-label={spanish ? "Registro requerido" : "Registration required"}
+      aria-labelledby="guest-registration-title"
+      aria-modal="true"
+      className="guest-registration-gate"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target) onClose();
+      }}
+      role="dialog"
+    >
+      <section>
+        <button
+          aria-label={spanish ? "Cerrar" : "Close"}
+          autoFocus
+          className="guest-registration-close"
+          onClick={onClose}
+          type="button"
+        >
+          <X size={18} />
+        </button>
+        <span className="guest-registration-icon">
+          <UserPlus size={22} />
+        </span>
+        <span className="eyebrow">{feature}</span>
+        <h2 id="guest-registration-title">
+          {spanish
+            ? "Esta función está disponible para miembros registrados."
+            : "This feature is available to registered members."}
+        </h2>
+        <p>
+          {spanish
+            ? "Crear una cuenta es gratis."
+            : "Creating an account is free."}
+        </p>
+        <div>
+          <Link href={`/signup?source=guest&feature=${encodeURIComponent(feature)}`}>
+            {spanish ? "Crear cuenta gratis" : "Create Free Account"}
+            <ArrowRight size={15} />
+          </Link>
+          <button onClick={onClose} type="button">
+            {spanish ? "Quizás después" : "Maybe Later"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function GuestSidebar({
+  guest,
+  locale,
+  view,
+  onView,
+  onGate,
+  mobile = false,
+}: {
+  guest: GuestSession;
+  locale: InterfaceLocale;
+  view: GuestView;
+  onView: (view: GuestView) => void;
+  onGate: (feature: string) => void;
+  mobile?: boolean;
+}) {
+  const spanish = locale === "es";
+  const initials = guest.nickname
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+  const items = [
+    {
+      id: "review" as const,
+      icon: Headphones,
+      label: spanish ? "Review canciones" : "Review Songs",
+    },
+    {
+      id: "dashboard" as const,
+      icon: LayoutDashboard,
+      label: spanish ? "Panel" : "Dashboard",
+    },
+    {
+      id: "discovery" as const,
+      icon: Music2,
+      label: spanish ? "Descubrimiento" : "Discovery",
+    },
+    {
+      id: "rankings" as const,
+      icon: Trophy,
+      label: spanish ? "Rankings" : "Rankings",
+    },
+  ];
+  return (
+    <aside className={`sidebar guest-sidebar${mobile ? " guest-sidebar-mobile" : ""}`}>
+      <Logo />
+      <nav>
+        <span className="nav-label">{spanish ? "Comunidad" : "Community"}</span>
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              className={view === item.id ? "active" : ""}
+              key={item.id}
+              onClick={() => onView(item.id)}
+              type="button"
+            >
+              <Icon size={19} />
+              <span>{item.label}</span>
+              {item.id === "review" && <em>{guest.validListens}</em>}
+            </button>
+          );
+        })}
+        <button onClick={() => onGate(spanish ? "Subir canción" : "Upload Song")} type="button">
+          <Upload size={19} />
+          <span>{spanish ? "Enviar canción" : "Submit Song"}</span>
+          <LockKeyhole className="nav-lock" size={14} />
+        </button>
+      </nav>
+      <div className="sidebar-bottom">
+        <div className="sidebar-card">
+          <div className="sidebar-card-icon"><Gauge size={18} /></div>
+          <strong>{spanish ? "La atención crea oportunidades" : "Attention creates opportunity"}</strong>
+          <p>
+            {spanish
+              ? "Escucha, comenta y descubre artistas junto a toda la comunidad."
+              : "Listen, comment, and discover artists alongside the full community."}
+          </p>
+          <button onClick={() => onGate(spanish ? "Ganar tokens" : "Earn Tokens")} type="button">
+            {spanish ? "Ver recompensas" : "View rewards"} <ArrowRight size={14} />
+          </button>
+        </div>
+        <button
+          className="profile-row"
+          onClick={() =>
+            onGate(spanish ? "Crear perfil de artista" : "Create Artist Profile")
+          }
+          type="button"
+        >
+          <span className="avatar">{initials || "FL"}</span>
+          <span>
+            <strong>{guest.nickname}</strong>
+            <small>{guest.listenerId}</small>
+          </span>
+          <LockKeyhole size={14} />
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function GuestTopbar({
+  locale,
+  view,
+  onLocaleChange,
+  onMenu,
+}: {
+  locale: InterfaceLocale;
+  view: GuestView;
+  onLocaleChange: (locale: InterfaceLocale) => void;
+  onMenu: () => void;
+}) {
+  const spanish = locale === "es";
+  const titles = {
+    review: {
+      title: spanish ? "Review canciones" : "Review Songs",
+      subtitle: spanish
+        ? "Escucha, reacciona y ayuda a artistas reales."
+        : "Listen, react, and help real artists.",
+    },
+    dashboard: {
+      title: spanish ? "Tu actividad" : "Your Activity",
+      subtitle: spanish
+        ? "Tu historial como miembro de la comunidad."
+        : "Your history as a community listener.",
+    },
+    discovery: {
+      title: spanish ? "Descubrimiento" : "Discovery",
+      subtitle: spanish
+        ? "Spotlight, resultados y artistas activos."
+        : "Spotlight, top results, and active artists.",
+    },
+    rankings: {
+      title: "Rankings",
+      subtitle: spanish
+        ? "Resultados impulsados por actividad real."
+        : "Results powered by real community activity.",
+    },
+  };
+  return (
+    <header className="topbar guest-topbar">
+      <button className="menu-button" onClick={onMenu} aria-label="Open menu">
+        <Menu size={21} />
+      </button>
+      <div className="mobile-logo"><Logo /></div>
+      <div className="page-title">
+        <h1>{titles[view].title}</h1>
+        <p>{titles[view].subtitle}</p>
+      </div>
+      <div className="topbar-actions">
+        <LanguageSelector compact locale={locale} onChange={onLocaleChange} />
+        <span className="app-status-pill">{spanish ? "Beta pública" : "Public Beta"}</span>
+        <span className="app-founder-pill"><i /> {spanish ? "Programa fundador activo" : "Founding Artists Program Active"}</span>
+        <Link className="help-button" href="/help" aria-label="Help Center">
+          <CircleHelp size={19} />
+        </Link>
+        <Link className="session-button" href="/login">
+          <LogIn size={15} />
+          <b>{spanish ? "Iniciar sesión" : "Log In"}</b>
+        </Link>
+      </div>
+    </header>
+  );
+}
+
+function GuestAwaySummary({
+  locale,
+  summary,
+  onViewActivity,
+}: {
+  locale: InterfaceLocale;
+  summary: GuestExperienceSummary;
+  onViewActivity: () => void;
+}) {
+  const spanish = locale === "es";
+  return (
+    <section className="offline-community-summary guest-away-summary">
+      <div className="offline-community-heading">
+        <span>
+          <Bell size={17} />
+          <strong>{spanish ? "Mientras no estabas" : "While You Were Away"}</strong>
+        </span>
+        <small>{new Date(summary.summarySince).toLocaleDateString()}</small>
+      </div>
+      <div className="offline-community-counts">
+        <span><strong>{summary.communityListensCount}</strong> {spanish ? "escuchas y reviews" : "listens and reviews"}</span>
+        <span><strong>{summary.communityLikesCount}</strong> {spanish ? "likes" : "likes"}</span>
+        <span><strong>{summary.communityCommentsCount}</strong> {spanish ? "comentarios" : "comments"}</span>
+        <span><strong>{summary.communityFollowsCount}</strong> {spanish ? "nuevos follows" : "new follows"}</span>
+      </div>
+      <div className="guest-away-details">
+        <span><Share2 size={14} /> {summary.communitySharesCount} {spanish ? "compartidos" : "shares"}</span>
+        <span><Music2 size={14} /> {summary.newSongsCount} {spanish ? "canciones nuevas" : "new songs"}</span>
+        <span><Users size={14} /> {summary.communityActivityCount} {spanish ? "acciones de comunidad" : "community actions"}</span>
+      </div>
+      <button className="offline-community-action" onClick={onViewActivity} type="button">
+        {spanish ? "Ver actividad" : "View Activity"} <ArrowRight size={14} />
+      </button>
+    </section>
+  );
+}
+
+function GuestDashboard({
+  locale,
+  summary,
+  onGate,
+}: {
+  locale: InterfaceLocale;
+  summary: GuestExperienceSummary;
+  onGate: (feature: string) => void;
+}) {
+  const spanish = locale === "es";
+  const hours = Math.floor(summary.totalListeningSeconds / 3600);
+  const minutes = Math.floor((summary.totalListeningSeconds % 3600) / 60);
+  const stats = [
+    [Headphones, spanish ? "Escuchas válidas" : "Valid Listens", summary.validListens],
+    [Music2, spanish ? "Canciones exploradas" : "Songs Explored", summary.songsExplored],
+    [Heart, "Likes", summary.likesCount],
+    [MessageSquareText, spanish ? "Comentarios" : "Comments", summary.commentsCount],
+    [Users, spanish ? "Artistas seguidos" : "Artists Followed", summary.followingCount],
+    [Bookmark, spanish ? "Guardadas" : "Saved Songs", summary.savedSongsCount],
+    [Share2, spanish ? "Compartidas" : "Shares", summary.sharesCount],
+    [ListMusic, spanish ? "En tu cola" : "In Your Queue", summary.queueSongCount],
+  ] as const;
+  return (
+    <section className="content guest-dashboard">
+      <div className="guest-dashboard-heading">
+        <div>
+          <span className="eyebrow"><BarChart3 size={13} /> {spanish ? "Estadísticas" : "Statistics"}</span>
+          <h2>{spanish ? "Tu impacto como listener" : "Your listener impact"}</h2>
+          <p>
+            {spanish
+              ? `Tiempo total verificado: ${hours}h ${minutes}m.`
+              : `Total verified listening time: ${hours}h ${minutes}m.`}
+          </p>
+        </div>
+      </div>
+      <div className="guest-stat-grid">
+        {stats.map(([Icon, label, value]) => (
+          <article key={label}>
+            <span><Icon size={17} /></span>
+            <small>{label}</small>
+            <strong>{value}</strong>
+          </article>
+        ))}
+      </div>
+      <div className="guest-member-opportunities">
+        <article>
+          <Coins size={22} />
+          <span className="eyebrow">{spanish ? "Tokens" : "Tokens"}</span>
+          <h3>{spanish ? "Convierte tu escucha en oportunidades" : "Turn listening into opportunities"}</h3>
+          <p>{spanish ? "Tu actividad permanece aquí. Regístrate para ganar y reclamar tokens." : "Your activity stays here. Register to earn and claim tokens."}</p>
+          <button onClick={() => onGate(spanish ? "Ganar tokens" : "Earn Tokens")} type="button">
+            {spanish ? "Ganar tokens" : "Earn Tokens"} <LockKeyhole size={13} />
+          </button>
+        </article>
+        <article>
+          <Sparkles size={22} />
+          <span className="eyebrow">{spanish ? "Puntos" : "Points"}</span>
+          <h3>{spanish ? "Participa más profundamente" : "Participate more deeply"}</h3>
+          <p>{spanish ? "Los miembros pueden ganar puntos de comunidad y progreso." : "Members can earn community points and progression."}</p>
+          <button onClick={() => onGate(spanish ? "Ganar puntos" : "Earn Points")} type="button">
+            {spanish ? "Ganar puntos" : "Earn Points"} <LockKeyhole size={13} />
+          </button>
+        </article>
+        <article>
+          <UserPlus size={22} />
+          <span className="eyebrow">{spanish ? "Perfil de artista" : "Artist Profile"}</span>
+          <h3>{spanish ? "Comparte tu propia música" : "Share your own music"}</h3>
+          <p>{spanish ? "Crea un perfil público y envía canciones cuando estés listo." : "Create a public profile and submit songs when you are ready."}</p>
+          <button onClick={() => onGate(spanish ? "Crear perfil de artista" : "Create Artist Profile")} type="button">
+            {spanish ? "Crear perfil" : "Create Artist Profile"} <LockKeyhole size={13} />
+          </button>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+function GuestDiscoveryShelves({
+  discoveryFeed,
+  locale,
+  onPlay,
+}: {
+  discoveryFeed: GuestDiscoveryItem[];
+  locale: InterfaceLocale;
+  onPlay: (item: GuestDiscoveryItem) => void;
+}) {
+  const spanish = locale === "es";
+  if (!discoveryFeed.length) return null;
+  return (
+    <section className="guest-discovery-hub">
+      {(
+        [
+          ["spotlight", "Spotlight"],
+          ["top", spanish ? "Top 10 de la comunidad" : "Community Top 10"],
+          ["recent", spanish ? "Actividad reciente" : "Recently Active"],
+        ] as const
+      ).map(([kind, title]) => {
+        const items = discoveryFeed.filter((item) => item.feedKind === kind);
+        if (!items.length) return null;
+        return (
+          <section className="guest-discovery-shelf" key={kind}>
+            <div className="guest-discovery-heading">
+              <span className="eyebrow">
+                {kind === "spotlight" ? <Sparkles size={13} /> : <Users size={13} />}
+                {title}
+              </span>
+              <h2>
+                {kind === "spotlight"
+                  ? spanish ? "Artistas para descubrir ahora" : "Artists to discover now"
+                  : spanish ? "Impulsado por escuchas y reacciones reales" : "Powered by real listens and reactions"}
+              </h2>
+            </div>
+            <div className="guest-discovery-grid">
+              {items.map((item) => (
+                <article key={`${kind}-${item.song.id}`}>
+                  <div className="guest-discovery-cover">
+                    <Image
+                      alt={`${item.song.title} cover`}
+                      fill
+                      sizes="(max-width: 700px) 76vw, 180px"
+                      src={item.song.coverUrl}
+                      unoptimized
+                    />
+                    <span>{kind === "top" ? `#${item.position}` : item.badge}</span>
+                  </div>
+                  <div className="guest-discovery-copy">
+                    <strong>{item.song.title}</strong>
+                    <Link href={`/artists/${item.song.artistId}`}>{item.song.artist}</Link>
+                    <small>
+                      {item.reviewsReceived} reviews / {item.averageRating.toFixed(1)} rating / Hook {Math.round(item.hookScore)}
+                    </small>
+                    <div>
+                      <span><Heart size={12} /> {item.likesCount}</span>
+                      <span><MessageSquareText size={12} /> {item.commentsCount}</span>
+                      <span><Users size={12} /> {item.followersCount}</span>
+                    </div>
+                    <button onClick={() => onPlay(item)} type="button">
+                      <Play fill="currentColor" size={13} />
+                      {spanish ? "Escuchar y reaccionar" : "Listen and react"}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </section>
+  );
+}
+
+function GuestRankings({
+  discoveryFeed,
+  locale,
+  onGate,
+  onPlay,
+}: {
+  discoveryFeed: GuestDiscoveryItem[];
+  locale: InterfaceLocale;
+  onGate: (feature: string) => void;
+  onPlay: (item: GuestDiscoveryItem) => void;
+}) {
+  const spanish = locale === "es";
+  const results = discoveryFeed
+    .filter((item) => item.feedKind === "top")
+    .sort((left, right) => left.position - right.position);
+  return (
+    <section className="content guest-rankings">
+      <div className="guest-dashboard-heading">
+        <div>
+          <span className="eyebrow"><Trophy size={13} /> {spanish ? "Mejores resultados" : "Top Results"}</span>
+          <h2>{spanish ? "Ranking de la comunidad" : "Community Rankings"}</h2>
+          <p>{spanish ? "Todos pueden explorar. La participación en rankings requiere una cuenta gratuita." : "Everyone can explore. Ranking participation requires a free account."}</p>
+        </div>
+        <button onClick={() => onGate(spanish ? "Participar en rankings" : "Participate In Rankings")} type="button">
+          {spanish ? "Participar en rankings" : "Participate In Rankings"} <LockKeyhole size={14} />
+        </button>
+      </div>
+      <div className="guest-ranking-list">
+        {results.map((item) => (
+          <article key={item.song.id}>
+            <strong>#{item.position}</strong>
+            <Image alt="" height={58} src={item.song.coverUrl} unoptimized width={58} />
+            <div>
+              <h3>{item.song.title}</h3>
+              <Link href={`/artists/${item.song.artistId}`}>{item.song.artist}</Link>
+              <small>{item.song.genre} / {item.song.language}</small>
+            </div>
+            <span><b>{Math.round(item.hookScore)}</b> Hook</span>
+            <span><Heart size={13} /> {item.likesCount}</span>
+            <span><Users size={13} /> {item.followersCount}</span>
+            <button onClick={() => onPlay(item)} type="button"><Play size={14} /> {spanish ? "Escuchar" : "Listen"}</button>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function GuestExperience() {
   const [locale, setLocale] = useState<InterfaceLocale>("en");
   const [guest, setGuest] = useState<GuestSession | null>(null);
+  const [view, setView] = useState<GuestView>("review");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [gateFeature, setGateFeature] = useState<string | null>(null);
+  const [summary, setSummary] = useState<GuestExperienceSummary | null>(null);
   const [nickname, setNickname] = useState("");
   const [recoveryCode, setRecoveryCode] = useState("");
   const [recoverMode, setRecoverMode] = useState(false);
@@ -187,6 +712,25 @@ export function GuestExperience() {
   );
   const spanish = locale === "es";
 
+  const loadSummary = useCallback(
+    async (token: string, markActivitySeen = false) => {
+      const supabase = createClient();
+      if (!supabase) return;
+      const { data, error } = await supabase.rpc(
+        "get_guest_experience_summary",
+        {
+          guest_access_token: token,
+          mark_activity_seen: markActivitySeen,
+        },
+      );
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!error && row) {
+        setSummary(mapGuestSummary(row as Record<string, unknown>));
+      }
+    },
+    [],
+  );
+
   const loadQueue = useCallback(async (token: string) => {
     const supabase = createClient();
     if (!supabase) throw new Error("First Listen is not configured.");
@@ -198,6 +742,24 @@ export function GuestExperience() {
     setSongs(mapGuestSongs((data ?? []) as Array<Record<string, unknown>>));
     setSongIndex(0);
   }, []);
+
+  useEffect(() => {
+    if (!guest) return;
+    const interval = window.setInterval(
+      () => void loadSummary(guest.token),
+      30_000,
+    );
+    return () => window.clearInterval(interval);
+  }, [guest, loadSummary]);
+
+  useEffect(() => {
+    if (!gateFeature) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setGateFeature(null);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [gateFeature]);
 
   useEffect(() => {
     let active = true;
@@ -269,7 +831,7 @@ export function GuestExperience() {
       setLocale(returningGuest.locale);
       document.documentElement.lang = returningGuest.locale;
       try {
-        await loadQueue(token);
+        await Promise.all([loadQueue(token), loadSummary(token, true)]);
       } catch (queueError) {
         setFatalError(
           queueError instanceof Error
@@ -284,7 +846,7 @@ export function GuestExperience() {
     return () => {
       active = false;
     };
-  }, [loadQueue]);
+  }, [loadQueue, loadSummary]);
 
   const completeIdentity = async (
     event: FormEvent<HTMLFormElement>,
@@ -323,7 +885,10 @@ export function GuestExperience() {
     document.documentElement.lang = nextGuest.locale;
     setShowCredentials(mode === "create");
     try {
-      await loadQueue(nextGuest.token);
+      await Promise.all([
+        loadQueue(nextGuest.token),
+        loadSummary(nextGuest.token, true),
+      ]);
     } catch (queueError) {
       setFatalError(
         queueError instanceof Error
@@ -553,9 +1118,10 @@ export function GuestExperience() {
             ? { ...current, validListens: current.validListens + 1 }
             : current,
         );
+        void loadSummary(guest.token);
       }
     },
-    [autoPlay, guest, listening.validListenRecorded],
+    [autoPlay, guest, listening.validListenRecorded, loadSummary],
   );
 
   useEffect(() => {
@@ -713,25 +1279,22 @@ export function GuestExperience() {
   }
 
   return (
-    <main className="guest-page">
-      <header className="guest-header">
-        <Link href="/"><Logo /></Link>
-        <div>
-          <LanguageSelector compact locale={locale} onChange={changeLocale} />
-          <span className="guest-listener-pill">
-            <Headphones size={14} />
-            <strong>{guest.nickname}</strong>
-            <small>ID: {guest.listenerId}</small>
-          </span>
-          <Link className="guest-login-link" href="/login">
-            {spanish ? "Iniciar sesión" : "Log In"}
-          </Link>
-          <Link className="guest-join-link" href="/signup">
-            {spanish ? "Convertir en cuenta gratis" : "Convert to Free Account"}
-          </Link>
-        </div>
-      </header>
-
+    <div className="app-shell guest-app-shell">
+      <GuestSidebar
+        guest={guest}
+        locale={locale}
+        onGate={setGateFeature}
+        onView={setView}
+        view={view}
+      />
+      <div className="app-main">
+        <GuestTopbar
+          locale={locale}
+          onLocaleChange={changeLocale}
+          onMenu={() => setMenuOpen(true)}
+          view={view}
+        />
+        <main className="guest-page">
       {showCredentials && (
         <section className="guest-credentials" role="status">
           <div>
@@ -761,6 +1324,50 @@ export function GuestExperience() {
         </section>
       )}
 
+      {summary && (
+        <GuestAwaySummary
+          locale={locale}
+          onViewActivity={() => setView("discovery")}
+          summary={summary}
+        />
+      )}
+
+      {view === "dashboard" && summary && (
+        <GuestDashboard
+          locale={locale}
+          onGate={setGateFeature}
+          summary={summary}
+        />
+      )}
+
+      {view === "discovery" && (
+        <>
+          <GuestDiscoveryShelves
+            discoveryFeed={discoveryFeed}
+            locale={locale}
+            onPlay={(item) => {
+              setView("review");
+              void playDiscoverySong(item);
+            }}
+          />
+          <CommunityPulse locale={locale} />
+        </>
+      )}
+
+      {view === "rankings" && (
+        <GuestRankings
+          discoveryFeed={discoveryFeed}
+          locale={locale}
+          onGate={setGateFeature}
+          onPlay={(item) => {
+            setView("review");
+            void playDiscoverySong(item);
+          }}
+        />
+      )}
+
+      {view === "review" && (
+      <>
       <section className="guest-welcome guest-welcome-compact">
         <span className="eyebrow"><Sparkles size={13} /> Review Songs</span>
         <h1>
@@ -775,8 +1382,8 @@ export function GuestExperience() {
         </p>
         <div>
           <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "escuchas válidas" : "valid listens"}</span>
-          <span><ShieldCheck size={14} /> {spanish ? "Sin recompensas ni ranking" : "No rewards or ranking"}</span>
-          <span><Headphones size={14} /> {spanish ? "Acceso permanente" : "Permanent guest access"}</span>
+          <span><Users size={14} /> {spanish ? "Comunidad completa" : "Full community access"}</span>
+          <span><Headphones size={14} /> {spanish ? "Perfil permanente" : "Permanent listener profile"}</span>
         </div>
       </section>
 
@@ -791,10 +1398,10 @@ export function GuestExperience() {
       )}
 
       {!fatalError && currentSong && (
-        <section className="guest-listening-layout">
-          <div className="guest-player-column">
+        <section className="content review-layout guest-listening-layout">
+          <div className="review-card guest-player-column">
             <div className="guest-now-playing">
-              <span className="eyebrow"><Headphones size={13} /> {spanish ? "Descubrimiento invitado" : "Guest discovery"}</span>
+              <span className="eyebrow"><Headphones size={13} /> {spanish ? "Ahora escuchando" : "Now Listening"}</span>
               <h2>{currentSong.title}</h2>
               <Link href={`/artists/${currentSong.artistId}`}>
                 {currentSong.artist} <ArrowRight size={13} />
@@ -896,18 +1503,22 @@ export function GuestExperience() {
             </div>
           </div>
 
-          <aside className="guest-side">
+          <aside className="review-side guest-side">
             <section>
               <span className="eyebrow"><Users size={13} /> {spanish ? "Comunidad real" : "Real community"}</span>
-              <h2>{spanish ? "Participa sin crear una cuenta" : "Participate without signing up"}</h2>
+              <h2>{spanish ? "Eres parte de la escucha" : "You are part of the listening community"}</h2>
               <p>
                 {spanish
-                  ? "Tu nickname aparece cuando apoyas artistas. Las escuchas válidas siguen protegidas: máximo una por canción cada 24 horas."
-                  : "Your nickname appears when you support artists. Valid listens remain protected: one per song every 24 hours."}
+                  ? "Tus likes, comentarios, follows y canciones guardadas aparecen junto a la actividad de todos los listeners."
+                  : "Your likes, comments, follows, and saved songs appear alongside every listener's community activity."}
               </p>
             </section>
             <section>
-              <span className="eyebrow"><Music2 size={13} /> {spanish ? "Siguiente" : "Up next"}</span>
+              <span className="eyebrow"><ListMusic size={13} /> {spanish ? "Cola de reviews" : "Review Queue"}</span>
+              <h2>
+                {songs.length - songIndex - 1}{" "}
+                {spanish ? "canciones siguientes" : "songs up next"}
+              </h2>
               {songs.slice(songIndex + 1, songIndex + 4).map((song) => (
                 <button
                   key={song.id}
@@ -928,12 +1539,19 @@ export function GuestExperience() {
               <h2>{spanish ? "¿También creas música?" : "Do you create music too?"}</h2>
               <p>
                 {spanish
-                  ? "Convierte este perfil en una cuenta gratuita. Conservaremos tu actividad, likes, comentarios, artistas seguidos y canciones guardadas."
-                  : "Convert this profile into a free account. We will preserve your activity, likes, comments, follows, and saved songs."}
+                  ? "Tu actividad de listener ya está guardada. Regístrate cuando quieras subir música o ganar recompensas."
+                  : "Your listener activity is already saved. Register whenever you want to upload music or earn rewards."}
               </p>
-              <Link href="/signup">
-                {spanish ? "Convertir en cuenta gratis" : "Convert to Free Account"} <ArrowRight size={14} />
-              </Link>
+              <button
+                onClick={() =>
+                  setGateFeature(
+                    spanish ? "Crear perfil de artista" : "Create Artist Profile",
+                  )
+                }
+                type="button"
+              >
+                {spanish ? "Crear perfil de artista" : "Create Artist Profile"} <ArrowRight size={14} />
+              </button>
             </section>
           </aside>
         </section>
@@ -950,94 +1568,54 @@ export function GuestExperience() {
         </section>
       )}
 
-      {discoveryFeed.length > 0 && (
-        <section className="guest-discovery-hub">
-          {(
-            [
-              ["spotlight", "Spotlight"],
-              [
-                "top",
-                spanish ? "Top 10 de la comunidad" : "Community Top 10",
-              ],
-              [
-                "recent",
-                spanish ? "Actividad reciente" : "Recently Active",
-              ],
-            ] as const
-          ).map(([kind, title]) => {
-            const items = discoveryFeed.filter(
-              (item) => item.feedKind === kind,
-            );
-            if (!items.length) return null;
-            return (
-              <section className="guest-discovery-shelf" key={kind}>
-                <div className="guest-discovery-heading">
-                  <span className="eyebrow">
-                    {kind === "spotlight" ? (
-                      <Sparkles size={13} />
-                    ) : (
-                      <Users size={13} />
-                    )}
-                    {title}
-                  </span>
-                  <h2>
-                    {kind === "spotlight"
-                      ? spanish
-                        ? "Artistas para descubrir ahora"
-                        : "Artists to discover now"
-                      : spanish
-                        ? "Impulsado por escuchas y reacciones reales"
-                        : "Powered by real listens and reactions"}
-                  </h2>
-                </div>
-                <div className="guest-discovery-grid">
-                  {items.map((item) => (
-                    <article key={`${kind}-${item.song.id}`}>
-                      <div className="guest-discovery-cover">
-                        <Image
-                          alt={`${item.song.title} cover`}
-                          fill
-                          sizes="(max-width: 700px) 42vw, 180px"
-                          src={item.song.coverUrl}
-                          unoptimized
-                        />
-                        <span>
-                          {kind === "top" ? `#${item.position}` : item.badge}
-                        </span>
-                      </div>
-                      <div className="guest-discovery-copy">
-                        <strong>{item.song.title}</strong>
-                        <Link href={`/artists/${item.song.artistId}`}>
-                          {item.song.artist}
-                        </Link>
-                        <small>
-                          {item.reviewsReceived} reviews /{" "}
-                          {item.averageRating.toFixed(1)} rating / Hook{" "}
-                          {Math.round(item.hookScore)}
-                        </small>
-                        <div>
-                          <span><Heart size={12} /> {item.likesCount}</span>
-                          <span><MessageSquareText size={12} /> {item.commentsCount}</span>
-                          <span><Users size={12} /> {item.followersCount}</span>
-                        </div>
-                        <button
-                          onClick={() => void playDiscoverySong(item)}
-                          type="button"
-                        >
-                          <Play fill="currentColor" size={13} />
-                          {spanish ? "Escuchar y reaccionar" : "Listen and react"}
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </section>
-      )}
+      <GuestDiscoveryShelves
+        discoveryFeed={discoveryFeed}
+        locale={locale}
+        onPlay={(item) => void playDiscoverySong(item)}
+      />
 
       <CommunityPulse locale={locale} />
-    </main>
+      </>
+      )}
+        </main>
+      </div>
+      {menuOpen && (
+        <div className="guest-mobile-drawer">
+          <button
+            aria-label={spanish ? "Cerrar menú" : "Close menu"}
+            className="guest-mobile-backdrop"
+            onClick={() => setMenuOpen(false)}
+            type="button"
+          />
+          <GuestSidebar
+            guest={guest}
+            locale={locale}
+            mobile
+            onGate={(feature) => {
+              setMenuOpen(false);
+              setGateFeature(feature);
+            }}
+            onView={(nextView) => {
+              setView(nextView);
+              setMenuOpen(false);
+            }}
+            view={view}
+          />
+          <button
+            aria-label={spanish ? "Cerrar menú" : "Close menu"}
+            className="guest-mobile-close"
+            onClick={() => setMenuOpen(false)}
+            type="button"
+          >
+            <X size={19} />
+          </button>
+        </div>
+      )}
+      <GuestRegistrationGate
+        feature={gateFeature}
+        locale={locale}
+        onClose={() => setGateFeature(null)}
+      />
+    </div>
   );
 }

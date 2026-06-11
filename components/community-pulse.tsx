@@ -103,7 +103,7 @@ export function CommunityPulse({
         <div>
           <span className="eyebrow">
             <UsersIcon />
-            {locale === "es" ? "Actividad en vivo" : "Community Pulse"}
+            {locale === "es" ? "Actividad de la comunidad" : "Community Activity"}
           </span>
           <h2>
             {locale === "es"

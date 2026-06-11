@@ -855,18 +855,183 @@ try {
       listen: document.querySelector(".guest-listen-button")?.innerText ?? "",
       title: document.querySelector(".guest-now-playing h2")?.innerText ?? "",
       text: document.querySelector(".guest-page")?.innerText ?? "",
+      sidebar: document.querySelector(".guest-sidebar")?.innerText ?? "",
+      topbar: document.querySelector(".guest-topbar")?.innerText ?? "",
+      betaStatus: document.querySelector(".guest-topbar .app-status-pill")?.textContent ?? "",
+      away: document.querySelector(".guest-away-summary")?.innerText ?? "",
+      discoveryShelves: document.querySelectorAll(".guest-discovery-shelf").length,
+      communityActivity: document.querySelector(".community-pulse")?.innerText ?? "",
+      reviewQueue: [...document.querySelectorAll(".guest-side section")]
+        .some((section) => section.innerText.toLowerCase().includes("review queue")),
       url: window.location.href
     }))()`,
     (value) =>
       value.listen.includes("Listen Now") &&
       value.title === expectedFirstTitle &&
-      value.text.includes("Permanent guest access"),
+      value.text.includes("Full community access") &&
+      value.sidebar.includes("Dashboard") &&
+      value.sidebar.includes("Discovery") &&
+      value.sidebar.includes("Rankings") &&
+      value.betaStatus.includes("Public Beta") &&
+      value.away.includes("While You Were Away") &&
+      value.discoveryShelves >= 2 &&
+      value.communityActivity.toLowerCase().includes("community activity") &&
+      value.reviewQueue,
     25000,
   );
   assert(
-    guestUi.title === expectedFirstTitle,
+    guestUi.title === expectedFirstTitle &&
+      guestUi.sidebar.includes("Dashboard") &&
+      guestUi.betaStatus.includes("Public Beta") &&
+      guestUi.away.includes("While You Were Away") &&
+      guestUi.discoveryShelves >= 2 &&
+      guestUi.communityActivity.toLowerCase().includes("community activity") &&
+      guestUi.reviewQueue,
     `Guest queue rendered an unexpected state: ${JSON.stringify(guestUi)}`,
   );
+  record("Guest experience parity shell", {
+    awaySummary: guestUi.away,
+    communityActivity: guestUi.communityActivity,
+    discoveryShelves: guestUi.discoveryShelves,
+    reviewQueue: guestUi.reviewQueue,
+    sidebar: guestUi.sidebar,
+    topbar: guestUi.topbar,
+  });
+
+  await evaluate(`(() => {
+    [...document.querySelectorAll(".guest-sidebar nav button")]
+      .find((button) => button.innerText.includes("Dashboard"))?.click();
+  })()`);
+  const dashboardParity = await waitFor(
+    `(() => ({
+      heading: document.querySelector(".guest-dashboard h2")?.innerText ?? "",
+      stats: [...document.querySelectorAll(".guest-stat-grid article")]
+        .map((card) => card.innerText),
+      actions: [...document.querySelectorAll(".guest-member-opportunities button")]
+        .map((button) => button.innerText)
+    }))()`,
+    (value) =>
+      value.heading.includes("listener impact") &&
+      value.stats.length === 8 &&
+      value.actions.some((action) => action.includes("Earn Tokens")) &&
+      value.actions.some((action) => action.includes("Earn Points")) &&
+      value.actions.some((action) => action.includes("Create Artist Profile")),
+  );
+  assert(
+    dashboardParity.stats.length === 8,
+    `Guest statistics did not render: ${JSON.stringify(dashboardParity)}`,
+  );
+
+  await evaluate(`(() => {
+    [...document.querySelectorAll(".guest-member-opportunities button")]
+      .find((button) => button.innerText.includes("Earn Tokens"))?.click();
+  })()`);
+  const tokenGate = await waitFor(
+    `(() => ({
+      text: document.querySelector(".guest-registration-gate")?.innerText ?? "",
+      create: document.querySelector(".guest-registration-gate a")?.innerText ?? "",
+      later: document.querySelector(".guest-registration-gate section > div button")?.innerText ?? ""
+    }))()`,
+    (value) =>
+      value.text.includes("This feature is available to registered members.") &&
+      value.text.includes("Creating an account is free.") &&
+      value.create.includes("Create Free Account") &&
+      value.later.includes("Maybe Later"),
+  );
+  assert(
+    tokenGate.create.includes("Create Free Account"),
+    `Guest registration gate is incomplete: ${JSON.stringify(tokenGate)}`,
+  );
+  await evaluate(`document.querySelector(".guest-registration-gate section > div button")?.click()`);
+
+  await evaluate(`(() => {
+    [...document.querySelectorAll(".guest-member-opportunities button")]
+      .find((button) => button.innerText.includes("Earn Points"))?.click();
+  })()`);
+  const pointsGate = await waitFor(
+    `document.querySelector(".guest-registration-gate")?.innerText ?? ""`,
+    (value) => value.includes("Earn Points"),
+  );
+  assert(
+    pointsGate.includes("registered members"),
+    "Community points did not open the member gate",
+  );
+  await evaluate(`document.querySelector(".guest-registration-close")?.click()`);
+
+  await evaluate(`(() => {
+    [...document.querySelectorAll(".guest-member-opportunities button")]
+      .find((button) => button.innerText.includes("Create Artist Profile"))?.click();
+  })()`);
+  const profileGate = await waitFor(
+    `document.querySelector(".guest-registration-gate")?.innerText ?? ""`,
+    (value) => value.includes("Create Artist Profile"),
+  );
+  assert(
+    profileGate.includes("Creating an account is free."),
+    "Artist profile creation did not open the member gate",
+  );
+  await evaluate(`document.querySelector(".guest-registration-close")?.click()`);
+
+  await evaluate(`(() => {
+    [...document.querySelectorAll(".guest-sidebar nav button")]
+      .find((button) => button.innerText.includes("Rankings"))?.click();
+  })()`);
+  const rankingsParity = await waitFor(
+    `(() => ({
+      heading: document.querySelector(".guest-rankings h2")?.innerText ?? "",
+      results: document.querySelectorAll(".guest-ranking-list article").length,
+      participate: document.querySelector(".guest-dashboard-heading > button")?.innerText ?? "",
+      artistLinks: document.querySelectorAll(".guest-ranking-list a[href^='/artists/']").length
+    }))()`,
+    (value) =>
+      value.heading.includes("Community Rankings") &&
+      value.results > 0 &&
+      value.participate.includes("Participate In Rankings") &&
+      value.artistLinks > 0,
+  );
+  assert(
+    rankingsParity.results > 0,
+    `Guest rankings are unavailable: ${JSON.stringify(rankingsParity)}`,
+  );
+  await evaluate(`document.querySelector(".guest-dashboard-heading > button")?.click()`);
+  const rankingGate = await waitFor(
+    `document.querySelector(".guest-registration-gate")?.innerText ?? ""`,
+    (value) => value.includes("Participate In Rankings"),
+  );
+  assert(
+    rankingGate.includes("registered members"),
+    "Ranking participation did not open the member gate",
+  );
+  await evaluate(`document.querySelector(".guest-registration-close")?.click()`);
+
+  await evaluate(`(() => {
+    [...document.querySelectorAll(".guest-sidebar nav button")]
+      .find((button) => button.innerText.includes("Submit Song"))?.click();
+  })()`);
+  const uploadGate = await waitFor(
+    `document.querySelector(".guest-registration-gate")?.innerText ?? ""`,
+    (value) => value.includes("Upload Song"),
+  );
+  assert(
+    uploadGate.includes("Create Free Account"),
+    "Song upload did not open the member gate",
+  );
+  await evaluate(`document.querySelector(".guest-registration-close")?.click()`);
+
+  await evaluate(`(() => {
+    [...document.querySelectorAll(".guest-sidebar nav button")]
+      .find((button) => button.innerText.includes("Review Songs"))?.click();
+  })()`);
+  record("Guest member-only action gates", {
+    artistProfilesVisible: rankingsParity.artistLinks,
+    dashboardStatistics: dashboardParity.stats.length,
+    rankingResults: rankingsParity.results,
+    rankingParticipationRestricted: true,
+    artistProfileRestricted: true,
+    pointsRestricted: true,
+    rewardsRestricted: true,
+    uploadRestricted: true,
+  });
   await trackBrowserGuest(
     await evaluate(`localStorage.getItem("first-listen-guest-token")`),
   );

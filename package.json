@@ -22,6 +22,8 @@
     "unified:dry-run": "node scripts/apply-unified-landing-migration.mjs",
     "unified:apply": "node scripts/apply-unified-landing-migration.mjs --apply",
     "unified:verify": "node scripts/verify-unified-landing.mjs",
+    "guest:parity:dry-run": "node scripts/apply-guest-parity-migration.mjs",
+    "guest:parity:apply": "node scripts/apply-guest-parity-migration.mjs --apply",
     "db:schema:sync": "node scripts/sync-schema.mjs",
     "db:schema:check": "node scripts/sync-schema.mjs --check",
     "db:verify": "node scripts/verify-database.mjs"
