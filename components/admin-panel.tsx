@@ -9,6 +9,7 @@ import {
   CopyCheck,
   Eye,
   Flag,
+  Gauge,
   Headphones,
   Link2,
   Megaphone,
@@ -25,6 +26,10 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import {
+  SuperAdminControlCenter,
+  type ControlCenterPayload,
+} from "@/components/super-admin-control-center";
+import {
   compactClassificationLabel,
   displayPlatform,
 } from "@/lib/content-economy";
@@ -37,6 +42,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 
 type AdminSection =
+  | "control"
   | "users"
   | "songs"
   | "reports"
@@ -255,6 +261,7 @@ export function AdminPanel({
   theme,
   announcements,
   communityHealth,
+  controlCenterData,
 }: {
   role: "super_admin" | "admin" | "moderator";
   users: AdminUser[];
@@ -283,6 +290,7 @@ export function AdminPanel({
   theme: PlatformTheme;
   announcements: AdminAnnouncement[];
   communityHealth: CommunityHealth | null;
+  controlCenterData: ControlCenterPayload | null;
 }) {
   const [section, setSection] = useState<AdminSection>(initialSection);
   const [notice, setNotice] = useState("");
@@ -515,6 +523,7 @@ export function AdminPanel({
   };
 
   const allSections = [
+    ["control", "Control Center", Gauge],
     ["users", "Users", Users],
     ["songs", "Songs", Music2],
     ["reports", "Reports", Flag],
@@ -552,6 +561,16 @@ export function AdminPanel({
 
         <section className="admin-content">
           {notice && <div className="admin-notice" role="status">{notice}</div>}
+
+          {section === "control" &&
+            role === "super_admin" &&
+            controlCenterData && (
+              <SuperAdminControlCenter
+                initialData={controlCenterData}
+                songs={songs}
+                users={users}
+              />
+            )}
 
           {section === "users" && (
             <>

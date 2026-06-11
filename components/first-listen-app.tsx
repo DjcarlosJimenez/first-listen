@@ -2110,7 +2110,9 @@ function ReviewView({
         spotlightSongs={spotlightSongs}
         topTenSongs={topTenSongs}
       />
-      <CommunityPulse locale={locale} />
+      <div data-platform-module="community_activity">
+        <CommunityPulse locale={locale} />
+      </div>
     </section>
     </>
   );
@@ -2694,7 +2696,10 @@ function DiscoverySections({
 
   return (
     <div className="dashboard-discovery">
-      <section className="panel discovery-section">
+      <section
+        className="panel discovery-section"
+        data-platform-module="spotlight"
+      >
         <div className="panel-heading">
           <div>
             <span className="eyebrow">
@@ -2744,7 +2749,10 @@ function DiscoverySections({
         )}
       </section>
 
-      <section className="panel discovery-section top-ten-section">
+      <section
+        className="panel discovery-section top-ten-section"
+        data-platform-module="top_results"
+      >
         <div className="panel-heading">
           <div>
             <span className="eyebrow">

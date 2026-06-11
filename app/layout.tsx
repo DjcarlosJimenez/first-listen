@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { PlatformRuntime } from "@/components/platform-runtime";
 import {
-  defaultPlatformTheme,
-  mapPlatformThemeRow,
-} from "@/lib/platform-theme";
+  defaultPlatformControlConfig,
+  mapPlatformControlState,
+  type PlatformControlState,
+} from "@/lib/platform-control";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 import "./unified.css";
@@ -47,27 +48,29 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  let initialTheme = defaultPlatformTheme;
+  let initialState: PlatformControlState = {
+    config: defaultPlatformControlConfig,
+    previewActive: false,
+    publishedVersion: 1,
+    draftRevision: 1,
+  };
   try {
     const supabase = await createClient();
-    const { data } = await supabase
-      .from("platform_theme_settings")
-      .select(
-        "preset, background_color, card_color, text_color, accent_color, button_color, link_color, border_color, updated_at",
-      )
-      .eq("id", true)
-      .maybeSingle();
-    initialTheme = mapPlatformThemeRow(
-      data as Record<string, unknown> | null,
-    );
+    const { data, error } = await supabase.rpc("get_platform_runtime");
+    if (!error) initialState = mapPlatformControlState(data);
   } catch {
-    initialTheme = defaultPlatformTheme;
+    initialState = {
+      config: defaultPlatformControlConfig,
+      previewActive: false,
+      publishedVersion: 1,
+      draftRevision: 1,
+    };
   }
 
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <PlatformRuntime initialTheme={initialTheme} />
+        <PlatformRuntime initialState={initialState} />
         {children}
       </body>
     </html>

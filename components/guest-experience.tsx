@@ -53,6 +53,7 @@ import { SongActionBar } from "@/components/song-action-bar";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { displayPlatform } from "@/lib/content-economy";
 import { safeCoverUrl } from "@/lib/media";
+import { mapPlatformControlState } from "@/lib/platform-control";
 import { createClient } from "@/lib/supabase/client";
 import type { Song } from "@/lib/types";
 
@@ -448,7 +449,10 @@ function GuestAwaySummary({
 }) {
   const spanish = locale === "es";
   return (
-    <section className="offline-community-summary guest-away-summary">
+    <section
+      className="offline-community-summary guest-away-summary"
+      data-platform-module="away_summary"
+    >
       <div className="offline-community-heading">
         <span>
           <Bell size={17} />
@@ -574,7 +578,17 @@ function GuestDiscoveryShelves({
         const items = discoveryFeed.filter((item) => item.feedKind === kind);
         if (!items.length) return null;
         return (
-          <section className="guest-discovery-shelf" key={kind}>
+          <section
+            className="guest-discovery-shelf"
+            data-platform-module={
+              kind === "spotlight"
+                ? "spotlight"
+                : kind === "top"
+                  ? "top_results"
+                  : "newest_songs"
+            }
+            key={kind}
+          >
             <div className="guest-discovery-heading">
               <span className="eyebrow">
                 {kind === "spotlight" ? <Sparkles size={13} /> : <Users size={13} />}
@@ -641,7 +655,10 @@ function GuestRankings({
     .filter((item) => item.feedKind === "top")
     .sort((left, right) => left.position - right.position);
   return (
-    <section className="content guest-rankings">
+    <section
+      className="content guest-rankings"
+      data-platform-module="organic_rankings"
+    >
       <div className="guest-dashboard-heading">
         <div>
           <span className="eyebrow"><Trophy size={13} /> {spanish ? "Mejores resultados" : "Top Results"}</span>
@@ -734,9 +751,13 @@ export function GuestExperience() {
   const loadQueue = useCallback(async (token: string) => {
     const supabase = createClient();
     if (!supabase) throw new Error("First Listen is not configured.");
+    const runtime = await supabase.rpc("get_platform_runtime");
+    const songsPerPage = runtime.error
+      ? 20
+      : mapPlatformControlState(runtime.data).config.discovery.songsPerPage;
     const { data, error } = await supabase.rpc("get_guest_song_queue", {
       guest_access_token: token,
-      queue_limit: 12,
+      queue_limit: songsPerPage,
     });
     if (error) throw error;
     setSongs(mapGuestSongs((data ?? []) as Array<Record<string, unknown>>));
@@ -766,9 +787,13 @@ export function GuestExperience() {
     const loadDiscovery = async () => {
       const supabase = createClient();
       if (!supabase) return;
+      const runtime = await supabase.rpc("get_platform_runtime");
+      const songsPerPage = runtime.error
+        ? 20
+        : mapPlatformControlState(runtime.data).config.discovery.songsPerPage;
       const { data, error } = await supabase.rpc(
         "get_public_discovery_feed",
-        { feed_limit: 8 },
+        { feed_limit: songsPerPage },
       );
       if (active && !error) {
         setDiscoveryFeed(
@@ -1350,7 +1375,9 @@ export function GuestExperience() {
               void playDiscoverySong(item);
             }}
           />
-          <CommunityPulse locale={locale} />
+          <div data-platform-module="community_activity">
+            <CommunityPulse locale={locale} />
+          </div>
         </>
       )}
 
@@ -1503,7 +1530,10 @@ export function GuestExperience() {
             </div>
           </div>
 
-          <aside className="review-side guest-side">
+          <aside
+            className="review-side guest-side"
+            data-platform-module="review_queue"
+          >
             <section>
               <span className="eyebrow"><Users size={13} /> {spanish ? "Comunidad real" : "Real community"}</span>
               <h2>{spanish ? "Eres parte de la escucha" : "You are part of the listening community"}</h2>
@@ -1574,7 +1604,9 @@ export function GuestExperience() {
         onPlay={(item) => void playDiscoverySong(item)}
       />
 
-      <CommunityPulse locale={locale} />
+      <div data-platform-module="community_activity">
+        <CommunityPulse locale={locale} />
+      </div>
       </>
       )}
         </main>

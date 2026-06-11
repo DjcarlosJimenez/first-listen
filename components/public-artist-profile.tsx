@@ -429,8 +429,11 @@ export function PublicArtistProfile({
                 ? spanish ? "Creador en pausa" : "Paused creator"
                 : spanish ? "Creador archivado" : "Archived creator"}
           </span>
-          <div className="artist-profile-stats">
-            <span><Users size={14} /> {followerCount} {spanish ? "seguidores" : "followers"}</span>
+          <div
+            className="artist-profile-stats"
+            data-artist-profile-section="statistics"
+          >
+            <span data-artist-profile-field="followers"><Users size={14} /> {followerCount} {spanish ? "seguidores" : "followers"}</span>
             <span><UserPlus size={14} /> {artist.following} {spanish ? "siguiendo" : "following"}</span>
             <span><Music2 size={14} /> {artist.songsSubmitted} {spanish ? "canciones" : "songs submitted"}</span>
             <span><Star size={14} /> {artist.averageRating.toFixed(1)} {spanish ? "rating promedio" : "average rating"}</span>
@@ -459,7 +462,10 @@ export function PublicArtistProfile({
       {message && <div className="artist-profile-notice" role="status">{message}</div>}
 
       <section className="artist-community-grid">
-        <div className="artist-community-panel">
+        <div
+          className="artist-community-panel"
+          data-artist-profile-section="supporters"
+        >
           <span className="eyebrow"><Users size={13} /> {spanish ? "Mayores colaboradores" : "Top Supporters"}</span>
           <h2>{spanish ? "Relaciones del creador" : "Creator relationships"}</h2>
           <div className="top-supporter-list">
@@ -491,7 +497,10 @@ export function PublicArtistProfile({
           </div>
         </div>
 
-        <div className="artist-community-panel">
+        <div
+          className="artist-community-panel"
+          data-artist-profile-section="recentActivity"
+        >
           <span className="eyebrow"><Radio size={13} /> {spanish ? "Actividad reciente" : "Recent Activity"}</span>
           <h2>{spanish ? "Actividad comunitaria" : "Community activity"}</h2>
           <div className="artist-activity-list">
@@ -546,7 +555,10 @@ export function PublicArtistProfile({
         </div>
       </section>
 
-      <section className="artist-song-grid">
+      <section
+        className="artist-song-grid"
+        data-artist-profile-section="songs"
+      >
         {songs.map((song) => (
           <ProfileSong
             active={activeSongId === song.id}
