@@ -6,15 +6,15 @@ import {
 export const homepageModuleLabels = {
   away_summary: "While You Were Away",
   spotlight: "Spotlight",
-  top_results: "Top Results",
+  top_results: "Top 10",
   organic_rankings: "Organic Rankings",
   community_activity: "Community Activity",
   review_queue: "Review Queue",
   artist_spotlight: "Artist Spotlight",
   trending: "Trending",
   most_shared: "Most Shared",
-  most_supported: "Most Supported",
-  newest_songs: "Newest Songs",
+  most_supported: "Community Picks",
+  newest_songs: "New Releases",
 } as const;
 
 export type HomepageModuleKey = keyof typeof homepageModuleLabels;
@@ -85,6 +85,9 @@ export type PlatformControlConfig = {
       | "special_event"
       | "editor_pick";
     label: string;
+    pinned: boolean;
+    startsAt: string | null;
+    endsAt: string | null;
   }>;
   artistProfile: {
     order: string[];
@@ -195,6 +198,9 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
     songId: null,
     placement: "editor_pick" as const,
     label: "",
+    pinned: false,
+    startsAt: null,
+    endsAt: null,
   })),
   artistProfile: {
     order: [
@@ -331,10 +337,59 @@ export function normalizePlatformControlConfig(
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return defaultPlatformControlConfig;
   }
-  return mergeConfig(
+  const merged = mergeConfig(
     defaultPlatformControlConfig as unknown as Record<string, unknown>,
     value as Record<string, unknown>,
   ) as unknown as PlatformControlConfig;
+  const allowedModules = new Set(moduleOrder);
+  const order = merged.homepage.order.filter((module) =>
+    allowedModules.has(module),
+  );
+  for (const moduleKey of moduleOrder) {
+    if (!order.includes(moduleKey)) order.push(moduleKey);
+  }
+  const spotlightSource = Array.isArray(merged.spotlight)
+    ? merged.spotlight
+    : defaultPlatformControlConfig.spotlight;
+  const spotlight = defaultPlatformControlConfig.spotlight.map(
+    (defaultSlot, index) => {
+      const candidate =
+        spotlightSource.find((item) => item.slot === defaultSlot.slot) ??
+        spotlightSource[index] ??
+        defaultSlot;
+      return {
+        ...defaultSlot,
+        ...candidate,
+        slot: defaultSlot.slot,
+        songId:
+          typeof candidate.songId === "string" && candidate.songId
+            ? candidate.songId
+            : null,
+        label: typeof candidate.label === "string" ? candidate.label : "",
+        pinned: Boolean(candidate.pinned),
+        startsAt:
+          typeof candidate.startsAt === "string" && candidate.startsAt
+            ? candidate.startsAt
+            : null,
+        endsAt:
+          typeof candidate.endsAt === "string" && candidate.endsAt
+            ? candidate.endsAt
+            : null,
+      };
+    },
+  );
+  return {
+    ...merged,
+    homepage: {
+      ...merged.homepage,
+      order,
+      visibility: {
+        ...defaultPlatformControlConfig.homepage.visibility,
+        ...merged.homepage.visibility,
+      },
+    },
+    spotlight,
+  };
 }
 
 export function mapPlatformControlState(

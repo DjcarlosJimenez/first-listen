@@ -36,7 +36,7 @@ type AdminSection =
   | "statistics";
 
 export async function AdminPageContent({
-  initialSection = "control",
+  initialSection = "users",
   allowModerator = false,
 }: {
   initialSection?: AdminSection;
@@ -94,7 +94,6 @@ export async function AdminPageContent({
     { data: themeRows },
     { data: announcements },
     { data: communityHealth },
-    { data: controlCenterData },
   ] = await Promise.all([
     supabase.rpc("admin_list_users", { result_limit: 1000 }),
     supabase
@@ -139,9 +138,6 @@ export async function AdminPageContent({
     supabase.rpc("get_platform_theme"),
     supabase.rpc("admin_list_platform_announcements"),
     supabase.rpc("admin_get_community_health"),
-    profile.role === "super_admin"
-      ? supabase.rpc("admin_get_control_center")
-      : Promise.resolve({ data: null }),
   ]);
 
   const profileById = new Map(
@@ -171,7 +167,6 @@ export async function AdminPageContent({
   return (
     <AdminPanel
       initialSection={effectiveInitialSection as AdminSection}
-      controlCenterData={(controlCenterData ?? null) as never}
       listeningSettings={{
         minutes_per_credit: Number(listeningRows?.minutes_per_credit ?? 120),
         daily_cap_minutes: Number(listeningRows?.daily_cap_minutes ?? 180),

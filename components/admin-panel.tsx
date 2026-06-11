@@ -26,10 +26,6 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import {
-  SuperAdminControlCenter,
-  type ControlCenterPayload,
-} from "@/components/super-admin-control-center";
-import {
   compactClassificationLabel,
   displayPlatform,
 } from "@/lib/content-economy";
@@ -261,7 +257,6 @@ export function AdminPanel({
   theme,
   announcements,
   communityHealth,
-  controlCenterData,
 }: {
   role: "super_admin" | "admin" | "moderator";
   users: AdminUser[];
@@ -290,7 +285,6 @@ export function AdminPanel({
   theme: PlatformTheme;
   announcements: AdminAnnouncement[];
   communityHealth: CommunityHealth | null;
-  controlCenterData: ControlCenterPayload | null;
 }) {
   const [section, setSection] = useState<AdminSection>(initialSection);
   const [notice, setNotice] = useState("");
@@ -368,14 +362,13 @@ export function AdminPanel({
     ),
   );
   const isSuper = role === "super_admin";
-  const hasControlCenter = isSuper && Boolean(controlCenterData);
   const supabase = createClient();
 
   useEffect(() => {
-    if (section === "control" && !hasControlCenter) {
+    if (section === "control") {
       setSection(role === "moderator" ? "reports" : "users");
     }
-  }, [hasControlCenter, role, section]);
+  }, [role, section]);
 
   useEffect(() => {
     if (section !== "health") return;
@@ -530,7 +523,6 @@ export function AdminPanel({
   };
 
   const allSections = [
-    ["control", "Control Center", Gauge],
     ["users", "Users", Users],
     ["songs", "Songs", Music2],
     ["reports", "Reports", Flag],
@@ -544,7 +536,7 @@ export function AdminPanel({
     ["statistics", "Statistics", BarChart3],
   ] as const;
   const sections = allSections.filter(([id]) => {
-    if (role === "super_admin") return id !== "control" || hasControlCenter;
+    if (role === "super_admin") return true;
     if (role === "admin") return !["credits", "listening", "economy"].includes(id);
     return ["users", "reports"].includes(id);
   });
@@ -559,6 +551,11 @@ export function AdminPanel({
         <aside className="admin-nav">
           <span className="eyebrow">{role.replace("_", " ")}</span>
           <h1>Administration</h1>
+          {isSuper && (
+            <Link className="admin-owner-link" href="/owner">
+              <Gauge size={17} /> Owner Control Center
+            </Link>
+          )}
           {sections.map(([id, label, Icon]) => (
             <button className={section === id ? "active" : ""} key={id} onClick={() => setSection(id)}>
               <Icon size={17} /> {label}
@@ -568,16 +565,6 @@ export function AdminPanel({
 
         <section className="admin-content">
           {notice && <div className="admin-notice" role="status">{notice}</div>}
-
-          {section === "control" &&
-            role === "super_admin" &&
-            controlCenterData && (
-              <SuperAdminControlCenter
-                initialData={controlCenterData}
-                songs={songs}
-                users={users}
-              />
-            )}
 
           {section === "users" && (
             <>

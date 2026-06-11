@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArchiveRestore,
@@ -15,6 +15,7 @@ import {
   Gauge,
   History,
   LayoutDashboard,
+  Music2,
   Palette,
   Plus,
   Save,
@@ -130,6 +131,12 @@ type DirectorySong = {
   title: string;
   artist_name: string;
   is_active: boolean;
+  featured?: boolean;
+  archived_at?: string | null;
+  removed_at?: string | null;
+  report_count?: number;
+  platform?: string;
+  created_at?: string;
 };
 
 type ControlTab =
@@ -137,6 +144,7 @@ type ControlTab =
   | "appearance"
   | "homepage"
   | "discovery"
+  | "content"
   | "profiles"
   | "tokens"
   | "announcements"
@@ -150,6 +158,7 @@ const tabs: Array<[ControlTab, string, typeof Gauge]> = [
   ["appearance", "Appearance", Palette],
   ["homepage", "Page Builder", LayoutDashboard],
   ["discovery", "Discovery", Sparkles],
+  ["content", "Content", Music2],
   ["profiles", "Artist Profiles", Users],
   ["tokens", "Token Economy", WalletCards],
   ["announcements", "Announcements", Bell],
@@ -178,12 +187,12 @@ const discoveryLabels: Record<
 > = {
   spotlight: "Spotlight",
   rankings: "Rankings",
-  topResults: "Top Results",
+  topResults: "Top 10",
   organicRankings: "Organic Rankings",
   trending: "Trending",
   mostShared: "Most Shared",
-  mostSupported: "Most Supported",
-  newestSongs: "Newest Songs",
+  mostSupported: "Community Picks",
+  newestSongs: "New Releases",
 };
 
 const artistVisibilityLabels: Record<
@@ -218,6 +227,27 @@ function emptyAnnouncement(): ControlAnnouncement {
   };
 }
 
+function renumberSpotlightSlots(config: PlatformControlConfig["spotlight"]) {
+  return config.map((slot, index) => ({
+    ...slot,
+    slot: (index + 1) as 1 | 2 | 3,
+  }));
+}
+
+function dateTimeInputValue(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function dateTimeStorageValue(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 export function SuperAdminControlCenter({
   initialData,
   users,
@@ -239,7 +269,15 @@ export function SuperAdminControlCenter({
   const [previewUserId, setPreviewUserId] = useState("");
   const [draggedModule, setDraggedModule] =
     useState<HomepageModuleKey | null>(null);
+  const [draggedSpotlightIndex, setDraggedSpotlightIndex] =
+    useState<number | null>(null);
+  const [songDirectory, setSongDirectory] = useState(songs);
+  const [contentSearch, setContentSearch] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setSongDirectory(songs);
+  }, [songs]);
 
   const refresh = async () => {
     const supabase = createClient();
@@ -334,6 +372,117 @@ export function SuperAdminControlCenter({
     setDraggedModule(null);
   };
 
+  const moveSpotlightSlot = (index: number, direction: -1 | 1) => {
+    setConfig((current) => {
+      const spotlight = [...current.spotlight];
+      const next = index + direction;
+      if (next < 0 || next >= spotlight.length) return current;
+      [spotlight[index], spotlight[next]] = [spotlight[next], spotlight[index]];
+      return { ...current, spotlight: renumberSpotlightSlots(spotlight) };
+    });
+  };
+
+  const dropSpotlightSlot = (targetIndex: number) => {
+    if (draggedSpotlightIndex === null || draggedSpotlightIndex === targetIndex) {
+      return;
+    }
+    setConfig((current) => {
+      const spotlight = [...current.spotlight];
+      const [dragged] = spotlight.splice(draggedSpotlightIndex, 1);
+      spotlight.splice(targetIndex, 0, dragged);
+      return { ...current, spotlight: renumberSpotlightSlots(spotlight) };
+    });
+    setDraggedSpotlightIndex(null);
+  };
+
+  const placeSongInFeaturedSection = (
+    songId: string,
+    section: "spotlight" | "new_release" | "community_pick",
+  ) => {
+    const song = songDirectory.find((candidate) => candidate.id === songId);
+    setConfig((current) => {
+      const existingIndex = current.spotlight.findIndex(
+        (slot) => slot.songId === songId,
+      );
+      const firstEmptyIndex = current.spotlight.findIndex((slot) => !slot.songId);
+      const index = existingIndex >= 0 ? existingIndex : Math.max(0, firstEmptyIndex);
+      const label =
+        section === "new_release"
+          ? "New Release"
+          : section === "community_pick"
+            ? "Community Pick"
+            : "Spotlight";
+      const placement =
+        section === "new_release" ? "new_release" : "editor_pick";
+      return {
+        ...current,
+        spotlight: current.spotlight.map((slot, slotIndex) =>
+          slotIndex === index
+            ? {
+                ...slot,
+                songId,
+                placement,
+                label,
+                pinned: section === "spotlight" ? slot.pinned : true,
+              }
+            : slot,
+        ),
+      };
+    });
+    setNotice(
+      `${song?.title ?? "Song"} was added to the Spotlight draft as ${
+        section === "new_release"
+          ? "New Release"
+          : section === "community_pick"
+            ? "Community Pick"
+            : "Spotlight"
+      }. Save the Spotlight draft, then publish.`,
+    );
+  };
+
+  const updateSongVisibility = async (
+    song: DirectorySong,
+    active: boolean,
+    featured: boolean,
+  ) => {
+    setBusy(true);
+    setNotice("");
+    try {
+      const supabase = createClient();
+      if (!supabase) throw new Error("Supabase is not configured.");
+      const { error } = await supabase.rpc("admin_set_song_state", {
+        target_song_id: song.id,
+        active,
+        feature: featured,
+      });
+      if (error) throw error;
+      setSongDirectory((current) =>
+        current.map((item) =>
+          item.id === song.id
+            ? {
+                ...item,
+                is_active: active,
+                featured: active ? featured : false,
+                removed_at: active ? null : new Date().toISOString(),
+                archived_at: active ? item.archived_at ?? null : item.archived_at,
+              }
+            : item,
+        ),
+      );
+      setNotice(
+        active
+          ? featured
+            ? `${song.title} was promoted.`
+            : `${song.title} was restored.`
+          : `${song.title} was hidden from public discovery.`,
+      );
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The action failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const exportConfig = () => {
     const blob = new Blob([JSON.stringify(config, null, 2)], {
       type: "application/json",
@@ -363,9 +512,24 @@ export function SuperAdminControlCenter({
   };
 
   const activeSongs = useMemo(
-    () => songs.filter((song) => song.is_active),
-    [songs],
+    () =>
+      songDirectory.filter(
+        (song) => song.is_active && !song.removed_at && !song.archived_at,
+      ),
+    [songDirectory],
   );
+
+  const filteredContentSongs = useMemo(() => {
+    const query = contentSearch.trim().toLowerCase();
+    return songDirectory.filter((song) => {
+      if (!query) return true;
+      return (
+        song.title.toLowerCase().includes(query) ||
+        song.artist_name.toLowerCase().includes(query) ||
+        song.id.toLowerCase().includes(query)
+      );
+    });
+  }, [contentSearch, songDirectory]);
 
   const healthCards = [
     ["Active guests", data.health?.active_guests ?? 0],
@@ -391,9 +555,9 @@ export function SuperAdminControlCenter({
       <header className="control-center-hero">
         <div>
           <span className="eyebrow">
-            <Shield size={14} /> Founder-level controls
+            <Shield size={14} /> Owner-level controls
           </span>
-          <h2>Super Admin Control Center</h2>
+          <h2>Owner Control Center</h2>
           <p>
             Configure, preview, publish, and restore First Listen without a
             deployment.
@@ -794,9 +958,14 @@ export function SuperAdminControlCenter({
             </button>
           </div>
           <p>Drag modules, use the arrow controls, or hide them from the site.</p>
+          <p>
+            Key public sections include Spotlight, Top 10, Trending, New
+            Releases, and Community Picks.
+          </p>
           <div className="control-module-list">
             {config.homepage.order.map((module, index) => (
               <article
+                data-owner-dnd="homepage-module"
                 draggable
                 key={module}
                 onDragOver={(event) => event.preventDefault()}
@@ -926,7 +1095,7 @@ export function SuperAdminControlCenter({
             <div className="control-heading">
               <div>
                 <span className="eyebrow">Spotlight manager</span>
-                <h3>Three editorial placements</h3>
+                <h3>Drag, pin, and schedule editorial placements</h3>
               </div>
               <button
                 className="primary-button"
@@ -939,8 +1108,36 @@ export function SuperAdminControlCenter({
             </div>
             <div className="control-spotlight-grid">
               {config.spotlight.map((slot, index) => (
-                <section key={slot.slot}>
-                  <strong>Spotlight #{slot.slot}</strong>
+                <section
+                  data-owner-dnd="spotlight-slot"
+                  draggable
+                  key={slot.slot}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDragStart={() => setDraggedSpotlightIndex(index)}
+                  onDrop={() => dropSpotlightSlot(index)}
+                >
+                  <div className="control-slot-heading">
+                    <strong>Spotlight #{slot.slot}</strong>
+                    <span>Position {index + 1}</span>
+                  </div>
+                  <div className="control-slot-actions">
+                    <button
+                      aria-label={`Move Spotlight #${slot.slot} up`}
+                      disabled={index === 0}
+                      onClick={() => moveSpotlightSlot(index, -1)}
+                      type="button"
+                    >
+                      <ArrowUp size={15} />
+                    </button>
+                    <button
+                      aria-label={`Move Spotlight #${slot.slot} down`}
+                      disabled={index === config.spotlight.length - 1}
+                      onClick={() => moveSpotlightSlot(index, 1)}
+                      type="button"
+                    >
+                      <ArrowDown size={15} />
+                    </button>
+                  </div>
                   <label>
                     Song
                     <select
@@ -1008,11 +1205,184 @@ export function SuperAdminControlCenter({
                       value={slot.label}
                     />
                   </label>
+                  <label className="control-switch">
+                    <input
+                      checked={slot.pinned}
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          spotlight: current.spotlight.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, pinned: event.target.checked }
+                              : item,
+                          ),
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                    <span>{slot.pinned ? "Pinned" : "Not pinned"}</span>
+                  </label>
+                  <label>
+                    Starts
+                    <input
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          spotlight: current.spotlight.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? {
+                                  ...item,
+                                  startsAt: dateTimeStorageValue(
+                                    event.target.value,
+                                  ),
+                                }
+                              : item,
+                          ),
+                        }))
+                      }
+                      type="datetime-local"
+                      value={dateTimeInputValue(slot.startsAt)}
+                    />
+                  </label>
+                  <label>
+                    Ends
+                    <input
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          spotlight: current.spotlight.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? {
+                                  ...item,
+                                  endsAt: dateTimeStorageValue(
+                                    event.target.value,
+                                  ),
+                                }
+                              : item,
+                          ),
+                        }))
+                      }
+                      type="datetime-local"
+                      value={dateTimeInputValue(slot.endsAt)}
+                    />
+                  </label>
                 </section>
               ))}
             </div>
           </article>
         </div>
+      )}
+
+      {tab === "content" && (
+        <article className="control-card control-card-wide">
+          <div className="control-heading">
+            <div>
+              <span className="eyebrow">Content management</span>
+              <h3>Promote, demote, hide, and place songs</h3>
+            </div>
+            <button
+              className="primary-button"
+              disabled={busy}
+              onClick={() => void saveSection("spotlight")}
+              type="button"
+            >
+              <Save size={15} /> Save Spotlight Draft
+            </button>
+          </div>
+          <p>
+            Move songs into editorial sections from here. Top 10 and Trending
+            remain performance-based, while their homepage position and
+            visibility are managed in Page Builder.
+          </p>
+          <label className="control-search">
+            Search songs
+            <input
+              onChange={(event) => setContentSearch(event.target.value)}
+              placeholder="Song, artist, or song ID"
+              value={contentSearch}
+            />
+          </label>
+          <div className="control-content-list">
+            {filteredContentSongs.map((song) => {
+              const hidden = !song.is_active || Boolean(song.removed_at);
+              const archived = Boolean(song.archived_at);
+              return (
+                <section key={song.id}>
+                  <div>
+                    <strong>{song.title}</strong>
+                    <small>
+                      {song.artist_name}
+                      {song.platform ? ` / ${song.platform}` : ""}
+                      {song.report_count ? ` / ${song.report_count} reports` : ""}
+                    </small>
+                  </div>
+                  <span className="control-song-status">
+                    {archived
+                      ? "Archived"
+                      : hidden
+                        ? "Hidden"
+                        : song.featured
+                          ? "Promoted"
+                          : "Active"}
+                  </span>
+                  <div className="control-content-actions">
+                    <button
+                      disabled={busy || hidden || archived}
+                      onClick={() => placeSongInFeaturedSection(song.id, "spotlight")}
+                      type="button"
+                    >
+                      Spotlight
+                    </button>
+                    <button
+                      disabled={busy || hidden || archived}
+                      onClick={() =>
+                        placeSongInFeaturedSection(song.id, "new_release")
+                      }
+                      type="button"
+                    >
+                      New Releases
+                    </button>
+                    <button
+                      disabled={busy || hidden || archived}
+                      onClick={() =>
+                        placeSongInFeaturedSection(song.id, "community_pick")
+                      }
+                      type="button"
+                    >
+                      Community Picks
+                    </button>
+                    <button
+                      disabled={busy || hidden || archived}
+                      onClick={() => void updateSongVisibility(song, true, true)}
+                      type="button"
+                    >
+                      Promote
+                    </button>
+                    <button
+                      disabled={busy || hidden || archived}
+                      onClick={() => void updateSongVisibility(song, true, false)}
+                      type="button"
+                    >
+                      Demote
+                    </button>
+                    <button
+                      disabled={busy || archived}
+                      onClick={() =>
+                        void updateSongVisibility(song, hidden, false)
+                      }
+                      type="button"
+                    >
+                      {hidden ? "Unhide" : "Hide"}
+                    </button>
+                  </div>
+                </section>
+              );
+            })}
+            {!filteredContentSongs.length && (
+              <p>No songs match this search.</p>
+            )}
+          </div>
+        </article>
       )}
 
       {tab === "profiles" && (
