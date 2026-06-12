@@ -1349,8 +1349,6 @@ function ReviewView({
   previouslySupportedSongs,
   todaySupport,
   listeningBank,
-  claimingReward,
-  onClaimReward,
   autoPlayNextSong,
   onAutoPlayChange,
   externalRedirectNoticeDisabled,
@@ -1392,8 +1390,6 @@ function ReviewView({
   previouslySupportedSongs: DiscoverySong[];
   todaySupport: TodaySupportSummary;
   listeningBank: ListeningBankStatus;
-  claimingReward: boolean;
-  onClaimReward: () => void;
   autoPlayNextSong: boolean;
   onAutoPlayChange: (enabled: boolean) => void;
   externalRedirectNoticeDisabled: boolean;
@@ -2111,14 +2107,35 @@ function ReviewView({
           </div>
         </div>
 
-        <div className="review-listening-bank-slot">
-          <ListeningBankPanel
-            claiming={claimingReward}
-            credits={reviewCredits}
-            onClaim={onClaimReward}
-            status={listeningBank}
-            locale={locale}
-          />
+        <div className="review-listening-trust-panel" aria-live="polite">
+          <div>
+            <span>
+              <Headphones size={13} />
+              {locale === "es" ? "Sesion verificada" : "Verified Session"}
+            </span>
+            <strong>{formatClock(listeningSession.liveSeconds)}</strong>
+          </div>
+          <div>
+            <span>
+              <CheckCircle2 size={13} />
+              {locale === "es" ? "Banco aprobado" : "Approved Bank"}
+            </span>
+            <strong>{formatPreciseMinutes(approvedListeningSeconds)}</strong>
+          </div>
+          <div>
+            <span>
+              <Sparkles size={13} />
+              {locale === "es" ? "Tokens de envio" : "Submission Tokens"}
+            </span>
+            <strong>
+              {unlimitedCredits
+                ? locale === "es"
+                  ? "Ilimitados"
+                  : "Unlimited"
+                : reviewCredits}
+            </strong>
+          </div>
+          {listeningSession.warning && <small>{listeningSession.warning}</small>}
         </div>
 
         <div className="review-form">
@@ -5482,8 +5499,6 @@ export function FirstListenApp({
         previouslySupportedSongs={initialPreviouslySupportedSongs}
         todaySupport={todaySupport}
         listeningBank={listeningBank}
-        claimingReward={claimingReward}
-        onClaimReward={() => void claimListeningReward()}
         autoPlayNextSong={autoPlayNextSong}
         onAutoPlayChange={(enabled) => void changeAutoPlayNextSong(enabled)}
         externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}

@@ -729,25 +729,53 @@ button {
   padding-top: 22px;
 }
 
-.review-listening-bank-slot {
-  display: block;
+.review-listening-trust-panel {
+  background:
+    linear-gradient(135deg, rgba(200, 255, 79, 0.2), transparent 72%),
+    var(--surface-strong);
+  border: 1px solid #d9e8b8;
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 16px;
 }
 
-.review-listening-bank-slot .listening-bank-panel {
-  margin-bottom: 0;
-  order: initial;
+.review-listening-trust-panel > div {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(217, 232, 184, 0.8);
+  border-radius: 14px;
+  display: grid;
+  gap: 7px;
+  padding: 13px;
+}
+
+.review-listening-trust-panel span {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.review-listening-trust-panel strong {
+  color: var(--ink);
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.review-listening-trust-panel small {
+  color: var(--muted);
+  font-size: 10px;
+  grid-column: 1 / -1;
+  line-height: 1.45;
 }
 
 .review-token-summary {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.review-token-summary > .listening-session-card {
   display: none;
-}
-
-.review-token-summary > .review-progress {
-  max-width: 540px;
 }
 
 .review-layout-content-first > .review-side > .listening-session-card,
@@ -4832,6 +4860,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 .theme-dark .review-card,
 .theme-dark .submit-form-card,
 .theme-dark .review-progress,
+.theme-dark .review-listening-trust-panel,
 .theme-dark .listening-session-card,
 .theme-dark .queue-card,
 .theme-dark .expect-card,
@@ -4841,6 +4870,11 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 .theme-dark .review-complete-card,
 .theme-dark .submit-success > section {
   background: var(--surface-strong);
+}
+
+.theme-dark .review-listening-trust-panel > div {
+  background: #242a25;
+  border-color: #353d36;
 }
 
 .theme-dark .admin-settings-card,
@@ -7585,6 +7619,10 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   }
 
   .review-secondary-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .review-listening-trust-panel {
     grid-template-columns: 1fr;
   }
 
