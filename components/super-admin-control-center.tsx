@@ -14,6 +14,7 @@ import {
   FlaskConical,
   Gauge,
   History,
+  Headphones,
   LayoutDashboard,
   Music2,
   Palette,
@@ -99,6 +100,45 @@ export type ControlCenterPayload = {
     reward_claims?: number;
     average_balance?: number;
   };
+  listening_bank?: {
+    diagnostics: {
+      total_listening_time_today?: number;
+      approved_listening_time_today?: number;
+      pending_listening_time?: number;
+      rejected_listening_time?: number;
+      current_listening_bank?: number;
+      current_token_balance?: number;
+      last_approval_event?: string | null;
+      last_reward_event?: string | null;
+      last_bank_update?: string | null;
+      last_calculation_timestamp?: string | null;
+      minutes_per_token?: number;
+      daily_cap_minutes?: number;
+      rewards_enabled?: boolean;
+    };
+    activity_log: Array<{
+      id: string;
+      user_id: string | null;
+      event_key: string;
+      event_type: string;
+      status: string;
+      amount_seconds: number;
+      token_amount: number;
+      title: string;
+      details: Record<string, unknown>;
+      created_at: string;
+    }>;
+    events: PlatformControlConfig["listeningBank"]["events"];
+    active_event?: {
+      event_id?: string;
+      event_name?: string;
+      listening_multiplier?: number;
+      token_multiplier?: number;
+      bonus_minutes?: number;
+      mission_multiplier?: number;
+    };
+    test_scenarios: string[];
+  };
   health: Record<string, number | string | null>;
   top_songs: Array<{
     id: string;
@@ -163,6 +203,7 @@ type ControlTab =
   | "profiles"
   | "community"
   | "membership"
+  | "listening"
   | "tokens"
   | "announcements"
   | "health"
@@ -181,6 +222,7 @@ const tabs: Array<[ControlTab, string, typeof Gauge]> = [
   ["profiles", "Artist Profiles", Users],
   ["community", "Community", Users],
   ["membership", "Membership", WalletCards],
+  ["listening", "Listening Bank", Headphones],
   ["tokens", "Token Economy", WalletCards],
   ["announcements", "Announcements", Bell],
   ["health", "Live Health", Activity],
@@ -211,6 +253,7 @@ const configSectionLabels: Record<ConfigSectionKey, string> = {
   spotlight: "Spotlight",
   artistProfile: "Artist Profiles",
   membership: "Membership",
+  listeningBank: "Listening Bank",
   tokens: "Tokens",
   permissions: "Permissions",
   experiments: "Experiments",
@@ -403,6 +446,77 @@ const profileAppearanceLabels: Record<
   profileAccent: "Profile Accent",
   recognitionStyling: "Recognition Styling",
 };
+
+const listeningModuleVisibilityLabels: Record<
+  PlatformControlConfig["listeningBank"]["module"]["desktop"]["visibility"],
+  string
+> = {
+  visible: "Visible",
+  hidden: "Hidden",
+  desktop_only: "Desktop Only",
+  mobile_only: "Mobile Only",
+};
+
+const listeningModuleColumnLabels: Record<
+  PlatformControlConfig["listeningBank"]["module"]["desktop"]["column"],
+  string
+> = {
+  left: "Left Column",
+  right: "Right Column",
+  full_width: "Full Width",
+};
+
+const listeningModuleSizeLabels: Record<
+  PlatformControlConfig["listeningBank"]["module"]["desktop"]["size"],
+  string
+> = {
+  compact: "Compact",
+  standard: "Standard",
+  expanded: "Expanded",
+  custom: "Custom",
+};
+
+const listeningTestLabels: Record<string, string> = {
+  simulate_5_minutes: "Simulate 5 Minutes",
+  simulate_10_minutes: "Simulate 10 Minutes",
+  simulate_30_minutes: "Simulate 30 Minutes",
+  simulate_60_minutes: "Simulate 60 Minutes",
+  simulate_approval_event: "Simulate Approval Event",
+  simulate_reward_event: "Simulate Reward Event",
+  simulate_token_award: "Simulate Token Award",
+};
+
+function formatBankSeconds(value?: number | null) {
+  const totalSeconds = Math.max(0, Number(value ?? 0));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function listeningEventTemplate(): PlatformControlConfig["listeningBank"]["events"][number] {
+  return {
+    id: crypto.randomUUID(),
+    name: "New Listening Event",
+    startsAt: new Date().toISOString(),
+    endsAt: null,
+    enabled: false,
+    visible: true,
+    rewardTypes: {
+      extraListeningMinutes: false,
+      listeningMultiplier: true,
+      tokenMultiplier: false,
+      missionMultiplier: false,
+    },
+    bonusMinutes: 0,
+    bonusThresholdMinutes: 60,
+    listeningMultiplier: 2,
+    tokenMultiplier: 1,
+    missionMultiplier: 1,
+    description: "",
+    preview: true,
+  };
+}
 
 const communityFeatureLabels: Record<
   keyof PlatformControlConfig["homepage"]["community"]["features"],
@@ -862,6 +976,8 @@ export function SuperAdminControlCenter({
   const [importSection, setImportSection] =
     useState<ConfigSectionKey>("theme");
   const [previewUserId, setPreviewUserId] = useState("");
+  const [listeningTestResult, setListeningTestResult] =
+    useState<Record<string, unknown> | null>(null);
   const [draggedModule, setDraggedModule] =
     useState<HomepageModuleKey | null>(null);
   const [draggedSpotlightIndex, setDraggedSpotlightIndex] =
@@ -927,6 +1043,26 @@ export function SuperAdminControlCenter({
       },
       `${section} draft saved. Preview it before publishing.`,
     );
+  };
+
+  const runListeningBankTest = async (testKey: string) => {
+    setBusy(true);
+    setNotice("");
+    try {
+      const supabase = createClient();
+      if (!supabase) throw new Error("Supabase is not configured.");
+      const { data: result, error } = await supabase.rpc(
+        "admin_run_listening_bank_test",
+        { test_key: testKey },
+      );
+      if (error) throw error;
+      setListeningTestResult((result ?? {}) as Record<string, unknown>);
+      setNotice("Listening Bank test completed without permanent changes.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The test failed.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const updateTheme = (
@@ -1002,6 +1138,7 @@ export function SuperAdminControlCenter({
       discovery: source.discovery,
       artistProfile: source.artistProfile,
       membership: source.membership,
+      listeningBank: source.listeningBank,
       tokens: source.tokens,
       announcements: source.announcements,
     };
@@ -1387,6 +1524,12 @@ export function SuperAdminControlCenter({
       `${data.health?.guest_to_member_conversion_rate ?? 0}%`,
     ],
   ];
+  const listeningBankPayload = data.listening_bank;
+  const listeningDiagnostics = listeningBankPayload?.diagnostics ?? {};
+  const listeningActivityLog = listeningBankPayload?.activity_log ?? [];
+  const listeningTestScenarios =
+    listeningBankPayload?.test_scenarios ?? Object.keys(listeningTestLabels);
+  const activeListeningEvent = listeningBankPayload?.active_event;
 
   return (
     <section className="control-center">
@@ -3515,6 +3658,975 @@ export function SuperAdminControlCenter({
               }
             />
           ))}
+        </div>
+      )}
+
+      {tab === "listening" && (
+        <div className="control-grid listening-bank-manager">
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Listening Bank Diagnostics</span>
+                <h3>Real-time accumulation and reward health</h3>
+                <p>
+                  These values come from listening sessions, reward claims,
+                  credit balances, and the Listening Bank activity log.
+                </p>
+              </div>
+              <button
+                className="secondary-button"
+                disabled={busy}
+                onClick={() => void refresh()}
+                type="button"
+              >
+                <Activity size={15} /> Refresh
+              </button>
+            </div>
+            <div className="control-stat-list listening-diagnostics-grid">
+              <div>
+                <strong>
+                  {formatBankSeconds(
+                    Number(listeningDiagnostics.total_listening_time_today ?? 0),
+                  )}
+                </strong>
+                <span>Total Listening Time Today</span>
+              </div>
+              <div>
+                <strong>
+                  {formatBankSeconds(
+                    Number(listeningDiagnostics.approved_listening_time_today ?? 0),
+                  )}
+                </strong>
+                <span>Approved Listening Time Today</span>
+              </div>
+              <div>
+                <strong>
+                  {formatBankSeconds(
+                    Number(listeningDiagnostics.pending_listening_time ?? 0),
+                  )}
+                </strong>
+                <span>Pending Listening Time</span>
+              </div>
+              <div>
+                <strong>
+                  {formatBankSeconds(
+                    Number(listeningDiagnostics.rejected_listening_time ?? 0),
+                  )}
+                </strong>
+                <span>Rejected Listening Time</span>
+              </div>
+              <div>
+                <strong>
+                  {formatBankSeconds(
+                    Number(listeningDiagnostics.current_listening_bank ?? 0),
+                  )}
+                </strong>
+                <span>Current Listening Bank</span>
+              </div>
+              <div>
+                <strong>
+                  {Number(listeningDiagnostics.current_token_balance ?? 0)}
+                </strong>
+                <span>Current Token Balance</span>
+              </div>
+              <div>
+                <strong>
+                  {listeningDiagnostics.last_approval_event
+                    ? new Date(listeningDiagnostics.last_approval_event).toLocaleString()
+                    : "None"}
+                </strong>
+                <span>Last Approval Event</span>
+              </div>
+              <div>
+                <strong>
+                  {listeningDiagnostics.last_reward_event
+                    ? new Date(listeningDiagnostics.last_reward_event).toLocaleString()
+                    : "None"}
+                </strong>
+                <span>Last Reward Event</span>
+              </div>
+              <div>
+                <strong>
+                  {listeningDiagnostics.last_bank_update
+                    ? new Date(listeningDiagnostics.last_bank_update).toLocaleString()
+                    : "None"}
+                </strong>
+                <span>Last Bank Update</span>
+              </div>
+              <div>
+                <strong>
+                  {listeningDiagnostics.last_calculation_timestamp
+                    ? new Date(
+                        listeningDiagnostics.last_calculation_timestamp,
+                      ).toLocaleString()
+                    : "Not calculated"}
+                </strong>
+                <span>Last Calculation Timestamp</span>
+              </div>
+            </div>
+          </article>
+
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Listening Bank Activity Log</span>
+                <h3>Approval, rejection, bonus, and reward history</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("listeningBank")}
+                type="button"
+              >
+                <Save size={15} /> Save Draft
+              </button>
+            </div>
+            <div className="listening-activity-log">
+              {listeningActivityLog.map((entry) => (
+                <div key={entry.id}>
+                  <strong>{entry.title}</strong>
+                  <span>{entry.status}</span>
+                  <small>
+                    {formatBankSeconds(Math.abs(Number(entry.amount_seconds ?? 0)))} /{" "}
+                    {Number(entry.token_amount ?? 0)} tokens /{" "}
+                    {new Date(entry.created_at).toLocaleString()}
+                  </small>
+                </div>
+              ))}
+              {!listeningActivityLog.length && (
+                <p>
+                  No Listening Bank activity has been logged yet. New approvals,
+                  rejections, reward claims, and event bonuses will appear here.
+                </p>
+              )}
+            </div>
+          </article>
+
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Listening Bank Test Center</span>
+                <h3>Rollback-safe simulations</h3>
+                <p>
+                  Tests calculate before, after, and expected results without
+                  permanently changing production balances.
+                </p>
+              </div>
+            </div>
+            <div className="control-actions listening-test-actions">
+              {listeningTestScenarios.map((scenario) => (
+                <button
+                  className="secondary-button"
+                  disabled={busy || !config.listeningBank.testing.enabled}
+                  key={scenario}
+                  onClick={() => void runListeningBankTest(scenario)}
+                  type="button"
+                >
+                  <FlaskConical size={14} />
+                  {listeningTestLabels[scenario] ?? scenario}
+                </button>
+              ))}
+            </div>
+            {listeningTestResult && (
+              <pre className="listening-test-result">
+                {JSON.stringify(listeningTestResult, null, 2)}
+              </pre>
+            )}
+          </article>
+
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Event Bonus Manager</span>
+                <h3>Temporary Listening Events</h3>
+                <p>
+                  Configure visible or hidden events, schedule windows,
+                  listening multipliers, token multipliers, and prepared mission
+                  multipliers.
+                </p>
+              </div>
+              <button
+                className="secondary-button"
+                onClick={() =>
+                  setConfig((current) => ({
+                    ...current,
+                    listeningBank: {
+                      ...current.listeningBank,
+                      events: [
+                        ...current.listeningBank.events,
+                        listeningEventTemplate(),
+                      ],
+                    },
+                  }))
+                }
+                type="button"
+              >
+                <Plus size={15} /> Add Event
+              </button>
+            </div>
+            {activeListeningEvent?.event_name && (
+              <div className="admin-notice">
+                Active event: {activeListeningEvent.event_name} /{" "}
+                {activeListeningEvent.listening_multiplier ?? 1}x listening /{" "}
+                {activeListeningEvent.token_multiplier ?? 1}x tokens
+              </div>
+            )}
+            <div className="listening-event-list">
+              {config.listeningBank.events.map((event, index) => (
+                <section key={event.id} className="control-card nested-control-card">
+                  <div className="control-heading">
+                    <div>
+                      <span className="eyebrow">Listening Event</span>
+                      <h3>{event.name}</h3>
+                    </div>
+                    <div className="control-actions">
+                      <button
+                        className="secondary-button"
+                        onClick={() =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, enabled: !item.enabled }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        type="button"
+                      >
+                        {event.enabled ? "Disable Event" : "Enable Event"}
+                      </button>
+                      <button
+                        className="secondary-button"
+                        onClick={() =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, preview: !item.preview }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        type="button"
+                      >
+                        {event.preview ? "Exit Preview" : "Preview Event"}
+                      </button>
+                      <button
+                        className="secondary-button"
+                        onClick={() =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? {
+                                      ...item,
+                                      enabled: true,
+                                      preview: false,
+                                      startsAt: new Date().toISOString(),
+                                    }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        type="button"
+                      >
+                        Schedule Event
+                      </button>
+                      <button
+                        className="secondary-button"
+                        onClick={() =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? {
+                                      ...item,
+                                      enabled: false,
+                                      endsAt: new Date().toISOString(),
+                                    }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        type="button"
+                      >
+                        End Event
+                      </button>
+                      <button
+                        className="secondary-button"
+                        onClick={() =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: [
+                                ...current.listeningBank.events,
+                                {
+                                  ...event,
+                                  id: crypto.randomUUID(),
+                                  name: `${event.name} Copy`,
+                                  enabled: false,
+                                  preview: true,
+                                },
+                              ],
+                            },
+                          }))
+                        }
+                        type="button"
+                      >
+                        Duplicate Event
+                      </button>
+                      <button
+                        className="secondary-button danger-button"
+                        onClick={() =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.filter(
+                                (_, itemIndex) => itemIndex !== index,
+                              ),
+                            },
+                          }))
+                        }
+                        type="button"
+                      >
+                        <Trash2 size={14} /> Remove
+                      </button>
+                    </div>
+                  </div>
+                  <div className="control-announcement-grid">
+                    <label>
+                      Event Name
+                      <input
+                        onChange={(eventInput) =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, name: eventInput.target.value }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        value={event.name}
+                      />
+                    </label>
+                    <label>
+                      Start Date
+                      <input
+                        onChange={(eventInput) =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? {
+                                      ...item,
+                                      startsAt: dateTimeStorageValue(eventInput.target.value),
+                                    }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        type="datetime-local"
+                        value={dateTimeInputValue(event.startsAt)}
+                      />
+                    </label>
+                    <label>
+                      End Date
+                      <input
+                        onChange={(eventInput) =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? {
+                                      ...item,
+                                      endsAt: dateTimeStorageValue(eventInput.target.value),
+                                    }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        type="datetime-local"
+                        value={dateTimeInputValue(event.endsAt)}
+                      />
+                    </label>
+                    <label>
+                      Visible
+                      <input
+                        checked={event.visible}
+                        onChange={(eventInput) =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, visible: eventInput.target.checked }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        type="checkbox"
+                      />
+                    </label>
+                    <label>
+                      Bonus Minutes
+                      <input
+                        min={0}
+                        max={1440}
+                        onChange={(eventInput) =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, bonusMinutes: Number(eventInput.target.value) }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        type="number"
+                        value={event.bonusMinutes}
+                      />
+                    </label>
+                    <label>
+                      Threshold Minutes
+                      <input
+                        min={0}
+                        max={1440}
+                        onChange={(eventInput) =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? {
+                                      ...item,
+                                      bonusThresholdMinutes: Number(eventInput.target.value),
+                                    }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        type="number"
+                        value={event.bonusThresholdMinutes}
+                      />
+                    </label>
+                    <label>
+                      Listening Multiplier
+                      <input
+                        max={10}
+                        min={1}
+                        onChange={(eventInput) =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? {
+                                      ...item,
+                                      listeningMultiplier: Number(eventInput.target.value),
+                                    }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        step={0.1}
+                        type="number"
+                        value={event.listeningMultiplier}
+                      />
+                    </label>
+                    <label>
+                      Token Multiplier
+                      <input
+                        max={10}
+                        min={1}
+                        onChange={(eventInput) =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? {
+                                      ...item,
+                                      tokenMultiplier: Number(eventInput.target.value),
+                                    }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        step={0.1}
+                        type="number"
+                        value={event.tokenMultiplier}
+                      />
+                    </label>
+                    <label>
+                      Mission Multiplier
+                      <input
+                        max={10}
+                        min={1}
+                        onChange={(eventInput) =>
+                          setConfig((current) => ({
+                            ...current,
+                            listeningBank: {
+                              ...current.listeningBank,
+                              events: current.listeningBank.events.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? {
+                                      ...item,
+                                      missionMultiplier: Number(eventInput.target.value),
+                                    }
+                                  : item,
+                              ),
+                            },
+                          }))
+                        }
+                        step={0.1}
+                        type="number"
+                        value={event.missionMultiplier}
+                      />
+                    </label>
+                  </div>
+                  <div className="control-toggle-grid">
+                    {(
+                      Object.keys(event.rewardTypes) as Array<
+                        keyof PlatformControlConfig["listeningBank"]["events"][number]["rewardTypes"]
+                      >
+                    ).map((field) => (
+                      <label key={field}>
+                        <input
+                          checked={event.rewardTypes[field]}
+                          onChange={(eventInput) =>
+                            setConfig((current) => ({
+                              ...current,
+                              listeningBank: {
+                                ...current.listeningBank,
+                                events: current.listeningBank.events.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? {
+                                        ...item,
+                                        rewardTypes: {
+                                          ...item.rewardTypes,
+                                          [field]: eventInput.target.checked,
+                                        },
+                                      }
+                                    : item,
+                                ),
+                              },
+                            }))
+                          }
+                          type="checkbox"
+                        />
+                        {field.replace(/([A-Z])/g, " $1")}
+                      </label>
+                    ))}
+                  </div>
+                  <label>
+                    Description
+                    <textarea
+                      onChange={(eventInput) =>
+                        setConfig((current) => ({
+                          ...current,
+                          listeningBank: {
+                            ...current.listeningBank,
+                            events: current.listeningBank.events.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? { ...item, description: eventInput.target.value }
+                                : item,
+                            ),
+                          },
+                        }))
+                      }
+                      rows={2}
+                      value={event.description}
+                    />
+                  </label>
+                </section>
+              ))}
+              {!config.listeningBank.events.length && (
+                <p>No Listening Events are configured yet.</p>
+              )}
+            </div>
+          </article>
+
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Listening Bank Module Control</span>
+                <h3>Visibility, placement, and sizing</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("listeningBank")}
+                type="button"
+              >
+                <Save size={15} /> Save Draft
+              </button>
+            </div>
+            <div className="control-toggle-grid">
+              <label>
+                <input
+                  checked={config.listeningBank.module.show}
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      listeningBank: {
+                        ...current.listeningBank,
+                        module: {
+                          ...current.listeningBank.module,
+                          show: event.target.checked,
+                        },
+                      },
+                    }))
+                  }
+                  type="checkbox"
+                />
+                Show Listening Bank
+              </label>
+              {(
+                Object.keys(config.listeningBank.module.visibility) as Array<
+                  keyof PlatformControlConfig["listeningBank"]["module"]["visibility"]
+                >
+              ).map((field) => (
+                <label key={field}>
+                  <input
+                    checked={config.listeningBank.module.visibility[field]}
+                    onChange={(event) =>
+                      setConfig((current) => ({
+                        ...current,
+                        listeningBank: {
+                          ...current.listeningBank,
+                          module: {
+                            ...current.listeningBank.module,
+                            visibility: {
+                              ...current.listeningBank.module.visibility,
+                              [field]: event.target.checked,
+                            },
+                          },
+                        },
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  {field.replace(/([A-Z])/g, " $1")}
+                </label>
+              ))}
+            </div>
+            <div className="owner-device-layout-grid">
+              {(["desktop", "mobile"] as const).map((device) => (
+                <section key={device} className="control-card nested-control-card">
+                  <span className="eyebrow">{device} layout</span>
+                  <label>
+                    Visibility
+                    <select
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          listeningBank: {
+                            ...current.listeningBank,
+                            module: {
+                              ...current.listeningBank.module,
+                              [device]: {
+                                ...current.listeningBank.module[device],
+                                visibility: event.target
+                                  .value as PlatformControlConfig["listeningBank"]["module"][typeof device]["visibility"],
+                              },
+                            },
+                          },
+                        }))
+                      }
+                      value={config.listeningBank.module[device].visibility}
+                    >
+                      {Object.entries(listeningModuleVisibilityLabels).map(
+                        ([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                  <label>
+                    Position
+                    <input
+                      min={1}
+                      max={50}
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          listeningBank: {
+                            ...current.listeningBank,
+                            module: {
+                              ...current.listeningBank.module,
+                              [device]: {
+                                ...current.listeningBank.module[device],
+                                position: Number(event.target.value),
+                              },
+                            },
+                          },
+                        }))
+                      }
+                      type="number"
+                      value={config.listeningBank.module[device].position}
+                    />
+                  </label>
+                  <div className="control-actions">
+                    <button
+                      className="secondary-button"
+                      onClick={() =>
+                        setConfig((current) => ({
+                          ...current,
+                          listeningBank: {
+                            ...current.listeningBank,
+                            module: {
+                              ...current.listeningBank.module,
+                              [device]: {
+                                ...current.listeningBank.module[device],
+                                position: Math.max(
+                                  1,
+                                  current.listeningBank.module[device].position - 1,
+                                ),
+                              },
+                            },
+                          },
+                        }))
+                      }
+                      type="button"
+                    >
+                      <ArrowUp size={14} /> Move Up
+                    </button>
+                    <button
+                      className="secondary-button"
+                      onClick={() =>
+                        setConfig((current) => ({
+                          ...current,
+                          listeningBank: {
+                            ...current.listeningBank,
+                            module: {
+                              ...current.listeningBank.module,
+                              [device]: {
+                                ...current.listeningBank.module[device],
+                                position:
+                                  current.listeningBank.module[device].position + 1,
+                              },
+                            },
+                          },
+                        }))
+                      }
+                      type="button"
+                    >
+                      <ArrowDown size={14} /> Move Down
+                    </button>
+                  </div>
+                  <label>
+                    Column
+                    <select
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          listeningBank: {
+                            ...current.listeningBank,
+                            module: {
+                              ...current.listeningBank.module,
+                              [device]: {
+                                ...current.listeningBank.module[device],
+                                column: event.target
+                                  .value as PlatformControlConfig["listeningBank"]["module"][typeof device]["column"],
+                              },
+                            },
+                          },
+                        }))
+                      }
+                      value={config.listeningBank.module[device].column}
+                    >
+                      {Object.entries(listeningModuleColumnLabels).map(
+                        ([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                  <label>
+                    Size
+                    <select
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          listeningBank: {
+                            ...current.listeningBank,
+                            module: {
+                              ...current.listeningBank.module,
+                              [device]: {
+                                ...current.listeningBank.module[device],
+                                size: event.target
+                                  .value as PlatformControlConfig["listeningBank"]["module"][typeof device]["size"],
+                              },
+                            },
+                          },
+                        }))
+                      }
+                      value={config.listeningBank.module[device].size}
+                    >
+                      {Object.entries(listeningModuleSizeLabels).map(
+                        ([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                </section>
+              ))}
+            </div>
+          </article>
+
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Reward Settings</span>
+                <h3>Conversion and transparency controls</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("listeningBank")}
+                type="button"
+              >
+                <Save size={15} /> Save Draft
+              </button>
+            </div>
+            <div className="control-number-grid">
+              <label>
+                Minutes per token
+                <input
+                  min={15}
+                  max={1440}
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      listeningBank: {
+                        ...current.listeningBank,
+                        rewards: {
+                          ...current.listeningBank.rewards,
+                          minutesPerToken: Number(event.target.value),
+                        },
+                      },
+                    }))
+                  }
+                  type="number"
+                  value={config.listeningBank.rewards.minutesPerToken}
+                />
+              </label>
+              <label>
+                Daily cap minutes
+                <input
+                  min={30}
+                  max={1440}
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      listeningBank: {
+                        ...current.listeningBank,
+                        rewards: {
+                          ...current.listeningBank.rewards,
+                          dailyCapMinutes: Number(event.target.value),
+                        },
+                      },
+                    }))
+                  }
+                  type="number"
+                  value={config.listeningBank.rewards.dailyCapMinutes}
+                />
+              </label>
+              <label>
+                Activity log limit
+                <input
+                  min={10}
+                  max={500}
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      listeningBank: {
+                        ...current.listeningBank,
+                        diagnostics: {
+                          ...current.listeningBank.diagnostics,
+                          activityLogLimit: Number(event.target.value),
+                        },
+                      },
+                    }))
+                  }
+                  type="number"
+                  value={config.listeningBank.diagnostics.activityLogLimit}
+                />
+              </label>
+            </div>
+            <div className="control-toggle-grid">
+              {(
+                Object.keys(config.listeningBank.rewards) as Array<
+                  keyof PlatformControlConfig["listeningBank"]["rewards"]
+                >
+              )
+                .filter((field) => typeof config.listeningBank.rewards[field] === "boolean")
+                .map((field) => (
+                  <label key={field}>
+                    <input
+                      checked={Boolean(config.listeningBank.rewards[field])}
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          listeningBank: {
+                            ...current.listeningBank,
+                            rewards: {
+                              ...current.listeningBank.rewards,
+                              [field]: event.target.checked,
+                            },
+                          },
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                    {field.replace(/([A-Z])/g, " $1")}
+                  </label>
+                ))}
+            </div>
+          </article>
         </div>
       )}
 

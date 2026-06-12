@@ -2339,9 +2339,21 @@ function ListeningBankPanel({
         </div>
       </div>
       <div className="listening-bank-stats">
-        <div>
+        <div className="listening-bank-approved-field">
           <strong>{formatClock(status.todaySeconds)}</strong>
           <span>{spanish ? "Escucha verificada hoy" : "Today's Verified Listening"}</span>
+        </div>
+        <div className="listening-bank-approved-field">
+          <strong>{formatClock(status.approvedSeconds)}</strong>
+          <span>{spanish ? "Tiempo aprobado" : "Approved Time"}</span>
+        </div>
+        <div className="listening-bank-pending-field">
+          <strong>{formatClock(status.pendingSeconds)}</strong>
+          <span>{spanish ? "Tiempo pendiente" : "Pending Time"}</span>
+        </div>
+        <div className="listening-bank-rejected-field">
+          <strong>{formatClock(status.rejectedSeconds)}</strong>
+          <span>{spanish ? "Tiempo rechazado" : "Rejected Time"}</span>
         </div>
         <div>
           <strong>{formatPreciseMinutes(status.bankSeconds)}</strong>
@@ -2360,7 +2372,7 @@ function ListeningBankPanel({
         <strong>{status.todayCompleteListens} {spanish ? "completas" : "complete"}</strong>
         <strong>{Math.round(status.todayAverageCompletionRate)}% {spanish ? "promedio" : "average completion"}</strong>
       </div>
-      <div className="listening-bank-progress">
+      <div className="listening-bank-progress listening-bank-token-conversion">
         <div>
           <span>{spanish ? "Siguiente token" : "Next token"}</span>
           <strong>
@@ -2378,6 +2390,11 @@ function ListeningBankPanel({
           {status.dailyCapMinutes} min
         </small>
       </div>
+      <p className="listening-bank-transparency listening-bank-next-threshold">
+        {spanish
+          ? "El tiempo cuenta cuando la reproduccion es activa, audible y First Listen permanece visible. Reclama manualmente cuando alcances el umbral."
+          : "Time counts when playback is active, audible, and First Listen stays visible. Claim manually once you reach the reward threshold."}
+      </p>
       <button
         className="primary-button listening-claim-button"
         disabled={
@@ -4711,6 +4728,7 @@ export function FirstListenApp({
       ...current,
       bankSeconds,
       pendingSeconds: 0,
+      approvedSeconds: current.approvedSeconds + bankedSeconds,
       lifetimeSeconds: current.lifetimeSeconds + bankedSeconds,
       todaySeconds: current.todaySeconds + bankedSeconds,
       availableRewardCredits: Math.floor(bankSeconds / exchangeSeconds),
@@ -4726,6 +4744,12 @@ export function FirstListenApp({
       setListeningBank({
         bankSeconds: Number(listeningStatus.bank_seconds ?? bankSeconds),
         pendingSeconds: Number(listeningStatus.pending_seconds ?? 0),
+        approvedSeconds: Number(
+          listeningStatus.approved_seconds ??
+            listeningStatus.today_seconds ??
+            0,
+        ),
+        rejectedSeconds: Number(listeningStatus.rejected_seconds ?? 0),
         lifetimeSeconds: Number(listeningStatus.lifetime_seconds ?? 0),
         todaySeconds: Number(listeningStatus.today_seconds ?? 0),
         weeklySeconds: Number(listeningStatus.weekly_seconds ?? 0),
@@ -4849,6 +4873,7 @@ export function FirstListenApp({
         return {
           ...current,
           bankSeconds,
+          approvedSeconds: current.approvedSeconds + Math.max(0, seconds),
           lifetimeSeconds: current.lifetimeSeconds + Math.max(0, seconds),
           todaySeconds: current.todaySeconds + Math.max(0, seconds),
           weeklySeconds: current.weeklySeconds + Math.max(0, seconds),
@@ -4930,9 +4955,10 @@ export function FirstListenApp({
       return;
     }
     const bankSeconds = Number(result.bank_seconds ?? 0);
+    const creditsAwarded = Number(result.credits_awarded ?? 1);
     const exchangeSeconds = listeningBank.minutesPerCredit * 60;
-    setReviewCount(Number(result.credits_balance ?? reviewCount + 1));
-    setTotalCreditsEarned((current) => current + 1);
+    setReviewCount(Number(result.credits_balance ?? reviewCount + creditsAwarded));
+    setTotalCreditsEarned((current) => current + creditsAwarded);
     setListeningBank((current) => ({
       ...current,
       bankSeconds,
@@ -4944,7 +4970,7 @@ export function FirstListenApp({
     notify(
       locale === "es"
         ? "Recompensa reclamada. Se agregó un token a tu cuenta."
-        : "Listening reward claimed. One token was added to your account.",
+        : `Listening reward claimed. ${creditsAwarded} token${creditsAwarded === 1 ? " was" : "s were"} added to your account.`,
     );
   };
 

@@ -47,6 +47,8 @@ type DashboardRow = {
 type ListeningBankRow = {
   bank_seconds: number;
   pending_seconds: number;
+  approved_seconds?: number;
+  rejected_seconds?: number;
   lifetime_seconds: number;
   today_seconds: number;
   weekly_seconds: number;
@@ -345,6 +347,10 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
   const listeningBank: ListeningBankStatus = {
     bankSeconds: Number(listeningRow?.bank_seconds ?? 0),
     pendingSeconds: Number(listeningRow?.pending_seconds ?? 0),
+    approvedSeconds: Number(
+      listeningRow?.approved_seconds ?? listeningRow?.today_seconds ?? 0,
+    ),
+    rejectedSeconds: Number(listeningRow?.rejected_seconds ?? 0),
     lifetimeSeconds: Number(listeningRow?.lifetime_seconds ?? 0),
     todaySeconds: Number(listeningRow?.today_seconds ?? 0),
     weeklySeconds: Number(listeningRow?.weekly_seconds ?? 0),

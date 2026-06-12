@@ -145,6 +145,42 @@ function applyControlConfig(config: PlatformControlConfig) {
   root.dataset.membershipMonthlySupportEnabled = String(
     config.membership.donations.monthlySupportEnabled,
   );
+  root.dataset.listeningBankVisible = String(config.listeningBank.module.show);
+  root.dataset.listeningBankDesktopVisibility =
+    config.listeningBank.module.desktop.visibility;
+  root.dataset.listeningBankMobileVisibility =
+    config.listeningBank.module.mobile.visibility;
+  root.dataset.listeningBankDesktopColumn =
+    config.listeningBank.module.desktop.column;
+  root.dataset.listeningBankMobileColumn =
+    config.listeningBank.module.mobile.column;
+  root.dataset.listeningBankDesktopSize =
+    config.listeningBank.module.desktop.size;
+  root.dataset.listeningBankMobileSize =
+    config.listeningBank.module.mobile.size;
+  root.dataset.listeningBankShowApprovedMinutes = String(
+    config.listeningBank.module.visibility.showApprovedMinutes,
+  );
+  root.dataset.listeningBankShowPendingMinutes = String(
+    config.listeningBank.module.visibility.showPendingMinutes,
+  );
+  root.dataset.listeningBankShowRejectedMinutes = String(
+    config.listeningBank.module.visibility.showRejectedMinutes,
+  );
+  root.dataset.listeningBankShowTokenConversion = String(
+    config.listeningBank.module.visibility.showTokenConversion,
+  );
+  root.dataset.listeningBankShowNextRewardThreshold = String(
+    config.listeningBank.module.visibility.showNextRewardThreshold,
+  );
+  root.style.setProperty(
+    "--listening-bank-desktop-order",
+    String(config.listeningBank.module.desktop.position),
+  );
+  root.style.setProperty(
+    "--listening-bank-mobile-order",
+    String(config.listeningBank.module.mobile.position),
+  );
   root.dataset.desktopActionLayout = config.ui.desktop.actionLayout;
   root.dataset.mobileActionLayout = config.ui.mobile.actionLayout;
   root.dataset.desktopCardLayout = config.ui.desktop.cardLayout;

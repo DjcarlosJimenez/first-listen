@@ -122,6 +122,8 @@ export type Review = {
 export type ListeningBankStatus = {
   bankSeconds: number;
   pendingSeconds: number;
+  approvedSeconds: number;
+  rejectedSeconds: number;
   lifetimeSeconds: number;
   todaySeconds: number;
   weeklySeconds: number;

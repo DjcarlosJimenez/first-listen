@@ -427,6 +427,69 @@ export type PlatformControlConfig = {
       monthlySupportEnabled: boolean;
     };
   };
+  listeningBank: {
+    diagnostics: {
+      enabled: boolean;
+      showOwnerDiagnostics: boolean;
+      showActivityLog: boolean;
+      showCalculationTimestamp: boolean;
+      activityLogLimit: number;
+    };
+    testing: {
+      enabled: boolean;
+      rollbackSafeOnly: boolean;
+      allowProductionSimulations: boolean;
+    };
+    rewards: {
+      minutesPerToken: number;
+      dailyCapMinutes: number;
+      showUserTransparency: boolean;
+      showApprovalRules: boolean;
+    };
+    module: {
+      show: boolean;
+      desktop: {
+        visibility: "visible" | "hidden" | "desktop_only" | "mobile_only";
+        position: number;
+        column: "left" | "right" | "full_width";
+        size: "compact" | "standard" | "expanded" | "custom";
+      };
+      mobile: {
+        visibility: "visible" | "hidden" | "desktop_only" | "mobile_only";
+        position: number;
+        column: "left" | "right" | "full_width";
+        size: "compact" | "standard" | "expanded" | "custom";
+      };
+      visibility: {
+        showApprovedMinutes: boolean;
+        showPendingMinutes: boolean;
+        showRejectedMinutes: boolean;
+        showTokenConversion: boolean;
+        showNextRewardThreshold: boolean;
+      };
+    };
+    events: Array<{
+      id: string;
+      name: string;
+      startsAt: string | null;
+      endsAt: string | null;
+      enabled: boolean;
+      visible: boolean;
+      rewardTypes: {
+        extraListeningMinutes: boolean;
+        listeningMultiplier: boolean;
+        tokenMultiplier: boolean;
+        missionMultiplier: boolean;
+      };
+      bonusMinutes: number;
+      bonusThresholdMinutes: number;
+      listeningMultiplier: number;
+      tokenMultiplier: number;
+      missionMultiplier: number;
+      description: string;
+      preview: boolean;
+    }>;
+  };
   experiments: {
     experimentalFeatures: boolean;
     abTesting: boolean;
@@ -864,6 +927,49 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       enabled: false,
       monthlySupportEnabled: false,
     },
+  },
+  listeningBank: {
+    diagnostics: {
+      enabled: true,
+      showOwnerDiagnostics: true,
+      showActivityLog: true,
+      showCalculationTimestamp: true,
+      activityLogLimit: 50,
+    },
+    testing: {
+      enabled: true,
+      rollbackSafeOnly: true,
+      allowProductionSimulations: true,
+    },
+    rewards: {
+      minutesPerToken: 120,
+      dailyCapMinutes: 180,
+      showUserTransparency: true,
+      showApprovalRules: true,
+    },
+    module: {
+      show: true,
+      desktop: {
+        visibility: "visible",
+        position: 5,
+        column: "right",
+        size: "standard",
+      },
+      mobile: {
+        visibility: "visible",
+        position: 5,
+        column: "full_width",
+        size: "standard",
+      },
+      visibility: {
+        showApprovedMinutes: true,
+        showPendingMinutes: true,
+        showRejectedMinutes: true,
+        showTokenConversion: true,
+        showNextRewardThreshold: true,
+      },
+    },
+    events: [],
   },
   experiments: {
     experimentalFeatures: false,
