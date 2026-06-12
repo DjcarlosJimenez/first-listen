@@ -729,6 +729,27 @@ button {
   padding-top: 22px;
 }
 
+.review-listening-bank-slot {
+  display: block;
+}
+
+.review-listening-bank-slot .listening-bank-panel {
+  margin-bottom: 0;
+  order: initial;
+}
+
+.review-token-summary {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.review-token-summary > .listening-session-card {
+  display: none;
+}
+
+.review-token-summary > .review-progress {
+  max-width: 540px;
+}
+
 .review-layout-content-first > .review-side > .listening-session-card,
 .review-layout-content-first > .review-side > .review-progress {
   display: none;
@@ -9947,6 +9968,41 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   gap: 10px;
 }
 
+.listening-activity-log {
+  max-height: 560px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.listening-activity-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
+.listening-activity-controls label {
+  background: #f7f9f4;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  display: grid;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 8px;
+  padding: 12px;
+  text-transform: uppercase;
+}
+
+.listening-activity-controls label:has(input[type="checkbox"]) {
+  align-items: center;
+  grid-template-columns: auto 1fr;
+}
+
+.listening-activity-actions {
+  margin-bottom: 12px;
+}
+
 .listening-activity-log div,
 .nested-control-card {
   background: #f7f9f4;
@@ -10539,6 +10595,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .theme-dark .control-component-grid > section,
 .theme-dark .control-section-visibility-grid > section,
 .theme-dark .control-module-list > article,
+.theme-dark .listening-activity-controls label,
 .theme-dark .control-toggle-grid label,
 .theme-dark .control-spotlight-grid section,
 .theme-dark .control-permission-grid section,
@@ -10587,6 +10644,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .control-preset-grid,
   .control-component-grid,
   .control-section-visibility-grid,
+  .listening-activity-controls,
   .control-toggle-grid,
   .membership-permission-grid,
   .membership-tier-summary,

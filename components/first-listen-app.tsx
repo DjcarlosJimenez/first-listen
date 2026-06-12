@@ -1325,6 +1325,7 @@ function EmptyQueueRetention({
 
 function ReviewView({
   reviewCount,
+  reviewCredits,
   onReviewed,
   setView,
   notify,
@@ -1348,12 +1349,15 @@ function ReviewView({
   previouslySupportedSongs,
   todaySupport,
   listeningBank,
+  claimingReward,
+  onClaimReward,
   autoPlayNextSong,
   onAutoPlayChange,
   externalRedirectNoticeDisabled,
   onExternalRedirectPreferenceChange,
 }: {
   reviewCount: number;
+  reviewCredits: number;
   onReviewed: (
     songId: string,
     form: ReviewForm,
@@ -1388,6 +1392,8 @@ function ReviewView({
   previouslySupportedSongs: DiscoverySong[];
   todaySupport: TodaySupportSummary;
   listeningBank: ListeningBankStatus;
+  claimingReward: boolean;
+  onClaimReward: () => void;
   autoPlayNextSong: boolean;
   onAutoPlayChange: (enabled: boolean) => void;
   externalRedirectNoticeDisabled: boolean;
@@ -2105,6 +2111,16 @@ function ReviewView({
           </div>
         </div>
 
+        <div className="review-listening-bank-slot">
+          <ListeningBankPanel
+            claiming={claimingReward}
+            credits={reviewCredits}
+            onClaim={onClaimReward}
+            status={listeningBank}
+            locale={locale}
+          />
+        </div>
+
         <div className="review-form">
           <div className="form-heading">
             <div>
@@ -2226,7 +2242,7 @@ function ReviewView({
             <Send size={17} />
           </button>
         </div>
-        <div className="review-secondary-stats">
+        <div className="review-secondary-stats review-token-summary">
           <div className="listening-session-card">
             <span className="eyebrow">
               <Headphones size={13} />{" "}
@@ -5452,6 +5468,7 @@ export function FirstListenApp({
         priorComments={priorComments}
         queueSongs={queueSongs}
         reviewCount={reviewCount}
+        reviewCredits={reviewCount}
         setView={changeView}
         unlimitedCredits={role === "super_admin"}
         approvedListeningSeconds={listeningBank.bankSeconds}
@@ -5465,6 +5482,8 @@ export function FirstListenApp({
         previouslySupportedSongs={initialPreviouslySupportedSongs}
         todaySupport={todaySupport}
         listeningBank={listeningBank}
+        claimingReward={claimingReward}
+        onClaimReward={() => void claimListeningReward()}
         autoPlayNextSong={autoPlayNextSong}
         onAutoPlayChange={(enabled) => void changeAutoPlayNextSong(enabled)}
         externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}

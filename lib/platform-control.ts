@@ -454,6 +454,10 @@ export type PlatformControlConfig = {
       showActivityLog: boolean;
       showCalculationTimestamp: boolean;
       activityLogLimit: number;
+      activityLogLimitMode: "10" | "20" | "30" | "50" | "custom";
+      customActivityLogLimit: number;
+      autoCleanupOldRecords: boolean;
+      autoCleanupKeepVisible: number;
     };
     testing: {
       enabled: boolean;
@@ -973,7 +977,11 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       showOwnerDiagnostics: true,
       showActivityLog: true,
       showCalculationTimestamp: true,
-      activityLogLimit: 50,
+      activityLogLimit: 20,
+      activityLogLimitMode: "20",
+      customActivityLogLimit: 20,
+      autoCleanupOldRecords: true,
+      autoCleanupKeepVisible: 30,
     },
     testing: {
       enabled: true,
@@ -990,13 +998,13 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       show: true,
       desktop: {
         visibility: "visible",
-        position: 5,
-        column: "right",
+        position: 2,
+        column: "full_width",
         size: "standard",
       },
       mobile: {
         visibility: "visible",
-        position: 5,
+        position: 2,
         column: "full_width",
         size: "standard",
       },

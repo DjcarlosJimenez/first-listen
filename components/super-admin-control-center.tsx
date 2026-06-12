@@ -108,12 +108,18 @@ export type ControlCenterPayload = {
       rejected_listening_time?: number;
       current_listening_bank?: number;
       current_token_balance?: number;
+      visible_activity_log_limit?: number;
+      current_activity_entries?: number;
+      archived_activity_entries?: number;
+      auto_cleanup_enabled?: boolean;
+      auto_cleanup_keep_visible?: number;
       last_approval_event?: string | null;
       last_rejection_event?: string | null;
       last_rejection_reason_code?: string | null;
       last_rejection_reason_description?: string | null;
       last_reward_event?: string | null;
       last_bank_update?: string | null;
+      last_archive_event?: string | null;
       last_calculation_timestamp?: string | null;
       minutes_per_token?: number;
       daily_cap_minutes?: number;
@@ -1104,6 +1110,41 @@ export function SuperAdminControlCenter({
     } finally {
       setBusy(false);
     }
+  };
+
+  const archiveListeningActivityLog = async () => {
+    const retainNewest = Math.max(
+      0,
+      Number(config.listeningBank.diagnostics.autoCleanupKeepVisible ?? 30),
+    );
+    await run(
+      "admin_archive_listening_bank_activity",
+      { retain_newest: retainNewest },
+      `Activity log archived. Newest ${retainNewest} records remain visible.`,
+    );
+  };
+
+  const cleanupListeningActivityLog = async () => {
+    await run(
+      "admin_cleanup_old_listening_bank_activity",
+      {},
+      "Old activity log records archived.",
+    );
+  };
+
+  const clearListeningActivityLog = async () => {
+    if (
+      !window.confirm(
+        "Clear the visible Listening Bank activity log? Records will be archived before they are removed from the active log.",
+      )
+    ) {
+      return;
+    }
+    await run(
+      "admin_clear_listening_bank_activity",
+      {},
+      "Activity log cleared and archived.",
+    );
   };
 
   const updateTheme = (
@@ -4018,6 +4059,16 @@ export function SuperAdminControlCenter({
               <div>
                 <span className="eyebrow">Listening Bank Activity Log</span>
                 <h3>Approval, rejection, bonus, and reward history</h3>
+                <p>
+                  Showing{" "}
+                  {Number(
+                    listeningDiagnostics.visible_activity_log_limit ??
+                      config.listeningBank.diagnostics.activityLogLimit,
+                  )}{" "}
+                  records by default.{" "}
+                  {Number(listeningDiagnostics.archived_activity_entries ?? 0)}{" "}
+                  records are archived.
+                </p>
               </div>
               <button
                 className="primary-button"
@@ -4026,6 +4077,137 @@ export function SuperAdminControlCenter({
                 type="button"
               >
                 <Save size={15} /> Save Draft
+              </button>
+            </div>
+            <div className="listening-activity-controls">
+              <label>
+                Visible records
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => {
+                      const mode = event.target
+                        .value as PlatformControlConfig["listeningBank"]["diagnostics"]["activityLogLimitMode"];
+                      const nextLimit =
+                        mode === "custom"
+                          ? current.listeningBank.diagnostics.customActivityLogLimit
+                          : Number(mode);
+                      return {
+                        ...current,
+                        listeningBank: {
+                          ...current.listeningBank,
+                          diagnostics: {
+                            ...current.listeningBank.diagnostics,
+                            activityLogLimitMode: mode,
+                            activityLogLimit: nextLimit,
+                          },
+                        },
+                      };
+                    })
+                  }
+                  value={config.listeningBank.diagnostics.activityLogLimitMode}
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="30">30</option>
+                  <option value="50">50</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+              {config.listeningBank.diagnostics.activityLogLimitMode ===
+                "custom" && (
+                <label>
+                  Custom visible records
+                  <input
+                    min={10}
+                    max={500}
+                    onChange={(event) => {
+                      const nextLimit = Number(event.target.value);
+                      setConfig((current) => ({
+                        ...current,
+                        listeningBank: {
+                          ...current.listeningBank,
+                          diagnostics: {
+                            ...current.listeningBank.diagnostics,
+                            activityLogLimit: nextLimit,
+                            customActivityLogLimit: nextLimit,
+                          },
+                        },
+                      }));
+                    }}
+                    type="number"
+                    value={
+                      config.listeningBank.diagnostics.customActivityLogLimit
+                    }
+                  />
+                </label>
+              )}
+              <label>
+                <input
+                  checked={
+                    config.listeningBank.diagnostics.autoCleanupOldRecords
+                  }
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      listeningBank: {
+                        ...current.listeningBank,
+                        diagnostics: {
+                          ...current.listeningBank.diagnostics,
+                          autoCleanupOldRecords: event.target.checked,
+                        },
+                      },
+                    }))
+                  }
+                  type="checkbox"
+                />
+                Auto Cleanup Old Records
+              </label>
+              <label>
+                Keep newest when archiving
+                <input
+                  min={10}
+                  max={500}
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      listeningBank: {
+                        ...current.listeningBank,
+                        diagnostics: {
+                          ...current.listeningBank.diagnostics,
+                          autoCleanupKeepVisible: Number(event.target.value),
+                        },
+                      },
+                    }))
+                  }
+                  type="number"
+                  value={config.listeningBank.diagnostics.autoCleanupKeepVisible}
+                />
+              </label>
+            </div>
+            <div className="control-actions listening-activity-actions">
+              <button
+                className="secondary-button"
+                disabled={busy}
+                onClick={() => void cleanupListeningActivityLog()}
+                type="button"
+              >
+                <Activity size={14} /> Auto Cleanup Old Records
+              </button>
+              <button
+                className="secondary-button"
+                disabled={busy}
+                onClick={() => void archiveListeningActivityLog()}
+                type="button"
+              >
+                <ArchiveRestore size={14} /> Archive Activity Log
+              </button>
+              <button
+                className="danger-button"
+                disabled={busy}
+                onClick={() => void clearListeningActivityLog()}
+                type="button"
+              >
+                <Trash2 size={14} /> Clear Activity Log
               </button>
             </div>
             <div className="listening-activity-log">
@@ -4840,7 +5022,7 @@ export function SuperAdminControlCenter({
                 />
               </label>
               <label>
-                Activity log limit
+                Cleanup keep-visible records
                 <input
                   min={10}
                   max={500}
@@ -4851,13 +5033,13 @@ export function SuperAdminControlCenter({
                         ...current.listeningBank,
                         diagnostics: {
                           ...current.listeningBank.diagnostics,
-                          activityLogLimit: Number(event.target.value),
+                          autoCleanupKeepVisible: Number(event.target.value),
                         },
                       },
                     }))
                   }
                   type="number"
-                  value={config.listeningBank.diagnostics.activityLogLimit}
+                  value={config.listeningBank.diagnostics.autoCleanupKeepVisible}
                 />
               </label>
             </div>
