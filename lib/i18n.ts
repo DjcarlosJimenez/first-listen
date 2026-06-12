@@ -94,7 +94,7 @@ export const translations = {
           "One Free Year of Premium",
           "Founding Member Recognition",
         ],
-        closed: "All founder spots have been claimed. Listening Bank rewards are active.",
+        closed: "All founder spots have been claimed. Time Bank rewards are active.",
         open: "Founder access closes automatically when all 50 spots are claimed.",
       },
       faq: {
@@ -160,7 +160,7 @@ export const translations = {
       },
       review: {
         submissionCredit: "Submission token",
-        founderReady: "Your Founder submissions are ready. Listening Bank tokens apply after all three are used.",
+        founderReady: "Your Founder submissions are ready. Time Bank tokens apply after all three are used.",
         unlocked: "Your next submission is unlocked.",
         toUnlock: "verified listening minutes to claim your next token.",
         fiveForOne: "Listen to earn",
@@ -212,7 +212,7 @@ export const translations = {
         tellUs: "Tell us about your song.",
         body: "Listeners will open the track on its original platform.",
         locked: "Submission locked",
-        completeReviews: "Claim a Listening Bank token to submit",
+        completeReviews: "Claim a Time Bank token to submit",
         founderFree: "Founder submission available",
         founderFreeBody: "Founding Artists receive three free submissions. Your remaining Founder submission is applied automatically.",
         musicLink: "Music link",
@@ -330,7 +330,7 @@ export const translations = {
           "Un año gratis de Premium",
           "Reconocimiento como miembro fundador",
         ],
-        closed: "Todos los lugares Founder fueron reclamados. El Banco de escucha está activo.",
+        closed: "Todos los lugares Founder fueron reclamados. El Banco de Tiempo está activo.",
         open: "El acceso Founder se cierra automáticamente cuando se reclaman los 50 lugares.",
       },
       faq: {
@@ -396,7 +396,7 @@ export const translations = {
       },
       review: {
         submissionCredit: "Token de envío",
-        founderReady: "Tus tres envíos Founder están disponibles. Después aplica el Banco de escucha.",
+        founderReady: "Tus tres envíos Founder están disponibles. Después aplica el Banco de Tiempo.",
         unlocked: "Tu próximo envío está desbloqueado.",
         toUnlock: "minutos verificados para reclamar tu próximo token.",
         fiveForOne: "Escucha para ganar",
@@ -448,7 +448,7 @@ export const translations = {
         tellUs: "Cuéntanos sobre tu canción.",
         body: "Los oyentes abrirán la canción en su plataforma original.",
         locked: "Envío bloqueado",
-        completeReviews: "Reclama un token del Banco de escucha",
+        completeReviews: "Reclama un token del Banco de Tiempo",
         founderFree: "Envío Founder disponible",
         founderFreeBody: "Los Artistas Founder reciben tres envíos gratis. El próximo se aplica automáticamente.",
         musicLink: "Enlace de música",

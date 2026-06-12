@@ -488,7 +488,7 @@ function GuestAwaySummary({
         <small>{new Date(summary.summarySince).toLocaleDateString()}</small>
       </div>
       <div className="offline-community-counts">
-        <span><strong>{summary.communityListensCount}</strong> {spanish ? "escuchas y reviews" : "listens and reviews"}</span>
+        <span><strong>{summary.communityListensCount}</strong> {spanish ? "reproducciones y reviews" : "plays and reviews"}</span>
         <span><strong>{summary.communityLikesCount}</strong> {spanish ? "likes" : "likes"}</span>
         <span><strong>{summary.communityCommentsCount}</strong> {spanish ? "comentarios" : "comments"}</span>
         <span><strong>{summary.communityFollowsCount}</strong> {spanish ? "nuevos follows" : "new follows"}</span>
@@ -518,7 +518,7 @@ function GuestDashboard({
   const hours = Math.floor(summary.totalListeningSeconds / 3600);
   const minutes = Math.floor((summary.totalListeningSeconds % 3600) / 60);
   const stats = [
-    [Headphones, spanish ? "Escuchas válidas" : "Valid Listens", summary.validListens],
+    [Headphones, spanish ? "Reproducciones válidas" : "Valid Plays", summary.validListens],
     [Music2, spanish ? "Canciones exploradas" : "Songs Explored", summary.songsExplored],
     [Heart, "Likes", summary.likesCount],
     [MessageSquareText, spanish ? "Comentarios" : "Comments", summary.commentsCount],
@@ -624,7 +624,7 @@ function GuestDiscoveryShelves({
               <h2>
                 {kind === "spotlight"
                   ? spanish ? "Artistas para descubrir ahora" : "Artists to discover now"
-                  : spanish ? "Impulsado por escuchas y reacciones reales" : "Powered by real listens and reactions"}
+                  : spanish ? "Impulsado por reproducciones y reacciones reales" : "Powered by real plays and reactions"}
               </h2>
             </div>
             <div className="guest-discovery-grid">
@@ -1099,8 +1099,6 @@ export function GuestExperience() {
       const sampleAt = Date.now();
       const liveEligible =
         snapshot.supported &&
-        snapshot.pageVisible &&
-        snapshot.pageFocused &&
         snapshot.muted === false &&
         (snapshot.volume ?? 0) > 0;
       const previous = lastLiveSampleRef.current;
@@ -1499,7 +1497,7 @@ export function GuestExperience() {
             : "The music starts here. Your reactions help real artists."}
         </p>
         <div>
-          <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "escuchas válidas" : "valid listens"}</span>
+          <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "reproducciones válidas" : "valid plays"}</span>
           <span><Users size={14} /> {spanish ? "Comunidad completa" : "Full community access"}</span>
           <span><Headphones size={14} /> {spanish ? "Perfil permanente" : "Permanent listener profile"}</span>
         </div>
@@ -1585,11 +1583,11 @@ export function GuestExperience() {
 
             <div className="guest-listening-progress">
               <div>
-                <span><Headphones size={14} /> {spanish ? "Tiempo escuchado" : "Listening Time"}</span>
+                <span><Headphones size={14} /> {spanish ? "Tiempo reproducido" : "Time Played"}</span>
                 <strong>{formatClock(listening.liveSeconds)}</strong>
               </div>
               <div>
-                <span><CheckCircle2 size={14} /> {spanish ? "Escucha válida" : "Valid Listen"}</span>
+                <span><CheckCircle2 size={14} /> {spanish ? "Reproducción válida" : "Valid Play"}</span>
                 <strong>
                   {listening.validListenRecorded
                     ? spanish ? "Completada" : "Completed"
@@ -1754,7 +1752,7 @@ export function GuestExperience() {
             : "The music starts here. Your reactions help real artists."}
         </p>
         <div>
-          <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "escuchas validas" : "valid listens"}</span>
+          <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "reproducciones válidas" : "valid plays"}</span>
           <span><Users size={14} /> {spanish ? "Comunidad completa" : "Full community access"}</span>
           <span><Headphones size={14} /> {spanish ? "Perfil permanente" : "Permanent listener profile"}</span>
         </div>

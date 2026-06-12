@@ -839,7 +839,7 @@ function PostReviewDiscovery({
       {validListenRecorded && (
         <strong className="valid-listen-confirmation">
           <CheckCircle2 size={15} />
-          {spanish ? "Escucha válida registrada" : "Valid Listen Recorded"}
+          {spanish ? "Reproducción válida registrada" : "Valid Play Recorded"}
         </strong>
       )}
       <section className="post-review-impact" aria-label="Your impact today">
@@ -1127,10 +1127,10 @@ function OfflineCommunitySummary({
           {spanish
             ? summary.validListensCount === 1
               ? "escucha válida"
-              : "escuchas válidas"
+              : "reproducciones válidas"
             : summary.validListensCount === 1
               ? "valid listen"
-              : "valid listens"}
+              : "valid plays"}
         </span>
       </div>
       <div className="offline-community-details">
@@ -1220,7 +1220,7 @@ function EmptyQueueRetention({
       <section className="queue-retention-stats" aria-label={spanish ? "Estadísticas de hoy" : "Today’s support"}>
         <div><strong>{todaySupport.songsReviewed}</strong><span>{spanish ? "Canciones revisadas hoy" : "Songs Reviewed Today"}</span></div>
         <div><strong>{todaySupport.creatorsSupported}</strong><span>{spanish ? "Creadores apoyados" : "Creators Supported"}</span></div>
-        <div><strong>{formatDuration(todaySupport.listeningSeconds)}</strong><span>{spanish ? "Tiempo de escucha ganado" : "Listening Time Earned"}</span></div>
+        <div><strong>{formatDuration(todaySupport.listeningSeconds)}</strong><span>{spanish ? "Tiempo reproducido ganado" : "Play Time Earned"}</span></div>
         <div><strong>{todaySupport.communityRank}</strong><span>{spanish ? "Rango comunitario" : "Current Community Rank"}</span></div>
       </section>
 
@@ -1232,7 +1232,7 @@ function EmptyQueueRetention({
           </div>
         </div>
         <div className="queue-retention-stats compact">
-          <div><strong>{todaySupport.validListens}</strong><span>{spanish ? "Escuchas válidas" : "Valid Listens"}</span></div>
+          <div><strong>{todaySupport.validListens}</strong><span>{spanish ? "Reproducciones válidas" : "Valid Plays"}</span></div>
           <div><strong>{todaySupport.completeListens}</strong><span>{spanish ? "Escuchas completas" : "Complete Listens"}</span></div>
           <div><strong>{Math.round(todaySupport.averageCompletionRate)}%</strong><span>{spanish ? "Finalización promedio" : "Average Completion Rate"}</span></div>
         </div>
@@ -1491,8 +1491,6 @@ function ReviewView({
       const sampleAt = Date.now();
       const liveEligible =
         snapshot.supported &&
-        snapshot.pageVisible &&
-        snapshot.pageFocused &&
         snapshot.muted === false &&
         (snapshot.volume ?? 0) > 0;
       const previousLiveSample = lastLiveSampleRef.current;
@@ -1927,11 +1925,11 @@ function ReviewView({
             ) : (
             <div className="listen-tracking-panel" aria-live="polite">
               <div>
-                <span><Headphones size={13} /> {locale === "es" ? "Tiempo escuchado" : "Listening Time"}</span>
+                <span><Headphones size={13} /> {locale === "es" ? "Tiempo reproducido" : "Time Played"}</span>
                 <strong>{formatClock(listeningSession.liveSeconds)}</strong>
               </div>
               <div>
-                <span><Target size={13} /> {locale === "es" ? "Escucha válida" : "Valid Listen Requirement"}</span>
+                <span><Target size={13} /> {locale === "es" ? "Reproducción válida" : "Valid Play Requirement"}</span>
                 <strong>
                   {formatClock(listeningSession.validRequirementSeconds)}
                   {listeningSession.validListenRecorded
@@ -1974,7 +1972,7 @@ function ReviewView({
                   <strong>
                     {locale === "es"
                       ? "Gracias por apoyar a este artista"
-                      : "Valid Listen Recorded"}
+                      : "Valid Play Recorded"}
                   </strong>
                   <button
                     data-ui-component="nextSongButton"
@@ -2110,22 +2108,29 @@ function ReviewView({
         <div className="review-listening-trust-panel" aria-live="polite">
           <div>
             <span>
+              <CheckCircle2 size={13} />
+              {locale === "es" ? "Sesión Verificada" : "Verified Session"}
+            </span>
+            <strong>{formatClock(listeningSession.verifiedSeconds)}</strong>
+          </div>
+          <div>
+            <span>
               <Headphones size={13} />
-              {locale === "es" ? "Sesion verificada" : "Verified Session"}
+              {locale === "es" ? "Tiempo reproducido" : "Time Played"}
             </span>
             <strong>{formatClock(listeningSession.liveSeconds)}</strong>
           </div>
           <div>
             <span>
-              <CheckCircle2 size={13} />
-              {locale === "es" ? "Banco aprobado" : "Approved Bank"}
+              <Clock3 size={13} />
+              {locale === "es" ? "Banco de Tiempo" : "Time Bank"}
             </span>
             <strong>{formatPreciseMinutes(approvedListeningSeconds)}</strong>
           </div>
           <div>
             <span>
               <Sparkles size={13} />
-              {locale === "es" ? "Tokens de envio" : "Submission Tokens"}
+              {locale === "es" ? "Tokens de Envío" : "Submission Tokens"}
             </span>
             <strong>
               {unlimitedCredits
@@ -2263,7 +2268,7 @@ function ReviewView({
           <div className="listening-session-card">
             <span className="eyebrow">
               <Headphones size={13} />{" "}
-              {locale === "es" ? "Banco de escucha" : "Listening Bank"}
+              {locale === "es" ? "Banco de Tiempo" : "Time Bank"}
             </span>
             <div className="listening-validation-totals">
               <div>
@@ -2282,8 +2287,8 @@ function ReviewView({
             <p>
               {externalContent
                 ? locale === "es"
-                  ? "El contenido externo no gana minutos, escuchas vÃ¡lidas ni recompensas."
-                  : "External Content does not earn minutes, valid listens, or rewards."
+                  ? "El contenido externo no gana minutos, reproducciones válidas ni recompensas."
+                  : "External Content does not earn minutes, valid plays, or rewards."
                 : listeningSession.earningEligible === false
                   ? locale === "es"
                     ? "La reproducciÃ³n estÃ¡ disponible, pero este proveedor no puede ganar minutos verificados."
@@ -2321,7 +2326,7 @@ function ReviewView({
         <div className="listening-session-card">
           <span className="eyebrow">
             <Headphones size={13} />{" "}
-            {locale === "es" ? "Banco de escucha" : "Listening Bank"}
+              {locale === "es" ? "Banco de Tiempo" : "Time Bank"}
           </span>
           <div className="listening-validation-totals">
             <div>
@@ -2336,8 +2341,8 @@ function ReviewView({
           <p>
             {externalContent
               ? locale === "es"
-                ? "El contenido externo no gana minutos, escuchas válidas ni recompensas."
-                : "External Content does not earn minutes, valid listens, or rewards."
+                ? "El contenido externo no gana minutos, reproducciones válidas ni recompensas."
+                : "External Content does not earn minutes, valid plays, or rewards."
               : listeningSession.earningEligible === false
               ? locale === "es"
                 ? "La reproducción está disponible, pero este proveedor no puede ganar minutos verificados."
@@ -2487,7 +2492,7 @@ function ListeningBankPanel({
       <div className="listening-bank-heading">
         <div>
           <span className="eyebrow">
-            <Headphones size={13} /> {spanish ? "Banco de escucha" : "Listening Bank"}
+            <Headphones size={13} /> {spanish ? "Banco de Tiempo" : "Time Bank"}
           </span>
           <strong>{formatPreciseMinutes(status.bankSeconds)}</strong>
         </div>
@@ -2504,7 +2509,7 @@ function ListeningBankPanel({
       <div className="listening-bank-stats">
         <div className="listening-bank-approved-field">
           <strong>{formatClock(status.todaySeconds)}</strong>
-          <span>{spanish ? "Escucha verificada hoy" : "Today's Verified Listening"}</span>
+          <span>{spanish ? "Tiempo reproducido verificado hoy" : "Today's Verified Play Time"}</span>
         </div>
         <div className="listening-bank-approved-field">
           <strong>{formatClock(status.approvedSeconds)}</strong>
@@ -2520,14 +2525,14 @@ function ListeningBankPanel({
         </div>
         <div>
           <strong>{formatPreciseMinutes(status.bankSeconds)}</strong>
-          <span>{spanish ? "Banco disponible" : "Available Listening Bank"}</span>
+          <span>{spanish ? "Banco de Tiempo disponible" : "Available Time Bank"}</span>
         </div>
         <div><strong>{credits}</strong><span>{spanish ? "Tokens disponibles" : "Available Tokens"}</span></div>
-        <div><strong>{status.validListens}</strong><span>{spanish ? "Escuchas válidas" : "Valid Listens"}</span></div>
+        <div><strong>{status.validListens}</strong><span>{spanish ? "Reproducciones válidas" : "Valid Plays"}</span></div>
         <div><strong>{status.completeListens}</strong><span>{spanish ? "Escuchas completas" : "Complete Listens"}</span></div>
-        <div><strong>{formatDuration(status.weeklySeconds)}</strong><span>{spanish ? "Escucha verificada semanal" : "Weekly Verified Listening"}</span></div>
-        <div><strong>{formatDuration(status.monthlySeconds)}</strong><span>{spanish ? "Escucha verificada mensual" : "Monthly Verified Listening"}</span></div>
-        <div><strong>{formatDuration(status.lifetimeSeconds)}</strong><span>{spanish ? "Escucha total" : "Lifetime Listening"}</span></div>
+        <div><strong>{formatDuration(status.weeklySeconds)}</strong><span>{spanish ? "Tiempo verificado semanal" : "Weekly Verified Play Time"}</span></div>
+        <div><strong>{formatDuration(status.monthlySeconds)}</strong><span>{spanish ? "Tiempo verificado mensual" : "Monthly Verified Play Time"}</span></div>
+        <div><strong>{formatDuration(status.lifetimeSeconds)}</strong><span>{spanish ? "Tiempo reproducido total" : "Lifetime Play Time"}</span></div>
       </div>
       <div className="today-support-strip">
         <span>{spanish ? "Apoyo de hoy" : "Today’s Support"}</span>
@@ -2695,8 +2700,6 @@ function DiscoverySongCard({
       const sampleAt = Date.now();
       const liveEligible =
         snapshot.supported &&
-        snapshot.pageVisible &&
-        snapshot.pageFocused &&
         snapshot.muted === false &&
         (snapshot.volume ?? 0) > 0;
       const previous = lastLiveSampleRef.current;
@@ -2979,7 +2982,7 @@ function DiscoverySongCard({
             <span>
               <CheckCircle2 size={13} />
               {listenState.validListenRecorded
-                ? spanish ? "Escucha válida" : "Valid Listen"
+                ? spanish ? "Reproducción válida" : "Valid Play"
                 : `${formatClock(listenState.verifiedSeconds)} / ${formatClock(
                     listenState.validRequirementSeconds,
                   )}`}
@@ -3042,7 +3045,7 @@ function DiscoverySongCard({
             <>
               <div>
                 <strong>{formatDuration(song.totalListeningSeconds)}</strong>
-                <span>{spanish ? "Tiempo escuchado" : "Listening time"}</span>
+                <span>{spanish ? "Tiempo reproducido" : "Play time"}</span>
               </div>
               <div>
                 <strong>{Math.round(song.completionRate)}%</strong>
@@ -3656,7 +3659,7 @@ function DashboardView({
                 <div><strong>{summary.reviewsReceived}</strong><span>{locale === "es" ? "Reviews recibidas" : "Reviews received"}</span></div>
                 <div><strong>{summary.averageRating.toFixed(1)}</strong><span>{locale === "es" ? "Rating promedio" : "Average rating"}</span></div>
                 <div><strong>{summary.hookScore}</strong><span>Hook score</span></div>
-                <div><strong>{formatDuration(summary.totalListeningSeconds)}</strong><span>{locale === "es" ? "Tiempo escuchado" : "Listening time"}</span></div>
+                <div><strong>{formatDuration(summary.totalListeningSeconds)}</strong><span>{locale === "es" ? "Tiempo reproducido" : "Play time"}</span></div>
                 <div><strong>{summary.reportCount}</strong><span>{locale === "es" ? "Reportes" : "Reports"}</span></div>
                 <Link href={`/dashboard/comments?song=${summary.id}`}>
                   {locale === "es" ? "Comentarios" : "Comments"} <ArrowRight size={13} />

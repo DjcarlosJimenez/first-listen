@@ -571,8 +571,8 @@ export function PublicArtistProfile({
             <span><Music2 size={14} /> {artist.songsSubmitted} {spanish ? "canciones" : "songs submitted"}</span>
             <span><Star size={14} /> {artist.averageRating.toFixed(1)} {spanish ? "rating promedio" : "average rating"}</span>
             <span><Headphones size={14} /> {artist.listeningHoursReceived.toFixed(1)} {spanish ? "horas escuchadas" : "listening hours received"}</span>
-            <span><Radio size={14} /> {artist.validListensReceived} {spanish ? "escuchas válidas" : "valid listens received"}</span>
-            <span><Disc3 size={14} /> {artist.completeListensReceived} {spanish ? "escuchas completas" : "complete listens"}</span>
+            <span><Radio size={14} /> {artist.validListensReceived} {spanish ? "reproducciones válidas" : "valid plays received"}</span>
+            <span><Disc3 size={14} /> {artist.completeListensReceived} {spanish ? "reproducciones completas" : "complete plays"}</span>
             <span><Trophy size={14} /> {artist.communityRank}</span>
           </div>
           <div className="artist-profile-tags">
@@ -788,7 +788,7 @@ export function PublicArtistProfile({
             {!activity.length && (
               <p className="discovery-empty">
                 {spanish
-                  ? "Las escuchas, reviews y seguidores aparecerán aquí."
+                  ? "Las reproducciones, reviews y seguidores aparecerán aquí."
                   : "Listening, reviews, and follows will appear here."}
               </p>
             )}

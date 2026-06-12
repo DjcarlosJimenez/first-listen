@@ -470,6 +470,9 @@ export type PlatformControlConfig = {
       showUserTransparency: boolean;
       showApprovalRules: boolean;
     };
+    validation: {
+      desktopValidationMode: "strict" | "balanced" | "playback_based";
+    };
     module: {
       show: boolean;
       desktop: {
@@ -993,6 +996,9 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       dailyCapMinutes: 180,
       showUserTransparency: true,
       showApprovalRules: true,
+    },
+    validation: {
+      desktopValidationMode: "playback_based",
     },
     module: {
       show: true,

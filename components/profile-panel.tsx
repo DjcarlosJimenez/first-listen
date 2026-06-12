@@ -324,7 +324,7 @@ export function ProfilePanel({
             <div>
               <Music2 size={16} />
               <strong>{impact?.valid_listens ?? 0}</strong>
-              <span>Valid Listens</span>
+              <span>Valid Plays</span>
             </div>
             <div>
               <Gauge size={16} />

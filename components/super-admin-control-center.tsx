@@ -248,7 +248,7 @@ const tabs: Array<[ControlTab, string, typeof Gauge]> = [
   ["profiles", "Artist Profiles", Users],
   ["community", "Community", Users],
   ["membership", "Membership", WalletCards],
-  ["listening", "Listening Bank", Headphones],
+  ["listening", "Time Bank", Headphones],
   ["tokens", "Token Economy", WalletCards],
   ["announcements", "Announcements", Bell],
   ["health", "Live Health", Activity],
@@ -279,7 +279,7 @@ const configSectionLabels: Record<ConfigSectionKey, string> = {
   spotlight: "Spotlight",
   artistProfile: "Artist Profiles",
   membership: "Membership",
-  listeningBank: "Listening Bank",
+  listeningBank: "Time Bank",
   tokens: "Tokens",
   permissions: "Permissions",
   experiments: "Experiments",
@@ -521,6 +521,15 @@ const listeningModuleSizeLabels: Record<
   standard: "Standard",
   expanded: "Expanded",
   custom: "Custom",
+};
+
+const desktopValidationModeLabels: Record<
+  PlatformControlConfig["listeningBank"]["validation"]["desktopValidationMode"],
+  string
+> = {
+  strict: "Strict",
+  balanced: "Balanced",
+  playback_based: "Playback Based",
 };
 
 const listeningTestLabels: Record<string, string> = {
@@ -939,7 +948,7 @@ const experimentMetricLabels: Record<
   keyof PlatformControlConfig["experiments"]["metrics"],
   string
 > = {
-  listeningTime: "Listening Time",
+  listeningTime: "Play Time",
   reviewsCompleted: "Reviews Completed",
   followersGained: "Followers Gained",
   shares: "Shares",
@@ -1104,7 +1113,7 @@ export function SuperAdminControlCenter({
       );
       if (error) throw error;
       setListeningTestResult((result ?? {}) as Record<string, unknown>);
-      setNotice("Listening Bank test completed without permanent changes.");
+      setNotice("Time Bank test completed without permanent changes.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The test failed.");
     } finally {
@@ -1135,7 +1144,7 @@ export function SuperAdminControlCenter({
   const clearListeningActivityLog = async () => {
     if (
       !window.confirm(
-        "Clear the visible Listening Bank activity log? Records will be archived before they are removed from the active log.",
+        "Clear the visible Time Bank activity log? Records will be archived before they are removed from the active log.",
       )
     ) {
       return;
@@ -3586,7 +3595,7 @@ export function SuperAdminControlCenter({
             <span className="eyebrow">Artist premium features</span>
             <h3>Customization only</h3>
             <p>
-              Premium options do not affect valid listens, rankings, reviews,
+              Premium options do not affect valid plays, rankings, reviews,
               followers, or queue fairness.
             </p>
             <div className="control-toggle-grid">
@@ -3947,11 +3956,11 @@ export function SuperAdminControlCenter({
           <article className="control-card control-card-wide">
             <div className="control-heading">
               <div>
-                <span className="eyebrow">Listening Bank Diagnostics</span>
+                <span className="eyebrow">Time Bank Diagnostics</span>
                 <h3>Real-time accumulation and reward health</h3>
                 <p>
                   These values come from listening sessions, reward claims,
-                  credit balances, and the Listening Bank activity log.
+                  credit balances, and the Time Bank activity log.
                 </p>
               </div>
               <button
@@ -3970,7 +3979,7 @@ export function SuperAdminControlCenter({
                     Number(listeningDiagnostics.total_listening_time_today ?? 0),
                   )}
                 </strong>
-                <span>Total Listening Time Today</span>
+                <span>Total Play Time Today</span>
               </div>
               <div>
                 <strong>
@@ -3978,7 +3987,7 @@ export function SuperAdminControlCenter({
                     Number(listeningDiagnostics.approved_listening_time_today ?? 0),
                   )}
                 </strong>
-                <span>Approved Listening Time Today</span>
+                <span>Approved Play Time Today</span>
               </div>
               <div>
                 <strong>
@@ -3986,7 +3995,7 @@ export function SuperAdminControlCenter({
                     Number(listeningDiagnostics.pending_listening_time ?? 0),
                   )}
                 </strong>
-                <span>Pending Listening Time</span>
+                <span>Pending Play Time</span>
               </div>
               <div>
                 <strong>
@@ -3994,7 +4003,7 @@ export function SuperAdminControlCenter({
                     Number(listeningDiagnostics.rejected_listening_time ?? 0),
                   )}
                 </strong>
-                <span>Rejected Listening Time</span>
+                <span>Rejected Play Time</span>
               </div>
               <div>
                 <strong>
@@ -4009,7 +4018,7 @@ export function SuperAdminControlCenter({
                     Number(listeningDiagnostics.current_listening_bank ?? 0),
                   )}
                 </strong>
-                <span>Current Listening Bank</span>
+                <span>Current Time Bank</span>
               </div>
               <div>
                 <strong>
@@ -4057,7 +4066,7 @@ export function SuperAdminControlCenter({
           <article className="control-card control-card-wide">
             <div className="control-heading">
               <div>
-                <span className="eyebrow">Listening Bank Activity Log</span>
+                <span className="eyebrow">Time Bank Activity Log</span>
                 <h3>Approval, rejection, bonus, and reward history</h3>
                 <p>
                   Showing{" "}
@@ -4241,7 +4250,7 @@ export function SuperAdminControlCenter({
               ))}
               {!listeningActivityLog.length && (
                 <p>
-                  No Listening Bank activity has been logged yet. New approvals,
+                  No Time Bank activity has been logged yet. New approvals,
                   rejections, reward claims, and event bonuses will appear here.
                 </p>
               )}
@@ -4251,7 +4260,7 @@ export function SuperAdminControlCenter({
           <article className="control-card control-card-wide">
             <div className="control-heading">
               <div>
-                <span className="eyebrow">Listening Bank Test Center</span>
+                <span className="eyebrow">Time Bank Test Center</span>
                 <h3>Rollback-safe simulations</h3>
                 <p>
                   Tests calculate before, after, and expected results without
@@ -4731,7 +4740,7 @@ export function SuperAdminControlCenter({
           <article className="control-card control-card-wide">
             <div className="control-heading">
               <div>
-                <span className="eyebrow">Listening Bank Module Control</span>
+                <span className="eyebrow">Time Bank Module Control</span>
                 <h3>Visibility, placement, and sizing</h3>
               </div>
               <button
@@ -4761,7 +4770,7 @@ export function SuperAdminControlCenter({
                   }
                   type="checkbox"
                 />
-                Show Listening Bank
+                Show Time Bank
               </label>
               {(
                 Object.keys(config.listeningBank.module.visibility) as Array<
@@ -4979,6 +4988,35 @@ export function SuperAdminControlCenter({
               </button>
             </div>
             <div className="control-number-grid">
+              <label>
+                Desktop Validation Mode
+                <select
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      listeningBank: {
+                        ...current.listeningBank,
+                        validation: {
+                          ...current.listeningBank.validation,
+                          desktopValidationMode: event.target
+                            .value as PlatformControlConfig["listeningBank"]["validation"]["desktopValidationMode"],
+                        },
+                      },
+                    }))
+                  }
+                  value={
+                    config.listeningBank.validation.desktopValidationMode
+                  }
+                >
+                  {Object.entries(desktopValidationModeLabels).map(
+                    ([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
               <label>
                 Minutes per token
                 <input
