@@ -20,6 +20,9 @@ await loadLocalEnvironment();
 
 const projectRef = process.env.SUPABASE_PROJECT_REF;
 const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.firstlisten.net";
+const logoUrl = `${siteUrl.replace(/\/$/, "")}/icons/first-listen-192x192.png`;
+const supportEmail = process.env.AUTH_SUPPORT_EMAIL ?? "support@firstlisten.net";
 
 if (!projectRef || !accessToken) {
   throw new Error("SUPABASE_PROJECT_REF and SUPABASE_ACCESS_TOKEN are required.");
@@ -32,7 +35,10 @@ const emailShell = (title, body, action, actionLabel, footer) => `
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#111411;padding:32px 16px">
       <tr><td align="center">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#1a1d1b;border:1px solid #343a34;border-radius:18px;padding:32px">
-          <tr><td style="color:#c8ff4f;font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">FIRST LISTEN</td></tr>
+          <tr><td>
+            <img src="${logoUrl}" alt="First Listen" width="48" height="48" style="display:block;border:0;border-radius:12px;margin:0 0 14px" />
+            <div style="color:#c8ff4f;font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">FIRST LISTEN</div>
+          </td></tr>
           <tr><td><h1 style="font-size:28px;line-height:1.15;margin:18px 0 12px">${title}</h1></td></tr>
           <tr><td><div style="color:#c8cdc8;font-size:15px;line-height:1.65;margin:0 0 24px">${body}</div></td></tr>
           <tr><td><a href="${action}" style="display:inline-block;background:#c8ff4f;color:#111411;text-decoration:none;font-weight:800;padding:13px 20px;border-radius:10px">${actionLabel}</a></td></tr>
@@ -44,9 +50,15 @@ const emailShell = (title, body, action, actionLabel, footer) => `
 </html>`.trim();
 
 const paragraph = (content) => `<p style="margin:0 0 12px">${content}</p>`;
+const footer = (extra = "") =>
+  [
+    paragraph("Sent by:<br>firstlisten.net"),
+    paragraph(`Need help? Contact ${supportEmail}.`),
+    extra,
+  ].join("");
 
 const payload = {
-  mailer_subjects_confirmation: "Welcome To First Listen",
+  mailer_subjects_confirmation: "Welcome to First Listen",
   mailer_templates_confirmation_content: emailShell(
     "Confirm Your Email Address",
     [
@@ -56,68 +68,59 @@ const payload = {
     ].join(""),
     "{{ .ConfirmationURL }}",
     "Confirm My Account",
-    [
-      paragraph("Sent by:<br>FirstListen.net"),
-      paragraph("If you did not create an account you may safely ignore this message."),
-    ].join(""),
+    footer(paragraph("If you did not create an account you may safely ignore this message.")),
   ),
-  mailer_subjects_recovery: "Reset your First Listen password",
+  mailer_subjects_recovery: "Reset Your First Listen Password",
   mailer_templates_recovery_content: emailShell(
-    "Reset your password",
+    "Reset Your First Listen Password",
     paragraph("We received a request to reset your First Listen password."),
     "{{ .ConfirmationURL }}",
-    "Reset password",
-    paragraph("Sent by:<br>FirstListen.net") +
-      paragraph("If you did not request this change, ignore this email and your password will remain unchanged."),
+    "Reset Password",
+    footer(paragraph("If you did not request this change, ignore this email and your password will remain unchanged.")),
   ),
-  mailer_subjects_email_change: "Confirm your new First Listen email",
+  mailer_subjects_email_change: "Confirm Your New First Listen Email",
   mailer_templates_email_change_content: emailShell(
-    "Confirm your new email",
+    "Confirm Your New Email",
     paragraph("Confirm {{ .NewEmail }} as the new email address for your First Listen account."),
     "{{ .ConfirmationURL }}",
-    "Confirm new email",
-    paragraph("Sent by:<br>FirstListen.net") +
-      paragraph("If you did not request this change, secure your account immediately."),
+    "Confirm New Email",
+    footer(paragraph("If you did not request this change, secure your account immediately.")),
   ),
-  mailer_subjects_invite: "You are invited to First Listen",
+  mailer_subjects_invite: "You're Invited to First Listen",
   mailer_templates_invite_content: emailShell(
-    "You are invited",
+    "You're Invited",
     paragraph("Accept this invitation to create your First Listen account."),
     "{{ .ConfirmationURL }}",
-    "Accept invitation",
-    paragraph("Sent by:<br>FirstListen.net") +
-      paragraph("This invitation link expires and can only be used once."),
+    "Accept Invitation",
+    footer(paragraph("This invitation link expires and can only be used once.")),
   ),
-  mailer_subjects_magic_link: "Your First Listen sign-in link",
+  mailer_subjects_magic_link: "Your First Listen Magic Link",
   mailer_templates_magic_link_content: emailShell(
     "Sign in to First Listen",
     paragraph("Use this secure, one-time link to sign in."),
     "{{ .ConfirmationURL }}",
-    "Sign in",
-    paragraph("Sent by:<br>FirstListen.net") +
-      paragraph("If you did not request this link, you can ignore this email."),
+    "Sign In",
+    footer(paragraph("If you did not request this link, you can ignore this email.")),
   ),
   mailer_notifications_password_changed_enabled: true,
   mailer_subjects_password_changed_notification:
-    "Your First Listen password was changed",
+    "Your First Listen Password Was Changed",
   mailer_templates_password_changed_notification_content: emailShell(
-    "Password changed",
+    "Password Changed",
     paragraph("The password for your First Listen account was changed."),
     "{{ .SiteURL }}/forgot-password",
-    "Secure my account",
-    paragraph("Sent by:<br>FirstListen.net") +
-      paragraph("If you made this change, no action is required."),
+    "Secure My Account",
+    footer(paragraph("If you made this change, no action is required.")),
   ),
   mailer_notifications_email_changed_enabled: true,
   mailer_subjects_email_changed_notification:
-    "Your First Listen email was changed",
+    "Your First Listen Email Was Changed",
   mailer_templates_email_changed_notification_content: emailShell(
-    "Email address changed",
+    "Email Address Changed",
     paragraph("The email address for your First Listen account was changed from {{ .OldEmail }} to {{ .Email }}."),
     "{{ .SiteURL }}/help",
-    "Contact support",
-    paragraph("Sent by:<br>FirstListen.net") +
-      paragraph("If you made this change, no action is required."),
+    "Contact Support",
+    footer(paragraph("If you made this change, no action is required.")),
   ),
 };
 
