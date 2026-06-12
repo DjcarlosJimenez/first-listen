@@ -44,6 +44,7 @@ type ProfileSeed = {
   listeningBank: ListeningBankStatus;
   spotlightSongs: DiscoverySong[];
   topTenSongs: DiscoverySong[];
+  externalDiscoverySongs: DiscoverySong[];
   followedArtists: FollowedArtist[];
   previouslySupportedSongs: DiscoverySong[];
   todaySupport: TodaySupportSummary;
@@ -145,6 +146,7 @@ export function ProtectedAppEntry({
       initialListeningBank={profile.listeningBank}
       initialSpotlightSongs={profile.spotlightSongs}
       initialTopTenSongs={profile.topTenSongs}
+      initialExternalDiscoverySongs={profile.externalDiscoverySongs}
       initialFollowedArtists={profile.followedArtists}
       initialPreviouslySupportedSongs={profile.previouslySupportedSongs}
       initialTodaySupport={profile.todaySupport}

@@ -58,6 +58,14 @@ export const cardDensityLabels = {
 } as const;
 
 export type CardDensityKey = keyof typeof cardDensityLabels;
+export type PlatformResolutionEngineMode = "off" | "recommend" | "automatic";
+export type PlatformResolutionProvider =
+  | "youtube_music"
+  | "youtube"
+  | "spotify"
+  | "apple_music"
+  | "tiktok"
+  | "soundcloud";
 
 export type UiResponsiveSize = {
   iconSize: UiSizePreset;
@@ -301,6 +309,18 @@ export type PlatformControlConfig = {
         | "internal_content_only";
       placement: "top" | "middle" | "bottom" | "hidden";
       userSkipExternalDefault: boolean;
+    };
+    platformResolution: {
+      engineMode: PlatformResolutionEngineMode;
+      preferredPlatformOrder: PlatformResolutionProvider[];
+      showPlatformRecommendations: boolean;
+      showSecondaryPlatforms: boolean;
+    };
+    externalDiscovery: {
+      showExternalSongs: boolean;
+      showExternalArtists: boolean;
+      showRecentReleases: boolean;
+      showTrendingExternalContent: boolean;
     };
   };
   spotlight: Array<{
@@ -737,6 +757,25 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       behavior: "ask_user",
       placement: "middle",
       userSkipExternalDefault: false,
+    },
+    platformResolution: {
+      engineMode: "recommend",
+      preferredPlatformOrder: [
+        "youtube_music",
+        "youtube",
+        "spotify",
+        "apple_music",
+        "tiktok",
+        "soundcloud",
+      ],
+      showPlatformRecommendations: true,
+      showSecondaryPlatforms: true,
+    },
+    externalDiscovery: {
+      showExternalSongs: true,
+      showExternalArtists: true,
+      showRecentReleases: true,
+      showTrendingExternalContent: true,
     },
   },
   spotlight: [1, 2, 3].map((slot) => ({

@@ -373,6 +373,27 @@ const externalPlacementLabels: Record<
   hidden: "Hidden",
 };
 
+const platformResolutionModeLabels: Record<
+  PlatformControlConfig["discovery"]["platformResolution"]["engineMode"],
+  string
+> = {
+  off: "Off",
+  recommend: "Recommend",
+  automatic: "Automatic",
+};
+
+const platformResolutionProviderLabels: Record<
+  PlatformControlConfig["discovery"]["platformResolution"]["preferredPlatformOrder"][number],
+  string
+> = {
+  youtube_music: "YouTube Music",
+  youtube: "YouTube",
+  spotify: "Spotify",
+  apple_music: "Apple Music",
+  tiktok: "TikTok",
+  soundcloud: "SoundCloud",
+};
+
 const artistVisibilityLabels: Record<
   keyof PlatformControlConfig["artistProfile"]["visibility"],
   string
@@ -2801,6 +2822,149 @@ export function SuperAdminControlCenter({
               />
               <span>Automatically skip external songs by default</span>
             </label>
+            <div className="control-divider" />
+            <span className="eyebrow">Platform Resolution Engine</span>
+            <label>
+              Resolution mode
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    discovery: {
+                      ...current.discovery,
+                      platformResolution: {
+                        ...current.discovery.platformResolution,
+                        engineMode: event.target
+                          .value as PlatformControlConfig["discovery"]["platformResolution"]["engineMode"],
+                      },
+                    },
+                  }))
+                }
+                value={config.discovery.platformResolution.engineMode}
+              >
+                {Object.entries(platformResolutionModeLabels).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+            <div className="control-toggle-grid">
+              <label>
+                <input
+                  checked={
+                    config.discovery.platformResolution
+                      .showPlatformRecommendations
+                  }
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      discovery: {
+                        ...current.discovery,
+                        platformResolution: {
+                          ...current.discovery.platformResolution,
+                          showPlatformRecommendations: event.target.checked,
+                        },
+                      },
+                    }))
+                  }
+                  type="checkbox"
+                />
+                Show Platform Recommendations
+              </label>
+              <label>
+                <input
+                  checked={
+                    config.discovery.platformResolution.showSecondaryPlatforms
+                  }
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      discovery: {
+                        ...current.discovery,
+                        platformResolution: {
+                          ...current.discovery.platformResolution,
+                          showSecondaryPlatforms: event.target.checked,
+                        },
+                      },
+                    }))
+                  }
+                  type="checkbox"
+                />
+                Show Secondary Platforms
+              </label>
+            </div>
+            <div className="control-mini-grid">
+              {config.discovery.platformResolution.preferredPlatformOrder.map(
+                (provider, index) => (
+                  <label key={`platform-order-${index}`}>
+                    Preferred #{index + 1}
+                    <select
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          discovery: {
+                            ...current.discovery,
+                            platformResolution: {
+                              ...current.discovery.platformResolution,
+                              preferredPlatformOrder:
+                                current.discovery.platformResolution
+                                  .preferredPlatformOrder.map((item, itemIndex) =>
+                                    itemIndex === index
+                                      ? (event.target
+                                          .value as typeof provider)
+                                      : item,
+                                  ),
+                            },
+                          },
+                        }))
+                      }
+                      value={provider}
+                    >
+                      {Object.entries(platformResolutionProviderLabels).map(
+                        ([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                ),
+              )}
+            </div>
+            <span className="eyebrow">External Discovery modules</span>
+            <div className="control-toggle-grid">
+              {(
+                Object.keys(config.discovery.externalDiscovery) as Array<
+                  keyof PlatformControlConfig["discovery"]["externalDiscovery"]
+                >
+              ).map((field) => (
+                <label key={field}>
+                  <input
+                    checked={config.discovery.externalDiscovery[field]}
+                    onChange={(event) =>
+                      setConfig((current) => ({
+                        ...current,
+                        discovery: {
+                          ...current.discovery,
+                          externalDiscovery: {
+                            ...current.discovery.externalDiscovery,
+                            [field]: event.target.checked,
+                          },
+                        },
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  {field
+                    .replace(/([A-Z])/g, " $1")
+                    .replace(/^./, (letter) => letter.toUpperCase())}
+                </label>
+              ))}
+            </div>
           </article>
 
           <article className="control-card control-card-wide">

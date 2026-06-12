@@ -85,7 +85,10 @@ import {
   type SongLanguage,
 } from "@/lib/catalog";
 import { getCopy, optionLabel } from "@/lib/i18n";
-import { getDiscoveryLinks } from "@/lib/discovery";
+import {
+  getDiscoveryLinks,
+  getPrimaryPlatformLinks,
+} from "@/lib/discovery";
 import {
   allPlatforms,
   compactClassificationLabel,
@@ -115,6 +118,7 @@ import type {
   Platform,
   Review,
   Song,
+  SongPlatformLink,
   SongDashboardSummary,
   TodaySupportSummary,
 } from "@/lib/types";
@@ -151,6 +155,14 @@ type ReviewSubmissionResult = {
   listeningBankSeconds?: number;
   communityPointsAwarded?: number;
   warning?: string;
+};
+
+type PlatformLinkRow = {
+  platform?: string;
+  music_url?: string;
+  is_primary?: boolean;
+  resolution_source?: string;
+  confidence_score?: number;
 };
 
 type ListeningSessionUi = {
@@ -190,25 +202,76 @@ type SongSubmission = {
 };
 
 function mapQueueRows(data: Array<Record<string, unknown>>): Song[] {
-  return data.map((row) => ({
-    id: String(row.song_id),
-    artistId: String(row.artist_id),
-    title: String(row.title),
-    artist: String(row.artist_name),
-    coverUrl: safeCoverUrl(String(row.cover_image_url)),
-    link: String(row.music_url),
-    platform:
+  return data.map((row) => {
+    const platform =
       allPlatforms.find(
-        (platform) => databasePlatform[platform] === String(row.platform),
-      ) ?? "Spotify",
-    genre: String(row.genre) as Genre,
-    language: String(row.song_language) as SongLanguage,
-    feedbackFocus: (row.feedback_focus ?? []) as FeedbackFocus[],
-    explicitContent: Boolean(row.explicit_content),
-    country: String(row.country),
-    submittedAt: String(row.submitted_at),
-    accent: "#c8ff4f",
-  }));
+        (item) => databasePlatform[item] === String(row.platform),
+      ) ?? "Spotify";
+    return {
+      id: String(row.song_id),
+      artistId: String(row.artist_id),
+      title: String(row.title),
+      artist: String(row.artist_name),
+      coverUrl: safeCoverUrl(String(row.cover_image_url)),
+      link: String(row.music_url),
+      platform,
+      platformLinks: mapSongPlatformLinks(
+        row.platform_links,
+        platform,
+        String(row.music_url),
+      ),
+      recommendedPlatform:
+        allPlatforms.find(
+          (item) =>
+            databasePlatform[item] === String(row.recommended_platform),
+        ) ?? platform,
+      genre: String(row.genre) as Genre,
+      language: String(row.song_language) as SongLanguage,
+      feedbackFocus: (row.feedback_focus ?? []) as FeedbackFocus[],
+      explicitContent: Boolean(row.explicit_content),
+      country: String(row.country),
+      submittedAt: String(row.submitted_at),
+      accent: "#c8ff4f",
+    };
+  });
+}
+
+function mapSongPlatformLinks(
+  value: unknown,
+  fallbackPlatform: Platform,
+  fallbackUrl: string,
+): SongPlatformLink[] {
+  const rows = Array.isArray(value) ? (value as PlatformLinkRow[]) : [];
+  if (!rows.length) {
+    return [
+      {
+        platform: fallbackPlatform,
+        url: fallbackUrl,
+        primary: true,
+        resolutionSource: "submitted",
+        confidenceScore: 100,
+      },
+    ];
+  }
+  return rows
+    .map((link) => {
+      const platform =
+        allPlatforms.find(
+          (item) => databasePlatform[item] === String(link.platform),
+        ) ?? fallbackPlatform;
+      return {
+        platform,
+        url: String(link.music_url ?? fallbackUrl),
+        primary: Boolean(link.is_primary),
+        resolutionSource:
+          link.resolution_source === "manual" ||
+          link.resolution_source === "inferred"
+            ? link.resolution_source
+            : "submitted",
+        confidenceScore: Number(link.confidence_score ?? 100),
+      } satisfies SongPlatformLink;
+    })
+    .filter((link) => link.url.trim().length > 0);
 }
 
 function mapNotificationRows(
@@ -684,6 +747,7 @@ function PostReviewDiscovery({
   listeningBank: ListeningBankStatus;
 }) {
   const links = getDiscoveryLinks(song);
+  const resolvedLinks = getPrimaryPlatformLinks(song);
   const [following, setFollowing] = useState(false);
   const [saved, setSaved] = useState(false);
   const spanish = locale === "es";
@@ -818,6 +882,38 @@ function PostReviewDiscovery({
           </small>
         </div>
       </section>
+      {resolvedLinks.length > 0 && (
+        <section className="platform-recommendation-card">
+          <span className="eyebrow">
+            <Globe2 size={13} />
+            {spanish ? "También disponible en" : "Also Available On"}
+          </span>
+          <p>
+            {validListenRecorded
+              ? spanish
+                ? "Tu escucha valida desbloqueo las opciones externas conocidas."
+                : "Your valid listen unlocked the known external listening options."
+              : spanish
+                ? "Estas opciones vienen de enlaces enviados o coincidencias inferidas."
+                : "These options come from submitted links or safe inferred matches."}
+          </p>
+          <div className="platform-chip-row">
+            {resolvedLinks.map((link) => (
+              <a
+                data-ui-component="openPlatformButton"
+                href={link.url}
+                key={`${song.id}-${link.platform}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <PlatformIcon platform={link.platform} size={14} />
+                {link.platform}
+                {!link.primary && <small>{link.resolutionSource}</small>}
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="discovery-links">
         <a
           data-ui-component="openPlatformButton"
@@ -1077,6 +1173,7 @@ function OfflineCommunitySummary({
 function EmptyQueueRetention({
   spotlightSongs,
   topTenSongs,
+  externalDiscoverySongs,
   followedArtists,
   previouslySupportedSongs,
   todaySupport,
@@ -1085,6 +1182,7 @@ function EmptyQueueRetention({
 }: {
   spotlightSongs: DiscoverySong[];
   topTenSongs: DiscoverySong[];
+  externalDiscoverySongs: DiscoverySong[];
   followedArtists: FollowedArtist[];
   previouslySupportedSongs: DiscoverySong[];
   todaySupport: TodaySupportSummary;
@@ -1094,7 +1192,7 @@ function EmptyQueueRetention({
   const spanish = locale === "es";
   const featuredArtists = Array.from(
     new Map(
-      [...spotlightSongs, ...topTenSongs].map((song) => [
+      [...spotlightSongs, ...topTenSongs, ...externalDiscoverySongs].map((song) => [
         song.artistId,
         { id: song.artistId, name: song.artist, genre: song.genre },
       ]),
@@ -1245,6 +1343,7 @@ function ReviewView({
   queueLoading,
   spotlightSongs,
   topTenSongs,
+  externalDiscoverySongs,
   followedArtists,
   previouslySupportedSongs,
   todaySupport,
@@ -1284,6 +1383,7 @@ function ReviewView({
   queueLoading: boolean;
   spotlightSongs: DiscoverySong[];
   topTenSongs: DiscoverySong[];
+  externalDiscoverySongs: DiscoverySong[];
   followedArtists: FollowedArtist[];
   previouslySupportedSongs: DiscoverySong[];
   todaySupport: TodaySupportSummary;
@@ -1734,12 +1834,15 @@ function ReviewView({
         locale={locale}
         onSubmit={() => setView("submit")}
         previouslySupportedSongs={previouslySupportedSongs}
+        externalDiscoverySongs={externalDiscoverySongs}
         spotlightSongs={spotlightSongs}
         todaySupport={todaySupport}
         topTenSongs={topTenSongs}
       />
     );
   }
+
+  const currentPlatformLinks = getPrimaryPlatformLinks(song);
 
   return (
     <>
@@ -1883,6 +1986,32 @@ function ReviewView({
               )}
             </div>
             )}
+            {listeningSession.validListenRecorded &&
+              currentPlatformLinks.length > 1 && (
+                <section className="platform-reveal-inline">
+                  <span className="eyebrow">
+                    <Globe2 size={13} />
+                    {locale === "es"
+                      ? "También disponible en"
+                      : "Also Available On"}
+                  </span>
+                  <div className="platform-chip-row">
+                    {currentPlatformLinks.map((link) => (
+                      <a
+                        data-ui-component="openPlatformButton"
+                        href={link.url}
+                        key={`${song.id}-${link.platform}`}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        <PlatformIcon platform={link.platform} size={14} />
+                        {link.platform}
+                        {!link.primary && <small>{link.resolutionSource}</small>}
+                      </a>
+                    ))}
+                  </div>
+                </section>
+              )}
             <div className="continuous-listening-controls">
               <button
                 data-ui-component="nextSongButton"
@@ -2247,6 +2376,7 @@ function ReviewView({
     </main>
     <section className="content review-community-hub">
       <DiscoverySections
+        externalDiscoverySongs={externalDiscoverySongs}
         externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
         locale={locale}
         onListeningCredited={onListeningCredited}
@@ -2459,6 +2589,11 @@ function DiscoverySongCard({
   const completeListenRef = useRef(false);
   const scrolledForPlaybackRef = useRef(false);
   const spanish = locale === "es";
+  const platformLinks = getPrimaryPlatformLinks(song);
+  const recommendedPlatform =
+    song.recommendedPlatform && song.recommendedPlatform !== song.platform
+      ? song.recommendedPlatform
+      : null;
 
   const scrollPlayerIntoView = useCallback(() => {
     const player = playerRef.current;
@@ -2671,7 +2806,10 @@ function DiscoverySongCard({
   };
 
   return (
-    <article className="discovery-song-card">
+    <article
+      className="discovery-song-card"
+      data-external-feed-kind={song.feedKind}
+    >
       <div className="discovery-song-cover">
         <Image
           alt={`${song.title} cover`}
@@ -2704,6 +2842,15 @@ function DiscoverySongCard({
           {optionLabel(locale, song.genre)} /{" "}
           {optionLabel(locale, song.language)}
         </small>
+        {recommendedPlatform && (
+          <div className="recommended-platform-inline">
+            <Star size={13} />
+            <span>
+              {spanish ? "Plataforma recomendada" : "Recommended Platform"}:{" "}
+              <strong>{recommendedPlatform}</strong>
+            </span>
+          </div>
+        )}
       </div>
       <div className="discovery-song-actions">
         <button
@@ -2807,6 +2954,29 @@ function DiscoverySongCard({
         songId={song.id}
         title={song.title}
       />
+      {listenState.validListenRecorded && platformLinks.length > 1 && (
+        <section className="platform-reveal-inline">
+          <span className="eyebrow">
+            <Globe2 size={13} />
+            {spanish ? "También disponible en" : "Also Available On"}
+          </span>
+          <div className="platform-chip-row">
+            {platformLinks.map((link) => (
+              <a
+                data-ui-component="openPlatformButton"
+                href={link.url}
+                key={`${song.id}-${link.platform}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <PlatformIcon platform={link.platform} size={14} />
+                {link.platform}
+                {!link.primary && <small>{link.resolutionSource}</small>}
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
       {details && (
         <div className="discovery-song-details" role="status">
           {details === "reviews" ? (
@@ -2851,6 +3021,7 @@ function DiscoverySongCard({
 function DiscoverySections({
   spotlightSongs,
   topTenSongs,
+  externalDiscoverySongs,
   locale,
   onListeningCredited,
   externalRedirectNoticeDisabled,
@@ -2858,6 +3029,7 @@ function DiscoverySections({
 }: {
   spotlightSongs: DiscoverySong[];
   topTenSongs: DiscoverySong[];
+  externalDiscoverySongs: DiscoverySong[];
   locale: InterfaceLocale;
   onListeningCredited: (
     seconds: number,
@@ -3001,11 +3173,36 @@ function DiscoverySections({
             {spanish ? "Spotify / Apple / TikTok / SoundCloud" : "Spotify / Apple / TikTok / SoundCloud"}
           </small>
         </div>
-        <p className="discovery-empty">
-          {spanish
-            ? "El Founder puede controlar si el contenido externo se mezcla con la cola, aparece separado o permanece oculto."
-            : "The Founder can control whether external content is mixed with the queue, shown separately, or hidden."}
-        </p>
+        {externalDiscoverySongs.length ? (
+          <div className="discovery-song-grid external-discovery-grid">
+            {externalDiscoverySongs.slice(0, 12).map((song) => (
+              <DiscoverySongCard
+                active={activeSongId === song.id}
+                externalRedirectNoticeDisabled={
+                  externalRedirectNoticeDisabled
+                }
+                key={`external-${song.badge ?? "feed"}-${song.id}-${song.position ?? 0}`}
+                locale={locale}
+                onExternalRedirectPreferenceChange={
+                  onExternalRedirectPreferenceChange
+                }
+                onListeningCredited={onListeningCredited}
+                onPlay={() =>
+                  setActiveSongId((current) =>
+                    current === song.id ? null : song.id,
+                  )
+                }
+                song={song}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="discovery-empty">
+            {spanish
+              ? "La Discovery externa aparecera cuando haya enlaces o artistas externos activos."
+              : "External Discovery will appear when external links or artists are active."}
+          </p>
+        )}
       </section>
     </div>
   );
@@ -3140,6 +3337,7 @@ function DashboardView({
   onClaimReward,
   spotlightSongs,
   topTenSongs,
+  externalDiscoverySongs,
   dailyMission,
   claimingMission,
   onClaimMission,
@@ -3164,6 +3362,7 @@ function DashboardView({
   onClaimReward: () => void;
   spotlightSongs: DiscoverySong[];
   topTenSongs: DiscoverySong[];
+  externalDiscoverySongs: DiscoverySong[];
   dailyMission: DailyMissionStatus | null;
   claimingMission: boolean;
   onClaimMission: () => void;
@@ -3196,6 +3395,7 @@ function DashboardView({
           onClaim={onClaimMission}
         />
         <DiscoverySections
+          externalDiscoverySongs={externalDiscoverySongs}
           externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
           locale={locale}
           onListeningCredited={onListeningCredited}
@@ -3270,6 +3470,7 @@ function DashboardView({
           onClaim={onClaimMission}
         />
       <DiscoverySections
+        externalDiscoverySongs={externalDiscoverySongs}
         externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
         locale={locale}
         onListeningCredited={onListeningCredited}
@@ -3574,6 +3775,8 @@ function SubmitView({
   >([]);
   const [duplicateWarningAccepted, setDuplicateWarningAccepted] =
     useState(false);
+  const [ignoredRecommendationUrl, setIgnoredRecommendationUrl] =
+    useState<string | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [browserOrigin, setBrowserOrigin] = useState<string>();
   const platformDetection = detectMusicPlatform(musicLink);
@@ -3596,6 +3799,37 @@ function SubmitView({
     platformDetection.valid,
     platformDetection.message,
   );
+  const platformRecommendation = useMemo(() => {
+    if (
+      !platformDetection.valid ||
+      !platformDetection.resourceId ||
+      !platformDetection.parsedUrl
+    ) {
+      return null;
+    }
+    if (platformDetection.platform === "YouTube Music") {
+      return {
+        platform: "YouTube" as const,
+        url: `https://www.youtube.com/watch?v=${platformDetection.resourceId}`,
+      };
+    }
+    if (platformDetection.platform === "YouTube") {
+      return {
+        platform: "YouTube Music" as const,
+        url: `https://music.youtube.com/watch?v=${platformDetection.resourceId}`,
+      };
+    }
+    return null;
+  }, [
+    platformDetection.parsedUrl,
+    platformDetection.platform,
+    platformDetection.resourceId,
+    platformDetection.valid,
+  ]);
+  const showPlatformRecommendation =
+    platformRecommendation &&
+    ignoredRecommendationUrl !== platformDetection.parsedUrl &&
+    platformRecommendation.platform !== platformDetection.platform;
   const reportedDurationSeconds =
     Number(durationMinutes || 0) * 60 + Number(durationSeconds || 0);
   const exactDuplicate = duplicateMatches.find((match) => match.exact_match);
@@ -4012,6 +4246,48 @@ function SubmitView({
             <small className={platformDetection.valid ? "link-valid" : "link-invalid"}>
               {platformMessage}
             </small>
+            {showPlatformRecommendation && platformRecommendation && (
+              <div className="platform-recommendation-card">
+                <span className="eyebrow">
+                  <Star size={13} />
+                  {locale === "es"
+                    ? "Plataforma recomendada encontrada"
+                    : "Recommended Platform Found"}
+                </span>
+                <p>
+                  {locale === "es"
+                    ? `Esta canción también puede abrirse en ${platformRecommendation.platform}. Tu enlace original no cambiará a menos que lo elijas.`
+                    : `This song can also open on ${platformRecommendation.platform}. Your original link will not change unless you choose it.`}
+                </p>
+                <div className="post-review-choice">
+                  <button
+                    data-ui-component="openPlatformButton"
+                    onClick={() => {
+                      setMusicLink(platformRecommendation.url);
+                      setPlatform(platformRecommendation.platform);
+                    }}
+                    type="button"
+                  >
+                    <Check size={14} />
+                    {locale === "es"
+                      ? "Usar recomendada"
+                      : "Use Recommended Platform"}
+                  </button>
+                  <button
+                    onClick={() =>
+                      setIgnoredRecommendationUrl(
+                        platformDetection.parsedUrl ?? musicLink,
+                      )
+                    }
+                    type="button"
+                  >
+                    {locale === "es"
+                      ? "Mantener original"
+                      : "Keep Original Platform"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="field-grid">
             <div className="field">
@@ -4396,6 +4672,7 @@ type FirstListenAppProps = {
   initialListeningBank: ListeningBankStatus;
   initialSpotlightSongs: DiscoverySong[];
   initialTopTenSongs: DiscoverySong[];
+  initialExternalDiscoverySongs: DiscoverySong[];
   initialFollowedArtists: FollowedArtist[];
   initialPreviouslySupportedSongs: DiscoverySong[];
   initialTodaySupport: TodaySupportSummary;
@@ -4429,6 +4706,7 @@ export function FirstListenApp({
   initialListeningBank,
   initialSpotlightSongs,
   initialTopTenSongs,
+  initialExternalDiscoverySongs,
   initialFollowedArtists,
   initialPreviouslySupportedSongs,
   initialTodaySupport,
@@ -5122,6 +5400,7 @@ export function FirstListenApp({
           totalCreditsEarned={totalCreditsEarned}
           spotlightSongs={initialSpotlightSongs}
           topTenSongs={initialTopTenSongs}
+          externalDiscoverySongs={initialExternalDiscoverySongs}
           dailyMission={dailyMission}
           claimingMission={claimingMission}
           onClaimMission={() => void claimDailyMission()}
@@ -5168,9 +5447,10 @@ export function FirstListenApp({
         onListeningCredited={handleListeningCredited}
         onAdvanceSong={advanceReviewQueue}
         queueLoading={queueLoading}
-        spotlightSongs={initialSpotlightSongs}
-        topTenSongs={initialTopTenSongs}
-        followedArtists={initialFollowedArtists}
+          spotlightSongs={initialSpotlightSongs}
+          topTenSongs={initialTopTenSongs}
+          externalDiscoverySongs={initialExternalDiscoverySongs}
+          followedArtists={initialFollowedArtists}
         previouslySupportedSongs={initialPreviouslySupportedSongs}
         todaySupport={todaySupport}
         listeningBank={listeningBank}

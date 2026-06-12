@@ -16,6 +16,7 @@ import type {
   ListeningBankStatus,
   Review,
   Song,
+  SongPlatformLink,
   SongDashboardSummary,
   TodaySupportSummary,
 } from "@/lib/types";
@@ -88,6 +89,28 @@ type DiscoveryRow = {
   hook_score: number;
   total_listening_seconds: number;
   completion_rate: number;
+  platform_links?: PlatformLinkRow[] | null;
+  recommended_platform?: string | null;
+};
+
+type ExternalDiscoveryRow = DiscoveryRow & {
+  feed_kind: string;
+  feed_position: number;
+  badge: string;
+  feedback_focus: string[];
+  country: string;
+  submitted_at: string;
+  comments_count: number;
+  likes_count: number;
+  followers_count: number;
+};
+
+type PlatformLinkRow = {
+  platform: string;
+  music_url: string;
+  is_primary?: boolean;
+  resolution_source?: string;
+  confidence_score?: number;
 };
 
 type MissionRow = {
@@ -176,6 +199,7 @@ type ContentEconomyRow = {
 };
 
 function mapDiscoveryRow(row: DiscoveryRow): DiscoverySong {
+  const platform = platformLabels[row.platform] ?? "YouTube";
   return {
     id: row.song_id,
     artistId: row.artist_id,
@@ -183,7 +207,12 @@ function mapDiscoveryRow(row: DiscoveryRow): DiscoverySong {
     artist: row.artist_name,
     coverUrl: safeCoverUrl(row.cover_image_url),
     link: row.music_url,
-    platform: platformLabels[row.platform],
+    platform,
+    platformLinks: mapPlatformLinks(row.platform_links, platform, row.music_url),
+    recommendedPlatform:
+      row.recommended_platform && platformLabels[row.recommended_platform]
+        ? platformLabels[row.recommended_platform]
+        : platform,
     genre: row.genre,
     language: row.song_language,
     reviewsReceived: Number(row.reviews_received ?? 0),
@@ -203,6 +232,35 @@ function mapDiscoveryRow(row: DiscoveryRow): DiscoverySong {
         ? undefined
         : Number(row.ranking_score),
   };
+}
+
+function mapPlatformLinks(
+  rows: PlatformLinkRow[] | null | undefined,
+  fallbackPlatform: DiscoverySong["platform"],
+  fallbackUrl: string,
+): SongPlatformLink[] {
+  if (!rows?.length) {
+    return [
+      {
+        platform: fallbackPlatform,
+        url: fallbackUrl,
+        primary: true,
+        resolutionSource: "submitted",
+        confidenceScore: 100,
+      },
+    ];
+  }
+  return rows.map((link) => ({
+    platform: platformLabels[link.platform] ?? fallbackPlatform,
+    url: link.music_url,
+    primary: Boolean(link.is_primary),
+    resolutionSource:
+      link.resolution_source === "manual" ||
+      link.resolution_source === "inferred"
+        ? link.resolution_source
+        : "submitted",
+    confidenceScore: Number(link.confidence_score ?? 100),
+  }));
 }
 
 export async function ProtectedAppPage({ initialView }: { initialView: View }) {
@@ -228,6 +286,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     { data: listeningRows },
     { data: spotlightRows },
     { data: topTenRows },
+    { data: externalDiscoveryRows },
     { data: missionRows },
     { data: communityRows },
     { data: followedArtistRows },
@@ -250,6 +309,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     supabase.rpc("get_listening_bank_status_v2"),
     supabase.rpc("get_spotlight_songs"),
     supabase.rpc("get_top_ten_songs"),
+    supabase.rpc("get_external_discovery_feed", { feed_limit: 24 }),
     supabase.rpc("get_daily_mission_status"),
     supabase.rpc("get_active_community_programs"),
     supabase.rpc("get_followed_artists", { queue_limit: 8 }),
@@ -284,6 +344,16 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
         country: latestSong.country,
         platform: platformLabels[latestSong.platform],
         link: latestSong.music_url,
+        platformLinks: [
+          {
+            platform: platformLabels[latestSong.platform],
+            url: latestSong.music_url,
+            primary: true,
+            resolutionSource: "submitted",
+            confidenceScore: 100,
+          },
+        ],
+        recommendedPlatform: platformLabels[latestSong.platform],
         coverUrl: safeCoverUrl(latestSong.cover_image_url),
         explicitContent: latestSong.explicit_content,
         accent: "#c8ff4f",
@@ -528,6 +598,14 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
         topTenSongs: ((topTenRows ?? []) as DiscoveryRow[]).map(
           mapDiscoveryRow,
         ),
+        externalDiscoverySongs: (
+          (externalDiscoveryRows ?? []) as ExternalDiscoveryRow[]
+        ).map((row) => ({
+          ...mapDiscoveryRow(row),
+          badge: row.badge,
+          feedKind: row.feed_kind,
+          position: Number(row.feed_position ?? 0),
+        })),
         followedArtists,
         previouslySupportedSongs: (
           (previouslySupportedRows ?? []) as DiscoveryRow[]

@@ -1643,6 +1643,61 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   text-decoration: none;
 }
 
+.platform-recommendation-card,
+.platform-reveal-inline {
+  background: #f6f7f3;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px;
+}
+
+.platform-recommendation-card p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.platform-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.platform-chip-row a,
+.platform-chip-row span {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 900;
+  gap: 6px;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.platform-chip-row small {
+  color: var(--muted);
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.recommended-platform-inline {
+  align-items: center;
+  color: #5f8314;
+  display: flex;
+  font-size: 10px;
+  font-weight: 900;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .artist-profile-link-button {
   color: #5f8314;
   justify-content: center;
@@ -9399,6 +9454,23 @@ html[data-external-discovery-placement="hidden"] [data-platform-module="external
   display: none;
 }
 
+html[data-show-platform-recommendations="false"] .recommended-platform-inline,
+html[data-show-platform-recommendations="false"] .platform-recommendation-card {
+  display: none;
+}
+
+html[data-show-secondary-platforms="false"] .platform-reveal-inline,
+html[data-show-secondary-platforms="false"] .platform-chip-row {
+  display: none;
+}
+
+html[data-external-discovery-show-external-songs="false"] [data-external-feed-kind="external_song"],
+html[data-external-discovery-show-external-artists="false"] [data-external-feed-kind="external_artist"],
+html[data-external-discovery-show-recent-releases="false"] [data-external-feed-kind="recent_release"],
+html[data-external-discovery-show-trending-external-content="false"] [data-external-feed-kind="trending_external"] {
+  display: none;
+}
+
 .offline-community-summary {
   display: var(--community-visibility-whileYouWereAway, block);
 }
@@ -10072,6 +10144,19 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   gap: 8px;
   padding: 10px;
   text-transform: capitalize;
+}
+
+.control-divider {
+  background: var(--line);
+  height: 1px;
+  margin: 4px 0;
+  width: 100%;
+}
+
+.control-mini-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .danger-toggles label {

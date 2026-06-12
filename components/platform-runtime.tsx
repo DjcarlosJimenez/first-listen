@@ -135,6 +135,21 @@ function applyControlConfig(config: PlatformControlConfig) {
   root.dataset.externalSongBehavior = config.discovery.externalContent.behavior;
   root.dataset.externalDiscoveryPlacement =
     config.discovery.externalContent.placement;
+  root.dataset.platformResolutionMode =
+    config.discovery.platformResolution.engineMode;
+  root.dataset.showPlatformRecommendations = String(
+    config.discovery.platformResolution.showPlatformRecommendations,
+  );
+  root.dataset.showSecondaryPlatforms = String(
+    config.discovery.platformResolution.showSecondaryPlatforms,
+  );
+  for (const [field, enabled] of Object.entries(
+    config.discovery.externalDiscovery,
+  )) {
+    root.dataset[
+      `externalDiscovery${field[0].toUpperCase()}${field.slice(1)}`
+    ] = String(enabled);
+  }
   root.dataset.membershipPreviewTier = config.membership.previewTier;
   root.dataset.membershipSupportWallEnabled = String(
     config.membership.supportWall.enabled,

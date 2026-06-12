@@ -141,6 +141,29 @@ function mapGuestSongs(rows: Array<Record<string, unknown>>): Song[] {
     coverUrl: safeCoverUrl(String(row.cover_image_url)),
     link: String(row.music_url),
     platform: displayPlatform[String(row.platform)] ?? "YouTube",
+    platformLinks: Array.isArray(row.platform_links)
+      ? row.platform_links.map((link) => {
+          const item = link as Record<string, unknown>;
+          return {
+            platform:
+              displayPlatform[String(item.platform)] ??
+              displayPlatform[String(row.platform)] ??
+              "YouTube",
+            url: String(item.music_url ?? row.music_url),
+            primary: Boolean(item.is_primary),
+            resolutionSource:
+              item.resolution_source === "manual" ||
+              item.resolution_source === "inferred"
+                ? item.resolution_source
+                : "submitted",
+            confidenceScore: Number(item.confidence_score ?? 100),
+          };
+        })
+      : undefined,
+    recommendedPlatform:
+      displayPlatform[String(row.recommended_platform)] ??
+      displayPlatform[String(row.platform)] ??
+      "YouTube",
     genre: String(row.genre) as Song["genre"],
     language: String(row.song_language) as Song["language"],
     feedbackFocus: (row.feedback_focus ?? []) as Song["feedbackFocus"],

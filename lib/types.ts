@@ -24,6 +24,14 @@ export type ContentEconomySetting = {
   activationPending: boolean;
 };
 
+export type SongPlatformLink = {
+  platform: Platform;
+  url: string;
+  primary: boolean;
+  resolutionSource: "submitted" | "inferred" | "manual";
+  confidenceScore: number;
+};
+
 export type Song = {
   id: string;
   artistId?: string;
@@ -36,6 +44,8 @@ export type Song = {
   country: string;
   platform: Platform;
   link: string;
+  platformLinks?: SongPlatformLink[];
+  recommendedPlatform?: Platform;
   coverUrl: string;
   accent: string;
   submittedAt: string;
@@ -85,6 +95,8 @@ export type SongDashboardSummary = {
   coverUrl: string;
   link: string;
   platform: Platform;
+  platformLinks?: SongPlatformLink[];
+  recommendedPlatform?: Platform;
   genre: string;
   language: string;
   submittedAt: string;
@@ -163,6 +175,8 @@ export type DiscoverySong = {
   coverUrl: string;
   link: string;
   platform: Platform;
+  platformLinks?: SongPlatformLink[];
+  recommendedPlatform?: Platform;
   genre: string;
   language: string;
   reviewsReceived: number;
@@ -171,6 +185,7 @@ export type DiscoverySong = {
   totalListeningSeconds: number;
   completionRate: number;
   badge?: string;
+  feedKind?: string;
   position?: number;
   rankingScore?: number;
 };
