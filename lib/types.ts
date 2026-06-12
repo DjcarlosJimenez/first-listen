@@ -154,6 +154,9 @@ export type ListeningBankStatus = {
   todayValidListens: number;
   todayCompleteListens: number;
   todayAverageCompletionRate: number;
+  lastRejectionReasonCode?: string;
+  lastRejectionReasonDescription?: string;
+  lastRejectionAt?: string;
 };
 
 export type ListenerImpact = {

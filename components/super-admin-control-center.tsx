@@ -109,6 +109,9 @@ export type ControlCenterPayload = {
       current_listening_bank?: number;
       current_token_balance?: number;
       last_approval_event?: string | null;
+      last_rejection_event?: string | null;
+      last_rejection_reason_code?: string | null;
+      last_rejection_reason_description?: string | null;
       last_reward_event?: string | null;
       last_bank_update?: string | null;
       last_calculation_timestamp?: string | null;
@@ -128,6 +131,23 @@ export type ControlCenterPayload = {
       details: Record<string, unknown>;
       created_at: string;
     }>;
+    rejection_insights?: {
+      last_100_rejections?: Array<{
+        id: string;
+        user_id: string | null;
+        listening_session_id: string | null;
+        song_id: string | null;
+        reason_code: string;
+        reason_description: string;
+        created_at: string;
+      }>;
+      reason_frequency?: Array<{
+        reason_code: string;
+        reason_description: string;
+        total: number;
+      }>;
+      most_common_failure_causes?: string[];
+    };
     events: PlatformControlConfig["listeningBank"]["events"];
     active_event?: {
       event_id?: string;
@@ -1551,6 +1571,11 @@ export function SuperAdminControlCenter({
   const listeningTestScenarios =
     listeningBankPayload?.test_scenarios ?? Object.keys(listeningTestLabels);
   const activeListeningEvent = listeningBankPayload?.active_event;
+  const rejectionInsights = listeningBankPayload?.rejection_insights ?? {};
+  const rejectionFrequency = rejectionInsights.reason_frequency ?? [];
+  const lastRejections = rejectionInsights.last_100_rejections ?? [];
+  const commonFailureCauses =
+    rejectionInsights.most_common_failure_causes ?? [];
 
   return (
     <section className="control-center">
@@ -2178,6 +2203,57 @@ export function SuperAdminControlCenter({
                   ))}
                 </select>
               </label>
+            </div>
+          </article>
+
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Why Was This Rejected?</span>
+                <h3>Last 100 rejection reasons</h3>
+                <p>
+                  Inspect failure causes so users can understand exactly why
+                  listening time did not count.
+                </p>
+              </div>
+            </div>
+            <div className="rejection-insights-grid">
+              <section>
+                <h4>Reason Frequency</h4>
+                {rejectionFrequency.map((reason) => (
+                  <div key={reason.reason_code}>
+                    <strong>{reason.reason_description}</strong>
+                    <span>{reason.reason_code}</span>
+                    <b>{reason.total}</b>
+                  </div>
+                ))}
+                {!rejectionFrequency.length && (
+                  <p>No rejection reasons have been recorded yet.</p>
+                )}
+              </section>
+              <section>
+                <h4>Most Common Failure Causes</h4>
+                {commonFailureCauses.map((cause, index) => (
+                  <div key={`${cause}-${index}`}>
+                    <strong>{cause}</strong>
+                  </div>
+                ))}
+                {!commonFailureCauses.length && (
+                  <p>No failure causes are available yet.</p>
+                )}
+              </section>
+            </div>
+            <div className="listening-rejection-list">
+              {lastRejections.map((rejection) => (
+                <div key={rejection.id}>
+                  <strong>{rejection.reason_description}</strong>
+                  <span>{rejection.reason_code}</span>
+                  <small>{new Date(rejection.created_at).toLocaleString()}</small>
+                </div>
+              ))}
+              {!lastRejections.length && (
+                <p>No rejected listening activity has been recorded yet.</p>
+              )}
             </div>
           </article>
 
@@ -3881,6 +3957,13 @@ export function SuperAdminControlCenter({
               </div>
               <div>
                 <strong>
+                  {listeningDiagnostics.last_rejection_reason_description ??
+                    "None"}
+                </strong>
+                <span>Last Rejection Reason</span>
+              </div>
+              <div>
+                <strong>
                   {formatBankSeconds(
                     Number(listeningDiagnostics.current_listening_bank ?? 0),
                   )}
@@ -3950,6 +4033,23 @@ export function SuperAdminControlCenter({
                 <div key={entry.id}>
                   <strong>{entry.title}</strong>
                   <span>{entry.status}</span>
+                  {entry.status === "rejected" && (
+                    <p className="listening-rejection-detail">
+                      Reason:{" "}
+                      <b>
+                        {String(
+                          entry.details?.reason_description ??
+                            "Reason unavailable",
+                        )}
+                      </b>
+                      <small>
+                        {String(
+                          entry.details?.reason_code ??
+                            "legacy_reason_unavailable",
+                        )}
+                      </small>
+                    </p>
+                  )}
                   <small>
                     {formatBankSeconds(Math.abs(Number(entry.amount_seconds ?? 0)))} /{" "}
                     {Number(entry.token_amount ?? 0)} tokens /{" "}

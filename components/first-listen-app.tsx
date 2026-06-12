@@ -2502,6 +2502,17 @@ function ListeningBankPanel({
         <strong>{status.todayCompleteListens} {spanish ? "completas" : "complete"}</strong>
         <strong>{Math.round(status.todayAverageCompletionRate)}% {spanish ? "promedio" : "average completion"}</strong>
       </div>
+      {status.lastRejectionReasonDescription && (
+        <div className="listening-bank-rejection-reason">
+          <span>{spanish ? "Ultimo rechazo" : "Last rejection"}</span>
+          <strong>{status.lastRejectionReasonDescription}</strong>
+          <small>
+            {status.lastRejectionAt
+              ? new Date(status.lastRejectionAt).toLocaleString(locale)
+              : status.lastRejectionReasonCode ?? "rejection recorded"}
+          </small>
+        </div>
+      )}
       <div className="listening-bank-progress listening-bank-token-conversion">
         <div>
           <span>{spanish ? "Siguiente token" : "Next token"}</span>

@@ -68,6 +68,9 @@ type ListeningBankRow = {
   today_valid_listens: number;
   today_complete_listens: number;
   today_average_completion_rate: number;
+  last_rejection_reason_code?: string | null;
+  last_rejection_reason_description?: string | null;
+  last_rejection_at?: string | null;
 };
 
 type DiscoveryRow = {
@@ -445,6 +448,11 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     todayAverageCompletionRate: Number(
       listeningRow?.today_average_completion_rate ?? 0,
     ),
+    lastRejectionReasonCode:
+      listeningRow?.last_rejection_reason_code ?? undefined,
+    lastRejectionReasonDescription:
+      listeningRow?.last_rejection_reason_description ?? undefined,
+    lastRejectionAt: listeningRow?.last_rejection_at ?? undefined,
   };
 
   const followedArtists: FollowedArtist[] = (

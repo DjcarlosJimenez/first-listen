@@ -1187,6 +1187,32 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   font-size: 9px;
 }
 
+.listening-bank-rejection-reason {
+  background: rgba(255, 189, 89, 0.1);
+  border: 1px solid rgba(255, 189, 89, 0.24);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  padding: 11px 13px;
+}
+
+.listening-bank-rejection-reason span {
+  color: #ffc878;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.listening-bank-rejection-reason strong {
+  color: white;
+  font-size: 11px;
+}
+
+.listening-bank-rejection-reason small {
+  color: #9ba39c;
+  font-size: 8px;
+}
+
 .listening-bank-progress {
   align-self: center;
 }
@@ -7566,6 +7592,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   }
 
   .listening-diagnostics-grid,
+  .rejection-insights-grid,
   .owner-device-layout-grid {
     grid-template-columns: 1fr;
   }
@@ -9935,6 +9962,87 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   font-size: 8px;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.listening-rejection-detail {
+  background: #fff8e8;
+  border: 1px solid #f0d39a;
+  border-radius: 10px;
+  color: #6c541d;
+  display: grid;
+  font-size: 10px;
+  gap: 3px;
+  margin: 0;
+  padding: 8px;
+}
+
+.listening-rejection-detail b {
+  color: #171a18;
+}
+
+.listening-rejection-detail small {
+  color: #9a7c35;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.rejection-insights-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rejection-insights-grid section,
+.listening-rejection-list {
+  background: #f7f9f4;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  gap: 9px;
+  padding: 13px;
+}
+
+.rejection-insights-grid h4 {
+  font-size: 12px;
+  margin: 0;
+}
+
+.rejection-insights-grid div,
+.listening-rejection-list div {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 5px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding-top: 9px;
+}
+
+.rejection-insights-grid div:first-of-type,
+.listening-rejection-list div:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.rejection-insights-grid span,
+.listening-rejection-list span {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.rejection-insights-grid b {
+  background: #eef2e9;
+  border-radius: 999px;
+  font-size: 10px;
+  padding: 5px 8px;
+}
+
+.listening-rejection-list {
+  margin-top: 14px;
+  max-height: 420px;
+  overflow: auto;
 }
 
 .listening-test-actions {
