@@ -190,11 +190,11 @@ function applyControlConfig(config: PlatformControlConfig) {
   );
   root.style.setProperty(
     "--listening-bank-desktop-order",
-    String(config.listeningBank.module.desktop.position),
+    String(config.listeningBank.module.desktop.position * 2),
   );
   root.style.setProperty(
     "--listening-bank-mobile-order",
-    String(config.listeningBank.module.mobile.position),
+    String(config.listeningBank.module.mobile.position * 2),
   );
   root.dataset.desktopActionLayout = config.ui.desktop.actionLayout;
   root.dataset.mobileActionLayout = config.ui.mobile.actionLayout;

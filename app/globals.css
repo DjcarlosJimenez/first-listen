@@ -970,12 +970,60 @@ button {
 }
 
 .dashboard-main {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.65fr);
   min-width: 0;
 }
 
 .dashboard-empty {
   display: grid;
   gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.65fr);
+}
+
+.dashboard-main > *,
+.dashboard-empty > * {
+  grid-column: 1 / -1;
+}
+
+.dashboard-main > .dashboard-intro {
+  order: 1;
+}
+
+.dashboard-main > .active-song {
+  order: 3;
+}
+
+.dashboard-main > .stats-grid {
+  order: 5;
+}
+
+.dashboard-main > .song-performance-panel {
+  order: 7;
+}
+
+.dashboard-main > .daily-mission-panel,
+.dashboard-empty > .daily-mission-panel {
+  order: 9;
+}
+
+.dashboard-main > .dashboard-discovery,
+.dashboard-empty > .dashboard-discovery {
+  order: 11;
+}
+
+.dashboard-main > .community-programs-panel,
+.dashboard-empty > .community-programs-panel {
+  order: 13;
+}
+
+.dashboard-main > .insights-grid {
+  order: 15;
+}
+
+.dashboard-empty > .review-complete-card {
+  order: 15;
 }
 
 .listening-bank-panel {
@@ -993,6 +1041,11 @@ button {
   order: var(--listening-bank-desktop-order, initial);
 }
 
+.dashboard-main > .listening-bank-panel,
+.dashboard-empty > .listening-bank-panel {
+  order: var(--listening-bank-desktop-order, 10);
+}
+
 html[data-listening-bank-visible="false"] .listening-bank-panel,
 html[data-listening-bank-show-approved-minutes="false"] .listening-bank-approved-field,
 html[data-listening-bank-show-pending-minutes="false"] .listening-bank-pending-field,
@@ -1008,6 +1061,21 @@ html[data-listening-bank-desktop-visibility="mobile_only"] .listening-bank-panel
 }
 
 html[data-listening-bank-desktop-column="full_width"] .listening-bank-panel {
+  grid-column: 1 / -1;
+}
+
+html[data-listening-bank-desktop-column="left"] .dashboard-main > .listening-bank-panel,
+html[data-listening-bank-desktop-column="left"] .dashboard-empty > .listening-bank-panel {
+  grid-column: 1;
+}
+
+html[data-listening-bank-desktop-column="right"] .dashboard-main > .listening-bank-panel,
+html[data-listening-bank-desktop-column="right"] .dashboard-empty > .listening-bank-panel {
+  grid-column: 2;
+}
+
+html[data-listening-bank-desktop-column="full_width"] .dashboard-main > .listening-bank-panel,
+html[data-listening-bank-desktop-column="full_width"] .dashboard-empty > .listening-bank-panel {
   grid-column: 1 / -1;
 }
 
@@ -7456,6 +7524,17 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
   .review-card {
     grid-row: 1;
+  }
+
+  .dashboard-main,
+  .dashboard-empty {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-main > .listening-bank-panel,
+  .dashboard-empty > .listening-bank-panel {
+    grid-column: 1 / -1;
+    order: var(--listening-bank-mobile-order, 10);
   }
 
   .review-secondary-stats {
