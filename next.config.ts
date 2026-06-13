@@ -25,6 +25,8 @@ const nextConfig: NextConfig = {
               `connect-src 'self' https://*.supabase.co wss://*.supabase.co${isDevelopment ? " ws:" : ""}`,
               "font-src 'self' data:",
               "frame-src https://www.youtube-nocookie.com https://www.youtube.com https://open.spotify.com https://w.soundcloud.com https://embed.music.apple.com",
+              "worker-src 'self'",
+              "manifest-src 'self'",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
@@ -35,6 +37,16 @@ const nextConfig: NextConfig = {
             key: "Strict-Transport-Security",
             value: "max-age=31536000; includeSubDomains",
           },
+        ],
+      },
+      {
+        source: "/service-worker.js",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
+          },
+          { key: "Service-Worker-Allowed", value: "/" },
         ],
       },
     ];

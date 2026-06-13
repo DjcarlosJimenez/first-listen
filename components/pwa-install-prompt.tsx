@@ -1,0 +1,169 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Download, Share2, Smartphone, X } from "lucide-react";
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
+const DISMISS_KEY = "first-listen-install-dismissed-at";
+const DISMISS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+function isStandaloneMode() {
+  if (typeof window === "undefined") return false;
+  const navigatorWithStandalone = window.navigator as Navigator & {
+    standalone?: boolean;
+  };
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    navigatorWithStandalone.standalone === true
+  );
+}
+
+function isIosSafari() {
+  if (typeof window === "undefined") return false;
+  const userAgent = window.navigator.userAgent;
+  const platform = window.navigator.platform;
+  const touchPoints = window.navigator.maxTouchPoints;
+  const isiOS =
+    /iPad|iPhone|iPod/.test(userAgent) ||
+    (platform === "MacIntel" && touchPoints > 1);
+  const isSafari =
+    /Safari/.test(userAgent) &&
+    !/CriOS|FxiOS|EdgiOS|OPiOS/.test(userAgent);
+  return isiOS && isSafari;
+}
+
+function recentlyDismissed() {
+  const value = window.localStorage.getItem(DISMISS_KEY);
+  if (!value) return false;
+  const dismissedAt = Number(value);
+  return Number.isFinite(dismissedAt) && Date.now() - dismissedAt < DISMISS_WINDOW_MS;
+}
+
+export function PwaInstallPrompt() {
+  const [promptEvent, setPromptEvent] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [iosSafari, setIosSafari] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  const [installing, setInstalling] = useState(false);
+
+  const canShowInstructions = useMemo(
+    () => iosSafari && !installed,
+    [installed, iosSafari],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const standalone = isStandaloneMode();
+    setInstalled(standalone);
+    document.documentElement.dataset.pwaStandalone = String(standalone);
+    setIosSafari(isIosSafari());
+
+    if (
+      "serviceWorker" in navigator &&
+      (window.location.protocol === "https:" ||
+        window.location.hostname === "localhost")
+    ) {
+      const register = () => {
+        navigator.serviceWorker
+          .register("/service-worker.js", { scope: "/" })
+          .catch(() => undefined);
+      };
+      if (document.readyState === "complete") register();
+      else window.addEventListener("load", register, { once: true });
+    }
+
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setPromptEvent(event as BeforeInstallPromptEvent);
+      if (!recentlyDismissed() && !isStandaloneMode()) setVisible(true);
+    };
+    const onInstalled = () => {
+      setInstalled(true);
+      setVisible(false);
+      document.documentElement.dataset.pwaStandalone = "true";
+    };
+    const onDisplayModeChange = (event: MediaQueryListEvent) => {
+      setInstalled(event.matches);
+      document.documentElement.dataset.pwaStandalone = String(event.matches);
+    };
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    const media = window.matchMedia("(display-mode: standalone)");
+    media.addEventListener("change", onDisplayModeChange);
+
+    const iosTimer = window.setTimeout(() => {
+      if (isIosSafari() && !recentlyDismissed() && !isStandaloneMode()) {
+        setVisible(true);
+      }
+    }, 1200);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+      media.removeEventListener("change", onDisplayModeChange);
+      window.clearTimeout(iosTimer);
+    };
+  }, []);
+
+  if (installed || !visible || (!promptEvent && !canShowInstructions)) {
+    return null;
+  }
+
+  const dismiss = () => {
+    window.localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    setVisible(false);
+  };
+
+  const install = async () => {
+    if (!promptEvent) return;
+    setInstalling(true);
+    await promptEvent.prompt();
+    const choice = await promptEvent.userChoice;
+    setInstalling(false);
+    if (choice.outcome === "accepted") {
+      setInstalled(true);
+      setVisible(false);
+      return;
+    }
+    dismiss();
+  };
+
+  return (
+    <aside className="pwa-install-card" aria-live="polite">
+      <div className="pwa-install-icon" aria-hidden="true">
+        <Smartphone size={20} />
+      </div>
+      <div>
+        <strong>Install First Listen</strong>
+        {promptEvent ? (
+          <span>
+            Add the First Listen icon to your home screen and reopen the app
+            without searching for the website.
+          </span>
+        ) : (
+          <span>
+            On iPhone or iPad, tap Share <Share2 size={13} /> then Add to Home
+            Screen.
+          </span>
+        )}
+      </div>
+      <div className="pwa-install-actions">
+        {promptEvent && (
+          <button disabled={installing} onClick={() => void install()} type="button">
+            <Download size={14} /> {installing ? "Installing..." : "Install"}
+          </button>
+        )}
+        <button aria-label="Dismiss install prompt" onClick={dismiss} type="button">
+          <X size={14} />
+        </button>
+      </div>
+    </aside>
+  );
+}

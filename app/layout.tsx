@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { PlatformRuntime } from "@/components/platform-runtime";
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import {
   defaultPlatformControlConfig,
   mapPlatformControlState,
@@ -14,6 +15,15 @@ export const metadata: Metadata = {
   description:
     "Get your first listens, views, reactions, and engagement from real people before spending money on promotion.",
   manifest: "/manifest.webmanifest",
+  applicationName: "First Listen",
+  appleWebApp: {
+    capable: true,
+    title: "First Listen",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
   icons: {
     icon: [
       { url: "/favicon.ico" },
@@ -41,6 +51,11 @@ export const metadata: Metadata = {
       },
     ],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#171a18",
+  colorScheme: "light dark",
 };
 
 export default async function RootLayout({
@@ -71,6 +86,7 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <PlatformRuntime initialState={initialState} />
+        <PwaInstallPrompt />
         {children}
       </body>
     </html>
