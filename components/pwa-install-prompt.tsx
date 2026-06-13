@@ -51,10 +51,7 @@ export function PwaInstallPrompt() {
   const [installed, setInstalled] = useState(false);
   const [installing, setInstalling] = useState(false);
 
-  const canShowInstructions = useMemo(
-    () => iosSafari && !installed,
-    [installed, iosSafari],
-  );
+  const canShowInstructions = useMemo(() => !installed, [installed]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -98,17 +95,17 @@ export function PwaInstallPrompt() {
     const media = window.matchMedia("(display-mode: standalone)");
     media.addEventListener("change", onDisplayModeChange);
 
-    const iosTimer = window.setTimeout(() => {
-      if (isIosSafari() && !recentlyDismissed() && !isStandaloneMode()) {
+    const instructionTimer = window.setTimeout(() => {
+      if (!recentlyDismissed() && !isStandaloneMode()) {
         setVisible(true);
       }
-    }, 1200);
+    }, 1600);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
       media.removeEventListener("change", onDisplayModeChange);
-      window.clearTimeout(iosTimer);
+      window.clearTimeout(instructionTimer);
     };
   }, []);
 
@@ -147,10 +144,16 @@ export function PwaInstallPrompt() {
             Add the First Listen icon to your home screen and reopen the app
             without searching for the website.
           </span>
-        ) : (
+        ) : iosSafari ? (
           <span>
             On iPhone or iPad, tap Share <Share2 size={13} /> then Add to Home
             Screen.
+          </span>
+        ) : (
+          <span>
+            Use your browser menu to install First Listen or add it to your
+            home screen. Chrome and Samsung Internet may also show an Install
+            button here.
           </span>
         )}
       </div>
@@ -158,6 +161,11 @@ export function PwaInstallPrompt() {
         {promptEvent && (
           <button disabled={installing} onClick={() => void install()} type="button">
             <Download size={14} /> {installing ? "Installing..." : "Install"}
+          </button>
+        )}
+        {!promptEvent && (
+          <button onClick={dismiss} type="button">
+            Got it
           </button>
         )}
         <button aria-label="Dismiss install prompt" onClick={dismiss} type="button">
