@@ -113,6 +113,11 @@ import {
   dismissYoutubeMusicDiscovery,
   shouldShowYoutubeMusicDiscoveryRecommendation,
 } from "@/lib/youtube-music-discovery";
+import {
+  defaultPlatformControlConfig,
+  type DiscoveryHubSectionKey,
+  type PlatformControlConfig,
+} from "@/lib/platform-control";
 import type {
   AccountSummary,
   CommunityNotification,
@@ -1373,6 +1378,7 @@ function ReviewView({
   onAutoPlayChange,
   externalRedirectNoticeDisabled,
   onExternalRedirectPreferenceChange,
+  platformConfig,
 }: {
   reviewCount: number;
   reviewCredits: number;
@@ -1417,6 +1423,7 @@ function ReviewView({
   onAutoPlayChange: (enabled: boolean) => void;
   externalRedirectNoticeDisabled: boolean;
   onExternalRedirectPreferenceChange: (disabled: boolean) => void;
+  platformConfig: PlatformControlConfig;
 }) {
   const reviewerProfile = useMemo(
     () => ({ languages: listenerLanguages, genrePreferences, activityScore }),
@@ -2450,6 +2457,7 @@ function ReviewView({
         externalDiscoverySongs={externalDiscoverySongs}
         externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
         locale={locale}
+        platformConfig={platformConfig}
         onListeningCredited={onListeningCredited}
         onExternalRedirectPreferenceChange={
           onExternalRedirectPreferenceChange
@@ -2766,7 +2774,6 @@ function ListeningBankPanel({
 }
 
 const DISCOVERY_HEARD_HISTORY_KEY = "first-listen-discovery-heard-history";
-const RECENTLY_HEARD_WINDOW_MS = 1000 * 60 * 60 * 24;
 
 function readDiscoveryHeardHistory(): Record<string, number> {
   if (typeof window === "undefined") return {};
@@ -2863,10 +2870,16 @@ function sortDiscoverySongs(
 function smartDiscoveryPick(
   songs: DiscoverySong[],
   heardHistory: Record<string, number>,
+  options: {
+    randomReplayPoolSize?: number;
+    replayWindowHours?: number;
+    underexposedBoost?: number;
+  } = {},
 ) {
   if (!songs.length) return null;
-  const ranked = rankDiscoveryQueue(songs, heardHistory);
-  const replayPool = ranked.slice(0, Math.min(6, ranked.length));
+  const ranked = rankDiscoveryQueue(songs, heardHistory, options);
+  const poolSize = Math.max(1, Math.round(options.randomReplayPoolSize ?? 6));
+  const replayPool = ranked.slice(0, Math.min(poolSize, ranked.length));
   return replayPool[Math.floor(Math.random() * replayPool.length)] ?? ranked[0];
 }
 
@@ -2938,22 +2951,30 @@ type DiscoveryQueueState = {
 function rankDiscoveryQueue(
   songs: DiscoverySong[],
   heardHistory: Record<string, number>,
+  options: {
+    replayWindowHours?: number;
+    underexposedBoost?: number;
+  } = {},
 ) {
   const now = Date.now();
+  const replayWindowMs =
+    Math.max(1, options.replayWindowHours ?? 24) * 60 * 60 * 1000;
+  const underexposedBoost = Math.max(0, options.underexposedBoost ?? 1);
   return [...songs].sort((left, right) => {
     const leftHeardAt = heardHistory[left.id] ?? 0;
     const rightHeardAt = heardHistory[right.id] ?? 0;
     const leftRecentlyHeard =
-      leftHeardAt > 0 && now - leftHeardAt < RECENTLY_HEARD_WINDOW_MS;
+      leftHeardAt > 0 && now - leftHeardAt < replayWindowMs;
     const rightRecentlyHeard =
-      rightHeardAt > 0 && now - rightHeardAt < RECENTLY_HEARD_WINDOW_MS;
+      rightHeardAt > 0 && now - rightHeardAt < replayWindowMs;
     if (leftRecentlyHeard !== rightRecentlyHeard) {
       return leftRecentlyHeard ? 1 : -1;
     }
     if (Boolean(leftHeardAt) !== Boolean(rightHeardAt)) {
       return leftHeardAt ? 1 : -1;
     }
-    const exposureDifference = exposureScore(left) - exposureScore(right);
+    const exposureDifference =
+      (exposureScore(left) - exposureScore(right)) * underexposedBoost;
     if (Math.abs(exposureDifference) > 0.1) return exposureDifference;
     return trendScore(right) - trendScore(left);
   });
@@ -3511,6 +3532,7 @@ function DiscoverySections({
   topTenSongs,
   externalDiscoverySongs,
   locale,
+  platformConfig,
   onListeningCredited,
   externalRedirectNoticeDisabled,
   onExternalRedirectPreferenceChange,
@@ -3519,6 +3541,7 @@ function DiscoverySections({
   topTenSongs: DiscoverySong[];
   externalDiscoverySongs: DiscoverySong[];
   locale: InterfaceLocale;
+  platformConfig: PlatformControlConfig;
   onListeningCredited: (
     seconds: number,
     becameValid: boolean,
@@ -3553,12 +3576,47 @@ function DiscoverySections({
     useState<DiscoveryCategoryKey | null>(null);
   const [expandedGenre, setExpandedGenre] = useState<string | null>(null);
   const spanish = locale === "es";
-  const catalogPreviewLimit = 8;
+  const discoveryHub = platformConfig.discovery.hub;
+  const limits = discoveryHub.limits;
+  const queuePolicy = discoveryHub.queuePolicy;
+  const sectionSettings = new Map(
+    discoveryHub.sections.map((section) => [section.key, section]),
+  );
+  const sectionTitle = (
+    key: DiscoveryHubSectionKey,
+    fallback: string,
+  ) => sectionSettings.get(key)?.title[locale] || fallback;
+  const sectionVisible = (key: DiscoveryHubSectionKey) => {
+    const setting = sectionSettings.get(key);
+    if (setting?.visible === false) return false;
+    const modules = platformConfig.discovery.modules;
+    if (key === "spotlight") return modules.spotlight;
+    if (key === "top_results") return modules.topResults || modules.rankings;
+    if (key === "external_discovery") {
+      return (
+        platformConfig.discovery.externalContent.visibility !== "hidden" &&
+        platformConfig.discovery.externalDiscovery.showExternalSongs
+      );
+    }
+    if (key === "trending") return modules.trending;
+    if (key === "newest_songs") return modules.newestSongs;
+    if (key === "most_supported") return modules.mostSupported;
+    return true;
+  };
+  const catalogPreviewLimit = Math.max(1, limits.catalogPreviewCount);
+  const queueRankOptions = useMemo(
+    () => ({
+      replayWindowHours: queuePolicy.replayWindowHours,
+      underexposedBoost: queuePolicy.underexposedBoost,
+    }),
+    [queuePolicy.replayWindowHours, queuePolicy.underexposedBoost],
+  );
 
   const spotlightIds = new Set(spotlightSongs.map((song) => song.id));
   const visibleTopTenSongs = topTenSongs.filter(
     (song) => !spotlightIds.has(song.id),
   );
+  const visibleSpotlightSongs = spotlightSongs.slice(0, limits.featuredCount);
   const allDiscoverySongs = useMemo(
     () =>
       mergeDiscoverySongs(
@@ -3576,13 +3634,16 @@ function DiscoverySections({
         (left, right) =>
           exposureScore(left) - exposureScore(right) ||
           trendScore(right) - trendScore(left),
-        catalogLimit,
+        Math.min(catalogLimit, queuePolicy.queueLength),
       ),
-    [allDiscoverySongs, catalogLimit],
+    [allDiscoverySongs, catalogLimit, queuePolicy.queueLength],
   );
   const topTenQueueSongs = useMemo(
-    () => visibleTopTenSongs.filter(isQueuePlayableDiscoverySong),
-    [visibleTopTenSongs],
+    () =>
+      visibleTopTenSongs
+        .slice(0, limits.topTenCount)
+        .filter(isQueuePlayableDiscoverySong),
+    [limits.topTenCount, visibleTopTenSongs],
   );
   const externalPlatformSongs = useMemo(
     () =>
@@ -3590,12 +3651,12 @@ function DiscoverySections({
         allDiscoverySongs.filter(hasExternalDiscoveryDestination),
         (left, right) =>
           Number(right.feedKind === "external_song") -
-            Number(left.feedKind === "external_song") ||
+          Number(left.feedKind === "external_song") ||
           submittedTime(right) - submittedTime(left) ||
           trendScore(right) - trendScore(left),
-        catalogLimit,
+        limits.externalCount,
       ),
-    [allDiscoverySongs, catalogLimit],
+    [allDiscoverySongs, limits.externalCount],
   );
   const trendingSongs = useMemo(() => {
     const explicitTrending = allDiscoverySongs.filter(
@@ -3604,26 +3665,26 @@ function DiscoverySections({
     return sortDiscoverySongs(
       explicitTrending.length ? explicitTrending : allDiscoverySongs,
       (left, right) => trendScore(right) - trendScore(left),
-      catalogLimit,
+      limits.trendingCount,
     );
-  }, [allDiscoverySongs, catalogLimit]);
+  }, [allDiscoverySongs, limits.trendingCount]);
   const newestSongs = useMemo(
     () =>
       sortDiscoverySongs(
         allDiscoverySongs,
         (left, right) => submittedTime(right) - submittedTime(left),
-        catalogLimit,
+        limits.newReleaseCount,
       ),
-    [allDiscoverySongs, catalogLimit],
+    [allDiscoverySongs, limits.newReleaseCount],
   );
   const mostSupportedSongs = useMemo(
     () =>
       sortDiscoverySongs(
         allDiscoverySongs,
         (left, right) => supportScore(right) - supportScore(left),
-        catalogLimit,
+        limits.mostSupportedCount,
       ),
-    [allDiscoverySongs, catalogLimit],
+    [allDiscoverySongs, limits.mostSupportedCount],
   );
   const mostListenedSongs = useMemo(
     () =>
@@ -3632,27 +3693,24 @@ function DiscoverySections({
         (left, right) =>
           right.totalListeningSeconds - left.totalListeningSeconds ||
           right.completionRate - left.completionRate,
-        catalogLimit,
+        limits.mostPlayedCount,
       ),
-    [allDiscoverySongs, catalogLimit],
+    [allDiscoverySongs, limits.mostPlayedCount],
   );
   const randomQueueSongs = useMemo(
-    () => rankDiscoveryQueue(internalPlaybackSongs, heardHistory),
-    [heardHistory, internalPlaybackSongs],
+    () =>
+      rankDiscoveryQueue(internalPlaybackSongs, heardHistory, queueRankOptions)
+        .slice(0, queuePolicy.queueLength),
+    [heardHistory, internalPlaybackSongs, queuePolicy.queueLength, queueRankOptions],
   );
   const genreSections = useMemo(() => {
     const grouped = new Map<string, DiscoverySong[]>();
     for (const song of internalPlaybackSongs) {
       const genre = song.genre || "Other";
+      if (discoveryHub.genres.visibility[genre] === false) continue;
       grouped.set(genre, [...(grouped.get(genre) ?? []), song]);
     }
-    const priorityGenres = [
-      "Cumbia",
-      "Regional Mexican",
-      "Hip Hop",
-      "Bachata",
-      "Chilena",
-    ];
+    const priorityGenres = discoveryHub.genres.order;
     return Array.from(grouped.entries())
       .sort(([left], [right]) => {
         const leftPriority = priorityGenres.indexOf(left);
@@ -3671,11 +3729,18 @@ function DiscoverySections({
           (left, right) =>
             exposureScore(left) - exposureScore(right) ||
             trendScore(right) - trendScore(left),
-          Math.max(1, songs.length),
+          Math.min(Math.max(1, songs.length), queuePolicy.genreQueueSize),
         ),
       }))
-      .filter((section) => section.songs.length > 0);
-  }, [internalPlaybackSongs]);
+      .filter((section) => section.songs.length > 0)
+      .slice(0, limits.genreCount);
+  }, [
+    discoveryHub.genres.order,
+    discoveryHub.genres.visibility,
+    internalPlaybackSongs,
+    limits.genreCount,
+    queuePolicy.genreQueueSize,
+  ]);
   const activeQueueSong = activeQueue?.songs[activeQueue.currentIndex] ?? null;
 
   useEffect(() => {
@@ -3706,9 +3771,21 @@ function DiscoverySections({
       preserveOrder?: boolean;
     }) => {
       if (!songs.length) return;
-      const queueSongs = preserveOrder
+      let queueSongs = preserveOrder
         ? [...songs]
-        : rankDiscoveryQueue(songs, heardHistory);
+        : rankDiscoveryQueue(songs, heardHistory, queueRankOptions);
+      if (id === "random" && queueSongs.length > 1) {
+        const poolSize = Math.min(
+          Math.max(1, queuePolicy.randomReplayPoolSize),
+          queueSongs.length,
+        );
+        const pool = queueSongs.slice(0, poolSize);
+        const firstSong = pool[Math.floor(Math.random() * pool.length)];
+        queueSongs = [
+          firstSong,
+          ...queueSongs.filter((song) => song.id !== firstSong.id),
+        ];
+      }
       const firstSong = queueSongs[0];
       setActiveCardKey(null);
       setExpandedCategory(null);
@@ -3724,12 +3801,35 @@ function DiscoverySections({
       });
       if (firstSong) markSongHeard(firstSong);
     },
-    [heardHistory, markSongHeard],
+    [
+      heardHistory,
+      markSongHeard,
+      queuePolicy.randomReplayPoolSize,
+      queueRankOptions,
+    ],
   );
 
   const advanceDiscoveryQueue = useCallback(() => {
     if (!activeQueue) return;
     const nextIndex = activeQueue.currentIndex + 1;
+    const replaySongs = rankDiscoveryQueue(
+      activeQueue.sourceSongs,
+      heardHistory,
+      queueRankOptions,
+    );
+    if (activeQueue.id === "random" && replaySongs.length > 1) {
+      const poolSize = Math.min(
+        Math.max(1, queuePolicy.randomReplayPoolSize),
+        replaySongs.length,
+      );
+      const pool = replaySongs.slice(0, poolSize);
+      const firstSong = pool[Math.floor(Math.random() * pool.length)];
+      replaySongs.splice(
+        replaySongs.findIndex((song) => song.id === firstSong.id),
+        1,
+      );
+      replaySongs.unshift(firstSong);
+    }
     const nextQueue =
       nextIndex < activeQueue.songs.length
         ? { ...activeQueue, currentIndex: nextIndex }
@@ -3737,12 +3837,18 @@ function DiscoverySections({
             ...activeQueue,
             currentIndex: 0,
             cycle: activeQueue.cycle + 1,
-            songs: rankDiscoveryQueue(activeQueue.sourceSongs, heardHistory),
+            songs: replaySongs,
           };
     const nextSong = nextQueue.songs[nextQueue.currentIndex] ?? null;
     setActiveQueue(nextQueue);
     if (nextSong) markSongHeard(nextSong);
-  }, [activeQueue, heardHistory, markSongHeard]);
+  }, [
+    activeQueue,
+    heardHistory,
+    markSongHeard,
+    queuePolicy.randomReplayPoolSize,
+    queueRankOptions,
+  ]);
 
   const stopDiscoveryQueue = useCallback(() => {
     setActiveQueue(null);
@@ -3778,17 +3884,20 @@ function DiscoverySections({
     });
   };
 
-  const categoryConfigs: DiscoveryCategoryConfig[] = [
+  const rawCategoryConfigs: DiscoveryCategoryConfig[] = [
     {
       key: "top_results",
       icon: <Trophy size={18} />,
-      title: spanish ? "Top 10 por resultados" : "Top 10 by results",
+      title: sectionTitle(
+        "top_results",
+        spanish ? "Top 10 por resultados" : "Top 10 by results",
+      ),
       description: spanish
         ? "Canciones con mejores resultados reales."
         : "Songs performing best with real listeners.",
       primaryLabel: spanish ? "Reproducir Top 10" : "Play Top 10",
       secondaryLabel: spanish ? "Ver lista" : "View list",
-      songs: visibleTopTenSongs,
+      songs: visibleTopTenSongs.slice(0, limits.topTenCount),
       queueSongs: topTenQueueSongs,
       queueable: true,
       preserveOrder: true,
@@ -3801,9 +3910,12 @@ function DiscoverySections({
     {
       key: "internal_playback",
       icon: <Headphones size={18} />,
-      title: spanish
-        ? "Reproduccion dentro de First Listen"
-        : "Playback inside First Listen",
+      title: sectionTitle(
+        "internal_playback",
+        spanish
+          ? "Reproduccion dentro de First Listen"
+          : "Playback inside First Listen",
+      ),
       description: spanish
         ? "Escucha y avanza hacia tokens."
         : "Listen and progress toward tokens.",
@@ -3822,7 +3934,7 @@ function DiscoverySections({
     {
       key: "random",
       icon: <Play size={18} />,
-      title: spanish ? "Modo Aleatorio" : "Random Mode",
+      title: sectionTitle("random", spanish ? "Modo Aleatorio" : "Random Mode"),
       description: spanish
         ? "Canciones no escuchadas primero; repeticion inteligente despues."
         : "Unheard songs first; smart replay after that.",
@@ -3840,7 +3952,10 @@ function DiscoverySections({
     {
       key: "external_discovery",
       icon: <ExternalLink size={18} />,
-      title: spanish ? "Plataformas externas" : "External platforms",
+      title: sectionTitle(
+        "external_discovery",
+        spanish ? "Plataformas externas" : "External platforms",
+      ),
       description: "Spotify / YouTube Music / Apple / SoundCloud",
       primaryLabel: spanish ? "Explorar" : "Explore",
       secondaryLabel: spanish ? "Ver canciones" : "View songs",
@@ -3856,7 +3971,7 @@ function DiscoverySections({
     {
       key: "genres",
       icon: <Music2 size={18} />,
-      title: spanish ? "Generos" : "Genres",
+      title: sectionTitle("genres", spanish ? "Generos" : "Genres"),
       description: spanish
         ? "Reproduce una cola completa por estilo."
         : "Play a full queue by style.",
@@ -3871,7 +3986,7 @@ function DiscoverySections({
     {
       key: "trending",
       icon: <Rocket size={18} />,
-      title: spanish ? "Tendencias" : "Trending",
+      title: sectionTitle("trending", spanish ? "Tendencias" : "Trending"),
       description: spanish
         ? "Canciones con actividad reciente."
         : "Songs with recent momentum.",
@@ -3886,7 +4001,10 @@ function DiscoverySections({
     {
       key: "newest_songs",
       icon: <CalendarDays size={18} />,
-      title: spanish ? "Nuevos lanzamientos" : "New releases",
+      title: sectionTitle(
+        "newest_songs",
+        spanish ? "Nuevos lanzamientos" : "New releases",
+      ),
       description: spanish ? "Publicadas recientemente." : "Recently published.",
       primaryLabel: spanish ? "Ver canciones" : "View songs",
       songs: newestSongs,
@@ -3899,7 +4017,10 @@ function DiscoverySections({
     {
       key: "most_supported",
       icon: <ThumbsUp size={18} />,
-      title: spanish ? "Mas apoyadas" : "Most supported",
+      title: sectionTitle(
+        "most_supported",
+        spanish ? "Mas apoyadas" : "Most supported",
+      ),
       description: spanish
         ? "Guardadas, seguidas y apoyadas por la comunidad."
         : "Saved, followed, and supported by the community.",
@@ -3916,7 +4037,10 @@ function DiscoverySections({
     {
       key: "most_listened",
       icon: <Gauge size={18} />,
-      title: spanish ? "Mas escuchadas" : "Most listened",
+      title: sectionTitle(
+        "most_listened",
+        spanish ? "Mas escuchadas" : "Most listened",
+      ),
       description: spanish
         ? "Mayor actividad de reproduccion."
         : "Highest listening activity.",
@@ -3931,6 +4055,17 @@ function DiscoverySections({
         : "Most listened songs will appear after more playback activity.",
     },
   ];
+  const categoryByKey = new Map(
+    rawCategoryConfigs.map((config) => [config.key, config]),
+  );
+  const categoryConfigForSection = (key: DiscoveryHubSectionKey) =>
+    key === "spotlight" ? undefined : categoryByKey.get(key as DiscoveryCategoryKey);
+  const categoryConfigs = discoveryHub.sections
+    .filter(
+      (section) => section.key !== "spotlight" && sectionVisible(section.key),
+    )
+    .map((section) => categoryConfigForSection(section.key))
+    .filter((config): config is DiscoveryCategoryConfig => Boolean(config));
   const expandedConfig =
     categoryConfigs.find((config) => config.key === expandedCategory) ?? null;
 
@@ -3954,9 +4089,12 @@ function DiscoverySections({
             {spanish ? "Destacadas" : "Featured"}
           </span>
           <h3>
-            {spanish
-              ? "Destacadas por First Listen"
-              : "Featured by First Listen"}
+            {sectionTitle(
+              "spotlight",
+              spanish
+                ? "Destacadas por First Listen"
+                : "Featured by First Listen",
+            )}
           </h3>
         </div>
         <small>
@@ -3965,9 +4103,9 @@ function DiscoverySections({
             : "Selected by First Listen"}
         </small>
       </div>
-      {spotlightSongs.length ? (
+      {visibleSpotlightSongs.length ? (
         <div className="discovery-song-grid">
-          {spotlightSongs.map((song) => {
+          {visibleSpotlightSongs.map((song) => {
             const cardKey = `spotlight-${song.id}`;
             return (
               <DiscoverySongCard
@@ -4042,40 +4180,34 @@ function DiscoverySections({
     );
   };
 
-  return (
-    <div className="dashboard-discovery">
-      <section className="discovery-hub-hero">
-        <div>
-          <span className="eyebrow">
-            <Sparkles size={13} />
-            {spanish ? "Centro de descubrimiento" : "Discovery hub"}
-          </span>
-          <h2>{spanish ? "Descubrir mas musica" : "Discover more music"}</h2>
-          <p>
-            {spanish
-              ? "Encuentra canciones para escuchar, artistas para apoyar y nuevos lanzamientos antes de revisar estadisticas."
-              : "Find songs to play, artists to support, and new releases before digging into analytics."}
-          </p>
-        </div>
-        <div className="discovery-hub-stats">
-          <span>
-            <strong>{allDiscoverySongs.length}</strong>
-            {spanish ? "canciones" : "songs"}
-          </span>
-          <span>
-            <strong>{internalPlaybackSongs.length}</strong>
-            {spanish ? "reproducen aqui" : "play here"}
-          </span>
-          <span>
-            <strong>{genreSections.length}</strong>
-            {spanish ? "generos" : "genres"}
-          </span>
-        </div>
-      </section>
+  const orderedVisibleSections = discoveryHub.sections.filter((section) =>
+    sectionVisible(section.key),
+  );
+  const spotlightIndex = orderedVisibleSections.findIndex(
+    (section) => section.key === "spotlight",
+  );
+  const navigationConfigsBeforeSpotlight =
+    spotlightIndex === -1
+      ? categoryConfigs
+      : orderedVisibleSections
+          .slice(0, spotlightIndex)
+          .map((section) => categoryConfigForSection(section.key))
+          .filter((config): config is DiscoveryCategoryConfig => Boolean(config));
+  const navigationConfigsAfterSpotlight =
+    spotlightIndex === -1
+      ? []
+      : orderedVisibleSections
+          .slice(spotlightIndex + 1)
+          .map((section) => categoryConfigForSection(section.key))
+          .filter((config): config is DiscoveryCategoryConfig => Boolean(config));
 
-      {renderSpotlightSection()}
-
-      <section className="panel discovery-navigation-panel">
+  const renderNavigationPanel = (
+    configs: DiscoveryCategoryConfig[],
+    panelKey: string,
+  ) => {
+    if (!configs.length) return null;
+    return (
+      <section className="panel discovery-navigation-panel" key={panelKey}>
         <div className="panel-heading">
           <div>
             <span className="eyebrow">
@@ -4095,7 +4227,7 @@ function DiscoverySections({
           </small>
         </div>
         <div className="discovery-navigation-grid">
-          {categoryConfigs.map((config) => {
+          {configs.map((config) => {
             const queueSongs = config.queueSongs ?? config.songs;
             const primaryDisabled = config.queueable
               ? queueSongs.length === 0
@@ -4154,6 +4286,43 @@ function DiscoverySections({
           })}
         </div>
       </section>
+    );
+  };
+
+  return (
+    <div className="dashboard-discovery">
+      <section className="discovery-hub-hero">
+        <div>
+          <span className="eyebrow">
+            <Sparkles size={13} />
+            {spanish ? "Centro de descubrimiento" : "Discovery hub"}
+          </span>
+          <h2>{spanish ? "Descubrir mas musica" : "Discover more music"}</h2>
+          <p>
+            {spanish
+              ? "Encuentra canciones para escuchar, artistas para apoyar y nuevos lanzamientos antes de revisar estadisticas."
+              : "Find songs to play, artists to support, and new releases before digging into analytics."}
+          </p>
+        </div>
+        <div className="discovery-hub-stats">
+          <span>
+            <strong>{allDiscoverySongs.length}</strong>
+            {spanish ? "canciones" : "songs"}
+          </span>
+          <span>
+            <strong>{internalPlaybackSongs.length}</strong>
+            {spanish ? "reproducen aqui" : "play here"}
+          </span>
+          <span>
+            <strong>{genreSections.length}</strong>
+            {spanish ? "generos" : "genres"}
+          </span>
+        </div>
+      </section>
+
+      {renderNavigationPanel(navigationConfigsBeforeSpotlight, "before-spotlight")}
+      {spotlightIndex !== -1 && renderSpotlightSection()}
+      {renderNavigationPanel(navigationConfigsAfterSpotlight, "after-spotlight")}
 
       {activeQueue && activeQueueSong && (
         <section className="panel discovery-queue-panel">
@@ -5643,6 +5812,7 @@ function DashboardView({
   onListeningCredited,
   externalRedirectNoticeDisabled,
   onExternalRedirectPreferenceChange,
+  platformConfig,
 }: {
   setView: (view: View) => void;
   founder: boolean;
@@ -5685,6 +5855,7 @@ function DashboardView({
   ) => void;
   externalRedirectNoticeDisabled: boolean;
   onExternalRedirectPreferenceChange: (disabled: boolean) => void;
+  platformConfig: PlatformControlConfig;
 }) {
   const [managedPlatformSongId, setManagedPlatformSongId] = useState<
     string | null
@@ -5711,6 +5882,7 @@ function DashboardView({
           externalDiscoverySongs={externalDiscoverySongs}
           externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
           locale={locale}
+          platformConfig={platformConfig}
           onListeningCredited={onListeningCredited}
           onExternalRedirectPreferenceChange={
             onExternalRedirectPreferenceChange
@@ -5786,6 +5958,7 @@ function DashboardView({
         externalDiscoverySongs={externalDiscoverySongs}
         externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
         locale={locale}
+        platformConfig={platformConfig}
         onListeningCredited={onListeningCredited}
         onExternalRedirectPreferenceChange={
           onExternalRedirectPreferenceChange
@@ -7236,6 +7409,7 @@ type FirstListenAppProps = {
   initialUserSong: Song | null;
   initialSongSummaries: SongDashboardSummary[];
   initialSongReviews: Review[];
+  platformConfig: PlatformControlConfig;
 };
 
 export function FirstListenApp({
@@ -7270,6 +7444,7 @@ export function FirstListenApp({
   initialUserSong,
   initialSongSummaries,
   initialSongReviews,
+  platformConfig = defaultPlatformControlConfig,
 }: FirstListenAppProps) {
   const router = useRouter();
   const copy = getCopy(locale);
@@ -8100,6 +8275,7 @@ export function FirstListenApp({
           onExternalRedirectPreferenceChange={(disabled) =>
             void changeExternalRedirectPreference(disabled)
           }
+          platformConfig={platformConfig}
         />
       );
     }
@@ -8153,6 +8329,7 @@ export function FirstListenApp({
         onExternalRedirectPreferenceChange={(disabled) =>
           void changeExternalRedirectPreference(disabled)
         }
+        platformConfig={platformConfig}
       />
     );
   })();

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { FirstListenApp, type View } from "@/components/first-listen-app";
 import { Onboarding, type OnboardingPreferences } from "@/components/onboarding";
 import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
+import type { PlatformControlConfig } from "@/lib/platform-control";
 import { createClient } from "@/lib/supabase/client";
 import type {
   AccountSummary,
@@ -52,6 +53,7 @@ type ProfileSeed = {
   notificationSummary: CommunityNotificationSummary;
   dailyMission: DailyMissionStatus | null;
   communityPrograms: CommunityProgram[];
+  platformConfig: PlatformControlConfig;
 };
 
 export function ProtectedAppEntry({
@@ -160,6 +162,7 @@ export function ProtectedAppEntry({
       contentEconomy={profile.contentEconomy}
       initialDailyMission={profile.dailyMission}
       initialCommunityPrograms={profile.communityPrograms}
+      platformConfig={profile.platformConfig}
       initialView={initialView}
       listenerLanguages={languages}
       locale={locale}

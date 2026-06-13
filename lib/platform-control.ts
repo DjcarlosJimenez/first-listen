@@ -102,6 +102,171 @@ export type PlatformResolutionProvider =
 
 export type PlatformPresenceIconSize = "compact" | "standard" | "large";
 
+export type DiscoveryHubSectionKey =
+  | "spotlight"
+  | "top_results"
+  | "internal_playback"
+  | "random"
+  | "external_discovery"
+  | "genres"
+  | "trending"
+  | "newest_songs"
+  | "most_supported"
+  | "most_listened";
+
+export type DiscoveryHubSectionConfig = {
+  key: DiscoveryHubSectionKey;
+  visible: boolean;
+  title: Record<HomepageCopyLocale, string>;
+};
+
+export type DiscoveryHubLimitsConfig = {
+  featuredCount: number;
+  topTenCount: number;
+  genreCount: number;
+  externalCount: number;
+  trendingCount: number;
+  newReleaseCount: number;
+  mostSupportedCount: number;
+  mostPlayedCount: number;
+  catalogPreviewCount: number;
+};
+
+export type DiscoveryHubQueuePolicyConfig = {
+  replayWindowHours: number;
+  underexposedBoost: number;
+  queueLength: number;
+  genreQueueSize: number;
+  randomReplayPoolSize: number;
+};
+
+export type DiscoveryHubGenreConfig = {
+  order: string[];
+  visibility: Record<string, boolean>;
+};
+
+export type DiscoveryHubConfig = {
+  sections: DiscoveryHubSectionConfig[];
+  limits: DiscoveryHubLimitsConfig;
+  genres: DiscoveryHubGenreConfig;
+  queuePolicy: DiscoveryHubQueuePolicyConfig;
+};
+
+export const discoveryHubDefaultSections: DiscoveryHubSectionConfig[] = [
+  {
+    key: "spotlight",
+    visible: true,
+    title: {
+      en: "Featured by First Listen",
+      es: "Destacadas por First Listen",
+    },
+  },
+  {
+    key: "top_results",
+    visible: true,
+    title: {
+      en: "Top 10 by results",
+      es: "Top 10 por resultados",
+    },
+  },
+  {
+    key: "internal_playback",
+    visible: true,
+    title: {
+      en: "Playback inside First Listen",
+      es: "Reproduccion dentro de First Listen",
+    },
+  },
+  {
+    key: "random",
+    visible: true,
+    title: {
+      en: "Random Mode",
+      es: "Modo Aleatorio",
+    },
+  },
+  {
+    key: "external_discovery",
+    visible: true,
+    title: {
+      en: "External platforms",
+      es: "Plataformas externas",
+    },
+  },
+  {
+    key: "genres",
+    visible: true,
+    title: {
+      en: "Genres",
+      es: "Generos",
+    },
+  },
+  {
+    key: "trending",
+    visible: true,
+    title: {
+      en: "Trending",
+      es: "Tendencias",
+    },
+  },
+  {
+    key: "newest_songs",
+    visible: true,
+    title: {
+      en: "New releases",
+      es: "Nuevos lanzamientos",
+    },
+  },
+  {
+    key: "most_supported",
+    visible: true,
+    title: {
+      en: "Most supported",
+      es: "Mas apoyadas",
+    },
+  },
+  {
+    key: "most_listened",
+    visible: true,
+    title: {
+      en: "Most listened",
+      es: "Mas escuchadas",
+    },
+  },
+];
+
+export const discoveryHubDefaultConfig: DiscoveryHubConfig = {
+  sections: discoveryHubDefaultSections,
+  limits: {
+    featuredCount: 6,
+    topTenCount: 10,
+    genreCount: 8,
+    externalCount: 8,
+    trendingCount: 8,
+    newReleaseCount: 8,
+    mostSupportedCount: 8,
+    mostPlayedCount: 8,
+    catalogPreviewCount: 8,
+  },
+  genres: {
+    order: [
+      "Cumbia",
+      "Regional Mexican",
+      "Hip Hop",
+      "Bachata",
+      "Chilena",
+    ],
+    visibility: {},
+  },
+  queuePolicy: {
+    replayWindowHours: 24,
+    underexposedBoost: 1,
+    queueLength: 25,
+    genreQueueSize: 25,
+    randomReplayPoolSize: 6,
+  },
+};
+
 export type UiResponsiveSize = {
   iconSize: UiSizePreset;
   iconCustomPx: number;
@@ -324,6 +489,7 @@ export type PlatformControlConfig = {
   };
   discovery: {
     songsPerPage: 10 | 20 | 50 | 100;
+    hub: DiscoveryHubConfig;
     modules: Record<
       | "spotlight"
       | "rankings"
@@ -825,6 +991,7 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
   },
   discovery: {
     songsPerPage: 20,
+    hub: discoveryHubDefaultConfig,
     modules: {
       spotlight: true,
       rankings: true,
@@ -1172,6 +1339,138 @@ function mergeConfig(
   return result;
 }
 
+function clampControlNumber(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return fallback;
+  return Math.round(Math.max(min, Math.min(max, numberValue)));
+}
+
+function normalizeDiscoveryHubConfig(value: unknown): DiscoveryHubConfig {
+  const incoming =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<DiscoveryHubConfig>)
+      : {};
+  const incomingSections = Array.isArray(incoming.sections)
+    ? incoming.sections
+    : [];
+  const sections = incomingSections
+    .filter((section): section is DiscoveryHubSectionConfig =>
+      Boolean(
+        section &&
+          typeof section === "object" &&
+          discoveryHubDefaultSections.some(
+            (defaultSection) => defaultSection.key === section.key,
+          ),
+      ),
+    )
+    .map((section) => {
+      const fallback =
+        discoveryHubDefaultSections.find(
+          (defaultSection) => defaultSection.key === section.key,
+        ) ?? discoveryHubDefaultSections[0];
+      return {
+        key: fallback.key,
+        visible:
+          typeof section.visible === "boolean"
+            ? section.visible
+            : fallback.visible,
+        title: {
+          en:
+            typeof section.title?.en === "string" && section.title.en.trim()
+              ? section.title.en
+              : fallback.title.en,
+          es:
+            typeof section.title?.es === "string" && section.title.es.trim()
+              ? section.title.es
+              : fallback.title.es,
+        },
+      };
+    });
+  for (const defaultSection of discoveryHubDefaultSections) {
+    if (!sections.some((section) => section.key === defaultSection.key)) {
+      sections.push({ ...defaultSection, title: { ...defaultSection.title } });
+    }
+  }
+  const limits = (incoming.limits ?? {}) as Partial<DiscoveryHubLimitsConfig>;
+  const genres = (incoming.genres ?? {}) as Partial<DiscoveryHubGenreConfig>;
+  const queuePolicy = (incoming.queuePolicy ??
+    {}) as Partial<DiscoveryHubQueuePolicyConfig>;
+  return {
+    sections,
+    limits: {
+      featuredCount: clampControlNumber(limits.featuredCount, 6, 1, 24),
+      topTenCount: clampControlNumber(limits.topTenCount, 10, 1, 25),
+      genreCount: clampControlNumber(limits.genreCount, 8, 1, 40),
+      externalCount: clampControlNumber(limits.externalCount, 8, 1, 50),
+      trendingCount: clampControlNumber(limits.trendingCount, 8, 1, 50),
+      newReleaseCount: clampControlNumber(limits.newReleaseCount, 8, 1, 50),
+      mostSupportedCount: clampControlNumber(
+        limits.mostSupportedCount,
+        8,
+        1,
+        50,
+      ),
+      mostPlayedCount: clampControlNumber(limits.mostPlayedCount, 8, 1, 50),
+      catalogPreviewCount: clampControlNumber(
+        limits.catalogPreviewCount,
+        8,
+        1,
+        50,
+      ),
+    },
+    genres: {
+      order: Array.isArray(genres.order)
+        ? genres.order.filter(
+            (genre): genre is string => typeof genre === "string",
+          )
+        : [...discoveryHubDefaultConfig.genres.order],
+      visibility:
+        genres.visibility &&
+        typeof genres.visibility === "object" &&
+        !Array.isArray(genres.visibility)
+          ? Object.fromEntries(
+              Object.entries(genres.visibility).filter(
+                ([genre, visible]) =>
+                  typeof genre === "string" && typeof visible === "boolean",
+              ),
+            )
+          : {},
+    },
+    queuePolicy: {
+      replayWindowHours: clampControlNumber(
+        queuePolicy.replayWindowHours,
+        24,
+        1,
+        720,
+      ),
+      underexposedBoost: clampControlNumber(
+        queuePolicy.underexposedBoost,
+        1,
+        0,
+        10,
+      ),
+      queueLength: clampControlNumber(queuePolicy.queueLength, 25, 1, 100),
+      genreQueueSize: clampControlNumber(
+        queuePolicy.genreQueueSize,
+        25,
+        1,
+        100,
+      ),
+      randomReplayPoolSize: clampControlNumber(
+        queuePolicy.randomReplayPoolSize,
+        6,
+        1,
+        25,
+      ),
+    },
+  };
+}
+
 export function normalizePlatformControlConfig(
   value: unknown,
 ): PlatformControlConfig {
@@ -1221,6 +1520,10 @@ export function normalizePlatformControlConfig(
   );
   return {
     ...merged,
+    discovery: {
+      ...merged.discovery,
+      hub: normalizeDiscoveryHubConfig(merged.discovery.hub),
+    },
     homepage: {
       ...merged.homepage,
       order,

@@ -4,6 +4,10 @@ import type { View } from "@/components/first-listen-app";
 import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
 import { getInitials, platformLabels } from "@/lib/discovery";
 import { safeCoverUrl } from "@/lib/media";
+import {
+  defaultPlatformControlConfig,
+  mapPlatformControlState,
+} from "@/lib/platform-control";
 import { createClient } from "@/lib/supabase/server";
 import type {
   CommunityNotification,
@@ -306,6 +310,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     { data: notificationRows },
     { data: notificationSummaryRows },
     { data: contentEconomyRows },
+    { data: platformRuntimeRows },
   ] = await Promise.all([
     supabase
       .from("songs")
@@ -331,6 +336,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     }),
     supabase.rpc("get_my_community_notification_summary"),
     supabase.rpc("get_content_economy_settings"),
+    supabase.rpc("get_platform_runtime"),
   ]);
 
   const { data: reviewRows } = latestSong
@@ -570,6 +576,9 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     rewardDescription: row.reward_description || undefined,
     entryCount: Number(row.entry_count ?? 0),
   }));
+  const platformConfig = platformRuntimeRows
+    ? mapPlatformControlState(platformRuntimeRows).config
+    : defaultPlatformControlConfig;
 
   return (
     <ProtectedAppEntry
@@ -640,6 +649,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
         notificationSummary,
         dailyMission,
         communityPrograms,
+        platformConfig,
       }}
     />
   );

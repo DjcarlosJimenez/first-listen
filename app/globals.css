@@ -10966,96 +10966,9 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   order: 0 !important;
 }
 
-.dashboard-discovery > [data-platform-module="spotlight"] {
-  order: 1 !important;
-}
-
-.dashboard-discovery > .discovery-navigation-panel {
-  order: 2 !important;
-}
-
-.dashboard-discovery > .discovery-queue-panel {
-  order: 3 !important;
-}
-
-.dashboard-discovery > .discovery-catalog-panel {
-  order: 4 !important;
-}
-
-.dashboard-discovery > .discovery-scalability-note {
-  order: 5 !important;
-}
-
-.dashboard-discovery > [data-platform-module="top_results"] {
-  order: 2 !important;
-}
-
-.dashboard-discovery > [data-platform-module="internal_playback"] {
-  order: 3 !important;
-}
-
-.dashboard-discovery > [data-platform-module="external_discovery"] {
-  order: 4 !important;
-}
-
-.dashboard-discovery > .discovery-random-panel {
-  order: 100 !important;
-}
-
-.dashboard-discovery > .discovery-genre-panel {
-  order: 101 !important;
-}
-
-.dashboard-discovery > [data-platform-module="trending"] {
-  order: 102 !important;
-}
-
-.dashboard-discovery > [data-platform-module="newest_songs"] {
-  order: 103 !important;
-}
-
-.dashboard-discovery > [data-platform-module="most_supported"] {
-  order: 104 !important;
-}
-
-.dashboard-discovery > [data-platform-module="most_listened"] {
-  order: 105 !important;
-}
-
-.discovery-navigation-grid > [data-platform-module="top_results"] {
-  order: 1 !important;
-}
-
-.discovery-navigation-grid > [data-platform-module="internal_playback"] {
-  order: 2 !important;
-}
-
-.discovery-navigation-grid > [data-platform-module="random"] {
-  order: 3 !important;
-}
-
-.discovery-navigation-grid > [data-platform-module="external_discovery"] {
-  order: 4 !important;
-}
-
-.discovery-navigation-grid > [data-platform-module="genres"] {
-  order: 5 !important;
-}
-
-.discovery-navigation-grid > [data-platform-module="trending"] {
-  order: 6 !important;
-}
-
-.discovery-navigation-grid > [data-platform-module="newest_songs"] {
-  order: 7 !important;
-}
-
-.discovery-navigation-grid > [data-platform-module="most_supported"] {
-  order: 8 !important;
-}
-
-.discovery-navigation-grid > [data-platform-module="most_listened"] {
-  order: 9 !important;
+.dashboard-discovery > [data-platform-module],
+.discovery-navigation-grid > [data-platform-module] {
+  order: initial;
 }
 
 html[data-review-layout-density="compact"] .content {
@@ -12252,6 +12165,18 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.control-status-list {
+  color: var(--control-muted);
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.control-status-list li::marker {
+  color: var(--acid);
 }
 
 .danger-toggles label {

@@ -42,6 +42,7 @@ import {
   uiComponentLabels,
   type CardDensityKey,
   type ControlAnnouncement,
+  type DiscoveryHubSectionKey,
   type HomepageCopyField,
   type HomepageCopyLocale,
   type HomepageModuleKey,
@@ -53,6 +54,7 @@ import {
   type UiResponsiveSize,
   type UiSizePreset,
 } from "@/lib/platform-control";
+import { genreOptions } from "@/lib/catalog";
 import {
   platformThemePresetLabels,
   platformThemePresets,
@@ -357,6 +359,45 @@ const discoveryLabels: Record<
   mostShared: "Most Shared",
   mostSupported: "Community Picks",
   newestSongs: "New Releases",
+};
+
+const discoveryHubSectionLabels: Record<DiscoveryHubSectionKey, string> = {
+  spotlight: "Featured by First Listen",
+  top_results: "Top 10 by results",
+  internal_playback: "Playback inside First Listen",
+  random: "Random Mode",
+  external_discovery: "External platforms",
+  genres: "Genres",
+  trending: "Trending",
+  newest_songs: "New releases",
+  most_supported: "Most supported",
+  most_listened: "Most listened",
+};
+
+const discoveryLimitLabels: Record<
+  keyof PlatformControlConfig["discovery"]["hub"]["limits"],
+  string
+> = {
+  featuredCount: "Featured count",
+  topTenCount: "Top 10 count",
+  genreCount: "Genre count",
+  externalCount: "External count",
+  trendingCount: "Trending count",
+  newReleaseCount: "New release count",
+  mostSupportedCount: "Most supported count",
+  mostPlayedCount: "Most played count",
+  catalogPreviewCount: "Expanded list preview count",
+};
+
+const discoveryQueuePolicyLabels: Record<
+  keyof PlatformControlConfig["discovery"]["hub"]["queuePolicy"],
+  string
+> = {
+  replayWindowHours: "Replay window hours",
+  underexposedBoost: "Underexposed boost",
+  queueLength: "Queue length",
+  genreQueueSize: "Genre queue size",
+  randomReplayPoolSize: "Random replay pool size",
 };
 
 const homepagePriorityLabels: Record<
@@ -1539,6 +1580,130 @@ export function SuperAdminControlCenter({
       };
     });
     setDraggedModule(null);
+  };
+
+  const moveDiscoverySection = (index: number, direction: -1 | 1) => {
+    setConfig((current) => {
+      const sections = [...current.discovery.hub.sections];
+      const next = index + direction;
+      if (next < 0 || next >= sections.length) return current;
+      [sections[index], sections[next]] = [sections[next], sections[index]];
+      return {
+        ...current,
+        discovery: {
+          ...current.discovery,
+          hub: {
+            ...current.discovery.hub,
+            sections,
+          },
+        },
+      };
+    });
+  };
+
+  const updateDiscoverySection = (
+    index: number,
+    updater: (
+      section: PlatformControlConfig["discovery"]["hub"]["sections"][number],
+    ) => PlatformControlConfig["discovery"]["hub"]["sections"][number],
+  ) => {
+    setConfig((current) => ({
+      ...current,
+      discovery: {
+        ...current.discovery,
+        hub: {
+          ...current.discovery.hub,
+          sections: current.discovery.hub.sections.map((section, sectionIndex) =>
+            sectionIndex === index ? updater(section) : section,
+          ),
+        },
+      },
+    }));
+  };
+
+  const updateDiscoveryLimit = (
+    field: keyof PlatformControlConfig["discovery"]["hub"]["limits"],
+    value: number,
+  ) => {
+    setConfig((current) => ({
+      ...current,
+      discovery: {
+        ...current.discovery,
+        hub: {
+          ...current.discovery.hub,
+          limits: {
+            ...current.discovery.hub.limits,
+            [field]: value,
+          },
+        },
+      },
+    }));
+  };
+
+  const updateDiscoveryQueuePolicy = (
+    field: keyof PlatformControlConfig["discovery"]["hub"]["queuePolicy"],
+    value: number,
+  ) => {
+    setConfig((current) => ({
+      ...current,
+      discovery: {
+        ...current.discovery,
+        hub: {
+          ...current.discovery.hub,
+          queuePolicy: {
+            ...current.discovery.hub.queuePolicy,
+            [field]: value,
+          },
+        },
+      },
+    }));
+  };
+
+  const moveDiscoveryGenre = (genre: string, direction: -1 | 1) => {
+    setConfig((current) => {
+      const order = [
+        ...current.discovery.hub.genres.order,
+        ...genreOptions.filter(
+          (option) => !current.discovery.hub.genres.order.includes(option),
+        ),
+      ];
+      const index = order.indexOf(genre);
+      const next = index + direction;
+      if (index < 0 || next < 0 || next >= order.length) return current;
+      [order[index], order[next]] = [order[next], order[index]];
+      return {
+        ...current,
+        discovery: {
+          ...current.discovery,
+          hub: {
+            ...current.discovery.hub,
+            genres: {
+              ...current.discovery.hub.genres,
+              order,
+            },
+          },
+        },
+      };
+    });
+  };
+
+  const updateDiscoveryGenreVisibility = (genre: string, visible: boolean) => {
+    setConfig((current) => ({
+      ...current,
+      discovery: {
+        ...current.discovery,
+        hub: {
+          ...current.discovery.hub,
+          genres: {
+            ...current.discovery.hub.genres,
+            visibility: {
+              ...current.discovery.hub.genres.visibility,
+              [genre]: visible,
+            },
+          },
+        },
+      },
+    }));
   };
 
   const updateHomepageCopy = (
@@ -3318,6 +3483,234 @@ export function SuperAdminControlCenter({
 
       {tab === "discovery" && (
         <div className="control-grid">
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Discovery Hub Builder</span>
+                <h3>Section manager</h3>
+                <p>
+                  Reorder, rename, and show or hide the Discover More Music
+                  sections without code changes.
+                </p>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("discovery")}
+                type="button"
+              >
+                <Save size={15} /> Save Draft
+              </button>
+            </div>
+            <div className="control-module-list">
+              {config.discovery.hub.sections.map((section, index) => (
+                <article key={section.key}>
+                  <Blocks size={17} />
+                  <div>
+                    <strong>
+                      {discoveryHubSectionLabels[section.key]}
+                    </strong>
+                    <small>Position {index + 1}</small>
+                    <div className="control-mini-grid">
+                      <label>
+                        English title
+                        <input
+                          onChange={(event) =>
+                            updateDiscoverySection(index, (currentSection) => ({
+                              ...currentSection,
+                              title: {
+                                ...currentSection.title,
+                                en: event.target.value,
+                              },
+                            }))
+                          }
+                          value={section.title.en}
+                        />
+                      </label>
+                      <label>
+                        Spanish title
+                        <input
+                          onChange={(event) =>
+                            updateDiscoverySection(index, (currentSection) => ({
+                              ...currentSection,
+                              title: {
+                                ...currentSection.title,
+                                es: event.target.value,
+                              },
+                            }))
+                          }
+                          value={section.title.es}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  <button
+                    aria-label={`Move ${discoveryHubSectionLabels[section.key]} up`}
+                    disabled={index === 0}
+                    onClick={() => moveDiscoverySection(index, -1)}
+                    type="button"
+                  >
+                    <ArrowUp size={15} />
+                  </button>
+                  <button
+                    aria-label={`Move ${discoveryHubSectionLabels[section.key]} down`}
+                    disabled={index === config.discovery.hub.sections.length - 1}
+                    onClick={() => moveDiscoverySection(index, 1)}
+                    type="button"
+                  >
+                    <ArrowDown size={15} />
+                  </button>
+                  <label className="control-switch">
+                    <input
+                      checked={section.visible}
+                      onChange={(event) =>
+                        updateDiscoverySection(index, (currentSection) => ({
+                          ...currentSection,
+                          visible: event.target.checked,
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                    <span>{section.visible ? "Visible" : "Hidden"}</span>
+                  </label>
+                </article>
+              ))}
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Discovery Limits Manager</span>
+            <h3>Display counts</h3>
+            <p>
+              Control how many songs each discovery section shows before users
+              enter queues or expanded lists.
+            </p>
+            <div className="control-mini-grid">
+              {(
+                Object.keys(config.discovery.hub.limits) as Array<
+                  keyof PlatformControlConfig["discovery"]["hub"]["limits"]
+                >
+              ).map((field) => (
+                <label key={field}>
+                  {discoveryLimitLabels[field]}
+                  <input
+                    min={1}
+                    onChange={(event) =>
+                      updateDiscoveryLimit(field, Number(event.target.value))
+                    }
+                    type="number"
+                    value={config.discovery.hub.limits[field]}
+                  />
+                </label>
+              ))}
+            </div>
+          </article>
+
+          <article className="control-card control-card-wide">
+            <span className="eyebrow">Genre Manager</span>
+            <h3>Genre visibility and order</h3>
+            <p>
+              Choose which genre queues appear and which genres are promoted
+              first in Discover More Music.
+            </p>
+            <div className="control-module-list">
+              {[
+                ...config.discovery.hub.genres.order,
+                ...genreOptions.filter(
+                  (genre) =>
+                    !config.discovery.hub.genres.order.includes(genre),
+                ),
+              ].map((genre, index, genres) => {
+                const visible =
+                  config.discovery.hub.genres.visibility[genre] !== false;
+                return (
+                  <article key={genre}>
+                    <Music2 size={17} />
+                    <div>
+                      <strong>{genre}</strong>
+                      <small>Genre position {index + 1}</small>
+                    </div>
+                    <button
+                      aria-label={`Move ${genre} up`}
+                      disabled={index === 0}
+                      onClick={() => moveDiscoveryGenre(genre, -1)}
+                      type="button"
+                    >
+                      <ArrowUp size={15} />
+                    </button>
+                    <button
+                      aria-label={`Move ${genre} down`}
+                      disabled={index === genres.length - 1}
+                      onClick={() => moveDiscoveryGenre(genre, 1)}
+                      type="button"
+                    >
+                      <ArrowDown size={15} />
+                    </button>
+                    <label className="control-switch">
+                      <input
+                        checked={visible}
+                        onChange={(event) =>
+                          updateDiscoveryGenreVisibility(
+                            genre,
+                            event.target.checked,
+                          )
+                        }
+                        type="checkbox"
+                      />
+                      <span>{visible ? "Visible" : "Hidden"}</span>
+                    </label>
+                  </article>
+                );
+              })}
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Queue Policy Controls</span>
+            <h3>Safe discovery queue settings</h3>
+            <p>
+              Tune replay and queue behavior without changing fairness,
+              listening validation, or token rewards.
+            </p>
+            <div className="control-mini-grid">
+              {(
+                Object.keys(config.discovery.hub.queuePolicy) as Array<
+                  keyof PlatformControlConfig["discovery"]["hub"]["queuePolicy"]
+                >
+              ).map((field) => (
+                <label key={field}>
+                  {discoveryQueuePolicyLabels[field]}
+                  <input
+                    min={field === "underexposedBoost" ? 0 : 1}
+                    onChange={(event) =>
+                      updateDiscoveryQueuePolicy(
+                        field,
+                        Number(event.target.value),
+                      )
+                    }
+                    type="number"
+                    value={config.discovery.hub.queuePolicy[field]}
+                  />
+                </label>
+              ))}
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Control Coverage Review</span>
+            <h3>Discovery settings connected</h3>
+            <ul className="control-status-list">
+              <li>Section order, visibility, and titles feed the live hub.</li>
+              <li>Display limits control visible discovery catalog sizes.</li>
+              <li>Genre order and visibility control genre queues.</li>
+              <li>Queue policy controls random and genre queue selection.</li>
+              <li>
+                Protected systems remain code-controlled: validation, token
+                rewards, and abuse prevention.
+              </li>
+            </ul>
+          </article>
+
           <article className="control-card">
             <div className="control-heading">
               <div>
