@@ -222,6 +222,26 @@ type DirectorySong = {
   created_at?: string;
 };
 
+type ContentStatusFilter = "all" | "active" | "archived" | "hidden" | "removed";
+
+const contentStatusOptions: Array<[ContentStatusFilter, string]> = [
+  ["all", "All Songs"],
+  ["active", "Active Songs"],
+  ["archived", "Archived Songs"],
+  ["hidden", "Legacy Hidden"],
+  ["removed", "Deleted Songs"],
+];
+
+function contentSongLifecycleStatus(
+  song: DirectorySong,
+): "removed" | "archived" | "hidden" | "promoted" | "active" {
+  if (song.removed_at) return "removed";
+  if (song.archived_at) return "archived";
+  if (!song.is_active) return "hidden";
+  if (song.featured) return "promoted";
+  return "active";
+}
+
 type FeedbackSubmission = {
   id: string;
   user_id: string | null;
@@ -1108,6 +1128,8 @@ export function SuperAdminControlCenter({
     Record<string, string>
   >({});
   const [contentSearch, setContentSearch] = useState("");
+  const [contentStatusFilter, setContentStatusFilter] =
+    useState<ContentStatusFilter>("all");
   const importRef = useRef<HTMLInputElement>(null);
   const sectionImportRef = useRef<HTMLInputElement>(null);
 
@@ -1728,6 +1750,82 @@ export function SuperAdminControlCenter({
     }
   };
 
+  const restoreArchivedSong = async (song: DirectorySong) => {
+    if (
+      !window.confirm(
+        `Restore "${song.title}" to active discovery? It will be available to listeners again.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setNotice("");
+    try {
+      const supabase = createClient();
+      if (!supabase) throw new Error("Supabase is not configured.");
+      const { error } = await supabase.rpc("owner_restore_archived_song", {
+        target_song_id: song.id,
+      });
+      if (error) throw error;
+      setSongDirectory((current) =>
+        current.map((item) =>
+          item.id === song.id
+            ? {
+                ...item,
+                archived_at: null,
+                featured: false,
+                is_active: true,
+                removed_at: null,
+              }
+            : item,
+        ),
+      );
+      setNotice(`${song.title} was restored to active discovery.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Restore failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const permanentlyDeleteSong = async (song: DirectorySong) => {
+    const status = contentSongLifecycleStatus(song);
+    const label =
+      status === "archived"
+        ? "archived song"
+        : status === "removed" || status === "hidden"
+          ? "legacy song"
+          : "song";
+    if (
+      !window.confirm(
+        `Permanently delete this ${label}?\n\n"${song.title}" by ${song.artist_name}\n\nThis is irreversible and will remove it from owner song management, discovery, queues, profiles, rankings, metrics, and platform links.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setNotice("");
+    try {
+      const supabase = createClient();
+      if (!supabase) throw new Error("Supabase is not configured.");
+      const { error } = await supabase.rpc("owner_permanently_delete_song", {
+        target_song_id: song.id,
+        deletion_reason: `Owner cleanup from ${status} catalog`,
+      });
+      if (error) throw error;
+      setSongDirectory((current) =>
+        current.filter((item) => item.id !== song.id),
+      );
+      setNotice(`${song.title} was permanently deleted.`);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Permanent delete failed.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const exportConfig = () => {
     const blob = new Blob([JSON.stringify(config, null, 2)], {
       type: "application/json",
@@ -1810,9 +1908,42 @@ export function SuperAdminControlCenter({
     [songDirectory],
   );
 
+  const contentStatusCounts = useMemo(() => {
+    const counts: Record<ContentStatusFilter, number> = {
+      all: songDirectory.length,
+      active: 0,
+      archived: 0,
+      hidden: 0,
+      removed: 0,
+    };
+    for (const song of songDirectory) {
+      const status = contentSongLifecycleStatus(song);
+      if (status === "active" || status === "promoted") counts.active += 1;
+      if (status === "archived") counts.archived += 1;
+      if (status === "hidden") counts.hidden += 1;
+      if (status === "removed") counts.removed += 1;
+    }
+    return counts;
+  }, [songDirectory]);
+
   const filteredContentSongs = useMemo(() => {
     const query = contentSearch.trim().toLowerCase();
     return songDirectory.filter((song) => {
+      const status = contentSongLifecycleStatus(song);
+      if (
+        contentStatusFilter === "active" &&
+        status !== "active" &&
+        status !== "promoted"
+      ) {
+        return false;
+      }
+      if (
+        contentStatusFilter !== "all" &&
+        contentStatusFilter !== "active" &&
+        status !== contentStatusFilter
+      ) {
+        return false;
+      }
       if (!query) return true;
       return (
         song.title.toLowerCase().includes(query) ||
@@ -1820,7 +1951,7 @@ export function SuperAdminControlCenter({
         song.id.toLowerCase().includes(query)
       );
     });
-  }, [contentSearch, songDirectory]);
+  }, [contentSearch, contentStatusFilter, songDirectory]);
 
   const healthCards = [
     ["Active guests", data.health?.active_guests ?? 0],
@@ -3868,6 +3999,12 @@ export function SuperAdminControlCenter({
             remain performance-based, while their homepage position and
             visibility are managed in Page Builder.
           </p>
+          <p className="control-muted">
+            Lifecycle cleanup is Founder-only. Archived songs keep historical
+            context until restored or permanently removed; permanent deletion is
+            irreversible and removes the song from discovery, queues, profiles,
+            rankings, metrics, and platform links.
+          </p>
           <label className="control-search">
             Search songs
             <input
@@ -3876,10 +4013,34 @@ export function SuperAdminControlCenter({
               value={contentSearch}
             />
           </label>
+          <div
+            aria-label="Song lifecycle filters"
+            className="control-filter-row"
+            role="group"
+          >
+            {contentStatusOptions.map(([value, label]) => (
+              <button
+                className={contentStatusFilter === value ? "active" : ""}
+                key={value}
+                onClick={() => setContentStatusFilter(value)}
+                type="button"
+              >
+                {label}
+                <span>{contentStatusCounts[value]}</span>
+              </button>
+            ))}
+          </div>
           <div className="control-content-list">
             {filteredContentSongs.map((song) => {
-              const hidden = !song.is_active || Boolean(song.removed_at);
-              const archived = Boolean(song.archived_at);
+              const lifecycleStatus = contentSongLifecycleStatus(song);
+              const hidden =
+                lifecycleStatus === "removed" || lifecycleStatus === "hidden";
+              const archived = lifecycleStatus === "archived";
+              const permanentlyDeleteLabel = archived
+                ? "Remove Archived Song"
+                : hidden
+                  ? "Force Delete Legacy Song"
+                  : "Permanently Delete Song";
               return (
                 <section key={song.id}>
                   <div>
@@ -3891,11 +4052,15 @@ export function SuperAdminControlCenter({
                     </small>
                   </div>
                   <span className="control-song-status">
-                    {archived
+                    {lifecycleStatus === "removed"
+                      ? "Removed"
+                      : archived
                       ? "Archived"
+                      : lifecycleStatus === "hidden"
+                      ? "Legacy Hidden"
                       : hidden
                         ? "Hidden"
-                        : song.featured
+                        : lifecycleStatus === "promoted"
                           ? "Promoted"
                           : "Active"}
                   </span>
@@ -3947,6 +4112,25 @@ export function SuperAdminControlCenter({
                       type="button"
                     >
                       {hidden ? "Unhide" : "Hide"}
+                    </button>
+                    {archived && (
+                      <button
+                        disabled={busy}
+                        onClick={() => void restoreArchivedSong(song)}
+                        type="button"
+                      >
+                        <ArchiveRestore size={13} />
+                        Restore Archived Song
+                      </button>
+                    )}
+                    <button
+                      className="danger-button"
+                      disabled={busy}
+                      onClick={() => void permanentlyDeleteSong(song)}
+                      type="button"
+                    >
+                      <Trash2 size={13} />
+                      {permanentlyDeleteLabel}
                     </button>
                   </div>
                 </section>

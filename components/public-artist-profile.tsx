@@ -257,7 +257,7 @@ function ProfileSong({
       />
       <div className="artist-song-copy">
         <span className="eyebrow">
-          {song.platform} / {compactClassificationLabel(song.platform)} /{" "}
+          {song.platform} / {compactClassificationLabel(song.platform, locale)} /{" "}
           {song.genre} / {song.language}
         </span>
         <h2>{song.title}</h2>
@@ -577,7 +577,7 @@ export function PublicArtistProfile({
             <span><Music2 size={14} /> {artist.songsSubmitted} {spanish ? "canciones" : "songs submitted"}</span>
             <span><Star size={14} /> {artist.averageRating.toFixed(1)} {spanish ? "rating promedio" : "average rating"}</span>
             <span><Headphones size={14} /> {artist.listeningHoursReceived.toFixed(1)} {spanish ? "horas escuchadas" : "listening hours received"}</span>
-            <span><Radio size={14} /> {artist.validListensReceived} {spanish ? "reproducciones válidas" : "valid plays received"}</span>
+            <span><Radio size={14} /> {artist.validListensReceived} {spanish ? "reproducciones que suman" : "plays that count"}</span>
             <span><Disc3 size={14} /> {artist.completeListensReceived} {spanish ? "reproducciones completas" : "complete plays"}</span>
             <span><Trophy size={14} /> {artist.communityRank}</span>
           </div>

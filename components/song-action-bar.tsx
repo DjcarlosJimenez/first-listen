@@ -430,7 +430,7 @@ export function SongActionBar({
               <h4>{spanish ? "Estadísticas de la canción" : "Song Statistics"}</h4>
               <div className="song-action-stats">
                 <span><strong>{engagement.views}</strong>{spanish ? "Vistas" : "Views"}</span>
-                <span><strong>{engagement.validListens}</strong>{spanish ? "Reproducciones válidas" : "Valid Plays"}</span>
+                <span><strong>{engagement.validListens}</strong>{spanish ? "Reproducciones que suman" : "Plays that count"}</span>
                 <span><strong>{engagement.likes}</strong>{spanish ? "Me gusta" : "Likes"}</span>
                 <span><strong>{engagement.comments}</strong>{spanish ? "Comentarios" : "Comments"}</span>
                 <span><strong>{engagement.followers}</strong>{spanish ? "Seguidores" : "Followers"}</span>

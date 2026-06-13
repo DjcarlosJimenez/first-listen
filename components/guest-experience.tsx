@@ -521,7 +521,7 @@ function GuestDashboard({
   const hours = Math.floor(summary.totalListeningSeconds / 3600);
   const minutes = Math.floor((summary.totalListeningSeconds % 3600) / 60);
   const stats = [
-    [Headphones, spanish ? "Reproducciones válidas" : "Valid Plays", summary.validListens],
+    [Headphones, spanish ? "Reproducciones que suman" : "Plays that count", summary.validListens],
     [Music2, spanish ? "Canciones exploradas" : "Songs Explored", summary.songsExplored],
     [Heart, "Likes", summary.likesCount],
     [MessageSquareText, spanish ? "Comentarios" : "Comments", summary.commentsCount],
@@ -538,8 +538,8 @@ function GuestDashboard({
           <h2>{spanish ? "Tu impacto como listener" : "Your listener impact"}</h2>
           <p>
             {spanish
-              ? `Tiempo total verificado: ${hours}h ${minutes}m.`
-              : `Total verified listening time: ${hours}h ${minutes}m.`}
+              ? `Tiempo acumulado total: ${hours}h ${minutes}m.`
+              : `Total saved listening time: ${hours}h ${minutes}m.`}
           </p>
         </div>
       </div>
@@ -1025,7 +1025,7 @@ export function GuestExperience() {
     if (error || !row?.listening_session_id) {
       setListening((current) => ({
         ...current,
-        warning: error?.message ?? "Listening verification could not start.",
+        warning: error?.message ?? (spanish ? "No pudimos iniciar el conteo de tiempo." : "We could not start listening time tracking."),
       }));
       return;
     }
@@ -1040,7 +1040,7 @@ export function GuestExperience() {
       target_song_id: currentSong.id,
       guest_access_token: guest.token,
     });
-  }, [currentSong, guest]);
+  }, [currentSong, guest, spanish]);
 
   const finishCurrentSession = useCallback(async () => {
     if (!guest || !listeningSessionRef.current) return;
@@ -1183,7 +1183,7 @@ export function GuestExperience() {
       if (error || !row) {
         setListening((current) => ({
           ...current,
-          warning: error?.message ?? "Listening progress could not be verified.",
+          warning: error?.message ?? (spanish ? "No pudimos actualizar el tiempo de escucha." : "We could not update listening time."),
         }));
         return;
       }
@@ -1209,7 +1209,7 @@ export function GuestExperience() {
         void loadSummary(guest.token);
       }
     },
-    [autoPlay, guest, listening.validListenRecorded, loadSummary],
+    [autoPlay, guest, listening.validListenRecorded, loadSummary, spanish],
   );
 
   useEffect(() => {
@@ -1371,19 +1371,19 @@ export function GuestExperience() {
       <div>
         <span className="eyebrow">
           <KeyRound size={13} />
-          {spanish ? "Guarda tu cÃ³digo de recuperaciÃ³n" : "Save your recovery code"}
+          {spanish ? "Guarda tu código de recuperación" : "Save your recovery code"}
         </span>
         <strong>{guest.recoveryCode}</strong>
         <p>
           {spanish
-            ? "Ãšsalo para recuperar tus likes, comentarios, artistas seguidos, canciones guardadas e historial en otro dispositivo."
+            ? "Úsalo para recuperar tus likes, comentarios, artistas seguidos, canciones guardadas e historial en otro dispositivo."
             : "Use it to recover your likes, comments, follows, saved songs, and history on another device."}
         </p>
       </div>
       <button
         onClick={() => {
           void navigator.clipboard.writeText(guest.recoveryCode);
-          setIdentityMessage(spanish ? "CÃ³digo copiado." : "Code copied.");
+          setIdentityMessage(spanish ? "Código copiado." : "Code copied.");
         }}
         type="button"
       >
@@ -1500,7 +1500,7 @@ export function GuestExperience() {
             : "The music starts here. Your reactions help real artists."}
         </p>
         <div>
-          <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "reproducciones válidas" : "valid plays"}</span>
+          <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "reproducciones que suman" : "plays that count"}</span>
           <span><Users size={14} /> {spanish ? "Comunidad completa" : "Full community access"}</span>
           <span><Headphones size={14} /> {spanish ? "Perfil permanente" : "Permanent listener profile"}</span>
         </div>
@@ -1590,7 +1590,7 @@ export function GuestExperience() {
                 <strong>{formatClock(listening.liveSeconds)}</strong>
               </div>
               <div>
-                <span><CheckCircle2 size={14} /> {spanish ? "Reproducción válida" : "Valid Play"}</span>
+                <span><CheckCircle2 size={14} /> {spanish ? "Tiempo que cuenta" : "Time toward tokens"}</span>
                 <strong>
                   {listening.validListenRecorded
                     ? spanish ? "Completada" : "Completed"
@@ -1674,7 +1674,7 @@ export function GuestExperience() {
               </p>
             </section>
             <section>
-              <span className="eyebrow"><ListMusic size={13} /> {spanish ? "Cola de reviews" : "Review Queue"}</span>
+              <span className="eyebrow"><ListMusic size={13} /> {spanish ? "Lista de canciones por escuchar" : "Review Queue"}</span>
               <h2>
                 {songs.length - songIndex - 1}{" "}
                 {spanish ? "canciones siguientes" : "songs up next"}
@@ -1755,7 +1755,7 @@ export function GuestExperience() {
             : "The music starts here. Your reactions help real artists."}
         </p>
         <div>
-          <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "reproducciones válidas" : "valid plays"}</span>
+          <span><CheckCircle2 size={14} /> {guest.validListens} {spanish ? "reproducciones que suman" : "plays that count"}</span>
           <span><Users size={14} /> {spanish ? "Comunidad completa" : "Full community access"}</span>
           <span><Headphones size={14} /> {spanish ? "Perfil permanente" : "Permanent listener profile"}</span>
         </div>

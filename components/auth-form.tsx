@@ -12,8 +12,29 @@ import {
   PASSWORD_REQUIREMENTS,
 } from "@/lib/password-policy";
 import { createClient } from "@/lib/supabase/client";
+import { useInterfaceLocale } from "@/lib/use-interface-locale";
+
+function authErrorMessage(message: string, spanish: boolean) {
+  if (!spanish) return message;
+  const normalized = message.toLowerCase();
+  if (normalized.includes("email not confirmed")) {
+    return "Confirma tu correo antes de iniciar sesión.";
+  }
+  if (normalized.includes("invalid login credentials")) {
+    return "Correo o contraseña incorrectos.";
+  }
+  if (normalized.includes("already registered")) {
+    return "Ya existe una cuenta con este correo.";
+  }
+  if (normalized.includes("password")) {
+    return "Revisa la contraseña e inténtalo de nuevo.";
+  }
+  return "No pudimos completar la solicitud. Inténtalo de nuevo.";
+}
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+  const locale = useInterfaceLocale();
+  const spanish = locale === "es";
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState("");
@@ -25,8 +46,13 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const nextPath = useMemo(() => searchParams.get("next") || "/review", [searchParams]);
   const resetMessage =
     searchParams.get("message") === "password-reset"
-      ? "Password updated. Log in with your new password."
+      ? spanish
+        ? "Contraseña actualizada. Inicia sesión con tu nueva contraseña."
+        : "Password updated. Log in with your new password."
       : "";
+  const passwordRequirements = spanish
+    ? "Mínimo 8 caracteres, una mayúscula, una minúscula y un número."
+    : PASSWORD_REQUIREMENTS;
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -34,7 +60,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     setMessage("");
     const supabase = createClient();
     if (!supabase) {
-      setError("Supabase is not configured. Add Vercel environment variables before launch.");
+      setError(
+        spanish
+          ? "El inicio de sesión no está disponible. Inténtalo más tarde."
+          : "Supabase is not configured. Add Vercel environment variables before launch.",
+      );
       return;
     }
 
@@ -44,15 +74,19 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     const name = String(formData.get("name") ?? "").trim();
 
     if (!email || !password || (isSignup && !name)) {
-      setError("Please complete all required fields.");
+      setError(spanish ? "Completa todos los campos requeridos." : "Please complete all required fields.");
       return;
     }
     if (isSignup && !isValidPassword(password)) {
-      setError(PASSWORD_REQUIREMENTS);
+      setError(passwordRequirements);
       return;
     }
     if (isSignup && !accepted) {
-      setError("You must accept the legal terms and explicit-content disclaimer.");
+      setError(
+        spanish
+          ? "Debes aceptar los términos legales y el aviso de contenido explícito."
+          : "You must accept the legal terms and explicit-content disclaimer.",
+      );
       return;
     }
 
@@ -80,7 +114,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         window.sessionStorage.setItem("first-listen-pending-email", email);
         setUnconfirmedEmail(email);
       }
-      setError(result.error.message);
+      setError(authErrorMessage(result.error.message, spanish));
       return;
     }
 
@@ -100,18 +134,30 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <Logo />
         <div className="auth-heading">
           <span className="auth-icon"><LockKeyhole size={22} /></span>
-          <h1>{isSignup ? "Create your First Listen account" : "Log in to First Listen"}</h1>
+          <h1>
+            {isSignup
+              ? spanish
+                ? "Crea tu cuenta de First Listen"
+                : "Create your First Listen account"
+              : spanish
+                ? "Inicia sesión en First Listen"
+                : "Log in to First Listen"}
+          </h1>
           <p>
             {isSignup
-              ? "Use your real email and a secure password. Private areas are account-only."
-              : "Dashboard, reviews, submissions, profile, and admin tools require authentication."}
+              ? spanish
+                ? "Usa tu correo real y una contraseña segura. Las áreas privadas requieren cuenta."
+                : "Use your real email and a secure password. Private areas are account-only."
+              : spanish
+                ? "Descubrir música, canciones por escuchar, envíos, perfil y herramientas privadas requieren iniciar sesión."
+                : "Music discovery, reviews, submissions, profile, and admin tools require authentication."}
           </p>
         </div>
 
         <form onSubmit={submit}>
           {isSignup && (
             <label className="auth-field">
-              <span>Name</span>
+              <span>{spanish ? "Nombre" : "Name"}</span>
               <input autoComplete="name" name="name" required type="text" />
             </label>
           )}
@@ -120,20 +166,20 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             <input autoComplete="email" name="email" required type="email" />
           </label>
           <label className="auth-field">
-            <span>Password</span>
+            <span>{spanish ? "Contraseña" : "Password"}</span>
             <input
               autoComplete={isSignup ? "new-password" : "current-password"}
               minLength={PASSWORD_MIN_LENGTH}
               name="password"
               pattern={isSignup ? PASSWORD_PATTERN : undefined}
               required
-              title={isSignup ? PASSWORD_REQUIREMENTS : undefined}
+              title={isSignup ? passwordRequirements : undefined}
               type="password"
             />
           </label>
           {!isSignup && (
             <div className="auth-inline-link">
-              <Link href="/forgot-password">Forgot password?</Link>
+              <Link href="/forgot-password">{spanish ? "¿Olvidaste tu contraseña?" : "Forgot password?"}</Link>
             </div>
           )}
 
@@ -146,12 +192,15 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 type="checkbox"
               />
               <span>
-                I accept the <Link href="/terms">Terms of Service</Link>,{" "}
-                <Link href="/privacy">Privacy Policy</Link>,{" "}
-                <Link href="/guidelines">Community Guidelines</Link>, and{" "}
-                <Link href="/explicit-content">Explicit Content Disclaimer</Link>.
-                Users may encounter music containing explicit language, mature
-                themes, or adult subject matter.
+                {spanish ? "Acepto los " : "I accept the "}
+                <Link href="/terms">{spanish ? "Términos de servicio" : "Terms of Service"}</Link>,{" "}
+                <Link href="/privacy">{spanish ? "Política de privacidad" : "Privacy Policy"}</Link>,{" "}
+                <Link href="/guidelines">{spanish ? "Guías de la comunidad" : "Community Guidelines"}</Link>
+                {spanish ? " y el " : ", and "}
+                <Link href="/explicit-content">{spanish ? "Aviso de contenido explícito" : "Explicit Content Disclaimer"}</Link>.
+                {spanish
+                  ? " Puedes encontrar música con lenguaje explícito, temas maduros o contenido para adultos."
+                  : " Users may encounter music containing explicit language, mature themes, or adult subject matter."}
               </span>
             </label>
           )}
@@ -159,7 +208,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           {error && <div className="auth-error" role="alert">{error}</div>}
           {unconfirmedEmail && (
             <div className="form-message" role="status">
-              Need another confirmation email? <Link href="/verify-email">Resend it</Link>.
+              {spanish ? "¿Necesitas otro correo de confirmación? " : "Need another confirmation email? "}
+              <Link href="/verify-email">{spanish ? "Reenviarlo" : "Resend it"}</Link>.
             </div>
           )}
           {(message || resetMessage) && (
@@ -167,7 +217,17 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           )}
 
           <button className="auth-submit" disabled={loading} type="submit">
-            {loading ? "Please wait..." : isSignup ? "Create account" : "Log in"}
+            {loading
+              ? spanish
+                ? "Espera..."
+                : "Please wait..."
+              : isSignup
+                ? spanish
+                  ? "Crear cuenta"
+                  : "Create account"
+                : spanish
+                  ? "Iniciar sesión"
+                  : "Log in"}
             <ArrowRight size={16} />
           </button>
         </form>
@@ -175,9 +235,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <div className="auth-switch">
           <ShieldCheck size={16} />
           {isSignup ? (
-            <span>Already have an account? <Link href="/login">Log in</Link></span>
+            <span>{spanish ? "¿Ya tienes cuenta? " : "Already have an account? "}<Link href="/login">{spanish ? "Inicia sesión" : "Log in"}</Link></span>
           ) : (
-            <span>New to First Listen? <Link href="/signup">Create account</Link></span>
+            <span>{spanish ? "¿Nuevo en First Listen? " : "New to First Listen? "}<Link href="/signup">{spanish ? "Crear cuenta" : "Create account"}</Link></span>
           )}
         </div>
       </section>

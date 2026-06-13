@@ -1067,7 +1067,7 @@ export function ProviderPlayer({
           unoptimized
         />
         <div className="external-player-action">
-          <span><Link2 size={15} /> External Content</span>
+          <span><Link2 size={15} /> {spanish ? "Abre fuera de First Listen" : "Opens outside First Listen"}</span>
           <strong>{title}</strong>
           <small>
             {spanish
@@ -1095,7 +1095,7 @@ export function ProviderPlayer({
               >
                 <X size={17} />
               </button>
-              <span className="eyebrow"><Link2 size={13} /> External Content</span>
+              <span className="eyebrow"><Link2 size={13} /> {spanish ? "Abre fuera de First Listen" : "Opens outside First Listen"}</span>
               <h3 id="external-content-dialog-title">
                 {spanish
                   ? `Este contenido esta alojado en ${platform}.`
@@ -1103,8 +1103,8 @@ export function ProviderPlayer({
               </h3>
               <p>
                 {spanish
-                  ? `Reproducir este contenido abrirá ${platform} en una nueva pestaña y saldrá temporalmente de First Listen. La actividad externa no cuenta como escucha válida.`
-                  : `Playing this content will open ${platform} in a new tab and temporarily leave First Listen. External activity does not count as a valid listen.`}
+                  ? `Este contenido abrirá ${platform} en una nueva pestaña y saldrá temporalmente de First Listen. La actividad externa no suma tiempo ni tokens dentro de First Listen.`
+                  : `This content will open ${platform} in a new tab and temporarily leave First Listen. External activity does not earn time or tokens inside First Listen.`}
               </p>
               <label>
                 <input

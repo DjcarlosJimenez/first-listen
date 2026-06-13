@@ -5,8 +5,11 @@ import Link from "next/link";
 import { MailCheck } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { createClient } from "@/lib/supabase/client";
+import { useInterfaceLocale } from "@/lib/use-interface-locale";
 
 export function ResendConfirmationForm() {
+  const locale = useInterfaceLocale();
+  const spanish = locale === "es";
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -29,13 +32,21 @@ export function ResendConfirmationForm() {
     setMessage("");
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail) {
-      setError("Enter the email address used to create your account.");
+      setError(
+        spanish
+          ? "Escribe el correo que usaste para crear tu cuenta."
+          : "Enter the email address used to create your account.",
+      );
       return;
     }
 
     const supabase = createClient();
     if (!supabase) {
-      setError("Email service is unavailable. Please try again later.");
+      setError(
+        spanish
+          ? "El servicio de correo no está disponible. Inténtalo más tarde."
+          : "Email service is unavailable. Please try again later.",
+      );
       return;
     }
 
@@ -52,8 +63,12 @@ export function ResendConfirmationForm() {
     if (resendError) {
       setError(
         resendError.message.toLowerCase().includes("rate")
-          ? "Please wait before requesting another confirmation email."
-          : "The confirmation email could not be sent. Please try again.",
+          ? spanish
+            ? "Espera antes de solicitar otro correo de confirmación."
+            : "Please wait before requesting another confirmation email."
+          : spanish
+            ? "No pudimos enviar el correo de confirmación. Inténtalo de nuevo."
+            : "The confirmation email could not be sent. Please try again.",
       );
       return;
     }
@@ -61,7 +76,9 @@ export function ResendConfirmationForm() {
     window.sessionStorage.setItem("first-listen-pending-email", normalizedEmail);
     setCooldown(60);
     setMessage(
-      "If this address has a pending First Listen account, a confirmation email has been sent.",
+      spanish
+        ? "Si este correo tiene una cuenta pendiente en First Listen, enviaremos un correo de confirmación."
+        : "If this address has a pending First Listen account, a confirmation email has been sent.",
     );
   };
 
@@ -71,10 +88,11 @@ export function ResendConfirmationForm() {
         <Logo />
         <div className="auth-heading">
           <span className="auth-icon"><MailCheck size={22} /></span>
-          <h1>Confirm your email</h1>
+          <h1>{spanish ? "Confirma tu correo" : "Confirm your email"}</h1>
           <p>
-            Open the confirmation link sent by First Listen. You can request a
-            replacement below if the original message expired or never arrived.
+            {spanish
+              ? "Abre el enlace de confirmación enviado por First Listen. Puedes pedir otro si el mensaje expiró o no llegó."
+              : "Open the confirmation link sent by First Listen. You can request a replacement below if the original message expired or never arrived."}
           </p>
         </div>
         <form onSubmit={submit}>
@@ -96,14 +114,23 @@ export function ResendConfirmationForm() {
             type="submit"
           >
             {loading
-              ? "Sending..."
+              ? spanish
+                ? "Enviando..."
+                : "Sending..."
               : cooldown > 0
-                ? `Resend available in ${cooldown}s`
-                : "Resend confirmation email"}
+                ? spanish
+                  ? `Reenvío disponible en ${cooldown}s`
+                  : `Resend available in ${cooldown}s`
+                : spanish
+                  ? "Reenviar correo de confirmación"
+                  : "Resend confirmation email"}
           </button>
         </form>
         <div className="auth-switch">
-          <span>Already confirmed? <Link href="/login">Log in</Link></span>
+          <span>
+            {spanish ? "¿Ya confirmaste? " : "Already confirmed? "}
+            <Link href="/login">{spanish ? "Inicia sesión" : "Log in"}</Link>
+          </span>
         </div>
       </section>
     </main>

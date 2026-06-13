@@ -73,13 +73,21 @@ export function isExternalPlatform(platform: Platform) {
   return getContentClassification(platform) === "external";
 }
 
-export function contentClassificationLabel(platform: Platform) {
+export function contentClassificationLabel(platform: Platform, locale: "en" | "es" = "en") {
+  if (locale === "es") {
+    return isExternalPlatform(platform)
+      ? "Abre fuera de First Listen"
+      : "Reproduce dentro de First Listen";
+  }
   return isExternalPlatform(platform)
-    ? "External Content"
-    : "Internal Content";
+    ? "Opens outside First Listen"
+    : "Plays inside First Listen";
 }
 
-export function compactClassificationLabel(platform: Platform) {
+export function compactClassificationLabel(platform: Platform, locale: "en" | "es" = "en") {
+  if (locale === "es") {
+    return isExternalPlatform(platform) ? "Abre fuera" : "Reproduce aquí";
+  }
   return isExternalPlatform(platform) ? "External" : "Internal";
 }
 

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { createClient } from "@/lib/supabase/client";
+import { useInterfaceLocale } from "@/lib/use-interface-locale";
 
 type SongComment = {
   review_id: string;
@@ -32,6 +33,8 @@ export function CommentsPage({
   comments: SongComment[];
   selectedSongTitle?: string;
 }) {
+  const locale = useInterfaceLocale();
+  const spanish = locale === "es";
   const [commentRows, setCommentRows] = useState(comments);
   const [reportReasons, setReportReasons] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
@@ -73,7 +76,9 @@ export function CommentsPage({
     <main className="comments-page">
       <header className="account-header">
         <Logo />
-        <Link href="/dashboard"><ArrowLeft size={16} /> Dashboard</Link>
+        <Link href="/dashboard">
+          <ArrowLeft size={16} /> {spanish ? "Descubrir música" : "Discover Music"}
+        </Link>
       </header>
 
       <section className="comments-page-card">

@@ -9,31 +9,40 @@ import {
   Send,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useInterfaceLocale } from "@/lib/use-interface-locale";
 
 const categories = [
   {
     id: "report_problem",
     label: "Report a Problem",
+    labelEs: "Reportar un problema",
     icon: Bug,
     description: "Something broke, looks wrong, or blocked your flow.",
+    descriptionEs: "Algo falló, se ve mal o bloqueó tu experiencia.",
   },
   {
     id: "suggest_improvement",
     label: "Suggest an Improvement",
+    labelEs: "Sugerir una mejora",
     icon: Lightbulb,
     description: "Share an idea that would make First Listen better.",
+    descriptionEs: "Comparte una idea para mejorar First Listen.",
   },
   {
     id: "ask_question",
     label: "Ask a Question",
+    labelEs: "Hacer una pregunta",
     icon: CircleHelp,
     description: "Get help understanding the platform or your account.",
+    descriptionEs: "Recibe ayuda para entender la plataforma o tu cuenta.",
   },
   {
     id: "general_feedback",
     label: "General Feedback",
+    labelEs: "Feedback general",
     icon: Heart,
     description: "Tell us what feels useful, confusing, or promising.",
+    descriptionEs: "Cuéntanos qué se siente útil, confuso o prometedor.",
   },
 ] as const;
 
@@ -42,6 +51,8 @@ export function FeedbackCenterForm({
 }: {
   supportEmail?: string;
 }) {
+  const locale = useInterfaceLocale();
+  const spanish = locale === "es";
   const [category, setCategory] =
     useState<(typeof categories)[number]["id"]>("report_problem");
   const [subject, setSubject] = useState("");
@@ -56,17 +67,29 @@ export function FeedbackCenterForm({
     event.preventDefault();
     setStatus("");
     if (subject.trim().length < 3 || message.trim().length < 10) {
-      setStatus("Please add a clear subject and a useful message.");
+      setStatus(
+        spanish
+          ? "Agrega un asunto claro y un mensaje útil."
+          : "Please add a clear subject and a useful message.",
+      );
       return;
     }
     if (screenshotUrl.trim() && !/^https:\/\//i.test(screenshotUrl.trim())) {
-      setStatus("Screenshot links must begin with https://.");
+      setStatus(
+        spanish
+          ? "El enlace de captura debe comenzar con https://."
+          : "Screenshot links must begin with https://.",
+      );
       return;
     }
 
     const supabase = createClient();
     if (!supabase) {
-      setStatus(`Support form is unavailable. Email ${supportEmail}.`);
+      setStatus(
+        spanish
+          ? `El formulario no está disponible. Escribe a ${supportEmail}.`
+          : `Support form is unavailable. Email ${supportEmail}.`,
+      );
       return;
     }
 
@@ -93,22 +116,28 @@ export function FeedbackCenterForm({
     setScreenshotUrl("");
     setContactEmail("");
     setNotifyByEmail(true);
-    setStatus("Thanks. Your message was sent to the First Listen team.");
+    setStatus(
+      spanish
+        ? "Gracias. Tu mensaje fue enviado al equipo de First Listen."
+        : "Thanks. Your message was sent to the First Listen team.",
+    );
   };
 
   return (
     <section className="feedback-center-card" id="feedback-center">
       <div className="help-section-heading">
-        <span className="eyebrow">Feedback Center</span>
-        <h2>Need help or want to improve First Listen?</h2>
+        <span className="eyebrow">{spanish ? "Centro de feedback" : "Feedback Center"}</span>
+        <h2>{spanish ? "¿Necesitas ayuda o quieres mejorar First Listen?" : "Need help or want to improve First Listen?"}</h2>
         <p>
-          Send a problem report, question, suggestion, or general note. You can
-          also email <a href={`mailto:${supportEmail}`}>{supportEmail}</a>.
+          {spanish
+            ? "Envía un problema, pregunta, sugerencia o nota general. También puedes escribir a "
+            : "Send a problem report, question, suggestion, or general note. You can also email "}
+          <a href={`mailto:${supportEmail}`}>{supportEmail}</a>.
         </p>
       </div>
 
       <div className="feedback-category-grid" role="radiogroup">
-        {categories.map(({ id, label, icon: Icon, description }) => (
+        {categories.map(({ id, label, labelEs, icon: Icon, description, descriptionEs }) => (
           <button
             aria-checked={category === id}
             className={category === id ? "active" : ""}
@@ -118,15 +147,15 @@ export function FeedbackCenterForm({
             type="button"
           >
             <Icon size={18} />
-            <strong>{label}</strong>
-            <small>{description}</small>
+            <strong>{spanish ? labelEs : label}</strong>
+            <small>{spanish ? descriptionEs : description}</small>
           </button>
         ))}
       </div>
 
       <form className="feedback-form" onSubmit={submit}>
         <label>
-          Subject
+          {spanish ? "Asunto" : "Subject"}
           <input
             maxLength={160}
             onChange={(event) => setSubject(event.target.value)}
@@ -135,7 +164,7 @@ export function FeedbackCenterForm({
           />
         </label>
         <label>
-          Message
+          {spanish ? "Mensaje" : "Message"}
           <textarea
             maxLength={4000}
             minLength={10}
@@ -146,7 +175,7 @@ export function FeedbackCenterForm({
           />
         </label>
         <label>
-          Optional screenshot URL
+          {spanish ? "URL de captura opcional" : "Optional screenshot URL"}
           <input
             onChange={(event) => setScreenshotUrl(event.target.value)}
             placeholder="https://"
@@ -155,7 +184,7 @@ export function FeedbackCenterForm({
           />
         </label>
         <label>
-          Contact email
+          {spanish ? "Correo de contacto" : "Contact email"}
           <input
             onChange={(event) => setContactEmail(event.target.value)}
             placeholder="you@example.com"
@@ -169,12 +198,18 @@ export function FeedbackCenterForm({
             onChange={(event) => setNotifyByEmail(event.target.checked)}
             type="checkbox"
           />
-          <span>Email me if a reply is available.</span>
+          <span>{spanish ? "Envíame un correo si hay respuesta." : "Email me if a reply is available."}</span>
         </label>
         {status && <div className="form-message" role="status">{status}</div>}
         <button className="primary-button" disabled={sending} type="submit">
           <Send size={15} />
-          {sending ? "Sending..." : "Send Feedback"}
+          {sending
+            ? spanish
+              ? "Enviando..."
+              : "Sending..."
+            : spanish
+              ? "Enviar feedback"
+              : "Send Feedback"}
         </button>
       </form>
     </section>

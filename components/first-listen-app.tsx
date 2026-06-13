@@ -108,6 +108,10 @@ import { detectMusicPlatform } from "@/lib/platform";
 import { getProviderEmbed } from "@/lib/player";
 import { evaluateReviewQuality } from "@/lib/review-quality";
 import { createClient } from "@/lib/supabase/client";
+import {
+  dismissYoutubeMusicDiscovery,
+  shouldShowYoutubeMusicDiscoveryRecommendation,
+} from "@/lib/youtube-music-discovery";
 import type {
   AccountSummary,
   CommunityNotification,
@@ -367,15 +371,15 @@ function secondsToNextReward(bankSeconds: number, exchangeSeconds: number) {
 function navItems(copy: Copy): Array<{ id: View; label: string; icon: typeof Headphones }> {
   return [
     { id: "review", label: copy.app.nav.review, icon: Headphones },
-    { id: "dashboard", label: copy.app.nav.dashboard, icon: BarChart3 },
+    { id: "dashboard", label: copy.app.nav.dashboard, icon: Sparkles },
     { id: "submit", label: copy.app.nav.submit, icon: Plus },
   ];
 }
 
-function shortMobileLabel(locale: InterfaceLocale, view: View, copy: Copy) {
+function shortMobileLabel(locale: InterfaceLocale, view: View) {
   if (view === "review") return locale === "es" ? "Review" : "Review";
   if (view === "submit") return locale === "es" ? "Enviar" : "Submit";
-  return copy.app.nav.results;
+  return locale === "es" ? "Descubrir" : "Discover";
 }
 
 function translatedPlatformMessage(
@@ -488,9 +492,11 @@ function PlatformPresenceIconRow({
 
 function ProviderClassificationBadge({
   platform,
+  locale,
   compact = false,
 }: {
   platform: Platform;
+  locale: InterfaceLocale;
   compact?: boolean;
 }) {
   const external = isExternalPlatform(platform);
@@ -504,8 +510,8 @@ function ProviderClassificationBadge({
     >
       {external ? <Link2 size={12} /> : <Music2 size={12} />}
       {compact
-        ? compactClassificationLabel(platform)
-        : contentClassificationLabel(platform)}
+        ? compactClassificationLabel(platform, locale)
+        : contentClassificationLabel(platform, locale)}
     </span>
   );
 }
@@ -573,7 +579,7 @@ function ReviewProgress({
             ? "Super Admin accounts can submit without spending tokens."
             : count >= 1
               ? "One token submits one validated song."
-              : "Bank verified listening minutes and claim tokens manually."}
+              : "Save listening time and claim tokens manually."}
       </p>
     </div>
   );
@@ -867,7 +873,7 @@ function PostReviewDiscovery({
       {validListenRecorded && (
         <strong className="valid-listen-confirmation">
           <CheckCircle2 size={15} />
-          {spanish ? "Reproducción válida registrada" : "Valid Play Recorded"}
+          {spanish ? "Reproducción que suma registrada" : "Play counted"}
         </strong>
       )}
       <section className="post-review-impact" aria-label="Your impact today">
@@ -1133,14 +1139,14 @@ function OfflineCommunitySummary({
               : "new reviews"}
         </span>
         <span>
-          <strong>{summary.validListensCount}</strong>{" "}
+          🎁 <strong>{summary.validListensCount}</strong>{" "}
           {spanish
             ? summary.validListensCount === 1
-              ? "escucha válida"
-              : "reproducciones válidas"
+              ? "token listo para reclamar"
+              : "tokens listos para reclamar"
             : summary.validListensCount === 1
-              ? "valid listen"
-              : "valid plays"}
+              ? "token ready to claim"
+              : "tokens ready to claim"}
         </span>
       </div>
       <div className="offline-community-details">
@@ -1242,7 +1248,7 @@ function EmptyQueueRetention({
           </div>
         </div>
         <div className="queue-retention-stats compact">
-          <div><strong>{todaySupport.validListens}</strong><span>{spanish ? "Reproducciones válidas" : "Valid Plays"}</span></div>
+          <div><strong>{todaySupport.validListens}</strong><span>{spanish ? "Reproducciones que suman" : "Plays that count"}</span></div>
           <div><strong>{todaySupport.completeListens}</strong><span>{spanish ? "Escuchas completas" : "Complete Listens"}</span></div>
           <div><strong>{Math.round(todaySupport.averageCompletionRate)}%</strong><span>{spanish ? "Finalización promedio" : "Average Completion Rate"}</span></div>
         </div>
@@ -1663,7 +1669,7 @@ function ReviewView({
       if (error || !result) {
         setListeningSession((current) => ({
           ...current,
-          warning: error?.message ?? "Listening progress could not be verified.",
+          warning: error?.message ?? (locale === "es" ? "No pudimos actualizar el tiempo de escucha." : "We could not update listening time."),
         }));
         return;
       }
@@ -1939,10 +1945,10 @@ function ReviewView({
               <div className="external-content-notice" aria-live="polite">
                 <Link2 size={17} />
                 <span>
-                  <strong>External Content</strong>
+                  <strong>{locale === "es" ? "Abre fuera de First Listen" : "Opens outside First Listen"}</strong>
                   {locale === "es"
-                    ? `Reproducir abrirá ${song.platform}. No se verifican escuchas ni recompensas externas.`
-                    : `Playing this content opens ${song.platform}. External listening and rewards are not verified.`}
+                    ? `Este contenido abre ${song.platform}. La actividad fuera de First Listen no suma tiempo ni tokens.`
+                    : `This content opens ${song.platform}. Activity outside First Listen does not earn time or tokens.`}
                 </span>
               </div>
             ) : (
@@ -1952,7 +1958,7 @@ function ReviewView({
                 <strong>{formatClock(listeningSession.liveSeconds)}</strong>
               </div>
               <div>
-                <span><Target size={13} /> {locale === "es" ? "Reproducción válida" : "Valid Play Requirement"}</span>
+                <span><Target size={13} /> {locale === "es" ? "Tiempo que cuenta" : "Time toward tokens"}</span>
                 <strong>
                   {formatClock(listeningSession.validRequirementSeconds)}
                   {listeningSession.validListenRecorded
@@ -1995,7 +2001,7 @@ function ReviewView({
                   <strong>
                     {locale === "es"
                       ? "Gracias por apoyar a este artista"
-                      : "Valid Play Recorded"}
+                      : "Play counted"}
                   </strong>
                   <button
                     data-ui-component="nextSongButton"
@@ -2054,7 +2060,7 @@ function ReviewView({
                 <PlatformIcon platform={song.platform} size={13} />
                 {song.platform}
               </span>
-              <ProviderClassificationBadge platform={song.platform} compact />
+              <ProviderClassificationBadge platform={song.platform} locale={locale} compact />
               <span>{song.country}</span>
               <span>{optionLabel(locale, song.language)}</span>
             </div>
@@ -2119,7 +2125,7 @@ function ReviewView({
           <div>
             <span>
               <CheckCircle2 size={13} />
-              {locale === "es" ? "Sesión Verificada" : "Verified Session"}
+              {locale === "es" ? "Sesión verificada" : "Verified Session"}
             </span>
             <strong>{formatClock(listeningSession.verifiedSeconds)}</strong>
           </div>
@@ -2299,7 +2305,7 @@ function ReviewView({
             <div className="listening-validation-totals">
               <div>
                 <span>
-                  {locale === "es" ? "SesiÃ³n verificada" : "Verified Session"}
+                  {locale === "es" ? "Sesión verificada" : "Verified Session"}
                 </span>
                 <strong>{formatClock(listeningSession.liveSeconds)}</strong>
               </div>
@@ -2313,15 +2319,15 @@ function ReviewView({
             <p>
               {externalContent
                 ? locale === "es"
-                  ? "El contenido externo no gana minutos, reproducciones válidas ni recompensas."
-                  : "External Content does not earn minutes, valid plays, or rewards."
+                  ? "El contenido externo no suma tiempo ni tokens dentro de First Listen."
+                  : "Content that opens outside First Listen does not earn time or tokens inside First Listen."
                 : listeningSession.earningEligible === false
                   ? locale === "es"
-                    ? "La reproducciÃ³n estÃ¡ disponible, pero este proveedor no puede ganar minutos verificados."
-                    : "Playback is available, but this provider cannot earn verified minutes."
+                    ? "Esta plataforma no permite sumar tiempo dentro de First Listen."
+                    : "This platform cannot count time inside First Listen."
                   : locale === "es"
-                    ? "Cada segundo verificado se agrega al banco sin redondear. La review es opcional."
-                    : "Every verified second is banked without rounding. The review is optional."}
+                    ? "Cada segundo que cuenta se agrega al Banco de Tiempo sin redondear. La review es opcional."
+                    : "Every counted second is added to the Time Bank without rounding. The review is optional."}
             </p>
             <div className="progress-track">
               <i
@@ -2367,15 +2373,15 @@ function ReviewView({
           <p>
             {externalContent
               ? locale === "es"
-                ? "El contenido externo no gana minutos, reproducciones válidas ni recompensas."
-                : "External Content does not earn minutes, valid plays, or rewards."
+                ? "El contenido externo no suma tiempo ni tokens dentro de First Listen."
+                : "Content that opens outside First Listen does not earn time or tokens inside First Listen."
               : listeningSession.earningEligible === false
               ? locale === "es"
-                ? "La reproducción está disponible, pero este proveedor no puede ganar minutos verificados."
-                : "Playback is available, but this provider cannot earn verified minutes."
+                ? "Esta plataforma no permite sumar tiempo dentro de First Listen."
+                : "This platform cannot count time inside First Listen."
               : locale === "es"
-                ? "Cada segundo verificado se agrega al banco sin redondear. La review es opcional."
-                : "Every verified second is banked without rounding. The review is optional."}
+                ? "Cada segundo que cuenta se agrega al Banco de Tiempo sin redondear. La review es opcional."
+                : "Every counted second is added to the Time Bank without rounding. The review is optional."}
           </p>
           <div className="progress-track">
             <i
@@ -2402,7 +2408,7 @@ function ReviewView({
               notify(
                 locale === "es"
                   ? "Sigue escuchando. Tu tiempo verificado continúa contando."
-                  : "Keep listening. Your verified time is still counting.",
+                  : "Keep listening. Your saved time is still counting.",
               );
             }}
             onNextSong={() => void advanceToNextSong(autoPlayNextSong)}
@@ -2511,8 +2517,8 @@ function ReviewRewardVisibility({
         <p>
           {ready
             ? spanish
-              ? `Alcanzaste ${status.minutesPerCredit} minutos verificados. Reclama manualmente para ver tu token agregado.`
-              : `You have reached ${status.minutesPerCredit} verified minutes. Claim manually to see your token added.`
+              ? `Alcanzaste ${status.minutesPerCredit} minutos de tiempo acumulado. Reclama manualmente para ver tu token agregado.`
+              : `You have reached ${status.minutesPerCredit} saved minutes. Claim manually to see your token added.`
             : spanish
               ? `${remainingMinutes} min restantes para el proximo token.`
               : `${remainingMinutes} min remaining until the next token.`}
@@ -2546,7 +2552,7 @@ function ReviewRewardVisibility({
         </div>
         <small>
           {status.minutesPerCredit}{" "}
-          {spanish ? "minutos verificados = 1 token" : "verified minutes = 1 token"}
+          {spanish ? "tiempo acumulado = 1 token" : "saved time = 1 token"}
         </small>
       </div>
 
@@ -2674,7 +2680,7 @@ function ListeningBankPanel({
       <div className="listening-bank-stats">
         <div className="listening-bank-approved-field">
           <strong>{formatClock(status.todaySeconds)}</strong>
-          <span>{spanish ? "Tiempo reproducido verificado hoy" : "Today's Verified Play Time"}</span>
+          <span>{spanish ? "Tiempo acumulado hoy" : "Time saved today"}</span>
         </div>
         <div className="listening-bank-approved-field">
           <strong>{formatClock(status.approvedSeconds)}</strong>
@@ -2693,15 +2699,15 @@ function ListeningBankPanel({
           <span>{spanish ? "Banco de Tiempo disponible" : "Available Time Bank"}</span>
         </div>
         <div><strong>{credits}</strong><span>{spanish ? "Tokens disponibles" : "Available Tokens"}</span></div>
-        <div><strong>{status.validListens}</strong><span>{spanish ? "Reproducciones válidas" : "Valid Plays"}</span></div>
-        <div><strong>{status.completeListens}</strong><span>{spanish ? "Escuchas completas" : "Complete Listens"}</span></div>
-        <div><strong>{formatDuration(status.weeklySeconds)}</strong><span>{spanish ? "Tiempo verificado semanal" : "Weekly Verified Play Time"}</span></div>
-        <div><strong>{formatDuration(status.monthlySeconds)}</strong><span>{spanish ? "Tiempo verificado mensual" : "Monthly Verified Play Time"}</span></div>
+        <div><strong>{status.validListens}</strong><span>{spanish ? "Reproducciones que suman" : "Plays that count"}</span></div>
+        <div><strong>{status.completeListens}</strong><span>{spanish ? "Reproducciones completas" : "Complete plays"}</span></div>
+        <div><strong>{formatDuration(status.weeklySeconds)}</strong><span>{spanish ? "Tiempo acumulado semanal" : "Weekly saved time"}</span></div>
+        <div><strong>{formatDuration(status.monthlySeconds)}</strong><span>{spanish ? "Tiempo acumulado mensual" : "Monthly saved time"}</span></div>
         <div><strong>{formatDuration(status.lifetimeSeconds)}</strong><span>{spanish ? "Tiempo reproducido total" : "Lifetime Play Time"}</span></div>
       </div>
       <div className="today-support-strip">
         <span>{spanish ? "Apoyo de hoy" : "Today’s Support"}</span>
-        <strong>{status.todayValidListens} {spanish ? "válidas" : "valid"}</strong>
+        <strong>{status.todayValidListens} {spanish ? "que suman" : "counted"}</strong>
         <strong>{status.todayCompleteListens} {spanish ? "completas" : "complete"}</strong>
         <strong>{Math.round(status.todayAverageCompletionRate)}% {spanish ? "promedio" : "average completion"}</strong>
       </div>
@@ -2736,8 +2742,8 @@ function ListeningBankPanel({
       </div>
       <p className="listening-bank-transparency listening-bank-next-threshold">
         {spanish
-          ? "El tiempo cuenta cuando la reproduccion es activa, audible y First Listen permanece visible. Reclama manualmente cuando alcances el umbral."
-          : "Time counts when playback is active, audible, and First Listen stays visible. Claim manually once you reach the reward threshold."}
+          ? "El tiempo cuenta para tokens cuando la reproducción está activa y audible. Reclama manualmente cuando alcances la meta."
+          : "Time counts toward tokens when playback is active and audible. Claim manually once you reach the goal."}
       </p>
       <button
         className="primary-button listening-claim-button"
@@ -2901,8 +2907,8 @@ function DiscoverySongCard({
           setListenState((current) => ({
             ...current,
             warning: spanish
-              ? "Este proveedor no ofrece verificacion de escucha."
-              : "This provider does not expose verified listening.",
+              ? "Esta plataforma no permite sumar tiempo dentro de First Listen."
+              : "This platform cannot count time inside First Listen.",
           }));
         }
         return;
@@ -2923,7 +2929,7 @@ function DiscoverySongCard({
             warning:
               error?.message ??
               (spanish
-                ? "Esta canción no es elegible para otra escucha verificada."
+                ? "Esta canción no puede sumar otra reproducción por ahora."
                 : "This song is not eligible for another verified listen."),
           }));
           return;
@@ -2963,7 +2969,7 @@ function DiscoverySongCard({
       if (error || !row) {
         setListenState((current) => ({
           ...current,
-          warning: error?.message ?? "Listening progress could not be verified.",
+          warning: error?.message ?? (spanish ? "No pudimos actualizar el tiempo de escucha." : "We could not update listening time."),
         }));
         return;
       }
@@ -3050,7 +3056,7 @@ function DiscoverySongCard({
         <h4>{song.title}</h4>
         <ArtistNameLink artistId={song.artistId} name={song.artist} />
         <small>
-          {song.platform} / {compactClassificationLabel(song.platform)} /{" "}
+          {song.platform} / {compactClassificationLabel(song.platform, locale)} /{" "}
           {optionLabel(locale, song.genre)} /{" "}
           {optionLabel(locale, song.language)}
         </small>
@@ -3147,7 +3153,7 @@ function DiscoverySongCard({
             <span>
               <CheckCircle2 size={13} />
               {listenState.validListenRecorded
-                ? spanish ? "Reproducción válida" : "Valid Play"
+                ? spanish ? "Tiempo que cuenta" : "Time toward tokens"
                 : `${formatClock(listenState.verifiedSeconds)} / ${formatClock(
                     listenState.validRequirementSeconds,
                   )}`}
@@ -3521,12 +3527,14 @@ function CommunityProgramsPanel({
 
 function PlatformPresenceManagerPanel({
   locale,
+  notify,
   onLinkSaved,
   onLinkRemoved,
   onPrimaryChanged,
   song,
 }: {
   locale: InterfaceLocale;
+  notify?: (message: string) => void;
   onLinkSaved: (songId: string, link: SongPlatformLink) => void;
   onLinkRemoved: (songId: string, platform: Platform) => void;
   onPrimaryChanged: (
@@ -3545,7 +3553,15 @@ function PlatformPresenceManagerPanel({
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [youtubeMusicRecommendation, setYoutubeMusicRecommendation] =
+    useState<SongPlatformLink | null>(null);
   const currentLinks = getPrimaryPlatformLinks(song);
+  const primaryPlatformLink = currentLinks.find((link) => link.primary);
+  const youtubeMusicLink = currentLinks.find(
+    (link) => link.platform === "YouTube Music",
+  );
+  const showYoutubeMusicTip =
+    Boolean(youtubeMusicLink) && primaryPlatformLink?.platform === "Spotify";
   const availablePlatforms = allPlatforms.filter(
     (platform) => platform !== song.platform,
   );
@@ -3604,7 +3620,7 @@ function PlatformPresenceManagerPanel({
       allPlatforms.find(
         (platform) => databasePlatform[platform] === String(row.platform),
       ) ?? targetPlatform;
-    onLinkSaved(song.id, {
+    const savedLink: SongPlatformLink = {
       platform: savedPlatform,
       url: String(row.music_url ?? url.trim()),
       primary: Boolean(row.is_primary),
@@ -3615,7 +3631,8 @@ function PlatformPresenceManagerPanel({
           ? row.resolution_source
           : "submitted",
       confidenceScore: Number(row.confidence_score ?? 100),
-    });
+    };
+    onLinkSaved(song.id, savedLink);
     setUrl("");
     setNote("");
     setMessage(
@@ -3623,6 +3640,17 @@ function PlatformPresenceManagerPanel({
         ? "Destino de plataforma guardado."
         : "Platform destination saved.",
     );
+    if (
+      shouldShowYoutubeMusicDiscoveryRecommendation({
+        primaryPlatform: savedLink.primary
+          ? savedPlatform
+          : primaryPlatformLink?.platform,
+        savedPlatform,
+        songId: song.id,
+      })
+    ) {
+      setYoutubeMusicRecommendation(savedLink);
+    }
   };
 
   const removeLink = async (link: SongPlatformLink) => {
@@ -3647,10 +3675,13 @@ function PlatformPresenceManagerPanel({
       return;
     }
     onLinkRemoved(song.id, link.platform);
-    setMessage(spanish ? "Destino eliminado." : "Destination removed.");
+    setMessage(spanish ? "Enlace eliminado." : "Link removed.");
   };
 
-  const makePrimary = async (link: SongPlatformLink) => {
+  const makePrimary = async (
+    link: SongPlatformLink,
+    options?: { discoveryUpgrade?: boolean },
+  ) => {
     setMessage("");
     if (!isPrimaryPlatform(link.platform)) {
       setMessage(
@@ -3658,7 +3689,7 @@ function PlatformPresenceManagerPanel({
           ? "Esta plataforma solo puede mostrarse como destino adicional."
           : "This platform can only be shown as an additional destination.",
       );
-      return;
+      return false;
     }
     const supabase = createClient();
     if (!supabase) {
@@ -3667,7 +3698,7 @@ function PlatformPresenceManagerPanel({
           ? "El servicio no esta disponible."
           : "The service is unavailable.",
       );
-      return;
+      return false;
     }
     setSaving(true);
     const { data, error } = await supabase.rpc("set_song_primary_platform", {
@@ -3677,7 +3708,7 @@ function PlatformPresenceManagerPanel({
     setSaving(false);
     if (error) {
       setMessage(error.message);
-      return;
+      return false;
     }
     const result = data as PlatformPresenceResult;
     const nextPlatform =
@@ -3687,10 +3718,10 @@ function PlatformPresenceManagerPanel({
     if (!isPrimaryPlatform(nextPlatform)) {
       setMessage(
         spanish
-          ? "La plataforma primaria recibida no es valida."
-          : "The returned primary platform is invalid.",
+          ? "No se pudo actualizar la plataforma principal de descubrimiento."
+          : "The primary discovery platform could not be updated.",
       );
-      return;
+      return false;
     }
     const nextUrl = String(result.music_url ?? link.url);
     onPrimaryChanged(
@@ -3699,11 +3730,16 @@ function PlatformPresenceManagerPanel({
       nextUrl,
       mapSongPlatformLinks(result.platform_links, nextPlatform, nextUrl),
     );
-    setMessage(
-      spanish
-        ? `${nextPlatform} ahora es la plataforma primaria.`
-        : `${nextPlatform} is now the primary platform.`,
-    );
+    const successMessage = options?.discoveryUpgrade
+      ? spanish
+        ? "✅ Ajustes de descubrimiento actualizados. YouTube Music ahora es tu plataforma principal de descubrimiento."
+        : "✅ Discovery settings updated. YouTube Music is now your Primary Discovery Platform."
+      : spanish
+        ? `${nextPlatform} ahora es la plataforma principal de descubrimiento.`
+        : `${nextPlatform} is now the primary discovery platform.`;
+    setMessage(successMessage);
+    notify?.(successMessage);
+    return true;
   };
 
   return (
@@ -3712,12 +3748,12 @@ function PlatformPresenceManagerPanel({
         <div>
           <span className="eyebrow">
             <Globe2 size={13} />
-            {spanish ? "Platform Presence Manager" : "Platform Presence Manager"}
+            {spanish ? "Plataformas de descubrimiento" : "Discovery Platforms"}
           </span>
           <h3>
             {spanish
-              ? "Edita plataformas de la canción"
-              : "Edit song platforms"}
+              ? "Edita dónde se puede descubrir tu canción"
+              : "Edit where listeners can discover your song"}
           </h3>
         </div>
         <small>
@@ -3727,7 +3763,7 @@ function PlatformPresenceManagerPanel({
         </small>
       </div>
       <div className="platform-disclaimer-card">
-        <strong>💡 Important</strong>
+        <strong>{spanish ? "💡 Importante" : "💡 Important"}</strong>
         <p>
           {spanish
             ? "Las plataformas adicionales deben pertenecer a la misma cancion o video que estas publicando. Puedes agregarlas ahora o despues desde la configuracion de la cancion."
@@ -3735,13 +3771,37 @@ function PlatformPresenceManagerPanel({
         </p>
       </div>
       <div className="platform-reminder-card">
-        <strong>💡 Reminder</strong>
+        <strong>{spanish ? "💡 Recordatorio" : "💡 Reminder"}</strong>
         <p>
           {spanish
-            ? "La Plataforma Primaria controla la reproduccion usada por First Listen. Las Plataformas Adicionales son solo destinos de descubrimiento y deben corresponder a la misma cancion o video."
-            : "The Primary Platform controls the playback used by First Listen. Additional Platforms are discovery destinations only and must correspond to the same song or video."}
+            ? "La plataforma principal de descubrimiento controla la reproducción usada por First Listen. Los enlaces adicionales son destinos de descubrimiento y deben corresponder a la misma canción o video."
+            : "The Primary Discovery Platform controls playback in First Listen. Additional links are discovery destinations and must match the same song or video."}
         </p>
       </div>
+      {showYoutubeMusicTip && youtubeMusicLink && (
+        <div className="platform-discovery-tip-card">
+          <strong>{spanish ? "💡 Consejo de descubrimiento" : "💡 Discovery Tip"}</strong>
+          <p>
+            {spanish
+              ? "YouTube Music está disponible para esta canción."
+              : "YouTube Music is available for this song."}
+            <br />
+            {spanish
+              ? "Las recomendaciones de YouTube pueden ayudar a nuevos oyentes a descubrir tu música."
+              : "YouTube recommendations can help new listeners discover your music."}
+          </p>
+          <button
+            className="primary-button"
+            disabled={saving}
+            onClick={() =>
+              void makePrimary(youtubeMusicLink, { discoveryUpgrade: true })
+            }
+            type="button"
+          >
+            {spanish ? "🚀 Aumentar mi descubrimiento" : "🚀 Increase My Discovery"}
+          </button>
+        </div>
+      )}
       <div className="platform-presence-management-list">
         {currentLinks.map((link) => (
           <article
@@ -3753,17 +3813,17 @@ function PlatformPresenceManagerPanel({
               <small>
                 {link.primary
                   ? spanish
-                    ? "Plataforma primaria"
-                    : "Primary Platform"
+                    ? "Plataforma principal de descubrimiento"
+                    : "Primary Discovery Platform"
                   : spanish
-                    ? "Destino adicional"
-                    : "Additional Destination"}
+                    ? "Enlace adicional"
+                    : "Additional Link"}
               </small>
             </span>
             <div>
               <a href={link.url} rel="noreferrer" target="_blank">
                 <ExternalLink size={13} />
-                {spanish ? "Abrir" : "Open"}
+                {spanish ? "Abrir enlace" : "Open link"}
               </a>
               {!link.primary && isPrimaryPlatform(link.platform) && (
                 <button
@@ -3771,7 +3831,7 @@ function PlatformPresenceManagerPanel({
                   onClick={() => void makePrimary(link)}
                   type="button"
                 >
-                  {spanish ? "Hacer primaria" : "Make Primary"}
+                  {spanish ? "🚀 Aumentar descubrimiento" : "🚀 Increase discovery"}
                 </button>
               )}
               {!link.primary && (
@@ -3790,7 +3850,7 @@ function PlatformPresenceManagerPanel({
       </div>
       <form className="verified-platform-form" onSubmit={submit}>
         <label>
-          {spanish ? "Destino" : "Destination"}
+          {spanish ? "Plataforma" : "Platform"}
           <select
             onChange={(event) =>
               setTargetPlatform(event.target.value as Platform)
@@ -3831,8 +3891,8 @@ function PlatformPresenceManagerPanel({
               ? "Guardando..."
               : "Saving..."
             : spanish
-              ? "Guardar destino"
-              : "Save Destination"}
+              ? "Guardar enlace"
+              : "Save link"}
         </button>
       </form>
       {url.trim() && (
@@ -3845,6 +3905,63 @@ function PlatformPresenceManagerPanel({
         </small>
       )}
       {message && <small className="form-message">{message}</small>}
+      {youtubeMusicRecommendation && (
+        <div className="platform-discovery-dialog-backdrop">
+          <div
+            aria-labelledby="youtube-music-discovery-title"
+            aria-modal="true"
+            className="platform-discovery-dialog"
+            role="dialog"
+          >
+            <h3 id="youtube-music-discovery-title">
+              {spanish
+                ? "🚀 Más descubrimiento disponible"
+                : "🚀 More Discovery Available"}
+            </h3>
+            <p>
+              {spanish
+                ? "Agregaste YouTube Music."
+                : "You just added YouTube Music."}
+            </p>
+            <p>
+              {spanish
+                ? "Las recomendaciones de YouTube pueden ayudar a nuevos oyentes a descubrir tu música."
+                : "YouTube recommendations can help new listeners discover your music."}
+            </p>
+            <p>
+              {spanish
+                ? "Cambiar a YouTube Music como plataforma principal de descubrimiento puede aumentar tus oportunidades de descubrimiento."
+                : "Switching to YouTube Music as your Primary Discovery Platform may increase your discovery opportunities."}
+            </p>
+            <div className="platform-guidance-actions">
+              <button
+                className="primary-button"
+                disabled={saving}
+                onClick={async () => {
+                  const updated = await makePrimary(youtubeMusicRecommendation, {
+                    discoveryUpgrade: true,
+                  });
+                  if (updated) setYoutubeMusicRecommendation(null);
+                }}
+                type="button"
+              >
+                {spanish ? "🚀 Aumentar mi descubrimiento" : "🚀 Increase My Discovery"}
+              </button>
+              <button
+                className="ghost-button"
+                disabled={saving}
+                onClick={() => {
+                  dismissYoutubeMusicDiscovery(song.id);
+                  setYoutubeMusicRecommendation(null);
+                }}
+                type="button"
+              >
+                {spanish ? "Ahora no" : "Not Right Now"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -3858,6 +3975,7 @@ function DashboardView({
   copy,
   locale,
   song,
+  notify,
   songSummaries,
   songReviews,
   listeningBank,
@@ -3886,6 +4004,7 @@ function DashboardView({
   copy: Copy;
   locale: InterfaceLocale;
   song: Song | null;
+  notify: (message: string) => void;
   songSummaries: SongDashboardSummary[];
   songReviews: Review[];
   listeningBank: ListeningBankStatus;
@@ -4034,7 +4153,7 @@ function DashboardView({
             <div>
               <span className="live-dot">{copy.app.dashboard.collecting}</span>
               <span className="platform-label">{song.platform}</span>
-              <ProviderClassificationBadge platform={song.platform} compact />
+              <ProviderClassificationBadge platform={song.platform} locale={locale} compact />
               {founder && <span className="song-founder-badge"><BadgeCheck size={12} /> {copy.app.dashboard.founder}</span>}
             </div>
             <h3>{song.title}</h3>
@@ -4059,6 +4178,7 @@ function DashboardView({
 
         <PlatformPresenceManagerPanel
           locale={locale}
+          notify={notify}
           onLinkRemoved={onPlatformPresenceLinkRemoved}
           onLinkSaved={onPlatformPresenceLinkSaved}
           onPrimaryChanged={onPrimaryPlatformChanged}
@@ -4218,6 +4338,7 @@ function DashboardView({
               {platformManagerOpen && (
                 <PlatformPresenceManagerPanel
                   locale={locale}
+                  notify={notify}
                   onLinkRemoved={onPlatformPresenceLinkRemoved}
                   onLinkSaved={onPlatformPresenceLinkSaved}
                   onPrimaryChanged={onPrimaryPlatformChanged}
@@ -4454,15 +4575,15 @@ function SubmitView({
     if (!platformDetection.valid || !platformDetection.platform) {
       failures.push(
         locale === "es"
-          ? "Usa un enlace valido de una plataforma compatible."
+          ? "Usa un enlace válido de una plataforma compatible."
           : "Use a valid link from a supported platform.",
       );
     }
     if (platformDetection.valid && platformDetection.platform && !primaryPlatformDetected) {
       failures.push(
         locale === "es"
-          ? "La plataforma primaria debe ser YouTube Music, YouTube, Spotify, Apple Music, TikTok o SoundCloud."
-          : "Primary Platform must be YouTube Music, YouTube, Spotify, Apple Music, TikTok, or SoundCloud.",
+          ? "La plataforma principal de descubrimiento debe ser YouTube Music, YouTube, Spotify, Apple Music, TikTok o SoundCloud."
+          : "Primary Discovery Platform must be YouTube Music, YouTube, Spotify, Apple Music, TikTok, or SoundCloud.",
       );
     }
     if (!songTitle.trim()) {
@@ -4690,7 +4811,7 @@ function SubmitView({
     setExternalConfirmationAcknowledged(false);
     notify(
       locale === "es"
-        ? "Reproduccion directa activada."
+        ? "Reproducción directa activada."
         : "Direct playback enabled.",
     );
   };
@@ -4726,7 +4847,7 @@ function SubmitView({
       reportedDurationSeconds > 480 || contentKind === "long_form",
     );
     setSubmitted(true);
-    notify(locale === "es" ? "Canción enviada. Ya entra a la cola de reviews." : "Song submitted. It is now entering the review queue.");
+    notify(locale === "es" ? "Canción enviada. Disponible para oyentes." : "Song submitted. It is now available to listeners.");
   };
 
   const submitSong = async (event: FormEvent<HTMLFormElement>) => {
@@ -4792,8 +4913,8 @@ function SubmitView({
           <p>
             {submittedForApproval
               ? locale === "es"
-                ? "El contenido de más de 8 minutos fue guardado y está esperando aprobación manual antes de entrar a la cola pública."
-                : "Content over 8 minutes was saved and is awaiting manual approval before entering the public queue."
+                ? "El contenido de más de 8 minutos fue guardado y espera aprobación manual antes de aparecer para oyentes."
+                : "Content over 8 minutes was saved and is awaiting manual approval before becoming available to listeners."
               : copy.app.submit.saved}
           </p>
           <div className="success-song">
@@ -4802,7 +4923,7 @@ function SubmitView({
               <strong>{copy.app.submit.newRelease}</strong>
               <small>
                 {platform} /{" "}
-                {platform ? compactClassificationLabel(platform) : ""} /{" "}
+                {platform ? compactClassificationLabel(platform, locale) : ""} /{" "}
                 {songLanguage && optionLabel(locale, songLanguage)} /{" "}
                 {submittedForApproval
                   ? locale === "es"
@@ -4835,28 +4956,28 @@ function SubmitView({
 
         <div className="content-economy-education">
           <article className="internal">
-            <span><Music2 size={17} /> Internal Content</span>
-            <strong>Cost: 1 Token</strong>
+            <span><Music2 size={17} /> {locale === "es" ? "Reproduce dentro de First Listen" : "Plays inside First Listen"}</span>
+            <strong>{locale === "es" ? "Costo: 1 token" : "Cost: 1 Token"}</strong>
             <p>
               {locale === "es"
-                ? "Mejor valor. Mantiene a los oyentes en First Listen y permite reviews, seguidores, comunidad, descubrimiento y escucha verificable."
-                : "Best value. Keeps listeners inside First Listen and supports reviews, followers, community activity, discovery, and verified listening."}
+                ? "Mejor valor. Mantiene a los oyentes en First Listen y permite reseñas, seguidores, comunidad, descubrimiento y tiempo que cuenta para tokens."
+                : "Best value. Keeps listeners inside First Listen and supports reviews, followers, community activity, discovery, and time toward tokens."}
             </p>
             <small>YouTube / YouTube Music / SoundCloud</small>
           </article>
           <article className="external">
-            <span><Link2 size={17} /> External Content</span>
+            <span><Link2 size={17} /> {locale === "es" ? "Abre fuera de First Listen" : "Opens outside First Listen"}</span>
             <strong>
-              Effective now: {requiredTokenCost}{" "}
-              {requiredTokenCost === 1 ? "Token" : "Tokens"} / Scheduled:{" "}
+              {locale === "es" ? "Costo actual" : "Current cost"}: {requiredTokenCost}{" "}
+              {requiredTokenCost === 1 ? "Token" : "Tokens"} / {locale === "es" ? "Programado" : "Scheduled"}:{" "}
               {selectedEconomy?.classification === "external"
                 ? selectedEconomy.scheduledTokenCost
                 : 8} Tokens
             </strong>
             <p>
               {locale === "es"
-                ? "Redirige fuera de First Listen. No ofrece verificación de reproducción interna ni recompensas por actividad externa."
-                : "Redirects outside First Listen. No internal playback verification or rewards are provided for external activity."}
+                ? "Redirige fuera de First Listen. La actividad externa no suma tiempo ni tokens dentro de First Listen."
+                : "Redirects outside First Listen. External activity does not earn time or tokens inside First Listen."}
             </p>
             <small>Spotify / Apple Music / TikTok</small>
           </article>
@@ -4873,8 +4994,8 @@ function SubmitView({
               </strong>
               <p>
                 {locale === "es"
-                  ? "Acumula minutos verificados y reclama una recompensa."
-                  : "Bank verified listening minutes and claim a reward."}
+                  ? "Acumula tiempo aprobado y reclama una recompensa."
+                  : "Save listening time and claim a reward."}
               </p>
             </div>
           </div>
@@ -4918,28 +5039,29 @@ function SubmitView({
             <div className="platform-guidance-card external-only-guidance" role="note">
               <span className="platform-guidance-title">
                 <Link2 size={16} />
-                🎵 {primaryPlatformDetected} detected
+                {locale === "es"
+                  ? `🎵 ${primaryPlatformDetected} detectado`
+                  : `🎵 ${primaryPlatformDetected} detected`}
               </span>
-              <strong>💡 Tip</strong>
+              <strong>{locale === "es" ? "💡 Consejo" : "💡 Tip"}</strong>
               <p>
-                This song will open outside of First Listen. If this song is
-                also available on YouTube or YouTube Music, you can add it now
-                to enable direct playback inside First Listen and publish for
-                only 1 Token.
+                {locale === "es"
+                  ? "Esta canción se abrirá fuera de First Listen. Si también está disponible en YouTube o YouTube Music, agrégala ahora para activar reproducción directa dentro de First Listen y publicar por solo 1 token."
+                  : "This song will open outside of First Listen. If this song is also available on YouTube or YouTube Music, you can add it now to enable direct playback inside First Listen and publish for only 1 Token."}
               </p>
               <div className="platform-guidance-actions">
                 <button
                   onClick={() => setShowDirectPlaybackSetup(true)}
                   type="button"
                 >
-                  <Plus size={14} /> Add Platform
+                  <Plus size={14} /> {locale === "es" ? "Agregar plataforma" : "Add Platform"}
                 </button>
                 <button
                   className="ghost-button"
                   onClick={() => setExternalGuidanceDismissed(true)}
                   type="button"
                 >
-                  Continue
+                  {locale === "es" ? "Continuar" : "Continue"}
                 </button>
               </div>
             </div>
@@ -4948,15 +5070,15 @@ function SubmitView({
           {showDirectPlaybackSetup && (
             <div className="platform-direct-setup-card">
               <div className="platform-disclaimer-card">
-                <strong>💡 Important</strong>
+                <strong>{locale === "es" ? "💡 Importante" : "💡 Important"}</strong>
                 <p>
-                  Additional platforms must belong to the same song or video you
-                  are publishing. You can add them now or later from the song
-                  settings.
+                  {locale === "es"
+                    ? "Los enlaces adicionales deben pertenecer a la misma canción o video que estás publicando. Puedes agregarlos ahora o después desde los ajustes de la canción."
+                    : "Additional platforms must belong to the same song or video you are publishing. You can add them now or later from the song settings."}
                 </p>
               </div>
               <label>
-                YouTube or YouTube Music link
+                {locale === "es" ? "Enlace de YouTube o YouTube Music" : "YouTube or YouTube Music link"}
                 <input
                   onChange={(event) => setDirectPlaybackLink(event.target.value)}
                   placeholder="https://music.youtube.com/watch?v=..."
@@ -4971,8 +5093,12 @@ function SubmitView({
                   }
                 >
                   {directPlaybackPlatform
-                    ? `${directPlaybackPlatform} ready for direct playback.`
-                    : "Paste a valid YouTube or YouTube Music link to enable direct playback."}
+                    ? locale === "es"
+                      ? `${directPlaybackPlatform} listo para reproducción directa.`
+                      : `${directPlaybackPlatform} ready for direct playback.`
+                    : locale === "es"
+                      ? "Pega un enlace válido de YouTube o YouTube Music para activar reproducción directa."
+                      : "Paste a valid YouTube or YouTube Music link to enable direct playback."}
                 </small>
               )}
               <div className="platform-guidance-actions">
@@ -4981,14 +5107,14 @@ function SubmitView({
                   onClick={applyDirectPlaybackLink}
                   type="button"
                 >
-                  <Check size={14} /> Use Direct Playback Link
+                  <Check size={14} /> {locale === "es" ? "Usar enlace de reproducción directa" : "Use Direct Playback Link"}
                 </button>
                 <button
                   className="ghost-button"
                   onClick={() => setShowDirectPlaybackSetup(false)}
                   type="button"
                 >
-                  Maybe Later
+                  {locale === "es" ? "Más tarde" : "Maybe Later"}
                 </button>
               </div>
             </div>
@@ -4998,10 +5124,10 @@ function SubmitView({
             <div className="platform-guidance-card direct-playback-enabled" role="status">
               <span className="platform-guidance-title">
                 <CheckCircle2 size={16} />
-                🎉 Direct playback enabled
+                {locale === "es" ? "🎉 Reproducción directa activada" : "🎉 Direct playback enabled"}
               </span>
               <p>
-                Publication cost: {requiredTokenCost} {tokenWord}
+                {locale === "es" ? "Costo de publicación" : "Publication cost"}: {requiredTokenCost} {tokenWord}
               </p>
             </div>
           )}
@@ -5015,20 +5141,24 @@ function SubmitView({
                 role="dialog"
               >
                 <span className="eyebrow">
-                  <LockKeyhole size={13} /> Confirm Publication
+                  <LockKeyhole size={13} /> {locale === "es" ? "Confirmar envío" : "Confirm Publication"}
                 </span>
                 <h3 id="external-publication-title">
-                  ⚠️ Confirm Publication
+                  {locale === "es" ? "⚠️ Confirmar envío" : "⚠️ Confirm Publication"}
                 </h3>
-                <p>This song will use external playback.</p>
+                <p>
+                  {locale === "es"
+                    ? "Esta canción se abrirá fuera de First Listen."
+                    : "This song will use external playback."}
+                </p>
                 <div className="confirmation-math-grid">
-                  <span>Publication cost:</span>
+                  <span>{locale === "es" ? "Costo de publicación:" : "Publication cost:"}</span>
                   <strong>
                     {requiredTokenCost} {tokenWord}
                   </strong>
-                  <span>Current balance:</span>
+                  <span>{locale === "es" ? "Saldo actual:" : "Current balance:"}</span>
                   <strong>{currentBalanceLabel}</strong>
-                  <span>Balance after publication:</span>
+                  <span>{locale === "es" ? "Saldo después de publicar:" : "Balance after publication:"}</span>
                   <strong>{balanceAfterPublicationLabel}</strong>
                 </div>
                 <div className="platform-guidance-actions">
@@ -5042,7 +5172,7 @@ function SubmitView({
                     }}
                     type="button"
                   >
-                    Publish for {requiredTokenCost} {tokenWord}
+                    {locale === "es" ? "Publicar por" : "Publish for"} {requiredTokenCost} {tokenWord}
                   </button>
                   <button
                     onClick={() => {
@@ -5052,7 +5182,7 @@ function SubmitView({
                     }}
                     type="button"
                   >
-                    <Plus size={14} /> Add Platform
+                    <Plus size={14} /> {locale === "es" ? "Agregar plataforma" : "Add Platform"}
                   </button>
                 </div>
               </section>
@@ -5240,7 +5370,7 @@ function SubmitView({
           </div>
 
           <fieldset className="explicit-field" disabled={!unlocked}>
-            <legend>Explicit Content</legend>
+            <legend>{locale === "es" ? "Contenido explícito" : "Explicit Content"}</legend>
             <label>
               <input
                 checked={explicitContent === false}
@@ -5249,7 +5379,7 @@ function SubmitView({
                 type="radio"
                 value="no"
               />
-              No
+              {locale === "es" ? "No" : "No"}
             </label>
             <label>
               <input
@@ -5259,7 +5389,7 @@ function SubmitView({
                 type="radio"
                 value="yes"
               />
-              Yes
+              {locale === "es" ? "Sí" : "Yes"}
             </label>
           </fieldset>
 
@@ -5271,7 +5401,7 @@ function SubmitView({
                   {platform === item ? <Check size={14} /> : <PlatformIcon platform={item} size={14} />}
                   <span>
                     {item}
-                    <small>{compactClassificationLabel(item)}</small>
+                    <small>{compactClassificationLabel(item, locale)}</small>
                   </span>
                 </button>
               ))}
@@ -5416,7 +5546,7 @@ function SubmitView({
           {[
             ["01", locale === "es" ? "Tu enlace entra a la cola de escucha." : "Your link enters the listening queue."],
             ["02", locale === "es" ? "Reviewers ven idioma, género y foco de feedback." : "Reviewers see the song language, genre, and feedback focus."],
-            ["03", locale === "es" ? "Los resultados aparecen en tu dashboard privado." : "Results appear privately in your dashboard."],
+            ["03", locale === "es" ? "Los resultados aparecen en tus analíticas privadas." : "Results appear in your private analytics."],
           ].map(([number, text]) => (
             <div key={number}><span>{number}</span><p>{text}</p></div>
           ))}
@@ -6297,6 +6427,7 @@ export function FirstListenApp({
           locale={locale}
           listeningBank={listeningBank}
           claimingReward={claimingReward}
+          notify={notify}
           onClaimReward={() => void claimListeningReward()}
           reviewCredits={reviewCount}
           reviewQualityScore={averageReviewQuality}
@@ -6477,7 +6608,7 @@ export function FirstListenApp({
               onClick={() => changeView(item.id)}
             >
               <Icon size={20} />
-              <span>{shortMobileLabel(locale, item.id, copy)}</span>
+              <span>{shortMobileLabel(locale, item.id)}</span>
               {item.id === "submit" && reviewCount < 1 && !founderFree && role !== "super_admin" && <i />}
             </button>
           );

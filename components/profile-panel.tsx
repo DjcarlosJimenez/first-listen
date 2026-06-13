@@ -37,6 +37,11 @@ import {
 } from "@/lib/content-economy";
 import { detectMusicPlatform } from "@/lib/platform";
 import { createClient } from "@/lib/supabase/client";
+import {
+  dismissYoutubeMusicDiscovery,
+  shouldShowYoutubeMusicDiscoveryRecommendation,
+} from "@/lib/youtube-music-discovery";
+import { useInterfaceLocale } from "@/lib/use-interface-locale";
 import type {
   CommunityActivity,
   CommunityNetwork,
@@ -125,12 +130,34 @@ const platformCompatibility: Record<ConnectedPlatform, string> = {
   tiktok: "Discovery Only",
 };
 
-function platformStatus(status?: ConnectedPlatformAccount["connectionStatus"]) {
-  if (status === "connected") return "Connected";
-  if (status === "pending") return "Pending";
-  if (status === "needs_reauth") return "Reconnect Required";
-  if (status === "revoked") return "Disconnected";
-  return "Not Connected";
+function platformStatus(
+  status: ConnectedPlatformAccount["connectionStatus"] | undefined,
+  spanish: boolean,
+) {
+  if (status === "connected") return spanish ? "Conectado" : "Connected";
+  if (status === "pending") return spanish ? "Pendiente" : "Pending";
+  if (status === "needs_reauth") return spanish ? "Reconectar" : "Reconnect Required";
+  if (status === "revoked") return spanish ? "Desconectado" : "Disconnected";
+  return spanish ? "No conectado" : "Not Connected";
+}
+
+function platformCompatibilityLabel(label: string, spanish: boolean) {
+  if (!spanish) return label;
+  if (label === "Discovery Only") return "Solo descubrimiento";
+  if (label === "Partially Supported") return "Soporte parcial";
+  if (label === "Not Recommended") return "No recomendado";
+  return label;
+}
+
+function roleLabel(role: string, spanish: boolean) {
+  const labels: Record<string, { en: string; es: string }> = {
+    super_admin: { en: "Super Admin", es: "Super admin" },
+    admin: { en: "Admin", es: "Admin" },
+    moderator: { en: "Moderator", es: "Moderador" },
+    user: { en: "User", es: "Usuario" },
+  };
+  const match = labels[role];
+  return match ? (spanish ? match.es : match.en) : role.replace("_", " ");
 }
 
 function formatImpactDuration(seconds: number) {
@@ -226,6 +253,8 @@ export function ProfilePanel({
   connectedPlatforms: ConnectedPlatformAccount[];
   removedSongHistory: RemovedSongHistory[];
 }) {
+  const locale = useInterfaceLocale();
+  const spanish = locale === "es";
   const [name, setName] = useState(profile.displayName);
   const [showExplicit, setShowExplicit] = useState(profile.showExplicitContent);
   const [visibility, setVisibility] = useState(profile.communityVisibility);
@@ -249,6 +278,9 @@ export function ProfilePanel({
   const [platformEditorUrl, setPlatformEditorUrl] = useState("");
   const [platformEditorNote, setPlatformEditorNote] = useState("");
   const [platformEditorMessage, setPlatformEditorMessage] = useState("");
+  const [toast, setToast] = useState("");
+  const [youtubeMusicRecommendation, setYoutubeMusicRecommendation] =
+    useState<{ songId: string; link: ProfilePlatformLink } | null>(null);
   const [platformLinksBySong, setPlatformLinksBySong] = useState<
     Record<string, ProfilePlatformLink[]>
   >(() =>
@@ -256,6 +288,11 @@ export function ProfilePanel({
       songs.map((song) => [song.song_id, mapProfilePlatformLinks(song)]),
     ),
   );
+
+  const showToast = (nextMessage: string) => {
+    setToast(nextMessage);
+    window.setTimeout(() => setToast(""), 3200);
+  };
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -283,7 +320,7 @@ export function ProfilePanel({
       profileError?.message ??
         communityError?.message ??
         redirectError?.message ??
-        "Profile saved.",
+        (spanish ? "Perfil guardado." : "Profile saved."),
     );
   };
 
@@ -293,12 +330,20 @@ export function ProfilePanel({
   ) => {
     const confirmation =
       action === "delete"
-        ? `Delete "${song.title}" permanently? ${
-            song.submission_token_cost > 0
-              ? `${song.submission_token_cost} token${song.submission_token_cost === 1 ? "" : "s"} will be refunded.`
-              : "No token was charged for this submission."
-          }`
-        : `Archive "${song.title}"? It will leave discovery and the review queue, while its statistics remain available. No tokens will be refunded.`;
+        ? spanish
+          ? `¿Eliminar "${song.title}" permanentemente? ${
+              song.submission_token_cost > 0
+                ? `Se reembolsarán ${song.submission_token_cost} token${song.submission_token_cost === 1 ? "" : "s"}.`
+                : "No se cobró ningún token por este envío."
+            }`
+          : `Delete "${song.title}" permanently? ${
+              song.submission_token_cost > 0
+                ? `${song.submission_token_cost} token${song.submission_token_cost === 1 ? "" : "s"} will be refunded.`
+                : "No token was charged for this submission."
+            }`
+        : spanish
+          ? `¿Archivar "${song.title}"? Saldrá del descubrimiento y de la lista de canciones por escuchar, pero sus estadísticas seguirán disponibles. No se reembolsarán tokens.`
+          : `Archive "${song.title}"? It will leave discovery and the review queue, while its statistics remain available. No tokens will be refunded.`;
     if (!window.confirm(confirmation)) return;
 
     const supabase = createClient();
@@ -336,8 +381,12 @@ export function ProfilePanel({
         ]);
         setMessage(
           Number(result?.refunded_tokens ?? 0) > 0
-            ? `Song deleted. ${result.refunded_tokens} token${Number(result.refunded_tokens) === 1 ? "" : "s"} refunded.`
-            : "Song deleted.",
+            ? spanish
+              ? `Canción eliminada. Se reembolsaron ${result.refunded_tokens} token${Number(result.refunded_tokens) === 1 ? "" : "s"}.`
+              : `Song deleted. ${result.refunded_tokens} token${Number(result.refunded_tokens) === 1 ? "" : "s"} refunded.`
+            : spanish
+              ? "Canción eliminada."
+              : "Song deleted.",
         );
       }
     } else {
@@ -360,7 +409,11 @@ export function ProfilePanel({
               : item,
           ),
         );
-        setMessage("Song archived. Its statistics are preserved.");
+        setMessage(
+          spanish
+            ? "Canción archivada. Sus estadísticas se conservan."
+            : "Song archived. Its statistics are preserved.",
+        );
       }
     }
 
@@ -398,7 +451,11 @@ export function ProfilePanel({
   const savePlatformDestination = async (song: ProfileSong) => {
     setPlatformEditorMessage("");
     if (!platformEditorUrl.trim()) {
-      setPlatformEditorMessage("Paste an official platform link.");
+      setPlatformEditorMessage(
+        spanish
+          ? "Pega un enlace oficial de la plataforma."
+          : "Paste an official platform link.",
+      );
       return;
     }
     const detection = detectMusicPlatform(platformEditorUrl);
@@ -408,7 +465,9 @@ export function ProfilePanel({
         detection.platform !== platformEditorPlatform)
     ) {
       setPlatformEditorMessage(
-        `Detected: ${detection.platform ?? "unsupported"}. Choose the matching platform.`,
+        spanish
+          ? `Detectado: ${detection.platform ?? "no compatible"}. Elige la plataforma correspondiente.`
+          : `Detected: ${detection.platform ?? "unsupported"}. Choose the matching platform.`,
       );
       return;
     }
@@ -434,19 +493,23 @@ export function ProfilePanel({
       String(row.platform ?? databasePlatform[platformEditorPlatform]),
       platformEditorPlatform,
     );
+    const existingLinks =
+      platformLinksBySong[song.song_id] ?? mapProfilePlatformLinks(song);
+    const primaryPlatform = existingLinks.find((link) => link.primary)?.platform;
+    const savedLink: ProfilePlatformLink = {
+      platform: savedPlatform,
+      url: String(row.music_url ?? platformEditorUrl.trim()),
+      primary: Boolean(row.is_primary),
+      resolutionSource: String(row.resolution_source ?? "manual"),
+      confidenceScore: Number(row.confidence_score ?? 100),
+    };
     setPlatformLinksBySong((current) => ({
       ...current,
       [song.song_id]: [
         ...(current[song.song_id] ?? mapProfilePlatformLinks(song)).filter(
           (link) => link.platform !== savedPlatform,
         ),
-        {
-          platform: savedPlatform,
-          url: String(row.music_url ?? platformEditorUrl.trim()),
-          primary: Boolean(row.is_primary),
-          resolutionSource: String(row.resolution_source ?? "manual"),
-          confidenceScore: Number(row.confidence_score ?? 100),
-        },
+        savedLink,
       ].sort(
         (left, right) =>
           Number(right.primary) - Number(left.primary) ||
@@ -456,7 +519,16 @@ export function ProfilePanel({
     }));
     setPlatformEditorUrl("");
     setPlatformEditorNote("");
-    setPlatformEditorMessage("Platform destination saved.");
+    setPlatformEditorMessage(spanish ? "Enlace guardado." : "Platform link saved.");
+    if (
+      shouldShowYoutubeMusicDiscoveryRecommendation({
+        primaryPlatform: savedLink.primary ? savedPlatform : primaryPlatform,
+        savedPlatform,
+        songId: song.song_id,
+      })
+    ) {
+      setYoutubeMusicRecommendation({ songId: song.song_id, link: savedLink });
+    }
   };
 
   const removePlatformDestination = async (
@@ -481,21 +553,26 @@ export function ProfilePanel({
         (item) => item.platform !== link.platform || item.primary,
       ),
     }));
-    setPlatformEditorMessage("Platform destination removed.");
+    setPlatformEditorMessage(
+      spanish ? "Enlace eliminado." : "Platform link removed.",
+    );
   };
 
   const makePrimaryPlatform = async (
     song: ProfileSong,
     link: ProfilePlatformLink,
+    options?: { discoveryUpgrade?: boolean },
   ) => {
     if (!isPrimaryPlatform(link.platform)) {
       setPlatformEditorMessage(
-        "This destination cannot be used as the primary playback source.",
+        spanish
+          ? "Este enlace no puede usarse como plataforma principal de descubrimiento."
+          : "This link cannot be used as the primary discovery platform.",
       );
-      return;
+      return false;
     }
     const supabase = createClient();
-    if (!supabase) return;
+    if (!supabase) return false;
     setManagingSongId(song.song_id);
     const { data, error } = await supabase.rpc("set_song_primary_platform", {
       target_song_id: song.song_id,
@@ -504,7 +581,7 @@ export function ProfilePanel({
     setManagingSongId(null);
     if (error) {
       setPlatformEditorMessage(error.message);
-      return;
+      return false;
     }
     const result = data as {
       platform?: string;
@@ -537,7 +614,16 @@ export function ProfilePanel({
         platform_links: result.platform_links,
       }),
     }));
-    setPlatformEditorMessage(`${nextPlatform} is now the Primary Platform.`);
+    const successMessage = options?.discoveryUpgrade
+      ? spanish
+        ? "✅ Ajustes de descubrimiento actualizados. YouTube Music ahora es tu plataforma principal de descubrimiento."
+        : "✅ Discovery settings updated. YouTube Music is now your Primary Discovery Platform."
+      : spanish
+        ? `${nextPlatform} ahora es tu plataforma principal de descubrimiento.`
+        : `${nextPlatform} is now your Primary Discovery Platform.`;
+    setPlatformEditorMessage(successMessage);
+    showToast(successMessage);
+    return true;
   };
 
   return (
@@ -545,21 +631,21 @@ export function ProfilePanel({
       <header className="account-header">
         <Logo />
         <div className="owner-header-actions">
-          <Link href="/help"><CircleHelp size={16} /> Need Help?</Link>
-          <Link href="/dashboard"><ArrowLeft size={16} /> Dashboard</Link>
+          <Link href="/help"><CircleHelp size={16} /> {spanish ? "¿Necesitas ayuda?" : "Need Help?"}</Link>
+          <Link href="/dashboard"><ArrowLeft size={16} /> {spanish ? "Descubrir música" : "Discover Music"}</Link>
         </div>
       </header>
       <div className="account-grid">
         <section className="account-card">
-          <span className="eyebrow">Profile</span>
+          <span className="eyebrow">{spanish ? "Perfil" : "Profile"}</span>
           <h1>{profile.displayName}</h1>
           <div className="profile-badges">
-            <span><ShieldCheck size={14} /> {profile.role.replace("_", " ")}</span>
-            {profile.founder && <span><BadgeCheck size={14} /> Founding Artist</span>}
-            <span>{profile.role === "super_admin" ? "Unlimited tokens" : `${tokenBalance} tokens`}</span>
+            <span><ShieldCheck size={14} /> {roleLabel(profile.role, spanish)}</span>
+            {profile.founder && <span><BadgeCheck size={14} /> {spanish ? "Artista fundador" : "Founding Artist"}</span>}
+            <span>{profile.role === "super_admin" ? (spanish ? "Tokens ilimitados" : "Unlimited tokens") : `${tokenBalance} tokens`}</span>
             {profile.founder && (
               <span>
-                {profile.founderSubmissionsRemaining} Founder submissions remaining
+                {profile.founderSubmissionsRemaining} {spanish ? "envíos Founder disponibles" : "Founder submissions remaining"}
               </span>
             )}
           </div>
@@ -567,47 +653,47 @@ export function ProfilePanel({
             <div>
               <Headphones size={16} />
               <strong>{formatImpactDuration(impact?.supporting_seconds ?? 0)}</strong>
-              <span>Time Supporting Creators</span>
+              <span>{spanish ? "Tiempo apoyando creadores" : "Time Supporting Creators"}</span>
             </div>
             <div>
               <MessageSquareText size={16} />
               <strong>{impact?.songs_reviewed ?? 0}</strong>
-              <span>Songs Reviewed</span>
+              <span>{spanish ? "Canciones revisadas" : "Songs Reviewed"}</span>
             </div>
             <div>
               <Users size={16} />
               <strong>{impact?.creators_supported ?? 0}</strong>
-              <span>Creators Supported</span>
+              <span>{spanish ? "Creadores apoyados" : "Creators Supported"}</span>
             </div>
             <div>
               <Music2 size={16} />
               <strong>{impact?.valid_listens ?? 0}</strong>
-              <span>Valid Plays</span>
+              <span>{spanish ? "Reproducciones que suman" : "Plays that count"}</span>
             </div>
             <div>
               <Gauge size={16} />
               <strong>{formatImpactDuration(impact?.average_listening_seconds ?? 0)}</strong>
-              <span>Average Listening Duration</span>
+              <span>{spanish ? "Duración promedio de escucha" : "Average Listening Duration"}</span>
             </div>
             <div>
               <CalendarDays size={16} />
               <strong>{impact?.days_active ?? 0}</strong>
-              <span>Days Active</span>
+              <span>{spanish ? "Días activos" : "Days Active"}</span>
             </div>
           </div>
           <div className="community-rank-card">
             <BadgeCheck size={18} />
             <span>
-              <strong>{impact?.community_rank ?? "New Member"}</strong>
-              <small>{impact?.community_points ?? 0} Community Points</small>
+              <strong>{impact?.community_rank ?? (spanish ? "Nuevo miembro" : "New Member")}</strong>
+              <small>{impact?.community_points ?? 0} {spanish ? "Puntos de la comunidad" : "Community Points"}</small>
             </span>
           </div>
           <div className="community-network-grid">
-            <div><strong>{network.followers}</strong><span>Followers</span></div>
-            <div><strong>{network.following}</strong><span>Following</span></div>
-            <div><strong>{network.artistsSupported}</strong><span>Artists Supported</span></div>
-            <div><strong>{network.visibleSupports}</strong><span>Visible Supports</span></div>
-            <div><strong>{network.anonymousSupports}</strong><span>Anonymous Supports</span></div>
+            <div><strong>{network.followers}</strong><span>{spanish ? "Seguidores" : "Followers"}</span></div>
+            <div><strong>{network.following}</strong><span>{spanish ? "Siguiendo" : "Following"}</span></div>
+            <div><strong>{network.artistsSupported}</strong><span>{spanish ? "Artistas apoyados" : "Artists Supported"}</span></div>
+            <div><strong>{network.visibleSupports}</strong><span>{spanish ? "Apoyos visibles" : "Visible Supports"}</span></div>
+            <div><strong>{network.anonymousSupports}</strong><span>{spanish ? "Apoyos anónimos" : "Anonymous Supports"}</span></div>
           </div>
           <Link
             className="public-profile-link"
@@ -615,7 +701,7 @@ export function ProfilePanel({
             data-ui-component="artistProfileButton"
             href={`/artists/${profile.id}`}
           >
-            View public artist profile <ExternalLink size={14} />
+            {spanish ? "Ver perfil público de artista" : "View public artist profile"} <ExternalLink size={14} />
           </Link>
           <section
             aria-labelledby="connected-platforms-heading"
@@ -624,12 +710,12 @@ export function ProfilePanel({
             <div className="connected-platforms-heading">
               <span>
                 <strong id="connected-platforms-heading">
-                  Connected Platforms
+                  {spanish ? "Plataformas conectadas" : "Connected Platforms"}
                 </strong>
-                <small>Future creator account connections</small>
+                <small>{spanish ? "Futuras conexiones de creador" : "Future creator account connections"}</small>
               </span>
               <span className="coming-soon-badge">
-                <Construction size={13} /> Coming Soon
+                <Construction size={13} /> {spanish ? "Próximamente" : "Coming Soon"}
               </span>
             </div>
             <div className="connected-platforms-list">
@@ -638,7 +724,7 @@ export function ProfilePanel({
                   (item) => item.platform === platform.id,
                 );
                 const PlatformIcon = platform.icon;
-                const status = platformStatus(account?.connectionStatus);
+                const status = platformStatus(account?.connectionStatus, spanish);
                 return (
                   <div key={platform.id}>
                     <span className="connected-platform-icon" aria-hidden="true">
@@ -646,11 +732,11 @@ export function ProfilePanel({
                     </span>
                     <span className="connected-platform-name">
                       <strong>{platform.label}</strong>
-                      <small>{platformCompatibility[platform.id]}</small>
+                      <small>{platformCompatibilityLabel(platformCompatibility[platform.id], spanish)}</small>
                     </span>
                     <span
                       className={
-                        status === "Connected"
+                        account?.connectionStatus === "connected"
                           ? "platform-status connected"
                           : "platform-status"
                       }
@@ -662,14 +748,14 @@ export function ProfilePanel({
               })}
             </div>
             <p>
-              Future account linking and creator verification will support
-              verified profiles, public links, and provider statistics where
-              official APIs permit them.
+              {spanish
+                ? "Las futuras conexiones de cuenta permitirán perfiles verificados, enlaces públicos y estadísticas cuando las APIs oficiales lo permitan."
+                : "Future account linking and creator verification will support verified profiles, public links, and provider statistics where official APIs permit them."}
             </p>
           </section>
           <form onSubmit={save}>
             <label className="auth-field">
-              <span>Name</span>
+              <span>{spanish ? "Nombre" : "Name"}</span>
               <input onChange={(event) => setName(event.target.value)} required value={name} />
             </label>
             <label className="auth-field">
@@ -683,8 +769,10 @@ export function ProfilePanel({
                 type="checkbox"
               />
               <span>
-                <strong>Show Explicit Content</strong>
-                Hide explicit songs from your review queue when disabled.
+                <strong>{spanish ? "Mostrar contenido explícito" : "Show Explicit Content"}</strong>
+                {spanish
+                  ? " Si lo desactivas, ocultamos canciones marcadas como explícitas en tu lista de canciones por escuchar."
+                  : " Hide explicit songs from your review queue when disabled."}
               </span>
             </label>
             <label className="setting-toggle">
@@ -697,13 +785,14 @@ export function ProfilePanel({
               />
               <Link2 size={16} />
               <span>
-                <strong>External Content Warnings</strong>
-                Confirm before Spotify, Apple Music, or TikTok opens in a new
-                tab.
+                <strong>{spanish ? "Avisos al abrir fuera de First Listen" : "External Content Warnings"}</strong>
+                {spanish
+                  ? " Confirma antes de abrir Spotify, Apple Music o TikTok en una pestaña nueva."
+                  : " Confirm before Spotify, Apple Music, or TikTok opens in a new tab."}
               </span>
             </label>
             <fieldset className="community-visibility-card">
-              <legend>Community Visibility</legend>
+              <legend>{spanish ? "Visibilidad en la comunidad" : "Community Visibility"}</legend>
               <label>
                 <input
                   checked={visibility === "public"}
@@ -713,9 +802,10 @@ export function ProfilePanel({
                 />
                 <Eye size={16} />
                 <span>
-                  <strong>Public Supporter (Recommended)</strong>
-                  Artists can see when you support their music. This can lead to
-                  more profile visits, followers, and creator connections.
+                  <strong>{spanish ? "Colaborador público (recomendado)" : "Public Supporter (Recommended)"}</strong>
+                  {spanish
+                    ? " Los artistas pueden ver cuando apoyas su música. Esto puede generar más visitas, seguidores y conexiones."
+                    : " Artists can see when you support their music. This can lead to more profile visits, followers, and creator connections."}
                 </span>
               </label>
               <label>
@@ -727,9 +817,10 @@ export function ProfilePanel({
                 />
                 <EyeOff size={16} />
                 <span>
-                  <strong>Anonymous Supporter</strong>
-                  Your support remains valid, but artists see Anonymous Listener
-                  instead of your name.
+                  <strong>{spanish ? "Colaborador anónimo" : "Anonymous Supporter"}</strong>
+                  {spanish
+                    ? " Tu apoyo sigue contando, pero los artistas verán Oyente anónimo en lugar de tu nombre."
+                    : " Your support remains valid, but artists see Anonymous Listener instead of your name."}
                 </span>
               </label>
             </fieldset>
@@ -741,24 +832,26 @@ export function ProfilePanel({
               />
               <Play size={16} />
               <span>
-                <strong>Auto Play Next Song</strong>
-                Load and play the next queued song after the current song ends.
+                <strong>{spanish ? "Reproducir siguiente canción automáticamente" : "Auto Play Next Song"}</strong>
+                {spanish
+                  ? " Carga y reproduce la siguiente canción cuando termine la actual."
+                  : " Load and play the next queued song after the current song ends."}
               </span>
             </label>
             {message && <p className="form-message" role="status">{message}</p>}
-            <button className="auth-submit" type="submit"><Save size={15} /> Save profile</button>
+            <button className="auth-submit" type="submit"><Save size={15} /> {spanish ? "Guardar perfil" : "Save profile"}</button>
           </form>
         </section>
 
         <section className="account-card my-songs" id="submitted-songs">
           <div className="saved-song-heading">
-            <span className="eyebrow">My Songs</span>
-            <h2>Submitted songs</h2>
+            <span className="eyebrow">{spanish ? "Mis canciones" : "My Songs"}</span>
+            <h2>{spanish ? "Canciones enviadas" : "Submitted songs"}</h2>
           </div>
           {managedSongs.length === 0 ? (
             <div className="empty-state">
-              <p>No songs submitted yet.</p>
-              <Link href="/submit">Submit your first song</Link>
+              <p>{spanish ? "Todavía no has enviado canciones." : "No songs submitted yet."}</p>
+              <Link href="/submit">{spanish ? "Enviar tu primera canción" : "Submit your first song"}</Link>
             </div>
           ) : (
             <div className="song-table">
@@ -768,6 +861,13 @@ export function ProfilePanel({
                 const links =
                   platformLinksBySong[song.song_id] ??
                   mapProfilePlatformLinks(song);
+                const primaryLink = links.find((link) => link.primary);
+                const youtubeMusicLink = links.find(
+                  (link) => link.platform === "YouTube Music",
+                );
+                const showYoutubeMusicTip =
+                  Boolean(youtubeMusicLink) &&
+                  primaryLink?.platform === "Spotify";
                 const addablePlatforms = allPlatforms.filter(
                   (platform) => platform !== songPlatform,
                 );
@@ -781,13 +881,15 @@ export function ProfilePanel({
                       {displayPlatform[song.platform]
                         ? compactClassificationLabel(
                             displayPlatform[song.platform],
+                            locale,
                           )
                         : ""}
                     </span>
                     <small className="song-activity-summary">
-                      {song.reviews} reviews /{" "}
-                      {song.valid_listens + song.guest_valid_listens} valid
-                      listens / {song.community_activity} other activity
+                      {song.reviews} {spanish ? "reseñas" : "reviews"} /{" "}
+                      {song.valid_listens + song.guest_valid_listens}{" "}
+                      {spanish ? "reproducciones que suman" : "plays that count"} /{" "}
+                      {song.community_activity} {spanish ? "acciones de comunidad" : "community actions"}
                     </small>
                   </div>
                   <span
@@ -798,10 +900,12 @@ export function ProfilePanel({
                     }
                   >
                     {song.catalog_status === "active"
-                      ? "In review queue"
+                      ? spanish
+                        ? "Disponible para oyentes"
+                        : "Available to listeners"
                       : song.catalog_status.replaceAll("_", " ")}
                   </span>
-                  {song.explicit_content && <small>Explicit</small>}
+                  {song.explicit_content && <small>{spanish ? "Explícita" : "Explicit"}</small>}
                   <div className="song-management-actions">
                     {song.can_delete && (
                       <button
@@ -809,7 +913,7 @@ export function ProfilePanel({
                         onClick={() => void manageSong(song, "delete")}
                         type="button"
                       >
-                        <Trash2 size={14} /> Delete Song
+                        <Trash2 size={14} /> {spanish ? "Eliminar canción" : "Delete Song"}
                       </button>
                     )}
                     {song.can_archive && (
@@ -818,7 +922,7 @@ export function ProfilePanel({
                         onClick={() => void manageSong(song, "archive")}
                         type="button"
                       >
-                        <Archive size={14} /> Archive Song
+                        <Archive size={14} /> {spanish ? "Archivar canción" : "Archive Song"}
                       </button>
                     )}
                     <button
@@ -833,12 +937,16 @@ export function ProfilePanel({
                       <Music2 size={14} />
                       <span>
                         {editorOpen
-                          ? "Cerrar Plataformas"
-                          : "Agregar Plataformas"}
+                          ? spanish
+                            ? "Cerrar plataformas"
+                            : "Close Platforms"
+                          : spanish
+                            ? "Agregar plataformas"
+                            : "Add Platforms"}
                         <small>Spotify, Apple, TikTok, YouTube Music</small>
                       </span>
                     </button>
-                    <a href={song.music_url} rel="noreferrer" target="_blank" aria-label={`Open ${song.title}`}>
+                    <a href={song.music_url} rel="noreferrer" target="_blank" aria-label={spanish ? `Abrir ${song.title}` : `Open ${song.title}`}>
                       <ExternalLink size={15} />
                     </a>
                     <Link
@@ -846,7 +954,7 @@ export function ProfilePanel({
                       data-ui-component="artistProfileButton"
                       href={`/artists/${profile.id}`}
                     >
-                      Artist Profile
+                      {spanish ? "Perfil de artista" : "Artist Profile"}
                     </Link>
                   </div>
                   {editorOpen && (
@@ -855,30 +963,56 @@ export function ProfilePanel({
                       id={`platform-presence-${song.song_id}`}
                     >
                       <div className="platform-editor-heading">
-                        <span className="eyebrow">Platform Presence</span>
+                        <span className="eyebrow">{spanish ? "Plataformas de descubrimiento" : "Discovery Platforms"}</span>
                         <strong>{song.title}</strong>
                         <small>
-                          Primary playback source: {songPlatform}. Additional
-                          destinations open externally only.
+                          {spanish
+                            ? `Plataforma principal de descubrimiento: ${songPlatform}. Los enlaces adicionales se abren fuera de First Listen.`
+                            : `Primary discovery platform: ${songPlatform}. Additional links open outside First Listen.`}
                         </small>
                       </div>
                       <div className="platform-disclaimer-card">
-                        <strong>💡 Important</strong>
+                        <strong>{spanish ? "💡 Importante" : "💡 Important"}</strong>
                         <p>
-                          Additional platforms must belong to the same song or
-                          video you are publishing. You can add them now or
-                          later from the song settings.
+                          {spanish
+                            ? "Los enlaces adicionales deben pertenecer a la misma canción o video. Puedes agregarlos ahora o después desde los ajustes de la canción."
+                            : "Additional platforms must belong to the same song or video you are publishing. You can add them now or later from the song settings."}
                         </p>
                       </div>
                       <div className="platform-reminder-card">
-                        <strong>💡 Reminder</strong>
+                        <strong>{spanish ? "💡 Recordatorio" : "💡 Reminder"}</strong>
                         <p>
-                          The Primary Platform controls the playback used by
-                          First Listen. Additional Platforms are discovery
-                          destinations only and must correspond to the same song
-                          or video.
+                          {spanish
+                            ? "La plataforma principal de descubrimiento controla la reproducción usada por First Listen. Los enlaces adicionales son destinos de descubrimiento y deben corresponder a la misma canción o video."
+                            : "The Primary Discovery Platform controls playback in First Listen. Additional links are discovery destinations and must match the same song or video."}
                         </p>
                       </div>
+                      {showYoutubeMusicTip && youtubeMusicLink && (
+                        <div className="platform-discovery-tip-card">
+                          <strong>{spanish ? "💡 Consejo de descubrimiento" : "💡 Discovery Tip"}</strong>
+                          <p>
+                            {spanish
+                              ? "YouTube Music está disponible para esta canción."
+                              : "YouTube Music is available for this song."}
+                            <br />
+                            {spanish
+                              ? "Las recomendaciones de YouTube pueden ayudar a nuevos oyentes a descubrir tu música."
+                              : "YouTube recommendations can help new listeners discover your music."}
+                          </p>
+                          <button
+                            className="primary-button"
+                            disabled={managingSongId === song.song_id}
+                            onClick={() =>
+                              void makePrimaryPlatform(song, youtubeMusicLink, {
+                                discoveryUpgrade: true,
+                              })
+                            }
+                            type="button"
+                          >
+                            {spanish ? "🚀 Aumentar mi descubrimiento" : "🚀 Increase My Discovery"}
+                          </button>
+                        </div>
+                      )}
                       <div className="profile-platform-link-list">
                         {links.map((link) => (
                           <div key={`${song.song_id}-${link.platform}`}>
@@ -887,13 +1021,17 @@ export function ProfilePanel({
                               <strong>{link.platform}</strong>
                               <small>
                                 {link.primary
-                                  ? "Primary Platform"
-                                  : "Additional Destination"}
+                                  ? spanish
+                                    ? "Plataforma principal de descubrimiento"
+                                    : "Primary Discovery Platform"
+                                  : spanish
+                                    ? "Enlace adicional"
+                                    : "Additional Link"}
                               </small>
                             </span>
                             <div>
                               <a href={link.url} rel="noreferrer" target="_blank">
-                                <ExternalLink size={13} /> Open
+                                <ExternalLink size={13} /> {spanish ? "Abrir enlace" : "Open link"}
                               </a>
                               {!link.primary && isPrimaryPlatform(link.platform) && (
                                 <button
@@ -903,7 +1041,7 @@ export function ProfilePanel({
                                   }
                                   type="button"
                                 >
-                                  Make Primary
+                                  {spanish ? "🚀 Aumentar descubrimiento" : "🚀 Increase discovery"}
                                 </button>
                               )}
                               {!link.primary && (
@@ -914,7 +1052,7 @@ export function ProfilePanel({
                                   }
                                   type="button"
                                 >
-                                  Remove
+                                  {spanish ? "Quitar" : "Remove"}
                                 </button>
                               )}
                             </div>
@@ -929,7 +1067,7 @@ export function ProfilePanel({
                         }}
                       >
                         <label>
-                          Destination
+                          {spanish ? "Plataforma" : "Platform"}
                           <select
                             onChange={(event) =>
                               setPlatformEditorPlatform(
@@ -946,7 +1084,7 @@ export function ProfilePanel({
                           </select>
                         </label>
                         <label>
-                          Official link
+                          {spanish ? "Enlace oficial" : "Official link"}
                           <input
                             onChange={(event) =>
                               setPlatformEditorUrl(event.target.value)
@@ -957,13 +1095,13 @@ export function ProfilePanel({
                           />
                         </label>
                         <label>
-                          Optional note
+                          {spanish ? "Nota opcional" : "Optional note"}
                           <input
                             maxLength={120}
                             onChange={(event) =>
                               setPlatformEditorNote(event.target.value)
                             }
-                            placeholder="Official artist link"
+                            placeholder={spanish ? "Enlace oficial del artista" : "Official artist link"}
                             value={platformEditorNote}
                           />
                         </label>
@@ -971,7 +1109,7 @@ export function ProfilePanel({
                           disabled={managingSongId === song.song_id}
                           type="submit"
                         >
-                          <Save size={14} /> Save Destination
+                          <Save size={14} /> {spanish ? "Guardar enlace" : "Save link"}
                         </button>
                       </form>
                       {platformEditorMessage && (
@@ -990,7 +1128,7 @@ export function ProfilePanel({
 
           <details className="removed-song-history" id="removed-song-history">
             <summary>
-              Removed Songs History
+              {spanish ? "Historial de canciones quitadas" : "Removed Songs History"}
               <span>{removedSongs.length}</span>
             </summary>
             {removedSongs.length ? (
@@ -1009,11 +1147,15 @@ export function ProfilePanel({
                     </span>
                     <small>
                       {song.refunded_tokens > 0
-                        ? `${song.refunded_tokens} token refund`
-                        : "No token refund"}
+                        ? spanish
+                          ? `${song.refunded_tokens} token reembolsado${song.refunded_tokens === 1 ? "" : "s"}`
+                          : `${song.refunded_tokens} token refund`
+                        : spanish
+                          ? "Sin reembolso de tokens"
+                          : "No token refund"}
                     </small>
                     <a
-                      aria-label={`Open ${song.title}`}
+                      aria-label={spanish ? `Abrir ${song.title}` : `Open ${song.title}`}
                       href={song.music_url}
                       rel="noreferrer"
                       target="_blank"
@@ -1024,13 +1166,13 @@ export function ProfilePanel({
                 ))}
               </div>
             ) : (
-              <p>No removed songs.</p>
+              <p>{spanish ? "No hay canciones quitadas." : "No removed songs."}</p>
             )}
           </details>
 
           <div className="profile-community-activity-section" id="community-activity">
-            <span className="eyebrow">Recent Community Activity</span>
-            <h2>Your creator connections</h2>
+            <span className="eyebrow">{spanish ? "Actividad reciente de la comunidad" : "Recent Community Activity"}</span>
+            <h2>{spanish ? "Tus conexiones con creadores" : "Your creator connections"}</h2>
             <div className="profile-activity-list">
               {activity.map((item) => (
                 <article key={item.id}>
@@ -1046,43 +1188,53 @@ export function ProfilePanel({
                   <div>
                     <strong>
                       {item.type === "follow"
-                        ? `You followed ${item.artistName}`
+                        ? spanish
+                          ? `Seguiste a ${item.artistName}`
+                          : `You followed ${item.artistName}`
                         : item.type === "review"
-                          ? `You reviewed ${item.songTitle ?? "a song"}`
-                          : `You supported ${item.songTitle ?? "a song"}`}
+                          ? spanish
+                            ? `Comentaste ${item.songTitle ?? "una canción"}`
+                            : `You reviewed ${item.songTitle ?? "a song"}`
+                          : spanish
+                            ? `Apoyaste ${item.songTitle ?? "una canción"}`
+                            : `You supported ${item.songTitle ?? "a song"}`}
                     </strong>
                     <small>
                       {item.visibility === "public"
-                        ? "Visible support"
-                        : "Anonymous support"}
+                        ? spanish
+                          ? "Apoyo visible"
+                          : "Visible support"
+                        : spanish
+                          ? "Apoyo anónimo"
+                          : "Anonymous support"}
                     </small>
                   </div>
                   <Link
                     data-artist-profile-button
                     data-ui-component="artistProfileButton"
-                    href={`/artists/${item.artistId}`}
-                  >
-                    View Artist
+                  href={`/artists/${item.artistId}`}
+                >
+                    {spanish ? "Ver artista" : "View Artist"}
                   </Link>
                 </article>
               ))}
               {!activity.length && (
                 <div className="empty-state">
-                  <p>Your listens, reviews, and follows will appear here.</p>
-                  <Link href="/review">Support a creator</Link>
+                  <p>{spanish ? "Tus escuchas, comentarios y artistas seguidos aparecerán aquí." : "Your listens, reviews, and follows will appear here."}</p>
+                  <Link href="/review">{spanish ? "Apoyar a un creador" : "Support a creator"}</Link>
                 </div>
               )}
             </div>
           </div>
 
           <div className="saved-song-heading">
-            <span className="eyebrow">Saved For Later</span>
-            <h2>Music to revisit</h2>
+            <span className="eyebrow">{spanish ? "Guardadas para después" : "Saved For Later"}</span>
+            <h2>{spanish ? "Música para volver a escuchar" : "Music to revisit"}</h2>
           </div>
           {savedSongs.length === 0 ? (
             <div className="empty-state">
-              <p>Songs you save after reviews will appear here.</p>
-              <Link href="/review">Review and discover music</Link>
+              <p>{spanish ? "Las canciones que guardes aparecerán aquí." : "Songs you save after reviews will appear here."}</p>
+              <Link href="/review">{spanish ? "Escuchar y descubrir música" : "Review and discover music"}</Link>
             </div>
           ) : (
             <div className="song-table">
@@ -1096,6 +1248,7 @@ export function ProfilePanel({
                       {displayPlatform[song.platform]
                         ? compactClassificationLabel(
                             displayPlatform[song.platform],
+                            locale,
                           )
                         : ""}
                     </span>
@@ -1103,12 +1256,12 @@ export function ProfilePanel({
                   <Link
                     data-artist-profile-button
                     data-ui-component="artistProfileButton"
-                    href={`/artists/${song.artist_id}`}
-                  >
-                    View Artist
+                  href={`/artists/${song.artist_id}`}
+                >
+                    {spanish ? "Ver artista" : "View Artist"}
                   </Link>
                   <small>{song.genre} / {song.song_language}</small>
-                  <a href={song.music_url} rel="noreferrer" target="_blank" aria-label={`Open ${song.title}`}>
+                  <a href={song.music_url} rel="noreferrer" target="_blank" aria-label={spanish ? `Abrir ${song.title}` : `Open ${song.title}`}>
                     <ExternalLink size={15} />
                   </a>
                 </article>
@@ -1117,6 +1270,77 @@ export function ProfilePanel({
           )}
         </section>
       </div>
+      {toast && (
+        <div className="toast visible" role="status">
+          <BadgeCheck size={18} />
+          {toast}
+        </div>
+      )}
+      {youtubeMusicRecommendation && (
+        <div className="platform-discovery-dialog-backdrop">
+          <div
+            aria-labelledby="profile-youtube-music-discovery-title"
+            aria-modal="true"
+            className="platform-discovery-dialog"
+            role="dialog"
+          >
+            <h3 id="profile-youtube-music-discovery-title">
+              {spanish ? "🚀 Más descubrimiento disponible" : "🚀 More Discovery Available"}
+            </h3>
+            <p>{spanish ? "Agregaste YouTube Music." : "You just added YouTube Music."}</p>
+            <p>
+              {spanish
+                ? "Las recomendaciones de YouTube pueden ayudar a nuevos oyentes a descubrir tu música."
+                : "YouTube recommendations can help new listeners discover your music."}
+            </p>
+            <p>
+              {spanish
+                ? "Cambiar a YouTube Music como plataforma principal de descubrimiento puede aumentar tus oportunidades de descubrimiento."
+                : "Switching to YouTube Music as your Primary Discovery Platform may increase your discovery opportunities."}
+            </p>
+            <div className="platform-guidance-actions">
+              <button
+                className="primary-button"
+                disabled={Boolean(managingSongId)}
+                onClick={async () => {
+                  const targetSong = managedSongs.find(
+                    (song) =>
+                      song.song_id === youtubeMusicRecommendation.songId,
+                  );
+                  if (!targetSong) {
+                    setYoutubeMusicRecommendation(null);
+                    return;
+                  }
+                  const updated = await makePrimaryPlatform(
+                    targetSong,
+                    youtubeMusicRecommendation.link,
+                    { discoveryUpgrade: true },
+                  );
+                  if (updated) {
+                    setYoutubeMusicRecommendation(null);
+                  }
+                }}
+                type="button"
+              >
+                {spanish ? "🚀 Aumentar mi descubrimiento" : "🚀 Increase My Discovery"}
+              </button>
+              <button
+                className="ghost-button"
+                disabled={Boolean(managingSongId)}
+                onClick={() => {
+                  dismissYoutubeMusicDiscovery(
+                    youtubeMusicRecommendation.songId,
+                  );
+                  setYoutubeMusicRecommendation(null);
+                }}
+                type="button"
+              >
+                {spanish ? "Ahora no" : "Not Right Now"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

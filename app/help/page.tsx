@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -12,6 +14,7 @@ import {
 } from "lucide-react";
 import { FeedbackCenterForm } from "@/components/feedback-center-form";
 import { Logo } from "@/components/logo";
+import { useInterfaceLocale } from "@/lib/use-interface-locale";
 
 const helpTopics = [
   {
@@ -27,7 +30,7 @@ const helpTopics = [
   {
     icon: BarChart3,
     title: "Understanding results",
-    body: "Hook Score combines Listen Full, Playlist Add, Attention, and Share With Friend percentages. Your dashboard keeps each song's performance separate.",
+    body: "Hook Score combines Listen Full, Playlist Add, Attention, and Share With Friend percentages. Your analytics keep each song's performance separate.",
   },
   {
     icon: UserPlus,
@@ -46,31 +49,73 @@ const helpTopics = [
   },
 ];
 
+const helpTopicsEs = [
+  {
+    icon: Headphones,
+    title: "Escuchar canciones",
+    body: "Escucha el inicio, responde las preguntas requeridas y deja un comentario específico de al menos 30 caracteres. El feedback repetido o de baja calidad no cuenta.",
+  },
+  {
+    icon: Link2,
+    title: "Enviar música",
+    body: "Envía un enlace directo de Spotify, YouTube, YouTube Music, SoundCloud o Apple Music. First Listen guarda metadata y enlaces, nunca audio.",
+  },
+  {
+    icon: BarChart3,
+    title: "Entender resultados",
+    body: "Hook Score combina escuchar completa, agregar a playlist, atención y compartir con un amigo. Tus analíticas mantienen separados los resultados de cada canción.",
+  },
+  {
+    icon: UserPlus,
+    title: "Seguir artistas",
+    body: "Sigue artistas desde su perfil público o después de escuchar una canción. Seguir registra interés real sin exponer información privada.",
+  },
+  {
+    icon: Bookmark,
+    title: "Guardar canciones",
+    body: "Usa Guardar para después tras escuchar o desde el perfil de artista. Los enlaces guardados quedan en tu cuenta para volver a escucharlos.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Seguridad y moderación",
+    body: "Reporta spam, enlaces rotos, contenido que no sea música, contenido ilegal u ofensivo. Los moderadores pueden revisar reportes y retirar envíos inválidos.",
+  },
+];
+
 export default function HelpPage() {
+  const locale = useInterfaceLocale();
+  const spanish = locale === "es";
+  const topics = spanish ? helpTopicsEs : helpTopics;
+
   return (
     <main className="help-page">
       <header className="account-header">
         <Logo />
-        <Link href="/dashboard"><ArrowLeft size={16} /> Back to dashboard</Link>
+        <Link href="/dashboard"><ArrowLeft size={16} /> {spanish ? "Volver a descubrir música" : "Back to discovery"}</Link>
       </header>
 
       <section className="help-hero">
         <span className="help-icon"><CircleHelp size={24} /></span>
-        <span className="eyebrow">Support Center</span>
-        <h1>Get useful feedback and discover your next favorite artist.</h1>
+        <span className="eyebrow">{spanish ? "Centro de ayuda" : "Support Center"}</span>
+        <h1>
+          {spanish
+            ? "Recibe feedback útil y descubre tu próximo artista favorito."
+            : "Get useful feedback and discover your next favorite artist."}
+        </h1>
         <p>
-          First Listen connects honest first impressions with direct listening,
-          following, and saving actions.
+          {spanish
+            ? "First Listen conecta primeras impresiones honestas con escucha directa, seguidores y canciones guardadas."
+            : "First Listen connects honest first impressions with direct listening, following, and saving actions."}
         </p>
         <div className="support-contact-strip">
-          <strong>Need Help?</strong>
+          <strong>{spanish ? "¿Necesitas ayuda?" : "Need Help?"}</strong>
           <a href="mailto:support@firstlisten.net">support@firstlisten.net</a>
-          <a href="#feedback-center">Open support form</a>
+          <a href="#feedback-center">{spanish ? "Abrir formulario de soporte" : "Open support form"}</a>
         </div>
       </section>
 
       <section className="help-topic-grid">
-        {helpTopics.map(({ icon: Icon, title, body }) => (
+        {topics.map(({ icon: Icon, title, body }) => (
           <article key={title}>
             <Icon size={20} />
             <h2>{title}</h2>
@@ -82,17 +127,18 @@ export default function HelpPage() {
       <section className="help-steps">
         <div>
           <MessageSquareText size={20} />
-          <h2>Still need help?</h2>
+          <h2>{spanish ? "¿Todavía necesitas ayuda?" : "Still need help?"}</h2>
           <p>
-            Check the platform rules and privacy details, or return to your
-            profile to review account and explicit-content settings.
+            {spanish
+              ? "Consulta las reglas, privacidad y ajustes de contenido explícito, o vuelve a tu perfil para revisar tu cuenta."
+              : "Check the platform rules and privacy details, or return to your profile to review account and explicit-content settings."}
           </p>
         </div>
         <nav aria-label="Help resources">
-          <Link href="/profile">Account settings</Link>
-          <Link href="/guidelines">Community Guidelines</Link>
-          <Link href="/privacy">Privacy Policy</Link>
-          <Link href="/terms">Terms of Service</Link>
+          <Link href="/profile">{spanish ? "Ajustes de cuenta" : "Account settings"}</Link>
+          <Link href="/guidelines">{spanish ? "Guías de la comunidad" : "Community Guidelines"}</Link>
+          <Link href="/privacy">{spanish ? "Política de privacidad" : "Privacy Policy"}</Link>
+          <Link href="/terms">{spanish ? "Términos de servicio" : "Terms of Service"}</Link>
         </nav>
       </section>
 
