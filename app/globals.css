@@ -12,6 +12,9 @@
   --text-strong: #151815;
   --text-soft: #454d43;
   --text-muted: #5f665d;
+  --readable-muted: var(--text-muted);
+  --readable-helper: var(--text-soft);
+  --placeholder-text: var(--text-muted);
   --input: var(--surface);
   --surface-muted: #f7f8f4;
   --surface-subtle: #f1f3ee;
@@ -430,7 +433,7 @@ textarea {
 
 input::placeholder,
 textarea::placeholder {
-  color: var(--text-muted);
+  color: var(--placeholder-text);
   opacity: 0.9;
 }
 
@@ -4839,7 +4842,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 }
 
 .founder-copy p {
-  color: #aab2aa;
+  color: #dfe7dc;
 }
 
 .founder-benefits {
@@ -5618,7 +5621,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   background: #272c28;
   border: 1px solid #363d37;
   border-radius: 18px;
-  color: #aab2aa;
+  color: #dfe7dc;
   font-size: 8px;
   padding: 5px 8px;
 }
@@ -5637,19 +5640,26 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   --surface: #161a17;
   --surface-strong: #1b201c;
   --ink: #f1f4ed;
-  --muted: #b7c0b4;
+  --muted: #dfe7dc;
   --line: #303731;
   --line-strong: #3b433c;
+  --card: var(--surface-strong);
+  --border: var(--line);
+  --text: var(--ink);
   --text-strong: #f5f8f2;
-  --text-soft: #d0d8cc;
-  --text-muted: #c2cabf;
+  --text-soft: #e5ece2;
+  --text-muted: #edf3ea;
+  --readable-muted: #edf4ea;
+  --readable-helper: #f7fbf4;
+  --placeholder-text: #f7fbf4;
+  --input: var(--surface-subtle);
   --surface-muted: #242a25;
   --surface-subtle: #202521;
   --surface-elevated: #242a25;
   --control-surface: #202521;
   --control-surface-muted: #242a25;
   --control-foreground: #f2f5ef;
-  --control-muted: #c4ccbf;
+  --control-muted: #e2e9df;
   --status-bg: #34441f;
   --status-fg: #e5ffc0;
   --warning-bg: #3a321d;
@@ -5743,7 +5753,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 .theme-dark .queue-top b,
 .theme-dark .all-comments-button {
   background: #242a25;
-  color: #c3c9c1;
+  color: #edf3ea;
 }
 
 .theme-dark .binary-choice button,
@@ -5751,7 +5761,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 .theme-dark .platform-picker button {
   background: #242a25;
   border-color: #353d36;
-  color: #aeb5ad;
+  color: #e5ece2;
 }
 
 .theme-dark .binary-choice button.selected.yes,
@@ -5779,7 +5789,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 }
 
 .theme-dark .side-note p {
-  color: #b6c89a;
+  color: #e0efbd;
 }
 
 .theme-dark .locked-banner {
@@ -5821,7 +5831,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 }
 
 .theme-dark .founder-unlock-banner p {
-  color: #b7c99b;
+  color: #e1f0c2;
 }
 
 .theme-dark .quality-warning {
@@ -5846,7 +5856,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 .theme-dark .focus-picker button {
   background: #242a25;
   border-color: #353d36;
-  color: #aeb5ad;
+  color: #e5ece2;
 }
 
 .theme-dark .preference-grid button.selected,
@@ -10181,6 +10191,100 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
 .theme-dark .song-platform-presence-cta small {
   color: var(--success-fg);
+}
+
+/* Dark-mode readability pass for helper text users need to scan quickly. */
+.theme-dark input::placeholder,
+.theme-dark textarea::placeholder {
+  color: var(--placeholder-text);
+  font-weight: 700;
+  opacity: 1;
+}
+
+.theme-dark .panel-heading > small,
+.theme-dark .help-section-heading p,
+.theme-dark .platform-editor-heading small,
+.theme-dark .platform-presence-management-list small,
+.theme-dark .profile-platform-link-list small,
+.theme-dark .connected-platforms-heading small,
+.theme-dark .connected-platforms-card > p,
+.theme-dark .connected-platform-name small,
+.theme-dark .feedback-category-grid small,
+.theme-dark .feedback-inbox-meta,
+.theme-dark .verified-platform-panel small,
+.theme-dark .song-table span,
+.theme-dark .admin-table small,
+.theme-dark .song-activity-summary,
+.theme-dark .optional-review-note,
+.theme-dark .review-respect-note p,
+.theme-dark .comment-field > small,
+.theme-dark .discovery-song-copy > small,
+.theme-dark .discovery-song-details span,
+.theme-dark .community-program-grid p,
+.theme-dark .community-program-grid small,
+.theme-dark .daily-mission-panel p,
+.theme-dark .daily-mission-progress small,
+.theme-dark .profile-activity-list small,
+.theme-dark .artist-activity-list small,
+.theme-dark .top-supporter-list small,
+.theme-dark .top-supporter-list em,
+.theme-dark .control-history-list p,
+.theme-dark .control-ranking-list small {
+  color: var(--readable-muted);
+}
+
+.theme-dark .platform-guidance-card p,
+.theme-dark .platform-direct-setup-card p,
+.theme-dark .platform-disclaimer-card p,
+.theme-dark .platform-reminder-card p,
+.theme-dark .community-visibility-card label > span,
+.theme-dark .profile-platform-form label,
+.theme-dark .verified-platform-form label,
+.theme-dark .feedback-form label,
+.theme-dark .field label,
+.theme-dark .control-card label,
+.theme-dark .listening-activity-controls label,
+.theme-dark .control-toggle-grid label,
+.theme-dark .admin-settings-card label,
+.theme-dark .admin-pricing-grid label,
+.theme-dark .admin-spotlight-grid label,
+.theme-dark .artist-token-gift-options label,
+.theme-dark .artist-catalog-toolbar label {
+  color: var(--readable-helper);
+}
+
+.theme-dark .platform-editor-heading small,
+.theme-dark .platform-guidance-card p,
+.theme-dark .platform-direct-setup-card p,
+.theme-dark .platform-disclaimer-card p,
+.theme-dark .platform-reminder-card p,
+.theme-dark .community-visibility-card label > span,
+.theme-dark .profile-platform-link-list small,
+.theme-dark .platform-presence-management-list small,
+.theme-dark .song-table span,
+.theme-dark .admin-table small {
+  font-size: max(10px, 0.72rem);
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.theme-dark .profile-platform-form label,
+.theme-dark .verified-platform-form label,
+.theme-dark .feedback-form label,
+.theme-dark .control-card label {
+  font-size: max(10px, 0.74rem);
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+}
+
+.theme-dark .song-platform-presence-cta small,
+.theme-dark .platform-status,
+.theme-dark .coming-soon-badge,
+.theme-dark .removed-song-history > p,
+.theme-dark .admin-duplicate-list small,
+.theme-dark .admin-duplicate-list > article > span {
+  color: var(--readable-muted);
+  font-weight: 900;
 }
 
 @media (max-width: 420px) {
