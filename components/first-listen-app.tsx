@@ -2815,6 +2815,10 @@ function isInternalDiscoverySong(song: DiscoverySong) {
   return !isExternalPlatform(song.platform);
 }
 
+function isQueuePlayableDiscoverySong(song: DiscoverySong) {
+  return Boolean(getProviderEmbed(song.link, song.platform, undefined, true));
+}
+
 function hasExternalDiscoveryDestination(song: DiscoverySong) {
   return (
     isExternalPlatform(song.platform) ||
@@ -3532,6 +3536,7 @@ function DiscoverySections({
     primaryLabel: string;
     secondaryLabel?: string;
     songs: DiscoverySong[];
+    queueSongs?: DiscoverySong[];
     queueable?: boolean;
     preserveOrder?: boolean;
     contextKind: string;
@@ -3567,13 +3572,17 @@ function DiscoverySections({
   const internalPlaybackSongs = useMemo(
     () =>
       sortDiscoverySongs(
-        allDiscoverySongs.filter(isInternalDiscoverySong),
+        allDiscoverySongs.filter(isQueuePlayableDiscoverySong),
         (left, right) =>
           exposureScore(left) - exposureScore(right) ||
           trendScore(right) - trendScore(left),
         catalogLimit,
       ),
     [allDiscoverySongs, catalogLimit],
+  );
+  const topTenQueueSongs = useMemo(
+    () => visibleTopTenSongs.filter(isQueuePlayableDiscoverySong),
+    [visibleTopTenSongs],
   );
   const externalPlatformSongs = useMemo(
     () =>
@@ -3628,12 +3637,12 @@ function DiscoverySections({
     [allDiscoverySongs, catalogLimit],
   );
   const randomQueueSongs = useMemo(
-    () => rankDiscoveryQueue(allDiscoverySongs, heardHistory),
-    [allDiscoverySongs, heardHistory],
+    () => rankDiscoveryQueue(internalPlaybackSongs, heardHistory),
+    [heardHistory, internalPlaybackSongs],
   );
   const genreSections = useMemo(() => {
     const grouped = new Map<string, DiscoverySong[]>();
-    for (const song of allDiscoverySongs) {
+    for (const song of internalPlaybackSongs) {
       const genre = song.genre || "Other";
       grouped.set(genre, [...(grouped.get(genre) ?? []), song]);
     }
@@ -3666,7 +3675,7 @@ function DiscoverySections({
         ),
       }))
       .filter((section) => section.songs.length > 0);
-  }, [allDiscoverySongs]);
+  }, [internalPlaybackSongs]);
   const activeQueueSong = activeQueue?.songs[activeQueue.currentIndex] ?? null;
 
   useEffect(() => {
@@ -3780,6 +3789,7 @@ function DiscoverySections({
       primaryLabel: spanish ? "Reproducir Top 10" : "Play Top 10",
       secondaryLabel: spanish ? "Ver lista" : "View list",
       songs: visibleTopTenSongs,
+      queueSongs: topTenQueueSongs,
       queueable: true,
       preserveOrder: true,
       contextKind: "top",
@@ -3824,8 +3834,8 @@ function DiscoverySections({
         ? "Descubrimiento aleatorio"
         : "Random discovery",
       emptyText: spanish
-        ? "Agrega canciones para activar el modo aleatorio."
-        : "Add songs to activate random discovery.",
+        ? "Agrega canciones con reproduccion dentro de First Listen para activar el modo aleatorio."
+        : "Add songs playable inside First Listen to activate random discovery.",
     },
     {
       key: "external_discovery",
@@ -3925,11 +3935,12 @@ function DiscoverySections({
     categoryConfigs.find((config) => config.key === expandedCategory) ?? null;
 
   const startCategoryQueue = (config: DiscoveryCategoryConfig) => {
+    const queueSongs = config.queueSongs ?? config.songs;
     startDiscoveryQueue({
       description: config.description,
       id: config.key,
       preserveOrder: config.preserveOrder,
-      songs: config.songs,
+      songs: queueSongs,
       title: config.title,
     });
   };
@@ -4085,7 +4096,11 @@ function DiscoverySections({
         </div>
         <div className="discovery-navigation-grid">
           {categoryConfigs.map((config) => {
-            const disabled = config.songs.length === 0;
+            const queueSongs = config.queueSongs ?? config.songs;
+            const primaryDisabled = config.queueable
+              ? queueSongs.length === 0
+              : config.songs.length === 0;
+            const secondaryDisabled = config.songs.length === 0;
             const expanded = expandedCategory === config.key;
             return (
               <article
@@ -4106,7 +4121,7 @@ function DiscoverySections({
                 <div className="discovery-nav-actions">
                   {config.queueable ? (
                     <button
-                      disabled={disabled}
+                      disabled={primaryDisabled}
                       onClick={() => startCategoryQueue(config)}
                       type="button"
                     >
@@ -4115,7 +4130,7 @@ function DiscoverySections({
                     </button>
                   ) : (
                     <button
-                      disabled={disabled}
+                      disabled={primaryDisabled}
                       onClick={() => toggleCategory(config.key)}
                       type="button"
                     >
@@ -4125,7 +4140,7 @@ function DiscoverySections({
                   )}
                   {config.secondaryLabel && (
                     <button
-                      disabled={disabled}
+                      disabled={secondaryDisabled}
                       onClick={() => toggleCategory(config.key)}
                       type="button"
                     >
