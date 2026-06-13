@@ -118,6 +118,7 @@ type DuplicateStatistics = {
 
 type AdminReport = {
   id: string;
+  song_id: string;
   reason: string;
   status: string;
   details: string | null;
@@ -365,6 +366,10 @@ export function AdminPanel({
   const supabase = createClient();
 
   useEffect(() => {
+    if (role === "moderator" && section !== "reports") {
+      setSection("reports");
+      return;
+    }
     if (section === "control") {
       setSection(role === "moderator" ? "reports" : "users");
     }
@@ -538,7 +543,7 @@ export function AdminPanel({
   const sections = allSections.filter(([id]) => {
     if (role === "super_admin") return true;
     if (role === "admin") return !["credits", "listening", "economy"].includes(id);
-    return ["users", "reports"].includes(id);
+    return id === "reports";
   });
 
   return (
@@ -916,6 +921,14 @@ export function AdminPanel({
                         target_report_id: report.id,
                         new_status: "resolved",
                       })}>Resolve</button>
+                      <button onClick={() => void runRpc("moderator_hide_reported_song", {
+                        target_report_id: report.id,
+                        moderation_reason: report.reason.replaceAll("_", " "),
+                      })}>Hide reported content</button>
+                      <button onClick={() => void runRpc("admin_resolve_report", {
+                        target_report_id: report.id,
+                        new_status: "reviewing",
+                      })}>Escalate to Admin</button>
                       <button onClick={() => void runRpc("admin_resolve_report", {
                         target_report_id: report.id,
                         new_status: "dismissed",
@@ -956,27 +969,31 @@ export function AdminPanel({
                         >
                           Remove comment
                         </button>
-                        <button
-                          onClick={() =>
-                            void runRpc("admin_issue_user_warning", {
-                              target_user_id: report.reported_user_id,
-                              warning_reason: `Reported comment: ${report.reason.replaceAll("_", " ")}`,
-                            })
-                          }
-                        >
-                          Warn user
-                        </button>
-                        <button
-                          onClick={() =>
-                            void runRpc("admin_enforce_account", {
-                              target_user_id: report.reported_user_id,
-                              enforcement: "suspend",
-                              enforcement_reason: `Reported comment: ${report.reason.replaceAll("_", " ")}`,
-                            })
-                          }
-                        >
-                          Suspend
-                        </button>
+                        {role !== "moderator" && (
+                          <>
+                            <button
+                              onClick={() =>
+                                void runRpc("admin_issue_user_warning", {
+                                  target_user_id: report.reported_user_id,
+                                  warning_reason: `Reported comment: ${report.reason.replaceAll("_", " ")}`,
+                                })
+                              }
+                            >
+                              Warn user
+                            </button>
+                            <button
+                              onClick={() =>
+                                void runRpc("admin_enforce_account", {
+                                  target_user_id: report.reported_user_id,
+                                  enforcement: "suspend",
+                                  enforcement_reason: `Reported comment: ${report.reason.replaceAll("_", " ")}`,
+                                })
+                              }
+                            >
+                              Suspend
+                            </button>
+                          </>
+                        )}
                         <button
                           onClick={() =>
                             void runRpc("admin_resolve_comment_report", {
@@ -986,6 +1003,16 @@ export function AdminPanel({
                           }
                         >
                           Resolve
+                        </button>
+                        <button
+                          onClick={() =>
+                            void runRpc("admin_resolve_comment_report", {
+                              target_report_id: report.id,
+                              new_status: "reviewing",
+                            })
+                          }
+                        >
+                          Escalate to Admin
                         </button>
                         <button
                           onClick={() =>

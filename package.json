@@ -46,6 +46,9 @@
     "db:schema:check": "node scripts/sync-schema.mjs --check",
     "priority39d:dry-run": "node scripts/apply-priority39d-resolution-feedback.mjs",
     "priority39d:apply": "node scripts/apply-priority39d-resolution-feedback.mjs --apply",
+    "moderator-hardening:dry-run": "node scripts/apply-moderator-permission-hardening.mjs",
+    "moderator-hardening:apply": "node scripts/apply-moderator-permission-hardening.mjs --apply",
+    "moderator-hardening:verify": "node scripts/verify-moderator-permission-hardening.mjs",
     "db:verify": "node scripts/verify-database.mjs"
   },
   "dependencies": {

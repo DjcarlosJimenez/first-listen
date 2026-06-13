@@ -59,6 +59,7 @@ export async function AdminPageContent({
   if (!profile || !allowedRoles.includes(profile.role)) {
     redirect("/review");
   }
+  const isModerator = profile.role === "moderator";
   await supabase.rpc("refresh_creator_activity_status", {
     target_user_id: null,
   });
@@ -95,12 +96,16 @@ export async function AdminPageContent({
     { data: announcements },
     { data: communityHealth },
   ] = await Promise.all([
-    supabase.rpc("admin_list_users", { result_limit: 1000 }),
-    supabase
-      .from("songs")
-      .select("id, user_id, title, artist_name, platform, music_url, is_active, featured, archived_at, removed_at, merged_into_song_id, content_kind, content_duration_seconds, queue_tier, approval_status, created_at")
-      .order("created_at", { ascending: false })
-      .limit(1000),
+    isModerator
+      ? Promise.resolve({ data: [] })
+      : supabase.rpc("admin_list_users", { result_limit: 1000 }),
+    isModerator
+      ? Promise.resolve({ data: [] })
+      : supabase
+          .from("songs")
+          .select("id, user_id, title, artist_name, platform, music_url, is_active, featured, archived_at, removed_at, merged_into_song_id, content_kind, content_duration_seconds, queue_tier, approval_status, created_at")
+          .order("created_at", { ascending: false })
+          .limit(1000),
     supabase
       .from("review_comment_reports")
       .select(
@@ -113,31 +118,49 @@ export async function AdminPageContent({
       .select("id, song_id, reason, status, details, created_at, songs(title, artist_name)")
       .order("created_at", { ascending: false })
       .limit(250),
-    profile.role === "moderator"
+    isModerator
       ? Promise.resolve({ data: null })
       : supabase.rpc("admin_get_statistics"),
-    supabase
-      .from("listening_reward_settings")
-      .select("minutes_per_credit, daily_cap_minutes, enabled")
-      .eq("id", true)
-      .maybeSingle(),
-    supabase
-      .from("spotlight_slots")
-      .select("slot_number, song_id, placement_kind, custom_label")
-      .order("slot_number"),
-    supabase
-      .from("song_boosts")
-      .select(
-        "id, credit_cost, status, requested_at, songs(title, artist_name), profiles!song_boosts_requested_by_fkey(display_name)",
-      )
-      .order("requested_at", { ascending: false })
-      .limit(100),
-    supabase.rpc("get_content_economy_settings"),
-    supabase.rpc("admin_get_duplicate_song_candidates"),
-    supabase.rpc("admin_get_duplicate_statistics"),
-    supabase.rpc("get_platform_theme"),
-    supabase.rpc("admin_list_platform_announcements"),
-    supabase.rpc("admin_get_community_health"),
+    isModerator
+      ? Promise.resolve({ data: null })
+      : supabase
+          .from("listening_reward_settings")
+          .select("minutes_per_credit, daily_cap_minutes, enabled")
+          .eq("id", true)
+          .maybeSingle(),
+    isModerator
+      ? Promise.resolve({ data: [] })
+      : supabase
+          .from("spotlight_slots")
+          .select("slot_number, song_id, placement_kind, custom_label")
+          .order("slot_number"),
+    isModerator
+      ? Promise.resolve({ data: [] })
+      : supabase
+          .from("song_boosts")
+          .select(
+            "id, credit_cost, status, requested_at, songs(title, artist_name), profiles!song_boosts_requested_by_fkey(display_name)",
+          )
+          .order("requested_at", { ascending: false })
+          .limit(100),
+    isModerator
+      ? Promise.resolve({ data: [] })
+      : supabase.rpc("get_content_economy_settings"),
+    isModerator
+      ? Promise.resolve({ data: [] })
+      : supabase.rpc("admin_get_duplicate_song_candidates"),
+    isModerator
+      ? Promise.resolve({ data: {} })
+      : supabase.rpc("admin_get_duplicate_statistics"),
+    isModerator
+      ? Promise.resolve({ data: null })
+      : supabase.rpc("get_platform_theme"),
+    isModerator
+      ? Promise.resolve({ data: [] })
+      : supabase.rpc("admin_list_platform_announcements"),
+    isModerator
+      ? Promise.resolve({ data: null })
+      : supabase.rpc("admin_get_community_health"),
   ]);
 
   const profileById = new Map(
