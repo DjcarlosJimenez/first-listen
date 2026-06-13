@@ -139,6 +139,7 @@ export function PublicLanding({
           <a href="#features">{copy.landing.nav.features}</a>
           <a href="#founders">{copy.landing.nav.founder}</a>
           <a href="#faq">{copy.landing.nav.faq}</a>
+          <a href="/help">Need Help?</a>
         </nav>
         <div className="landing-actions">
           <LanguageSelector compact locale={locale} onChange={onLocaleChange} />

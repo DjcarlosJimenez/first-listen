@@ -10,6 +10,7 @@ import {
   CalendarDays,
   Clapperboard,
   Cloud,
+  CircleHelp,
   Construction,
   ExternalLink,
   Eye,
@@ -289,7 +290,10 @@ export function ProfilePanel({
     <main className="account-page">
       <header className="account-header">
         <Logo />
-        <Link href="/dashboard"><ArrowLeft size={16} /> Dashboard</Link>
+        <div className="owner-header-actions">
+          <Link href="/help"><CircleHelp size={16} /> Need Help?</Link>
+          <Link href="/dashboard"><ArrowLeft size={16} /> Dashboard</Link>
+        </div>
       </header>
       <div className="account-grid">
         <section className="account-card">

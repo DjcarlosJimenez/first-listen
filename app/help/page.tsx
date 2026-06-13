@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   UserPlus,
 } from "lucide-react";
+import { FeedbackCenterForm } from "@/components/feedback-center-form";
 import { Logo } from "@/components/logo";
 
 const helpTopics = [
@@ -55,12 +56,17 @@ export default function HelpPage() {
 
       <section className="help-hero">
         <span className="help-icon"><CircleHelp size={24} /></span>
-        <span className="eyebrow">Help Center</span>
+        <span className="eyebrow">Support Center</span>
         <h1>Get useful feedback and discover your next favorite artist.</h1>
         <p>
           First Listen connects honest first impressions with direct listening,
           following, and saving actions.
         </p>
+        <div className="support-contact-strip">
+          <strong>Need Help?</strong>
+          <a href="mailto:support@firstlisten.net">support@firstlisten.net</a>
+          <a href="#feedback-center">Open support form</a>
+        </div>
       </section>
 
       <section className="help-topic-grid">
@@ -89,6 +95,8 @@ export default function HelpPage() {
           <Link href="/terms">Terms of Service</Link>
         </nav>
       </section>
+
+      <FeedbackCenterForm supportEmail="support@firstlisten.net" />
     </main>
   );
 }

@@ -58,7 +58,11 @@ export const cardDensityLabels = {
 } as const;
 
 export type CardDensityKey = keyof typeof cardDensityLabels;
-export type PlatformResolutionEngineMode = "off" | "recommend" | "automatic";
+export type PlatformResolutionEngineMode = "off" | "basic" | "advanced";
+export type PlatformRecommendationEngineMode =
+  | "off"
+  | "recommend"
+  | "automatic";
 export type PlatformResolutionProvider =
   | "youtube_music"
   | "youtube"
@@ -312,9 +316,11 @@ export type PlatformControlConfig = {
     };
     platformResolution: {
       engineMode: PlatformResolutionEngineMode;
+      recommendationMode: PlatformRecommendationEngineMode;
       preferredPlatformOrder: PlatformResolutionProvider[];
       showPlatformRecommendations: boolean;
       showSecondaryPlatforms: boolean;
+      allowCreatorVerifiedLinks: boolean;
     };
     externalDiscovery: {
       showExternalSongs: boolean;
@@ -766,7 +772,8 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       userSkipExternalDefault: false,
     },
     platformResolution: {
-      engineMode: "recommend",
+      engineMode: "basic",
+      recommendationMode: "recommend",
       preferredPlatformOrder: [
         "youtube_music",
         "youtube",
@@ -777,6 +784,7 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       ],
       showPlatformRecommendations: true,
       showSecondaryPlatforms: true,
+      allowCreatorVerifiedLinks: true,
     },
     externalDiscovery: {
       showExternalSongs: true,

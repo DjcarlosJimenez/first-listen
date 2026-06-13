@@ -153,7 +153,8 @@ function mapGuestSongs(rows: Array<Record<string, unknown>>): Song[] {
             primary: Boolean(item.is_primary),
             resolutionSource:
               item.resolution_source === "manual" ||
-              item.resolution_source === "inferred"
+              item.resolution_source === "inferred" ||
+              item.resolution_source === "verified"
                 ? item.resolution_source
                 : "submitted",
             confidenceScore: Number(item.confidence_score ?? 100),

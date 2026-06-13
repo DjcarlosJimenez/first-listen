@@ -44,6 +44,8 @@
     "priority25:verify:production": "node scripts/verify-priority25-production.mjs",
     "db:schema:sync": "node scripts/sync-schema.mjs",
     "db:schema:check": "node scripts/sync-schema.mjs --check",
+    "priority39d:dry-run": "node scripts/apply-priority39d-resolution-feedback.mjs",
+    "priority39d:apply": "node scripts/apply-priority39d-resolution-feedback.mjs --apply",
     "db:verify": "node scripts/verify-database.mjs"
   },
   "dependencies": {

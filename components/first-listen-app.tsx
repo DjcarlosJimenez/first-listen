@@ -88,6 +88,7 @@ import { getCopy, optionLabel } from "@/lib/i18n";
 import {
   getDiscoveryLinks,
   getPrimaryPlatformLinks,
+  sortPlatformLinks,
 } from "@/lib/discovery";
 import {
   allPlatforms,
@@ -164,6 +165,16 @@ type PlatformLinkRow = {
   resolution_source?: string;
   confidence_score?: number;
 };
+
+function mergePlatformLink(
+  links: SongPlatformLink[] | undefined,
+  nextLink: SongPlatformLink,
+) {
+  return sortPlatformLinks([
+    ...(links ?? []).filter((link) => link.platform !== nextLink.platform),
+    nextLink,
+  ]);
+}
 
 type ListeningSessionUi = {
   sessionId: string | null;
@@ -265,7 +276,8 @@ function mapSongPlatformLinks(
         primary: Boolean(link.is_primary),
         resolutionSource:
           link.resolution_source === "manual" ||
-          link.resolution_source === "inferred"
+          link.resolution_source === "inferred" ||
+          link.resolution_source === "verified"
             ? link.resolution_source
             : "submitted",
         confidenceScore: Number(link.confidence_score ?? 100),
@@ -3368,6 +3380,197 @@ function CommunityProgramsPanel({
   );
 }
 
+function VerifiedPlatformLinksPanel({
+  locale,
+  onSaved,
+  song,
+}: {
+  locale: InterfaceLocale;
+  onSaved: (songId: string, link: SongPlatformLink) => void;
+  song: Song;
+}) {
+  const spanish = locale === "es";
+  const [targetPlatform, setTargetPlatform] = useState<Platform>(
+    allPlatforms.find((platform) => platform !== song.platform) ?? "YouTube",
+  );
+  const [url, setUrl] = useState("");
+  const [note, setNote] = useState("");
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const currentLinks = getPrimaryPlatformLinks(song);
+  const availablePlatforms = allPlatforms.filter(
+    (platform) => platform !== song.platform,
+  );
+  const detection = detectMusicPlatform(url);
+  const selectedMatches =
+    !url.trim() ||
+    (detection.valid && detection.platform === targetPlatform);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMessage("");
+    if (!url.trim()) {
+      setMessage(
+        spanish ? "Pega un enlace verificado." : "Paste a verified link.",
+      );
+      return;
+    }
+    if (!selectedMatches) {
+      setMessage(
+        spanish
+          ? `El enlace detectado no coincide con ${targetPlatform}.`
+          : `The detected link does not match ${targetPlatform}.`,
+      );
+      return;
+    }
+    const supabase = createClient();
+    if (!supabase) {
+      setMessage(
+        spanish
+          ? "El servicio no esta disponible."
+          : "The service is unavailable.",
+      );
+      return;
+    }
+
+    setSaving(true);
+    const { data, error } = await supabase.rpc(
+      "upsert_verified_song_platform_link",
+      {
+        target_song_id: song.id,
+        target_platform: databasePlatform[targetPlatform],
+        target_music_url: url.trim(),
+        verification_note: note.trim() || null,
+      },
+    );
+    setSaving(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    const row = data as PlatformLinkRow;
+    const savedPlatform =
+      allPlatforms.find(
+        (platform) => databasePlatform[platform] === String(row.platform),
+      ) ?? targetPlatform;
+    onSaved(song.id, {
+      platform: savedPlatform,
+      url: String(row.music_url ?? url.trim()),
+      primary: Boolean(row.is_primary),
+      resolutionSource:
+        row.resolution_source === "verified" ||
+        row.resolution_source === "manual" ||
+        row.resolution_source === "inferred"
+          ? row.resolution_source
+          : "submitted",
+      confidenceScore: Number(row.confidence_score ?? 100),
+    });
+    setUrl("");
+    setNote("");
+    setMessage(
+      spanish
+        ? "Enlace verificado guardado."
+        : "Verified platform link saved.",
+    );
+  };
+
+  return (
+    <section className="verified-platform-panel">
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">
+            <Globe2 size={13} />
+            {spanish ? "También disponible en" : "Also Available On"}
+          </span>
+          <h3>
+            {spanish
+              ? "Agrega enlaces verificados"
+              : "Add verified platform links"}
+          </h3>
+        </div>
+        <small>
+          {spanish
+            ? "No inventamos coincidencias."
+            : "Only real links are shown."}
+        </small>
+      </div>
+      <div className="platform-chip-row">
+        {currentLinks.map((link) => (
+          <a
+            href={link.url}
+            key={`${song.id}-verified-${link.platform}`}
+            rel="noreferrer"
+            target="_blank"
+          >
+            <PlatformIcon platform={link.platform} size={14} />
+            {link.platform}
+            <small>{link.resolutionSource}</small>
+          </a>
+        ))}
+      </div>
+      <form className="verified-platform-form" onSubmit={submit}>
+        <label>
+          {spanish ? "Plataforma" : "Platform"}
+          <select
+            onChange={(event) =>
+              setTargetPlatform(event.target.value as Platform)
+            }
+            value={targetPlatform}
+          >
+            {availablePlatforms.map((platform) => (
+              <option key={platform} value={platform}>
+                {platform}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {spanish ? "Enlace verificado" : "Verified link"}
+          <input
+            onChange={(event) => setUrl(event.target.value)}
+            placeholder="https://"
+            type="url"
+            value={url}
+          />
+        </label>
+        <label>
+          {spanish ? "Nota opcional" : "Optional note"}
+          <input
+            maxLength={120}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder={
+              spanish ? "Ej. enlace oficial del artista" : "Ex. official artist link"
+            }
+            value={note}
+          />
+        </label>
+        <button className="secondary-button" disabled={saving} type="submit">
+          <Link2 size={14} />
+          {saving
+            ? spanish
+              ? "Guardando..."
+              : "Saving..."
+            : spanish
+              ? "Guardar enlace"
+              : "Save Link"}
+        </button>
+      </form>
+      {url.trim() && (
+        <small className={selectedMatches ? "form-message" : "auth-error"}>
+          {selectedMatches
+            ? detection.message
+            : spanish
+              ? `Detectado: ${detection.platform ?? "no compatible"}`
+              : `Detected: ${detection.platform ?? "unsupported"}`}
+        </small>
+      )}
+      {message && <small className="form-message">{message}</small>}
+    </section>
+  );
+}
+
 function DashboardView({
   setView,
   founder,
@@ -3390,6 +3593,7 @@ function DashboardView({
   onClaimMission,
   communityPrograms,
   onBoostSong,
+  onVerifiedPlatformLinkSaved,
   onListeningCredited,
   externalRedirectNoticeDisabled,
   onExternalRedirectPreferenceChange,
@@ -3415,6 +3619,10 @@ function DashboardView({
   onClaimMission: () => void;
   communityPrograms: CommunityProgram[];
   onBoostSong: (songId: string) => void;
+  onVerifiedPlatformLinkSaved: (
+    songId: string,
+    link: SongPlatformLink,
+  ) => void;
   onListeningCredited: (
     seconds: number,
     becameValid: boolean,
@@ -3557,6 +3765,12 @@ function DashboardView({
             <span>{copy.app.dashboard.totalReviews}</span>
           </div>
         </div>
+
+        <VerifiedPlatformLinksPanel
+          locale={locale}
+          onSaved={onVerifiedPlatformLinkSaved}
+          song={song}
+        />
 
         <div className="stats-grid">
           <StatCard
@@ -4804,6 +5018,21 @@ export function FirstListenApp({
   const [songSummaries, setSongSummaries] = useState(
     initialSongSummaries,
   );
+  const [userSong, setUserSong] = useState<Song | null>(() => {
+    if (!initialUserSong) return null;
+    const summary = initialSongSummaries.find(
+      (item) => item.id === initialUserSong.id,
+    );
+    return {
+      ...initialUserSong,
+      platformLinks:
+        summary?.platformLinks?.length
+          ? summary.platformLinks
+          : initialUserSong.platformLinks,
+      recommendedPlatform:
+        summary?.recommendedPlatform ?? initialUserSong.recommendedPlatform,
+    };
+  });
   const [priorComments, setPriorComments] = useState<string[]>([]);
   const founder = initialFounder;
   const [founderSubmissionsRemaining, setFounderSubmissionsRemaining] =
@@ -5363,6 +5592,37 @@ export function FirstListenApp({
     );
   };
 
+  const handleVerifiedPlatformLinkSaved = (
+    songId: string,
+    link: SongPlatformLink,
+  ) => {
+    setUserSong((current) =>
+      current?.id === songId
+        ? {
+            ...current,
+            platformLinks: mergePlatformLink(current.platformLinks, link),
+            recommendedPlatform: current.recommendedPlatform ?? link.platform,
+          }
+        : current,
+    );
+    setSongSummaries((current) =>
+      current.map((summary) =>
+        summary.id === songId
+          ? {
+              ...summary,
+              platformLinks: mergePlatformLink(summary.platformLinks, link),
+              recommendedPlatform: summary.recommendedPlatform ?? link.platform,
+            }
+          : summary,
+      ),
+    );
+    notify(
+      locale === "es"
+        ? "Enlace verificado agregado."
+        : "Verified platform link added.",
+    );
+  };
+
   const handleSongSubmitted = async (
     usedFounderFree: boolean,
     submission: SongSubmission,
@@ -5441,7 +5701,7 @@ export function FirstListenApp({
           reviewCredits={reviewCount}
           reviewQualityScore={averageReviewQuality}
           setView={changeView}
-          song={initialUserSong}
+          song={userSong}
           songSummaries={songSummaries}
           songReviews={initialSongReviews}
           totalCreditsEarned={totalCreditsEarned}
@@ -5453,6 +5713,7 @@ export function FirstListenApp({
           onClaimMission={() => void claimDailyMission()}
           communityPrograms={initialCommunityPrograms}
           onBoostSong={(songId) => void requestSongBoost(songId)}
+          onVerifiedPlatformLinkSaved={handleVerifiedPlatformLinkSaved}
           onListeningCredited={handleListeningCredited}
           externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
           onExternalRedirectPreferenceChange={(disabled) =>

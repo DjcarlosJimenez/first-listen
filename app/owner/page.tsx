@@ -29,6 +29,27 @@ type OwnerSongRow = {
   created_at: string;
 };
 
+type OwnerFeedbackRow = {
+  id: string;
+  user_id: string | null;
+  submitter_name: string;
+  submitter_email: string | null;
+  category: string;
+  status: string;
+  subject: string;
+  message: string;
+  screenshot_url: string | null;
+  page_url: string | null;
+  contact_email: string | null;
+  notify_by_email: boolean;
+  founder_reply: string | null;
+  replied_at: string | null;
+  resolved_at: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export default async function OwnerControlCenterPage() {
   const supabase = await createClient();
   const {
@@ -48,6 +69,7 @@ export default async function OwnerControlCenterPage() {
     { data: users },
     { data: songs },
     { data: reports },
+    { data: feedback },
   ] = await Promise.all([
     supabase.rpc("admin_get_control_center"),
     supabase.rpc("admin_list_users", { result_limit: 1000 }),
@@ -63,6 +85,10 @@ export default async function OwnerControlCenterPage() {
       .select("song_id")
       .eq("status", "open")
       .limit(5000),
+    supabase.rpc("admin_list_feedback", {
+      feedback_status: "all",
+      result_limit: 100,
+    }),
   ]);
 
   if (controlError || !controlCenterData) {
@@ -111,6 +137,7 @@ export default async function OwnerControlCenterPage() {
       </header>
       <SuperAdminControlCenter
         initialData={controlCenterData as ControlCenterPayload}
+        feedback={(feedback ?? []) as OwnerFeedbackRow[]}
         songs={ownerSongs}
         users={(users ?? []) as OwnerDirectoryUser[]}
       />

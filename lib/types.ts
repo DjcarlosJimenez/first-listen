@@ -28,7 +28,7 @@ export type SongPlatformLink = {
   platform: Platform;
   url: string;
   primary: boolean;
-  resolutionSource: "submitted" | "inferred" | "manual";
+  resolutionSource: "submitted" | "inferred" | "manual" | "verified";
   confidenceScore: number;
 };
 

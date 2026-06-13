@@ -16,6 +16,7 @@ import {
   History,
   Headphones,
   LayoutDashboard,
+  MessageSquareText,
   Music2,
   Palette,
   Plus,
@@ -217,6 +218,27 @@ type DirectorySong = {
   created_at?: string;
 };
 
+type FeedbackSubmission = {
+  id: string;
+  user_id: string | null;
+  submitter_name: string;
+  submitter_email: string | null;
+  category: string;
+  status: string;
+  subject: string;
+  message: string;
+  screenshot_url: string | null;
+  page_url: string | null;
+  contact_email: string | null;
+  notify_by_email: boolean;
+  founder_reply: string | null;
+  replied_at: string | null;
+  resolved_at: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type ConfigSectionKey = Exclude<keyof PlatformControlConfig, "schemaVersion">;
 
 type ControlTab =
@@ -228,6 +250,7 @@ type ControlTab =
   | "content"
   | "profiles"
   | "community"
+  | "feedback"
   | "membership"
   | "listening"
   | "tokens"
@@ -247,6 +270,7 @@ const tabs: Array<[ControlTab, string, typeof Gauge]> = [
   ["content", "Content", Music2],
   ["profiles", "Artist Profiles", Users],
   ["community", "Community", Users],
+  ["feedback", "Feedback", MessageSquareText],
   ["membership", "Membership", WalletCards],
   ["listening", "Time Bank", Headphones],
   ["tokens", "Token Economy", WalletCards],
@@ -401,6 +425,15 @@ const externalPlacementLabels: Record<
 
 const platformResolutionModeLabels: Record<
   PlatformControlConfig["discovery"]["platformResolution"]["engineMode"],
+  string
+> = {
+  off: "Off",
+  basic: "Basic",
+  advanced: "Advanced",
+};
+
+const platformRecommendationModeLabels: Record<
+  PlatformControlConfig["discovery"]["platformResolution"]["recommendationMode"],
   string
 > = {
   off: "Off",
@@ -1009,10 +1042,12 @@ function dateTimeStorageValue(value: string) {
 }
 
 export function SuperAdminControlCenter({
+  feedback,
   initialData,
   users,
   songs,
 }: {
+  feedback: FeedbackSubmission[];
   initialData: ControlCenterPayload;
   users: DirectoryUser[];
   songs: DirectorySong[];
@@ -1039,6 +1074,10 @@ export function SuperAdminControlCenter({
   const [draggedSpotlightIndex, setDraggedSpotlightIndex] =
     useState<number | null>(null);
   const [songDirectory, setSongDirectory] = useState(songs);
+  const [feedbackInbox, setFeedbackInbox] = useState(feedback);
+  const [feedbackReplyDrafts, setFeedbackReplyDrafts] = useState<
+    Record<string, string>
+  >({});
   const [contentSearch, setContentSearch] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
   const sectionImportRef = useRef<HTMLInputElement>(null);
@@ -1046,6 +1085,10 @@ export function SuperAdminControlCenter({
   useEffect(() => {
     setSongDirectory(songs);
   }, [songs]);
+
+  useEffect(() => {
+    setFeedbackInbox(feedback);
+  }, [feedback]);
 
   const refresh = async () => {
     const supabase = createClient();
@@ -1116,6 +1159,61 @@ export function SuperAdminControlCenter({
       setNotice("Time Bank test completed without permanent changes.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The test failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const refreshFeedbackInbox = async () => {
+    const supabase = createClient();
+    if (!supabase) throw new Error("Supabase is not configured.");
+    const { data: rows, error } = await supabase.rpc("admin_list_feedback", {
+      feedback_status: "all",
+      result_limit: 100,
+    });
+    if (error) throw error;
+    setFeedbackInbox((rows ?? []) as FeedbackSubmission[]);
+  };
+
+  const updateFeedbackItem = async (
+    feedbackId: string,
+    nextStatus: "open" | "in_progress" | "resolved" | "archived",
+    replyMessage?: string,
+  ) => {
+    setBusy(true);
+    setNotice("");
+    try {
+      const supabase = createClient();
+      if (!supabase) throw new Error("Supabase is not configured.");
+      const { error } = await supabase.rpc("admin_update_feedback", {
+        feedback_id: feedbackId,
+        next_status: nextStatus,
+        reply_message: replyMessage?.trim() || null,
+      });
+      if (error) throw error;
+      await refreshFeedbackInbox();
+      setNotice("Feedback item updated.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Feedback update failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteFeedbackSpam = async (feedbackId: string) => {
+    setBusy(true);
+    setNotice("");
+    try {
+      const supabase = createClient();
+      if (!supabase) throw new Error("Supabase is not configured.");
+      const { error } = await supabase.rpc("admin_delete_feedback_spam", {
+        feedback_id: feedbackId,
+      });
+      if (error) throw error;
+      await refreshFeedbackInbox();
+      setNotice("Spam feedback removed from the inbox.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Spam delete failed.");
     } finally {
       setBusy(false);
     }
@@ -1626,6 +1724,13 @@ export function SuperAdminControlCenter({
   const lastRejections = rejectionInsights.last_100_rejections ?? [];
   const commonFailureCauses =
     rejectionInsights.most_common_failure_causes ?? [];
+  const feedbackCounts = {
+    open: feedbackInbox.filter((item) => item.status === "open").length,
+    inProgress: feedbackInbox.filter((item) => item.status === "in_progress")
+      .length,
+    resolved: feedbackInbox.filter((item) => item.status === "resolved").length,
+    archived: feedbackInbox.filter((item) => item.status === "archived").length,
+  };
 
   return (
     <section className="control-center">
@@ -2977,6 +3082,33 @@ export function SuperAdminControlCenter({
                 )}
               </select>
             </label>
+            <label>
+              Recommendation engine
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    discovery: {
+                      ...current.discovery,
+                      platformResolution: {
+                        ...current.discovery.platformResolution,
+                        recommendationMode: event.target
+                          .value as PlatformControlConfig["discovery"]["platformResolution"]["recommendationMode"],
+                      },
+                    },
+                  }))
+                }
+                value={config.discovery.platformResolution.recommendationMode}
+              >
+                {Object.entries(platformRecommendationModeLabels).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
             <div className="control-toggle-grid">
               <label>
                 <input
@@ -3020,6 +3152,28 @@ export function SuperAdminControlCenter({
                   type="checkbox"
                 />
                 Show Secondary Platforms
+              </label>
+              <label>
+                <input
+                  checked={
+                    config.discovery.platformResolution
+                      .allowCreatorVerifiedLinks
+                  }
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      discovery: {
+                        ...current.discovery,
+                        platformResolution: {
+                          ...current.discovery.platformResolution,
+                          allowCreatorVerifiedLinks: event.target.checked,
+                        },
+                      },
+                    }))
+                  }
+                  type="checkbox"
+                />
+                Allow Creator Verified Links
               </label>
             </div>
             <div className="control-mini-grid">
@@ -3789,6 +3943,153 @@ export function SuperAdminControlCenter({
               ))}
             </div>
           </article>
+        </div>
+      )}
+
+      {tab === "feedback" && (
+        <div className="control-grid feedback-inbox-manager">
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Feedback Inbox</span>
+                <h3>User problems, questions, and suggestions</h3>
+                <p>
+                  Keep real users close: reply, resolve, archive, or remove spam
+                  without database access.
+                </p>
+              </div>
+              <button
+                className="secondary-button"
+                disabled={busy}
+                onClick={() => void refreshFeedbackInbox()}
+                type="button"
+              >
+                <Activity size={15} /> Refresh
+              </button>
+            </div>
+            <div className="control-stat-list feedback-status-grid">
+              <div>
+                <strong>{feedbackCounts.open}</strong>
+                <span>Open</span>
+              </div>
+              <div>
+                <strong>{feedbackCounts.inProgress}</strong>
+                <span>In Progress</span>
+              </div>
+              <div>
+                <strong>{feedbackCounts.resolved}</strong>
+                <span>Resolved</span>
+              </div>
+              <div>
+                <strong>{feedbackCounts.archived}</strong>
+                <span>Archived</span>
+              </div>
+            </div>
+          </article>
+
+          {feedbackInbox.map((item) => (
+            <article className="control-card control-card-wide feedback-inbox-item" key={item.id}>
+              <div className="control-heading">
+                <div>
+                  <span className="eyebrow">
+                    {item.category.replace(/_/g, " ")} / {item.status.replace(/_/g, " ")}
+                  </span>
+                  <h3>{item.subject}</h3>
+                  <p>
+                    From {item.submitter_name}
+                    {item.submitter_email ? ` / ${item.submitter_email}` : ""}
+                  </p>
+                </div>
+                <small>{new Date(item.created_at).toLocaleString()}</small>
+              </div>
+              <p className="feedback-inbox-message">{item.message}</p>
+              <div className="feedback-inbox-meta">
+                {item.page_url && (
+                  <a href={item.page_url} rel="noreferrer" target="_blank">
+                    Page
+                  </a>
+                )}
+                {item.screenshot_url && (
+                  <a href={item.screenshot_url} rel="noreferrer" target="_blank">
+                    Screenshot
+                  </a>
+                )}
+                {item.notify_by_email && <span>Email reply requested</span>}
+              </div>
+              <label>
+                Founder reply
+                <textarea
+                  maxLength={1000}
+                  onChange={(event) =>
+                    setFeedbackReplyDrafts((current) => ({
+                      ...current,
+                      [item.id]: event.target.value,
+                    }))
+                  }
+                  placeholder={item.founder_reply ?? "Write a short reply note."}
+                  value={feedbackReplyDrafts[item.id] ?? ""}
+                />
+              </label>
+              {item.founder_reply && (
+                <small className="form-message">
+                  Last reply: {item.founder_reply}
+                </small>
+              )}
+              <div className="control-button-row">
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void updateFeedbackItem(
+                      item.id,
+                      "in_progress",
+                      feedbackReplyDrafts[item.id],
+                    )
+                  }
+                  type="button"
+                >
+                  <Send size={14} /> Reply / In Progress
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void updateFeedbackItem(
+                      item.id,
+                      "resolved",
+                      feedbackReplyDrafts[item.id],
+                    )
+                  }
+                  type="button"
+                >
+                  <Save size={14} /> Mark Resolved
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => void updateFeedbackItem(item.id, "archived")}
+                  type="button"
+                >
+                  <ArchiveRestore size={14} /> Archive
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => void deleteFeedbackSpam(item.id)}
+                  type="button"
+                >
+                  <Trash2 size={14} /> Delete Spam
+                </button>
+              </div>
+            </article>
+          ))}
+
+          {!feedbackInbox.length && (
+            <article className="control-card control-card-wide">
+              <span className="eyebrow">Feedback Inbox</span>
+              <h3>No feedback yet</h3>
+              <p>
+                New support requests, questions, suggestions, and problem
+                reports will appear here.
+              </p>
+            </article>
+          )}
         </div>
       )}
 

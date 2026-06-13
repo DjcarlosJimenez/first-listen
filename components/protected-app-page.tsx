@@ -43,6 +43,8 @@ type DashboardRow = {
   share_intent: number;
   listener_retention: number;
   boost_status: string | null;
+  platform_links?: PlatformLinkRow[] | null;
+  recommended_platform?: string | null;
 };
 
 type ListeningBankRow = {
@@ -259,7 +261,8 @@ function mapPlatformLinks(
     primary: Boolean(link.is_primary),
     resolutionSource:
       link.resolution_source === "manual" ||
-      link.resolution_source === "inferred"
+      link.resolution_source === "inferred" ||
+      link.resolution_source === "verified"
         ? link.resolution_source
         : "submitted",
     confidenceScore: Number(link.confidence_score ?? 100),
@@ -374,6 +377,15 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     coverUrl: safeCoverUrl(row.cover_image_url),
     link: row.music_url,
     platform: platformLabels[row.platform],
+    platformLinks: mapPlatformLinks(
+      row.platform_links,
+      platformLabels[row.platform],
+      row.music_url,
+    ),
+    recommendedPlatform:
+      row.recommended_platform && platformLabels[row.recommended_platform]
+        ? platformLabels[row.recommended_platform]
+        : platformLabels[row.platform],
     genre: row.genre,
     language: row.song_language,
     submittedAt: row.submitted_at,
