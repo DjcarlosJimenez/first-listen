@@ -4400,6 +4400,15 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   padding: 8px 11px;
 }
 
+.landing-founder-message {
+  color: var(--muted);
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.55;
+  margin-top: 10px;
+}
+
 .landing-hero h1,
 .section-heading h2,
 .why-copy h2,
@@ -11483,6 +11492,46 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: var(--control-text);
 }
 
+.control-builder-phase-grid,
+.control-builder-copy-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.control-builder-phase-grid button,
+.control-builder-copy-grid section {
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  text-align: left;
+}
+
+.control-builder-phase-grid button {
+  cursor: pointer;
+}
+
+.control-builder-phase-grid button svg {
+  color: var(--secondary-color, #4f7110);
+}
+
+.control-builder-phase-grid button strong,
+.control-builder-copy-grid h4 {
+  color: var(--ink);
+  font-size: 13px;
+  margin: 0;
+}
+
+.control-builder-phase-grid button span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
 .control-preview-canvas {
   background: var(--control-card);
   border: 1px solid var(--control-border);
@@ -11816,6 +11865,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .theme-dark .control-spotlight-grid section,
 .theme-dark .control-permission-grid section,
 .theme-dark .control-announcement-list > section,
+.theme-dark .control-builder-phase-grid button,
+.theme-dark .control-builder-copy-grid section,
 .theme-dark .control-content-list > section,
 .theme-dark .control-saved-list > div,
 .theme-dark .control-history-list > div {
@@ -11857,6 +11908,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .control-color-grid,
   .control-number-grid,
   .control-announcement-grid,
+  .control-builder-phase-grid,
+  .control-builder-copy-grid,
   .control-preset-grid,
   .control-component-grid,
   .control-section-visibility-grid,

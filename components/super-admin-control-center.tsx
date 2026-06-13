@@ -33,6 +33,8 @@ import {
 import {
   cardDensityLabels,
   defaultPlatformControlConfig,
+  homepageCopyFieldLabels,
+  homepageCopyLocales,
   homepageModuleLabels,
   membershipPermissionLabels,
   membershipTierLabels,
@@ -40,6 +42,8 @@ import {
   uiComponentLabels,
   type CardDensityKey,
   type ControlAnnouncement,
+  type HomepageCopyField,
+  type HomepageCopyLocale,
   type HomepageModuleKey,
   type MembershipPermissionKey,
   type MembershipTierConfig,
@@ -243,6 +247,7 @@ type ConfigSectionKey = Exclude<keyof PlatformControlConfig, "schemaVersion">;
 
 type ControlTab =
   | "overview"
+  | "builder"
   | "interface"
   | "appearance"
   | "homepage"
@@ -263,6 +268,7 @@ type ControlTab =
 
 const tabs: Array<[ControlTab, string, typeof Gauge]> = [
   ["overview", "Publish", Gauge],
+  ["builder", "Builder", Blocks],
   ["interface", "Interface", SlidersHorizontal],
   ["appearance", "Appearance", Palette],
   ["homepage", "Page Builder", LayoutDashboard],
@@ -309,6 +315,15 @@ const configSectionLabels: Record<ConfigSectionKey, string> = {
   experiments: "Experiments",
   announcements: "Announcements",
 };
+
+const homepageCopyLocaleLabels: Record<HomepageCopyLocale, string> = {
+  en: "English",
+  es: "Spanish",
+};
+
+const homepageCopyFieldEntries = Object.entries(
+  homepageCopyFieldLabels,
+) as Array<[HomepageCopyField, string]>;
 
 const discoveryLabels: Record<
   keyof PlatformControlConfig["discovery"]["modules"],
@@ -1504,6 +1519,104 @@ export function SuperAdminControlCenter({
     setDraggedModule(null);
   };
 
+  const updateHomepageCopy = (
+    locale: HomepageCopyLocale,
+    field: HomepageCopyField,
+    value: string,
+  ) => {
+    setConfig((current) => ({
+      ...current,
+      homepage: {
+        ...current.homepage,
+        copy: {
+          ...current.homepage.copy,
+          [locale]: {
+            ...current.homepage.copy[locale],
+            [field]: value,
+          },
+        },
+      },
+    }));
+  };
+
+  const addFounderAnnouncementDraft = () => {
+    setConfig((current) => ({
+      ...current,
+      announcements: [
+        ...current.announcements,
+        {
+          ...emptyAnnouncement(),
+          type: "founder_message",
+          title: "Founder Update",
+          message: "Share a short First Listen update with the community.",
+          priority: 4,
+          pinned: true,
+          bannerPlacement: "homepage",
+        },
+      ],
+    }));
+    setTab("announcements");
+    setNotice("Founder message added to the announcements draft.");
+  };
+
+  const renderHomepageModuleList = () => (
+    <div className="control-module-list">
+      {config.homepage.order.map((module, index) => (
+        <article
+          data-owner-dnd="homepage-module"
+          draggable
+          key={module}
+          onDragOver={(event) => event.preventDefault()}
+          onDragStart={() => setDraggedModule(module)}
+          onDrop={() => dropModule(module)}
+        >
+          <Blocks size={17} />
+          <div>
+            <strong>{homepageModuleLabels[module]}</strong>
+            <small>Position {index + 1}</small>
+          </div>
+          <button
+            aria-label={`Move ${homepageModuleLabels[module]} up`}
+            disabled={index === 0}
+            onClick={() => moveModule(module, -1)}
+            type="button"
+          >
+            <ArrowUp size={15} />
+          </button>
+          <button
+            aria-label={`Move ${homepageModuleLabels[module]} down`}
+            disabled={index === config.homepage.order.length - 1}
+            onClick={() => moveModule(module, 1)}
+            type="button"
+          >
+            <ArrowDown size={15} />
+          </button>
+          <label className="control-switch">
+            <input
+              checked={config.homepage.visibility[module]}
+              onChange={(event) =>
+                setConfig((current) => ({
+                  ...current,
+                  homepage: {
+                    ...current.homepage,
+                    visibility: {
+                      ...current.homepage.visibility,
+                      [module]: event.target.checked,
+                    },
+                  },
+                }))
+              }
+              type="checkbox"
+            />
+            <span>
+              {config.homepage.visibility[module] ? "Visible" : "Hidden"}
+            </span>
+          </label>
+        </article>
+      ))}
+    </div>
+  );
+
   const moveSpotlightSlot = (index: number, direction: -1 | 1) => {
     setConfig((current) => {
       const spotlight = [...current.spotlight];
@@ -2050,6 +2163,262 @@ export function SuperAdminControlCenter({
                 ref={sectionImportRef}
                 type="file"
               />
+            </div>
+          </article>
+        </div>
+      )}
+
+      {tab === "builder" && (
+        <div className="control-grid">
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Founder Control Builder</span>
+                <h3>Routine platform management in one place</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("homepage")}
+                type="button"
+              >
+                <Save size={15} /> Save Homepage Draft
+              </button>
+            </div>
+            <p>
+              Manage landing copy, module order, announcements, discovery, and
+              submission settings without editing code. Save draft first, then
+              use Preview and Publish when the change is ready.
+            </p>
+            <div className="control-builder-phase-grid">
+              <button onClick={() => setTab("homepage")} type="button">
+                <Blocks size={15} />
+                <strong>Module Management</strong>
+                <span>Show, hide, move, and reorder public sections.</span>
+              </button>
+              <button onClick={() => setTab("announcements")} type="button">
+                <Bell size={15} />
+                <strong>Founder Announcements</strong>
+                <span>Pin, schedule, archive, or remove messages.</span>
+              </button>
+              <button onClick={() => setTab("tokens")} type="button">
+                <WalletCards size={15} />
+                <strong>Submission Settings</strong>
+                <span>Review active costs, limits, and thresholds.</span>
+              </button>
+              <button onClick={() => setTab("discovery")} type="button">
+                <Sparkles size={15} />
+                <strong>Discovery Controls</strong>
+                <span>Manage Spotlight, Top 10, and discovery modules.</span>
+              </button>
+              <button onClick={() => setTab("feedback")} type="button">
+                <MessageSquareText size={15} />
+                <strong>User Communication</strong>
+                <span>Review support requests and community feedback.</span>
+              </button>
+              <button onClick={() => setTab("overview")} type="button">
+                <Eye size={15} />
+                <strong>Safety Workflow</strong>
+                <span>Preview, publish, export, import, and restore.</span>
+              </button>
+            </div>
+          </article>
+
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Phase 1</span>
+                <h3>Homepage module order and visibility</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("homepage")}
+                type="button"
+              >
+                <Save size={15} /> Save Draft
+              </button>
+            </div>
+            <p>
+              Drag sections, use Move Up or Move Down, or hide modules from the
+              public experience. These are the same controls used by Page
+              Builder.
+            </p>
+            {renderHomepageModuleList()}
+          </article>
+
+          <article className="control-card control-card-wide">
+            <div className="control-heading">
+              <div>
+                <span className="eyebrow">Phase 2</span>
+                <h3>Homepage copy builder</h3>
+              </div>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={() => void saveSection("homepage")}
+                type="button"
+              >
+                <Save size={15} /> Save Draft
+              </button>
+            </div>
+            <p>
+              Edit visitor-facing headlines, descriptions, welcome messages,
+              Founder announcements, and beta messages for each supported
+              language.
+            </p>
+            <div className="control-builder-copy-grid">
+              {homepageCopyLocales.map((localeCode) => (
+                <section key={localeCode}>
+                  <h4>{homepageCopyLocaleLabels[localeCode]}</h4>
+                  <div className="control-announcement-grid">
+                    {homepageCopyFieldEntries.map(([field, label]) => {
+                      const multiline =
+                        field.toLowerCase().includes("description") ||
+                        field.toLowerCase().includes("body") ||
+                        field === "betaMessage";
+                      return (
+                        <label
+                          className={multiline ? "control-field-wide" : ""}
+                          key={field}
+                        >
+                          {label}
+                          {multiline ? (
+                            <textarea
+                              maxLength={500}
+                              onChange={(event) =>
+                                updateHomepageCopy(
+                                  localeCode,
+                                  field,
+                                  event.target.value,
+                                )
+                              }
+                              value={config.homepage.copy[localeCode][field]}
+                            />
+                          ) : (
+                            <input
+                              maxLength={160}
+                              onChange={(event) =>
+                                updateHomepageCopy(
+                                  localeCode,
+                                  field,
+                                  event.target.value,
+                                )
+                              }
+                              value={config.homepage.copy[localeCode][field]}
+                            />
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Phase 3 / 6</span>
+            <h3>Founder announcements and communication</h3>
+            <p>
+              Create announcement cards for new features, maintenance,
+              contests, platform updates, or Founder messages.
+            </p>
+            <div className="control-actions">
+              <button
+                className="secondary-button"
+                onClick={addFounderAnnouncementDraft}
+                type="button"
+              >
+                <Plus size={15} /> New Founder Message
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() => setTab("announcements")}
+                type="button"
+              >
+                <Bell size={15} /> Manage Announcements
+              </button>
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Phase 4</span>
+            <h3>Submission settings snapshot</h3>
+            <div className="control-stat-list">
+              <div>
+                <strong>{config.tokens.contentTypeCosts.internalSong}</strong>
+                <span>Internal playback cost</span>
+              </div>
+              <div>
+                <strong>{config.tokens.contentTypeCosts.externalSong}</strong>
+                <span>External playback cost</span>
+              </div>
+              <div>
+                <strong>{config.tokens.minutesPerToken}</strong>
+                <span>Minutes per token</span>
+              </div>
+              <div>
+                <strong>{config.tokens.dailyListeningLimit}</strong>
+                <span>Daily listening limit</span>
+              </div>
+            </div>
+            <button
+              className="secondary-button"
+              onClick={() => setTab("tokens")}
+              type="button"
+            >
+              <WalletCards size={15} /> Open Token Economy
+            </button>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Phase 5</span>
+            <h3>Discovery controls</h3>
+            <p>
+              Manage Spotlight, Top 10, Featured Songs, Featured Artists, and
+              discovery module visibility from the existing discovery tools.
+            </p>
+            <div className="control-actions">
+              <button
+                className="secondary-button"
+                onClick={() => setTab("discovery")}
+                type="button"
+              >
+                <Sparkles size={15} /> Discovery Modules
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() => setTab("content")}
+                type="button"
+              >
+                <Music2 size={15} /> Content Manager
+              </button>
+            </div>
+          </article>
+
+          <article className="control-card">
+            <span className="eyebrow">Phase 7</span>
+            <h3>Safety controls</h3>
+            <p>
+              Every Builder change remains a draft until published. Snapshots,
+              import/export, preview mode, reset, and restore are already active.
+            </p>
+            <div className="control-actions">
+              <button
+                className="secondary-button"
+                onClick={() => setTab("overview")}
+                type="button"
+              >
+                <Eye size={15} /> Preview / Publish
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() => setTab("history")}
+                type="button"
+              >
+                <History size={15} /> Snapshots
+              </button>
             </div>
           </article>
         </div>
@@ -2812,61 +3181,7 @@ export function SuperAdminControlCenter({
               ))}
             </select>
           </label>
-          <div className="control-module-list">
-            {config.homepage.order.map((module, index) => (
-              <article
-                data-owner-dnd="homepage-module"
-                draggable
-                key={module}
-                onDragOver={(event) => event.preventDefault()}
-                onDragStart={() => setDraggedModule(module)}
-                onDrop={() => dropModule(module)}
-              >
-                <Blocks size={17} />
-                <div>
-                  <strong>{homepageModuleLabels[module]}</strong>
-                  <small>Position {index + 1}</small>
-                </div>
-                <button
-                  aria-label={`Move ${homepageModuleLabels[module]} up`}
-                  disabled={index === 0}
-                  onClick={() => moveModule(module, -1)}
-                  type="button"
-                >
-                  <ArrowUp size={15} />
-                </button>
-                <button
-                  aria-label={`Move ${homepageModuleLabels[module]} down`}
-                  disabled={index === config.homepage.order.length - 1}
-                  onClick={() => moveModule(module, 1)}
-                  type="button"
-                >
-                  <ArrowDown size={15} />
-                </button>
-                <label className="control-switch">
-                  <input
-                    checked={config.homepage.visibility[module]}
-                    onChange={(event) =>
-                      setConfig((current) => ({
-                        ...current,
-                        homepage: {
-                          ...current.homepage,
-                          visibility: {
-                            ...current.homepage.visibility,
-                            [module]: event.target.checked,
-                          },
-                        },
-                      }))
-                    }
-                    type="checkbox"
-                  />
-                  <span>
-                    {config.homepage.visibility[module] ? "Visible" : "Hidden"}
-                  </span>
-                </label>
-              </article>
-            ))}
-          </div>
+          {renderHomepageModuleList()}
         </article>
       )}
 

@@ -20,6 +20,30 @@ export const homepageModuleLabels = {
 
 export type HomepageModuleKey = keyof typeof homepageModuleLabels;
 
+export const homepageCopyLocales = ["en", "es"] as const;
+
+export type HomepageCopyLocale = (typeof homepageCopyLocales)[number];
+
+export const homepageCopyFieldLabels = {
+  welcomeHeadline: "Welcome headline",
+  welcomeDescription: "Welcome description",
+  creatorHeadline: "Creator headline",
+  creatorDescription: "Creator description",
+  heroLabel: "Beta label",
+  heroHeadline: "Main headline",
+  heroDescription: "Main description",
+  founderAnnouncementTitle: "Founder announcement title",
+  founderAnnouncementBody: "Founder announcement message",
+  betaMessage: "Beta message",
+} as const;
+
+export type HomepageCopyField = keyof typeof homepageCopyFieldLabels;
+
+export type HomepageCopyConfig = Record<
+  HomepageCopyLocale,
+  Record<HomepageCopyField, string>
+>;
+
 export const uiComponentLabels = {
   artistProfileButton: "Artist Profile Button",
   likeButton: "Like Button",
@@ -201,6 +225,7 @@ export type PlatformControlConfig = {
   homepage: {
     order: HomepageModuleKey[];
     visibility: Record<HomepageModuleKey, boolean>;
+    copy: HomepageCopyConfig;
     firstVisibleSection:
       | "review_queue"
       | "spotlight"
@@ -568,6 +593,39 @@ const moduleOrder = Object.keys(
   homepageModuleLabels,
 ) as HomepageModuleKey[];
 
+export const defaultHomepageCopyConfig: HomepageCopyConfig = {
+  en: {
+    welcomeHeadline: "Listen to music. Discover artists. Support creators.",
+    welcomeDescription: "No registration is required to listen. Always free.",
+    creatorHeadline: "Submit music. Earn tokens. Receive real listens.",
+    creatorDescription: "Grow your audience with a free creator account.",
+    heroLabel: "Public beta now open",
+    heroHeadline: "Real Listeners. Real Viewers. Real Reactions.",
+    heroDescription:
+      "Get your first listens, views and engagement from real people before spending money on promotion. Because every creator deserves a fair first chance.",
+    founderAnnouncementTitle:
+      "Become one of the first 50 Founding Artists.",
+    founderAnnouncementBody:
+      "Claim a permanent Founder badge, three free song submissions, early access to features, one free year of Premium, and permanent Founding Member recognition.",
+    betaMessage: "First Listen is live in public beta.",
+  },
+  es: {
+    welcomeHeadline: "Escucha música. Descubre artistas. Apoya creadores.",
+    welcomeDescription: "No necesitas registrarte para escuchar. Siempre gratis.",
+    creatorHeadline: "Sube contenido. Gana tokens. Recibe reproducciones reales.",
+    creatorDescription: "Haz crecer tu audiencia con una cuenta gratuita.",
+    heroLabel: "Beta pública abierta",
+    heroHeadline: "Oyentes reales. Vistas reales. Reacciones reales.",
+    heroDescription:
+      "Obtén tus primeras reproducciones, vistas e interacción de personas reales antes de gastar dinero en promoción. Porque cada creador merece una primera oportunidad justa.",
+    founderAnnouncementTitle:
+      "Sé uno de los primeros 50 Artistas Fundadores.",
+    founderAnnouncementBody:
+      "Obtén insignia Founder permanente, tres envíos gratis, acceso temprano, un año gratis de Premium y reconocimiento permanente como miembro fundador.",
+    betaMessage: "First Listen está activo en beta pública.",
+  },
+};
+
 const uiComponentKeys = Object.keys(uiComponentLabels) as UiComponentKey[];
 const cardDensityKeys = Object.keys(cardDensityLabels) as CardDensityKey[];
 
@@ -695,6 +753,7 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
     visibility: Object.fromEntries(
       moduleOrder.map((module) => [module, true]),
     ) as Record<HomepageModuleKey, boolean>,
+    copy: defaultHomepageCopyConfig,
     firstVisibleSection: "review_queue",
     reviewLayoutDensity: "standard",
     actionButtonLayout: {
@@ -1165,6 +1224,13 @@ export function normalizePlatformControlConfig(
     homepage: {
       ...merged.homepage,
       order,
+      copy: mergeConfig(
+        defaultPlatformControlConfig.homepage.copy as unknown as Record<
+          string,
+          unknown
+        >,
+        (merged.homepage.copy ?? {}) as unknown as Record<string, unknown>,
+      ) as unknown as HomepageCopyConfig,
       visibility: {
         ...defaultPlatformControlConfig.homepage.visibility,
         ...merged.homepage.visibility,

@@ -26,10 +26,15 @@ import { Logo } from "@/components/logo";
 import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import { growthStages, type InterfaceLocale } from "@/lib/catalog";
 import { getCopy } from "@/lib/i18n";
+import type {
+  HomepageCopyField,
+  PlatformControlConfig,
+} from "@/lib/platform-control";
 
 type PublicLandingProps = {
   founderRemaining: number;
   locale: InterfaceLocale;
+  platformConfig?: PlatformControlConfig | null;
   onLocaleChange: (locale: InterfaceLocale) => void;
   onGuest: () => void;
   onLogin: () => void;
@@ -43,6 +48,7 @@ const benefitIcons = [BadgeCheck, Music2, Sparkles, Crown, Star];
 export function PublicLanding({
   founderRemaining,
   locale,
+  platformConfig,
   onLocaleChange,
   onGuest,
   onLogin,
@@ -50,6 +56,9 @@ export function PublicLanding({
   onJoinWaitlist,
 }: PublicLandingProps) {
   const copy = getCopy(locale);
+  const controlledCopy = platformConfig?.homepage.copy?.[locale];
+  const managedText = (field: HomepageCopyField, fallback: string) =>
+    controlledCopy?.[field]?.trim() || fallback;
   const [email, setEmail] = useState("");
   const [joined, setJoined] = useState(false);
   const [openFaq, setOpenFaq] = useState(0);
@@ -72,11 +81,21 @@ export function PublicLanding({
       >
         <article className="landing-path-card guest-path-card">
           <span className="eyebrow"><Headphones size={14} /> {locale === "es" ? "Visita para escuchar" : "Guest Listener"}</span>
-          <h1>{locale === "es" ? "Escucha música. Descubre artistas. Apoya creadores." : "Listen to music. Discover artists. Support creators."}</h1>
+          <h1>
+            {managedText(
+              "welcomeHeadline",
+              locale === "es"
+                ? "Escucha música. Descubre artistas. Apoya creadores."
+                : "Listen to music. Discover artists. Support creators.",
+            )}
+          </h1>
           <p>
-            {locale === "es"
-              ? "No necesitas registrarte para escuchar. Siempre gratis."
-              : "No registration is required to listen. Always free."}
+            {managedText(
+              "welcomeDescription",
+              locale === "es"
+                ? "No necesitas registrarte para escuchar. Siempre gratis."
+                : "No registration is required to listen. Always free.",
+            )}
           </p>
           <ul>
             <li><Check size={14} /> {locale === "es" ? "Elige un nickname comunitario" : "Choose a community nickname"}</li>
@@ -91,11 +110,21 @@ export function PublicLanding({
 
         <article className="landing-path-card join-path-card">
           <span className="eyebrow"><Music2 size={14} /> {locale === "es" ? "Comparte tu música" : "Creator Account"}</span>
-          <h2>{locale === "es" ? "Sube contenido. Gana tokens. Recibe escuchas reales." : "Submit music. Earn tokens. Receive real listens."}</h2>
+          <h2>
+            {managedText(
+              "creatorHeadline",
+              locale === "es"
+                ? "Sube contenido. Gana tokens. Recibe reproducciones reales."
+                : "Submit music. Earn tokens. Receive real listens.",
+            )}
+          </h2>
           <p>
-            {locale === "es"
-              ? "Haz crecer tu audiencia con una cuenta gratuita."
-              : "Grow your audience with a free creator account."}
+            {managedText(
+              "creatorDescription",
+              locale === "es"
+                ? "Haz crecer tu audiencia con una cuenta gratuita."
+                : "Grow your audience with a free creator account.",
+            )}
           </p>
           <ul>
             <li><Check size={14} /> {locale === "es" ? "Envía canciones para recibir feedback" : "Submit songs for honest feedback"}</li>
@@ -159,8 +188,18 @@ export function PublicLanding({
             <span className="founder-label">
               <BadgeCheck size={14} /> {copy.landing.founderTop.eyebrow}
             </span>
-            <h1>{copy.landing.founderTop.title}</h1>
-            <p>{copy.landing.founderTop.body}</p>
+            <h1>
+              {managedText(
+                "founderAnnouncementTitle",
+                copy.landing.founderTop.title,
+              )}
+            </h1>
+            <p>
+              {managedText(
+                "founderAnnouncementBody",
+                copy.landing.founderTop.body,
+              )}
+            </p>
             <div className="founder-benefits">
               {copy.landing.founder.benefits.map((benefit, index) => {
                 const Icon = benefitIcons[index];
@@ -202,9 +241,16 @@ export function PublicLanding({
 
         <section className="landing-hero">
           <div className="landing-hero-copy">
-            <div className="launch-label"><i /> {copy.landing.hero.label}</div>
-            <h2>{copy.landing.hero.headline}</h2>
-            <p>{copy.landing.hero.subheadline}</p>
+            <div className="launch-label">
+              <i /> {managedText("heroLabel", copy.landing.hero.label)}
+            </div>
+            <h2>{managedText("heroHeadline", copy.landing.hero.headline)}</h2>
+            <p>{managedText("heroDescription", copy.landing.hero.subheadline)}</p>
+            {managedText("betaMessage", "") && (
+              <small className="landing-founder-message">
+                {managedText("betaMessage", "")}
+              </small>
+            )}
             <div className="hero-actions">
               <button className="landing-primary" onClick={onSignUp}>
                 {copy.landing.hero.primary} <ArrowRight size={17} />

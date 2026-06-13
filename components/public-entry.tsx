@@ -4,12 +4,18 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PublicLanding } from "@/components/public-landing";
 import type { InterfaceLocale } from "@/lib/catalog";
+import {
+  mapPlatformControlState,
+  type PlatformControlConfig,
+} from "@/lib/platform-control";
 import { createClient } from "@/lib/supabase/client";
 
 export function PublicEntry({ initialFounderRemaining }: { initialFounderRemaining: number }) {
   const router = useRouter();
   const [founderRemaining, setFounderRemaining] = useState(initialFounderRemaining);
   const [locale, setLocale] = useState<InterfaceLocale>("en");
+  const [platformConfig, setPlatformConfig] =
+    useState<PlatformControlConfig | null>(null);
 
   useEffect(() => {
     const storedLocale = window.localStorage.getItem("first-listen-locale");
@@ -30,7 +36,13 @@ export function PublicEntry({ initialFounderRemaining }: { initialFounderRemaini
       if (data) setFounderRemaining(Math.max(0, data.capacity - data.claimed_count));
     };
 
+    const loadPlatformRuntime = async () => {
+      const { data, error } = await supabase.rpc("get_platform_runtime");
+      if (!error) setPlatformConfig(mapPlatformControlState(data).config);
+    };
+
     void loadFounderCount();
+    void loadPlatformRuntime();
     const channel = supabase
       .channel("founder-program-count")
       .on(
@@ -62,6 +74,7 @@ export function PublicEntry({ initialFounderRemaining }: { initialFounderRemaini
     <PublicLanding
       founderRemaining={founderRemaining}
       locale={locale}
+      platformConfig={platformConfig}
       onJoinWaitlist={joinWaitlist}
       onGuest={() => router.push("/guest")}
       onLocaleChange={changeLocale}
