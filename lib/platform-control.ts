@@ -69,7 +69,14 @@ export type PlatformResolutionProvider =
   | "spotify"
   | "apple_music"
   | "tiktok"
-  | "soundcloud";
+  | "soundcloud"
+  | "amazon_music"
+  | "deezer"
+  | "facebook_video"
+  | "instagram"
+  | "other";
+
+export type PlatformPresenceIconSize = "compact" | "standard" | "large";
 
 export type UiResponsiveSize = {
   iconSize: UiSizePreset;
@@ -321,6 +328,11 @@ export type PlatformControlConfig = {
       showPlatformRecommendations: boolean;
       showSecondaryPlatforms: boolean;
       allowCreatorVerifiedLinks: boolean;
+    };
+    platformPresence: {
+      enabled: boolean;
+      iconSize: PlatformPresenceIconSize;
+      platformOrder: PlatformResolutionProvider[];
     };
     externalDiscovery: {
       showExternalSongs: boolean;
@@ -772,8 +784,8 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
       userSkipExternalDefault: false,
     },
     platformResolution: {
-      engineMode: "basic",
-      recommendationMode: "recommend",
+      engineMode: "off",
+      recommendationMode: "off",
       preferredPlatformOrder: [
         "youtube_music",
         "youtube",
@@ -781,10 +793,32 @@ export const defaultPlatformControlConfig: PlatformControlConfig = {
         "apple_music",
         "tiktok",
         "soundcloud",
+        "amazon_music",
+        "deezer",
+        "facebook_video",
+        "instagram",
+        "other",
       ],
-      showPlatformRecommendations: true,
+      showPlatformRecommendations: false,
       showSecondaryPlatforms: true,
       allowCreatorVerifiedLinks: true,
+    },
+    platformPresence: {
+      enabled: true,
+      iconSize: "compact",
+      platformOrder: [
+        "youtube_music",
+        "youtube",
+        "spotify",
+        "apple_music",
+        "tiktok",
+        "soundcloud",
+        "amazon_music",
+        "deezer",
+        "facebook_video",
+        "instagram",
+        "other",
+      ],
     },
     externalDiscovery: {
       showExternalSongs: true,

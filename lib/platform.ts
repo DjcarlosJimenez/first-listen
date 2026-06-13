@@ -145,6 +145,70 @@ export function detectMusicPlatform(rawUrl: string): PlatformDetection {
     }
 
     if (
+      host === "music.amazon.com" ||
+      host.endsWith(".music.amazon.com") ||
+      host === "amazon.com" ||
+      host.endsWith(".amazon.com")
+    ) {
+      const valid =
+        normalizedPath.includes("/albums/") ||
+        normalizedPath.includes("/tracks/") ||
+        normalizedPath.includes("/music/");
+      return {
+        platform: "Amazon Music",
+        valid,
+        message: valid
+          ? "Amazon Music link detected."
+          : "Use a public Amazon Music song link.",
+        parsedUrl: valid ? url.toString() : null,
+        resourceId: valid ? path.split("/").filter(Boolean).at(-1) ?? null : null,
+        resourceType: valid ? "track" : null,
+      };
+    }
+
+    if (host === "deezer.com" || host.endsWith(".deezer.com")) {
+      const parts = path.split("/").filter(Boolean);
+      const valid = normalizedPath.includes("/track/") && parts.length >= 2;
+      return {
+        platform: "Deezer",
+        valid,
+        message: valid ? "Deezer track detected." : "Use a public Deezer track link.",
+        parsedUrl: valid ? url.toString() : null,
+        resourceId: valid ? parts.at(-1) ?? null : null,
+        resourceType: valid ? "track" : null,
+      };
+    }
+
+    if (host === "facebook.com" || host.endsWith(".facebook.com") || host === "fb.watch") {
+      const valid = host === "fb.watch" || normalizedPath.includes("/videos/");
+      return {
+        platform: "Facebook Video",
+        valid,
+        message: valid
+          ? "Facebook video detected."
+          : "Use a public Facebook video link.",
+        parsedUrl: valid ? url.toString() : null,
+        resourceId: valid ? path.split("/").filter(Boolean).at(-1) ?? null : null,
+        resourceType: valid ? "video" : null,
+      };
+    }
+
+    if (host === "instagram.com" || host.endsWith(".instagram.com")) {
+      const parts = path.split("/").filter(Boolean);
+      const valid = ["p", "reel", "tv"].includes(parts[0]?.toLowerCase() ?? "") && parts.length >= 2;
+      return {
+        platform: "Instagram",
+        valid,
+        message: valid
+          ? "Instagram media detected."
+          : "Use a public Instagram post or reel link.",
+        parsedUrl: valid ? url.toString() : null,
+        resourceId: valid ? parts[1] ?? null : null,
+        resourceType: valid ? "video" : null,
+      };
+    }
+
+    if (
       host === "tiktok.com" ||
       host === "m.tiktok.com" ||
       host === "vm.tiktok.com" ||
@@ -173,13 +237,14 @@ export function detectMusicPlatform(rawUrl: string): PlatformDetection {
     }
 
     return {
-      platform: null,
-      valid: false,
-      message: "This link is not from a supported music platform.",
-      parsedUrl: null,
-      resourceId: null,
-      resourceType: null,
+      platform: "Other",
+      valid: true,
+      message: "External platform link detected.",
+      parsedUrl: url.toString(),
+      resourceId: url.hostname,
+      resourceType: "track",
     };
+
   } catch {
     return {
       platform: null,

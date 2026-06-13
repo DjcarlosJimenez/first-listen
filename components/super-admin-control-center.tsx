@@ -451,6 +451,20 @@ const platformResolutionProviderLabels: Record<
   apple_music: "Apple Music",
   tiktok: "TikTok",
   soundcloud: "SoundCloud",
+  amazon_music: "Amazon Music",
+  deezer: "Deezer",
+  facebook_video: "Facebook Video",
+  instagram: "Instagram",
+  other: "Other",
+};
+
+const platformPresenceIconSizeLabels: Record<
+  PlatformControlConfig["discovery"]["platformPresence"]["iconSize"],
+  string
+> = {
+  compact: "Compact",
+  standard: "Standard",
+  large: "Large",
 };
 
 const artistVisibilityLabels: Record<
@@ -3192,6 +3206,95 @@ export function SuperAdminControlCenter({
                               preferredPlatformOrder:
                                 current.discovery.platformResolution
                                   .preferredPlatformOrder.map((item, itemIndex) =>
+                                    itemIndex === index
+                                      ? (event.target
+                                          .value as typeof provider)
+                                      : item,
+                                  ),
+                            },
+                          },
+                        }))
+                      }
+                      value={provider}
+                    >
+                      {Object.entries(platformResolutionProviderLabels).map(
+                        ([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                ),
+              )}
+            </div>
+            <div className="control-divider" />
+            <span className="eyebrow">Platform Presence Manager</span>
+            <div className="control-toggle-grid">
+              <label>
+                <input
+                  checked={config.discovery.platformPresence.enabled}
+                  onChange={(event) =>
+                    setConfig((current) => ({
+                      ...current,
+                      discovery: {
+                        ...current.discovery,
+                        platformPresence: {
+                          ...current.discovery.platformPresence,
+                          enabled: event.target.checked,
+                        },
+                      },
+                    }))
+                  }
+                  type="checkbox"
+                />
+                Enable Platform Presence Manager
+              </label>
+            </div>
+            <label>
+              Platform icon size
+              <select
+                onChange={(event) =>
+                  setConfig((current) => ({
+                    ...current,
+                    discovery: {
+                      ...current.discovery,
+                      platformPresence: {
+                        ...current.discovery.platformPresence,
+                        iconSize: event.target
+                          .value as PlatformControlConfig["discovery"]["platformPresence"]["iconSize"],
+                      },
+                    },
+                  }))
+                }
+                value={config.discovery.platformPresence.iconSize}
+              >
+                {Object.entries(platformPresenceIconSizeLabels).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+            <div className="control-mini-grid">
+              {config.discovery.platformPresence.platformOrder.map(
+                (provider, index) => (
+                  <label key={`presence-platform-order-${index}`}>
+                    Destination #{index + 1}
+                    <select
+                      onChange={(event) =>
+                        setConfig((current) => ({
+                          ...current,
+                          discovery: {
+                            ...current.discovery,
+                            platformPresence: {
+                              ...current.discovery.platformPresence,
+                              platformOrder:
+                                current.discovery.platformPresence
+                                  .platformOrder.map((item, itemIndex) =>
                                     itemIndex === index
                                       ? (event.target
                                           .value as typeof provider)

@@ -97,8 +97,10 @@ import {
   contentClassificationLabel,
   databasePlatform,
   economySettingFor,
+  isPrimaryPlatform,
   isExternalPlatform,
   nextEconomyActivation,
+  primaryPlatforms,
   submissionTokenCost,
 } from "@/lib/content-economy";
 import { safeCoverUrl } from "@/lib/media";
@@ -118,6 +120,7 @@ import type {
   FollowedArtist,
   ListeningBankStatus,
   Platform,
+  PrimaryPlatform,
   Review,
   Song,
   SongPlatformLink,
@@ -174,6 +177,17 @@ type PlatformLinkRow = {
   confidence_score?: number;
 };
 
+type PlatformPresenceResult = {
+  platform?: string;
+  music_url?: string;
+  platform_links?: PlatformLinkRow[];
+};
+
+type PlatformManagedSong = Pick<
+  Song,
+  "id" | "link" | "platform" | "platformLinks" | "title"
+>;
+
 function mergePlatformLink(
   links: SongPlatformLink[] | undefined,
   nextLink: SongPlatformLink,
@@ -204,7 +218,7 @@ type SongSubmission = {
   artistName: string;
   coverImageUrl: string;
   musicUrl: string;
-  platform: Platform;
+  platform: PrimaryPlatform;
   genre: Genre;
   language: SongLanguage;
   feedbackFocus: FeedbackFocus[];
@@ -380,6 +394,11 @@ function translatedPlatformMessage(
   if (platform === "YouTube Music") return "Usa un enlace watch de YouTube Music.";
   if (platform === "SoundCloud") return "Usa un enlace público de SoundCloud.";
   if (platform === "TikTok") return "Usa un enlace público directo de TikTok.";
+  if (platform === "Amazon Music") return "Usa un enlace público de Amazon Music.";
+  if (platform === "Deezer") return "Usa un enlace público de Deezer.";
+  if (platform === "Facebook Video") return "Usa un enlace público de Facebook Video.";
+  if (platform === "Instagram") return "Usa un enlace público de Instagram.";
+  if (platform === "Other") return "Usa un enlace público https://.";
   return "Este enlace no pertenece a una plataforma compatible.";
 }
 
@@ -405,7 +424,67 @@ function PlatformIcon({
   if (platform === "TikTok") {
     return <Clapperboard size={size} />;
   }
+  if (platform === "Amazon Music" || platform === "Deezer") {
+    return <Radio size={size} />;
+  }
+  if (platform === "Facebook Video" || platform === "Instagram") {
+    return <Clapperboard size={size} />;
+  }
   return <Music2 size={size} />;
+}
+
+function platformPresenceIconSize() {
+  if (typeof document === "undefined") return 14;
+  const size = document.documentElement.dataset.platformPresenceIconSize;
+  if (size === "large") return 18;
+  if (size === "standard") return 16;
+  return 14;
+}
+
+function sortPlatformPresenceLinks(links: SongPlatformLink[]) {
+  if (typeof document === "undefined") return sortPlatformLinks(links);
+  const order = document.documentElement.dataset.platformPresenceOrder
+    ?.split(",")
+    .filter(Boolean);
+  if (!order?.length) return sortPlatformLinks(links);
+  return [...links].sort((left, right) => {
+    const leftIndex = order.indexOf(databasePlatform[left.platform]);
+    const rightIndex = order.indexOf(databasePlatform[right.platform]);
+    return (
+      (leftIndex === -1 ? 99 : leftIndex) -
+        (rightIndex === -1 ? 99 : rightIndex) ||
+      Number(right.primary) - Number(left.primary) ||
+      right.confidenceScore - left.confidenceScore
+    );
+  });
+}
+
+function PlatformPresenceIconRow({
+  links,
+  songId,
+}: {
+  links: SongPlatformLink[];
+  songId: string;
+}) {
+  const iconSize = platformPresenceIconSize();
+  return (
+    <div className="platform-presence-row">
+      {sortPlatformPresenceLinks(links).map((link) => (
+        <a
+          aria-label={`Open ${link.platform}`}
+          data-ui-component="openPlatformButton"
+          href={link.url}
+          key={`${songId}-presence-${link.platform}`}
+          rel="noreferrer"
+          target="_blank"
+          title={link.platform}
+        >
+          <PlatformIcon platform={link.platform} size={iconSize} />
+          <span className="sr-only">{link.platform}</span>
+        </a>
+      ))}
+    </div>
+  );
 }
 
 function ProviderClassificationBadge({
@@ -683,6 +762,7 @@ function Topbar({
   onMenu,
   onLogout,
   onHelp,
+  onProfile,
   darkMode,
   onToggleTheme,
   copy,
@@ -693,6 +773,7 @@ function Topbar({
   onMenu: () => void;
   onLogout: () => void;
   onHelp: () => void;
+  onProfile: () => void;
   darkMode: boolean;
   onToggleTheme: () => void;
   copy: Copy;
@@ -726,9 +807,17 @@ function Topbar({
       </div>
       <div className="topbar-actions">
         <LanguageSelector compact locale={locale} onChange={onLocaleChange} />
+        <button
+          className="topbar-profile-link"
+          data-ui-component="headerProfileShortcut"
+          onClick={onProfile}
+          type="button"
+        >
+          <UserRound size={15} />
+          <span>{locale === "es" ? "Mi Perfil" : "My Profile"}</span>
+        </button>
         <PwaInstallButton compact locale={locale} />
         <span className="app-status-pill">{copy.common.publicBeta}</span>
-        <span className="app-founder-pill"><i /> {copy.common.founderActive}</span>
         <button
           className="help-button"
           onClick={onToggleTheme}
@@ -903,36 +992,18 @@ function PostReviewDiscovery({
           </small>
         </div>
       </section>
-      {resolvedLinks.length > 0 && (
+      {validListenRecorded && resolvedLinks.length > 1 && (
         <section className="platform-recommendation-card">
           <span className="eyebrow">
             <Globe2 size={13} />
-            {spanish ? "También disponible en" : "Also Available On"}
+            {spanish ? "Disponible en:" : "Available On:"}
           </span>
           <p>
-            {validListenRecorded
-              ? spanish
-                ? "Tu escucha valida desbloqueo las opciones externas conocidas."
-                : "Your valid listen unlocked the known external listening options."
-              : spanish
-                ? "Estas opciones vienen de enlaces enviados o coincidencias inferidas."
-                : "These options come from submitted links or safe inferred matches."}
+            {spanish
+              ? "Enlaces agregados por el artista. No crean sesiones de reproducción adicionales."
+              : "Artist-added destinations. They do not create extra playback sessions."}
           </p>
-          <div className="platform-chip-row">
-            {resolvedLinks.map((link) => (
-              <a
-                data-ui-component="openPlatformButton"
-                href={link.url}
-                key={`${song.id}-${link.platform}`}
-                rel="noreferrer"
-                target="_blank"
-              >
-                <PlatformIcon platform={link.platform} size={14} />
-                {link.platform}
-                {!link.primary && <small>{link.resolutionSource}</small>}
-              </a>
-            ))}
-          </div>
+          <PlatformPresenceIconRow links={resolvedLinks} songId={song.id} />
         </section>
       )}
       <div className="discovery-links">
@@ -1871,6 +1942,12 @@ function ReviewView({
   }
 
   const currentPlatformLinks = getPrimaryPlatformLinks(song);
+  const platformPresenceUnlocked =
+    listeningSession.validListenRecorded ||
+    (listeningSession.playbackDurationSeconds > 0 &&
+      listeningSession.verifiedSeconds /
+        Math.max(1, listeningSession.playbackDurationSeconds) >=
+        0.5);
 
   return (
     <>
@@ -1926,8 +2003,8 @@ function ReviewView({
                     ? "Plataforma externa"
                     : "External platform"
                   : locale === "es"
-                    ? "Reproductor oficial"
-                  : "Provider player"}
+                    ? `Reproduciendo desde: ${song.platform}`
+                  : `Playing From: ${song.platform}`}
               </span>
             </div>
             <SongActionBar
@@ -2014,30 +2091,17 @@ function ReviewView({
               )}
             </div>
             )}
-            {listeningSession.validListenRecorded &&
+            {platformPresenceUnlocked &&
               currentPlatformLinks.length > 1 && (
                 <section className="platform-reveal-inline">
                   <span className="eyebrow">
-                    <Globe2 size={13} />
-                    {locale === "es"
-                      ? "También disponible en"
-                      : "Also Available On"}
+                    <Music2 size={13} />
+                    {locale === "es" ? "Disponible en:" : "Available On:"}
                   </span>
-                  <div className="platform-chip-row">
-                    {currentPlatformLinks.map((link) => (
-                      <a
-                        data-ui-component="openPlatformButton"
-                        href={link.url}
-                        key={`${song.id}-${link.platform}`}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        <PlatformIcon platform={link.platform} size={14} />
-                        {link.platform}
-                        {!link.primary && <small>{link.resolutionSource}</small>}
-                      </a>
-                    ))}
-                  </div>
+                  <PlatformPresenceIconRow
+                    links={currentPlatformLinks}
+                    songId={song.id}
+                  />
                 </section>
               )}
             <div className="continuous-listening-controls">
@@ -3188,23 +3252,9 @@ function DiscoverySongCard({
         <section className="platform-reveal-inline">
           <span className="eyebrow">
             <Globe2 size={13} />
-            {spanish ? "También disponible en" : "Also Available On"}
+            {spanish ? "Disponible en:" : "Available On:"}
           </span>
-          <div className="platform-chip-row">
-            {platformLinks.map((link) => (
-              <a
-                data-ui-component="openPlatformButton"
-                href={link.url}
-                key={`${song.id}-${link.platform}`}
-                rel="noreferrer"
-                target="_blank"
-              >
-                <PlatformIcon platform={link.platform} size={14} />
-                {link.platform}
-                {!link.primary && <small>{link.resolutionSource}</small>}
-              </a>
-            ))}
-          </div>
+          <PlatformPresenceIconRow links={platformLinks} songId={song.id} />
         </section>
       )}
       {details && (
@@ -3551,14 +3601,23 @@ function CommunityProgramsPanel({
   );
 }
 
-function VerifiedPlatformLinksPanel({
+function PlatformPresenceManagerPanel({
   locale,
-  onSaved,
+  onLinkSaved,
+  onLinkRemoved,
+  onPrimaryChanged,
   song,
 }: {
   locale: InterfaceLocale;
-  onSaved: (songId: string, link: SongPlatformLink) => void;
-  song: Song;
+  onLinkSaved: (songId: string, link: SongPlatformLink) => void;
+  onLinkRemoved: (songId: string, platform: Platform) => void;
+  onPrimaryChanged: (
+    songId: string,
+    platform: PrimaryPlatform,
+    url: string,
+    links: SongPlatformLink[],
+  ) => void;
+  song: PlatformManagedSong;
 }) {
   const spanish = locale === "es";
   const [targetPlatform, setTargetPlatform] = useState<Platform>(
@@ -3575,7 +3634,8 @@ function VerifiedPlatformLinksPanel({
   const detection = detectMusicPlatform(url);
   const selectedMatches =
     !url.trim() ||
-    (detection.valid && detection.platform === targetPlatform);
+    (detection.valid &&
+      (targetPlatform === "Other" || detection.platform === targetPlatform));
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -3606,12 +3666,12 @@ function VerifiedPlatformLinksPanel({
 
     setSaving(true);
     const { data, error } = await supabase.rpc(
-      "upsert_verified_song_platform_link",
+      "upsert_song_platform_presence_link",
       {
         target_song_id: song.id,
         target_platform: databasePlatform[targetPlatform],
         target_music_url: url.trim(),
-        verification_note: note.trim() || null,
+        presence_note: note.trim() || null,
       },
     );
     setSaving(false);
@@ -3626,7 +3686,7 @@ function VerifiedPlatformLinksPanel({
       allPlatforms.find(
         (platform) => databasePlatform[platform] === String(row.platform),
       ) ?? targetPlatform;
-    onSaved(song.id, {
+    onLinkSaved(song.id, {
       platform: savedPlatform,
       url: String(row.music_url ?? url.trim()),
       primary: Boolean(row.is_primary),
@@ -3642,48 +3702,177 @@ function VerifiedPlatformLinksPanel({
     setNote("");
     setMessage(
       spanish
-        ? "Enlace verificado guardado."
-        : "Verified platform link saved.",
+        ? "Destino de plataforma guardado."
+        : "Platform destination saved.",
+    );
+  };
+
+  const removeLink = async (link: SongPlatformLink) => {
+    setMessage("");
+    const supabase = createClient();
+    if (!supabase) {
+      setMessage(
+        spanish
+          ? "El servicio no esta disponible."
+          : "The service is unavailable.",
+      );
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase.rpc("remove_song_platform_presence_link", {
+      target_song_id: song.id,
+      target_platform: databasePlatform[link.platform],
+    });
+    setSaving(false);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    onLinkRemoved(song.id, link.platform);
+    setMessage(spanish ? "Destino eliminado." : "Destination removed.");
+  };
+
+  const makePrimary = async (link: SongPlatformLink) => {
+    setMessage("");
+    if (!isPrimaryPlatform(link.platform)) {
+      setMessage(
+        spanish
+          ? "Esta plataforma solo puede mostrarse como destino adicional."
+          : "This platform can only be shown as an additional destination.",
+      );
+      return;
+    }
+    const supabase = createClient();
+    if (!supabase) {
+      setMessage(
+        spanish
+          ? "El servicio no esta disponible."
+          : "The service is unavailable.",
+      );
+      return;
+    }
+    setSaving(true);
+    const { data, error } = await supabase.rpc("set_song_primary_platform", {
+      target_song_id: song.id,
+      target_platform: databasePlatform[link.platform],
+    });
+    setSaving(false);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    const result = data as PlatformPresenceResult;
+    const nextPlatform =
+      allPlatforms.find(
+        (platform) => databasePlatform[platform] === String(result.platform),
+      ) ?? link.platform;
+    if (!isPrimaryPlatform(nextPlatform)) {
+      setMessage(
+        spanish
+          ? "La plataforma primaria recibida no es valida."
+          : "The returned primary platform is invalid.",
+      );
+      return;
+    }
+    const nextUrl = String(result.music_url ?? link.url);
+    onPrimaryChanged(
+      song.id,
+      nextPlatform,
+      nextUrl,
+      mapSongPlatformLinks(result.platform_links, nextPlatform, nextUrl),
+    );
+    setMessage(
+      spanish
+        ? `${nextPlatform} ahora es la plataforma primaria.`
+        : `${nextPlatform} is now the primary platform.`,
     );
   };
 
   return (
-    <section className="verified-platform-panel">
+    <section className="verified-platform-panel platform-presence-manager-panel">
       <div className="panel-heading">
         <div>
           <span className="eyebrow">
             <Globe2 size={13} />
-            {spanish ? "También disponible en" : "Also Available On"}
+            {spanish ? "Platform Presence Manager" : "Platform Presence Manager"}
           </span>
           <h3>
             {spanish
-              ? "Agrega enlaces verificados"
-              : "Add verified platform links"}
+              ? "Edita plataformas de la canción"
+              : "Edit song platforms"}
           </h3>
         </div>
         <small>
           {spanish
-            ? "No inventamos coincidencias."
-            : "Only real links are shown."}
+            ? "Una canción, un reproductor, varios destinos."
+            : "One song, one player, multiple destinations."}
         </small>
       </div>
-      <div className="platform-chip-row">
+      <div className="platform-disclaimer-card">
+        <strong>💡 Important</strong>
+        <p>
+          {spanish
+            ? "Las plataformas adicionales deben pertenecer a la misma cancion o video que estas publicando. Puedes agregarlas ahora o despues desde la configuracion de la cancion."
+            : "Additional platforms must belong to the same song or video you are publishing. You can add them now or later from the song settings."}
+        </p>
+      </div>
+      <div className="platform-reminder-card">
+        <strong>💡 Reminder</strong>
+        <p>
+          {spanish
+            ? "La Plataforma Primaria controla la reproduccion usada por First Listen. Las Plataformas Adicionales son solo destinos de descubrimiento y deben corresponder a la misma cancion o video."
+            : "The Primary Platform controls the playback used by First Listen. Additional Platforms are discovery destinations only and must correspond to the same song or video."}
+        </p>
+      </div>
+      <div className="platform-presence-management-list">
         {currentLinks.map((link) => (
-          <a
-            href={link.url}
+          <article
             key={`${song.id}-verified-${link.platform}`}
-            rel="noreferrer"
-            target="_blank"
           >
-            <PlatformIcon platform={link.platform} size={14} />
-            {link.platform}
-            <small>{link.resolutionSource}</small>
-          </a>
+            <span>
+              <PlatformIcon platform={link.platform} size={14} />
+              <strong>{link.platform}</strong>
+              <small>
+                {link.primary
+                  ? spanish
+                    ? "Plataforma primaria"
+                    : "Primary Platform"
+                  : spanish
+                    ? "Destino adicional"
+                    : "Additional Destination"}
+              </small>
+            </span>
+            <div>
+              <a href={link.url} rel="noreferrer" target="_blank">
+                <ExternalLink size={13} />
+                {spanish ? "Abrir" : "Open"}
+              </a>
+              {!link.primary && isPrimaryPlatform(link.platform) && (
+                <button
+                  disabled={saving}
+                  onClick={() => void makePrimary(link)}
+                  type="button"
+                >
+                  {spanish ? "Hacer primaria" : "Make Primary"}
+                </button>
+              )}
+              {!link.primary && (
+                <button
+                  className="danger-lite-button"
+                  disabled={saving}
+                  onClick={() => void removeLink(link)}
+                  type="button"
+                >
+                  {spanish ? "Eliminar" : "Remove"}
+                </button>
+              )}
+            </div>
+          </article>
         ))}
       </div>
       <form className="verified-platform-form" onSubmit={submit}>
         <label>
-          {spanish ? "Plataforma" : "Platform"}
+          {spanish ? "Destino" : "Destination"}
           <select
             onChange={(event) =>
               setTargetPlatform(event.target.value as Platform)
@@ -3698,7 +3887,7 @@ function VerifiedPlatformLinksPanel({
           </select>
         </label>
         <label>
-          {spanish ? "Enlace verificado" : "Verified link"}
+          {spanish ? "Enlace oficial" : "Official link"}
           <input
             onChange={(event) => setUrl(event.target.value)}
             placeholder="https://"
@@ -3724,8 +3913,8 @@ function VerifiedPlatformLinksPanel({
               ? "Guardando..."
               : "Saving..."
             : spanish
-              ? "Guardar enlace"
-              : "Save Link"}
+              ? "Guardar destino"
+              : "Save Destination"}
         </button>
       </form>
       {url.trim() && (
@@ -3764,7 +3953,9 @@ function DashboardView({
   onClaimMission,
   communityPrograms,
   onBoostSong,
-  onVerifiedPlatformLinkSaved,
+  onPlatformPresenceLinkSaved,
+  onPlatformPresenceLinkRemoved,
+  onPrimaryPlatformChanged,
   onListeningCredited,
   externalRedirectNoticeDisabled,
   onExternalRedirectPreferenceChange,
@@ -3790,9 +3981,16 @@ function DashboardView({
   onClaimMission: () => void;
   communityPrograms: CommunityProgram[];
   onBoostSong: (songId: string) => void;
-  onVerifiedPlatformLinkSaved: (
+  onPlatformPresenceLinkSaved: (
     songId: string,
     link: SongPlatformLink,
+  ) => void;
+  onPlatformPresenceLinkRemoved: (songId: string, platform: Platform) => void;
+  onPrimaryPlatformChanged: (
+    songId: string,
+    platform: PrimaryPlatform,
+    url: string,
+    links: SongPlatformLink[],
   ) => void;
   onListeningCredited: (
     seconds: number,
@@ -3803,6 +4001,10 @@ function DashboardView({
   externalRedirectNoticeDisabled: boolean;
   onExternalRedirectPreferenceChange: (disabled: boolean) => void;
 }) {
+  const [managedPlatformSongId, setManagedPlatformSongId] = useState<
+    string | null
+  >(null);
+
   const reviews = songReviews;
   if (!song) {
     return (
@@ -3937,9 +4139,11 @@ function DashboardView({
           </div>
         </div>
 
-        <VerifiedPlatformLinksPanel
+        <PlatformPresenceManagerPanel
           locale={locale}
-          onSaved={onVerifiedPlatformLinkSaved}
+          onLinkRemoved={onPlatformPresenceLinkRemoved}
+          onLinkSaved={onPlatformPresenceLinkSaved}
+          onPrimaryChanged={onPrimaryPlatformChanged}
           song={song}
         />
 
@@ -4032,8 +4236,11 @@ function DashboardView({
             <span>{songSummaries.length} {locale === "es" ? "total" : "total"}</span>
           </div>
           <div className="song-performance-list">
-            {songSummaries.map((summary) => (
-              <article key={summary.id}>
+            {songSummaries.map((summary) => {
+              const platformManagerOpen = managedPlatformSongId === summary.id;
+              return (
+              <div className="song-performance-entry" key={summary.id}>
+              <article>
                 <div className="song-performance-title">
                   <strong>{summary.title}</strong>
                   <small>
@@ -4049,6 +4256,24 @@ function DashboardView({
                 <Link href={`/dashboard/comments?song=${summary.id}`}>
                   {locale === "es" ? "Comentarios" : "Comments"} <ArrowRight size={13} />
                 </Link>
+                <button
+                  className="song-platform-manage-button"
+                  onClick={() =>
+                    setManagedPlatformSongId((current) =>
+                      current === summary.id ? null : summary.id,
+                    )
+                  }
+                  type="button"
+                >
+                  <Globe2 size={13} />
+                  {platformManagerOpen
+                    ? locale === "es"
+                      ? "Cerrar plataformas"
+                      : "Close Platforms"
+                    : locale === "es"
+                      ? "Gestionar plataformas"
+                      : "Manage Platforms"}
+                </button>
                 <button
                   className="song-boost-button"
                   disabled={
@@ -4072,7 +4297,24 @@ function DashboardView({
                         : "Boost Song"}
                 </button>
               </article>
-            ))}
+              {platformManagerOpen && (
+                <PlatformPresenceManagerPanel
+                  locale={locale}
+                  onLinkRemoved={onPlatformPresenceLinkRemoved}
+                  onLinkSaved={onPlatformPresenceLinkSaved}
+                  onPrimaryChanged={onPrimaryPlatformChanged}
+                  song={{
+                    id: summary.id,
+                    link: summary.link,
+                    platform: summary.platform,
+                    platformLinks: summary.platformLinks,
+                    title: summary.title,
+                  }}
+                />
+              )}
+              </div>
+              );
+            })}
           </div>
         </section>
 
@@ -4207,61 +4449,75 @@ function SubmitView({
   >([]);
   const [duplicateWarningAccepted, setDuplicateWarningAccepted] =
     useState(false);
-  const [ignoredRecommendationUrl, setIgnoredRecommendationUrl] =
-    useState<string | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [browserOrigin, setBrowserOrigin] = useState<string>();
+  const [externalGuidanceDismissed, setExternalGuidanceDismissed] =
+    useState(false);
+  const [showDirectPlaybackSetup, setShowDirectPlaybackSetup] =
+    useState(false);
+  const [directPlaybackLink, setDirectPlaybackLink] = useState("");
+  const [externalConfirmationOpen, setExternalConfirmationOpen] =
+    useState(false);
+  const [externalConfirmationAcknowledged, setExternalConfirmationAcknowledged] =
+    useState(false);
   const platformDetection = detectMusicPlatform(musicLink);
-  const requiredTokenCost = platformDetection.platform
-    ? submissionTokenCost(contentEconomy, platformDetection.platform)
+  const primaryPlatformDetected = isPrimaryPlatform(platformDetection.platform)
+    ? platformDetection.platform
+    : null;
+  const directPlaybackDetection = detectMusicPlatform(directPlaybackLink);
+  const directPlaybackPlatform =
+    directPlaybackDetection.valid &&
+    (directPlaybackDetection.platform === "YouTube" ||
+      directPlaybackDetection.platform === "YouTube Music")
+      ? directPlaybackDetection.platform
+      : null;
+  const requiredTokenCost = primaryPlatformDetected
+    ? submissionTokenCost(contentEconomy, primaryPlatformDetected)
     : 1;
+  const externalPrimaryDetected = Boolean(
+    platformDetection.valid &&
+      primaryPlatformDetected &&
+      isExternalPlatform(primaryPlatformDetected),
+  );
+  const youtubeDirectPlaybackDetected =
+    primaryPlatformDetected === "YouTube" ||
+    primaryPlatformDetected === "YouTube Music";
+  const tokenWord = requiredTokenCost === 1 ? "Token" : "Tokens";
+  const currentBalanceLabel = unlimitedCredits
+    ? locale === "es"
+      ? "Ilimitado"
+      : "Unlimited"
+    : `${reviewCount} ${reviewCount === 1 ? "Token" : "Tokens"}`;
+  const balanceAfterPublicationLabel = unlimitedCredits
+    ? locale === "es"
+      ? "Ilimitado"
+      : "Unlimited"
+    : `${Math.max(0, reviewCount - requiredTokenCost)} ${
+        Math.max(0, reviewCount - requiredTokenCost) === 1
+          ? "Token"
+          : "Tokens"
+      }`;
   const unlocked =
     reviewCount >= requiredTokenCost || founderFree || unlimitedCredits;
-  const selectedEconomy = platformDetection.platform
-    ? economySettingFor(contentEconomy, platformDetection.platform)
+  const selectedEconomy = primaryPlatformDetected
+    ? economySettingFor(contentEconomy, primaryPlatformDetected)
     : undefined;
   const providerEmbed =
-    platformDetection.platform && platformDetection.valid
-      ? getProviderEmbed(musicLink, platformDetection.platform, browserOrigin)
+    primaryPlatformDetected && platformDetection.valid
+      ? getProviderEmbed(musicLink, primaryPlatformDetected, browserOrigin)
       : null;
-  const platformMessage = translatedPlatformMessage(
-    locale,
-    musicLink,
-    platformDetection.platform,
-    platformDetection.valid,
-    platformDetection.message,
-  );
-  const platformRecommendation = useMemo(() => {
-    if (
-      !platformDetection.valid ||
-      !platformDetection.resourceId ||
-      !platformDetection.parsedUrl
-    ) {
-      return null;
-    }
-    if (platformDetection.platform === "YouTube Music") {
-      return {
-        platform: "YouTube" as const,
-        url: `https://www.youtube.com/watch?v=${platformDetection.resourceId}`,
-      };
-    }
-    if (platformDetection.platform === "YouTube") {
-      return {
-        platform: "YouTube Music" as const,
-        url: `https://music.youtube.com/watch?v=${platformDetection.resourceId}`,
-      };
-    }
-    return null;
-  }, [
-    platformDetection.parsedUrl,
-    platformDetection.platform,
-    platformDetection.resourceId,
-    platformDetection.valid,
-  ]);
-  const showPlatformRecommendation =
-    platformRecommendation &&
-    ignoredRecommendationUrl !== platformDetection.parsedUrl &&
-    platformRecommendation.platform !== platformDetection.platform;
+  const platformMessage =
+    platformDetection.valid && platformDetection.platform && !primaryPlatformDetected
+      ? locale === "es"
+        ? "Esta plataforma puede agregarse después como destino adicional. Usa una plataforma primaria para el reproductor."
+        : "This platform can be added later as an additional destination. Use a primary platform for playback."
+      : translatedPlatformMessage(
+          locale,
+          musicLink,
+          platformDetection.platform,
+          platformDetection.valid,
+          platformDetection.message,
+        );
   const reportedDurationSeconds =
     Number(durationMinutes || 0) * 60 + Number(durationSeconds || 0);
   const exactDuplicate = duplicateMatches.find((match) => match.exact_match);
@@ -4282,6 +4538,13 @@ function SubmitView({
         locale === "es"
           ? "Usa un enlace valido de una plataforma compatible."
           : "Use a valid link from a supported platform.",
+      );
+    }
+    if (platformDetection.valid && platformDetection.platform && !primaryPlatformDetected) {
+      failures.push(
+        locale === "es"
+          ? "La plataforma primaria debe ser YouTube Music, YouTube, Spotify, Apple Music, TikTok o SoundCloud."
+          : "Primary Platform must be YouTube Music, YouTube, Spotify, Apple Music, TikTok, or SoundCloud.",
       );
     }
     if (!songTitle.trim()) {
@@ -4361,6 +4624,7 @@ function SubmitView({
     locale,
     platformDetection.platform,
     platformDetection.valid,
+    primaryPlatformDetected,
     songLanguage,
     songTitle,
     unlocked,
@@ -4378,7 +4642,15 @@ function SubmitView({
   }, []);
 
   useEffect(() => {
-    if (!platformDetection.valid || !platformDetection.parsedUrl) {
+    setExternalGuidanceDismissed(false);
+    setShowDirectPlaybackSetup(false);
+    setDirectPlaybackLink("");
+    setExternalConfirmationOpen(false);
+    setExternalConfirmationAcknowledged(false);
+  }, [platformDetection.parsedUrl]);
+
+  useEffect(() => {
+    if (!platformDetection.valid || !platformDetection.parsedUrl || !primaryPlatformDetected) {
       setMetadataLoading(false);
       return;
     }
@@ -4413,13 +4685,13 @@ function SubmitView({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [platformDetection.parsedUrl, platformDetection.valid]);
+  }, [platformDetection.parsedUrl, platformDetection.valid, primaryPlatformDetected]);
 
   useEffect(() => {
     setDuplicateWarningAccepted(false);
     if (
       !platformDetection.valid ||
-      !platformDetection.platform ||
+      !primaryPlatformDetected ||
       !musicLink.trim() ||
       songTitle.trim().length < 3
     ) {
@@ -4437,7 +4709,7 @@ function SubmitView({
         "check_song_submission_duplicates",
         {
           song_title: songTitle.trim(),
-          song_platform: databasePlatform[platformDetection.platform!],
+          song_platform: databasePlatform[primaryPlatformDetected],
           song_music_url: musicLink.trim(),
         },
       );
@@ -4456,6 +4728,7 @@ function SubmitView({
     musicLink,
     platformDetection.platform,
     platformDetection.valid,
+    primaryPlatformDetected,
     songTitle,
   ]);
 
@@ -4483,26 +4756,36 @@ function SubmitView({
     duplicateMatches,
   ]);
 
-  const submitSong = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (validationFailures.length > 0 || !platformDetection.platform || !songLanguage || !genre) {
-      console.warn("[First Listen submission] Submission blocked", {
-        validationFailures,
-      });
+  const applyDirectPlaybackLink = () => {
+    if (!directPlaybackPlatform) {
       notify(
         locale === "es"
-          ? "Corrige los campos marcados antes de enviar."
-          : "Fix the listed validation issues before submitting.",
+          ? "Pega un enlace valido de YouTube o YouTube Music."
+          : "Paste a valid YouTube or YouTube Music link.",
       );
       return;
     }
+    setMusicLink(directPlaybackLink.trim());
+    setPlatform(directPlaybackPlatform);
+    setShowDirectPlaybackSetup(false);
+    setExternalConfirmationOpen(false);
+    setExternalConfirmationAcknowledged(false);
+    notify(
+      locale === "es"
+        ? "Reproduccion directa activada."
+        : "Direct playback enabled.",
+    );
+  };
+
+  const publishCurrentSubmission = async () => {
+    if (!primaryPlatformDetected || !songLanguage || !genre) return;
     const submission: SongSubmission = {
       title: songTitle.trim(),
       artistName: artistName.trim(),
       coverImageUrl:
         coverImageUrl.trim() || "https://www.firstlisten.net/covers/default-song.svg",
       musicUrl: musicLink,
-      platform: platformDetection.platform,
+      platform: primaryPlatformDetected,
       genre,
       language: songLanguage,
       feedbackFocus,
@@ -4515,14 +4798,42 @@ function SubmitView({
     setSaving(true);
     const saved = await onSubmitted(founderFree, submission);
     setSaving(false);
-    if (!saved) return;
+    if (!saved) {
+      setExternalConfirmationAcknowledged(false);
+      return;
+    }
 
-    setPlatform(platformDetection.platform);
+    setPlatform(primaryPlatformDetected);
     setSubmittedForApproval(
       reportedDurationSeconds > 480 || contentKind === "long_form",
     );
     setSubmitted(true);
     notify(locale === "es" ? "Canción enviada. Ya entra a la cola de reviews." : "Song submitted. It is now entering the review queue.");
+  };
+
+  const submitSong = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (validationFailures.length > 0 || !primaryPlatformDetected || !songLanguage || !genre) {
+      console.warn("[First Listen submission] Submission blocked", {
+        validationFailures,
+      });
+      notify(
+        locale === "es"
+          ? "Corrige los campos marcados antes de enviar."
+          : "Fix the listed validation issues before submitting.",
+      );
+      return;
+    }
+    if (externalPrimaryDetected && !externalConfirmationAcknowledged) {
+      setExternalConfirmationOpen(true);
+      notify(
+        locale === "es"
+          ? "Confirma el costo de publicacion externa antes de continuar."
+          : "Confirm the external publication cost before continuing.",
+      );
+      return;
+    }
+    await publishCurrentSubmission();
   };
 
   const resetSubmissionForm = () => {
@@ -4544,6 +4855,11 @@ function SubmitView({
     setDuplicateCheckLoading(false);
     setDuplicateMatches([]);
     setDuplicateWarningAccepted(false);
+    setExternalGuidanceDismissed(false);
+    setShowDirectPlaybackSetup(false);
+    setDirectPlaybackLink("");
+    setExternalConfirmationOpen(false);
+    setExternalConfirmationAcknowledged(false);
     setSaving(false);
     setSubmitted(false);
   };
@@ -4678,49 +4994,153 @@ function SubmitView({
             <small className={platformDetection.valid ? "link-valid" : "link-invalid"}>
               {platformMessage}
             </small>
-            {showPlatformRecommendation && platformRecommendation && (
-              <div className="platform-recommendation-card">
-                <span className="eyebrow">
-                  <Star size={13} />
-                  {locale === "es"
-                    ? "Plataforma recomendada encontrada"
-                    : "Recommended Platform Found"}
-                </span>
+          </div>
+
+          {externalPrimaryDetected && primaryPlatformDetected && !externalGuidanceDismissed && (
+            <div className="platform-guidance-card external-only-guidance" role="note">
+              <span className="platform-guidance-title">
+                <Link2 size={16} />
+                🎵 {primaryPlatformDetected} detected
+              </span>
+              <strong>💡 Tip</strong>
+              <p>
+                This song will open outside of First Listen. If this song is
+                also available on YouTube or YouTube Music, you can add it now
+                to enable direct playback inside First Listen and publish for
+                only 1 Token.
+              </p>
+              <div className="platform-guidance-actions">
+                <button
+                  onClick={() => setShowDirectPlaybackSetup(true)}
+                  type="button"
+                >
+                  <Plus size={14} /> Add Platform
+                </button>
+                <button
+                  className="ghost-button"
+                  onClick={() => setExternalGuidanceDismissed(true)}
+                  type="button"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          )}
+
+          {showDirectPlaybackSetup && (
+            <div className="platform-direct-setup-card">
+              <div className="platform-disclaimer-card">
+                <strong>💡 Important</strong>
                 <p>
-                  {locale === "es"
-                    ? `Esta canción también puede abrirse en ${platformRecommendation.platform}. Tu enlace original no cambiará a menos que lo elijas.`
-                    : `This song can also open on ${platformRecommendation.platform}. Your original link will not change unless you choose it.`}
+                  Additional platforms must belong to the same song or video you
+                  are publishing. You can add them now or later from the song
+                  settings.
                 </p>
-                <div className="post-review-choice">
+              </div>
+              <label>
+                YouTube or YouTube Music link
+                <input
+                  onChange={(event) => setDirectPlaybackLink(event.target.value)}
+                  placeholder="https://music.youtube.com/watch?v=..."
+                  type="url"
+                  value={directPlaybackLink}
+                />
+              </label>
+              {directPlaybackLink.trim() && (
+                <small
+                  className={
+                    directPlaybackPlatform ? "link-valid" : "link-invalid"
+                  }
+                >
+                  {directPlaybackPlatform
+                    ? `${directPlaybackPlatform} ready for direct playback.`
+                    : "Paste a valid YouTube or YouTube Music link to enable direct playback."}
+                </small>
+              )}
+              <div className="platform-guidance-actions">
+                <button
+                  disabled={!directPlaybackPlatform}
+                  onClick={applyDirectPlaybackLink}
+                  type="button"
+                >
+                  <Check size={14} /> Use Direct Playback Link
+                </button>
+                <button
+                  className="ghost-button"
+                  onClick={() => setShowDirectPlaybackSetup(false)}
+                  type="button"
+                >
+                  Maybe Later
+                </button>
+              </div>
+            </div>
+          )}
+
+          {youtubeDirectPlaybackDetected && platformDetection.valid && (
+            <div className="platform-guidance-card direct-playback-enabled" role="status">
+              <span className="platform-guidance-title">
+                <CheckCircle2 size={16} />
+                🎉 Direct playback enabled
+              </span>
+              <p>
+                Publication cost: {requiredTokenCost} {tokenWord}
+              </p>
+            </div>
+          )}
+
+          {externalConfirmationOpen && primaryPlatformDetected && (
+            <div className="external-publication-dialog-backdrop">
+              <section
+                aria-labelledby="external-publication-title"
+                aria-modal="true"
+                className="external-publication-dialog"
+                role="dialog"
+              >
+                <span className="eyebrow">
+                  <LockKeyhole size={13} /> Confirm Publication
+                </span>
+                <h3 id="external-publication-title">
+                  ⚠️ Confirm Publication
+                </h3>
+                <p>This song will use external playback.</p>
+                <div className="confirmation-math-grid">
+                  <span>Publication cost:</span>
+                  <strong>
+                    {requiredTokenCost} {tokenWord}
+                  </strong>
+                  <span>Current balance:</span>
+                  <strong>{currentBalanceLabel}</strong>
+                  <span>Balance after publication:</span>
+                  <strong>{balanceAfterPublicationLabel}</strong>
+                </div>
+                <div className="platform-guidance-actions">
                   <button
-                    data-ui-component="openPlatformButton"
+                    className="primary-button"
+                    disabled={saving}
                     onClick={() => {
-                      setMusicLink(platformRecommendation.url);
-                      setPlatform(platformRecommendation.platform);
+                      setExternalConfirmationAcknowledged(true);
+                      setExternalConfirmationOpen(false);
+                      void publishCurrentSubmission();
                     }}
                     type="button"
                   >
-                    <Check size={14} />
-                    {locale === "es"
-                      ? "Usar recomendada"
-                      : "Use Recommended Platform"}
+                    Publish for {requiredTokenCost} {tokenWord}
                   </button>
                   <button
-                    onClick={() =>
-                      setIgnoredRecommendationUrl(
-                        platformDetection.parsedUrl ?? musicLink,
-                      )
-                    }
+                    onClick={() => {
+                      setExternalConfirmationOpen(false);
+                      setExternalGuidanceDismissed(true);
+                      setShowDirectPlaybackSetup(true);
+                    }}
                     type="button"
                   >
-                    {locale === "es"
-                      ? "Mantener original"
-                      : "Keep Original Platform"}
+                    <Plus size={14} /> Add Platform
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
+              </section>
+            </div>
+          )}
+
           <div className="field-grid">
             <div className="field">
               <label htmlFor="song-title">{copy.app.submit.songTitle}</label>
@@ -4928,7 +5348,7 @@ function SubmitView({
           <div className="platform-picker">
             <label>{copy.app.submit.detectedPlatform}</label>
             <div>
-              {allPlatforms.map((item) => (
+              {primaryPlatforms.map((item) => (
                 <button className={platform === item ? "active" : ""} disabled key={item} type="button">
                   {platform === item ? <Check size={14} /> : <PlatformIcon platform={item} size={14} />}
                   <span>
@@ -5784,7 +6204,7 @@ export function FirstListenApp({
     );
   };
 
-  const handleVerifiedPlatformLinkSaved = (
+  const handlePlatformPresenceLinkSaved = (
     songId: string,
     link: SongPlatformLink,
   ) => {
@@ -5810,8 +6230,78 @@ export function FirstListenApp({
     );
     notify(
       locale === "es"
-        ? "Enlace verificado agregado."
-        : "Verified platform link added.",
+        ? "Destino de plataforma agregado."
+        : "Platform destination added.",
+    );
+  };
+
+  const handlePlatformPresenceLinkRemoved = (
+    songId: string,
+    platform: Platform,
+  ) => {
+    setUserSong((current) =>
+      current?.id === songId
+        ? {
+            ...current,
+            platformLinks: (current.platformLinks ?? []).filter(
+              (link) => link.platform !== platform || link.primary,
+            ),
+          }
+        : current,
+    );
+    setSongSummaries((current) =>
+      current.map((summary) =>
+        summary.id === songId
+          ? {
+              ...summary,
+              platformLinks: (summary.platformLinks ?? []).filter(
+                (link) => link.platform !== platform || link.primary,
+              ),
+            }
+          : summary,
+      ),
+    );
+    notify(
+      locale === "es"
+        ? "Destino de plataforma eliminado."
+        : "Platform destination removed.",
+    );
+  };
+
+  const handlePrimaryPlatformChanged = (
+    songId: string,
+    platform: PrimaryPlatform,
+    url: string,
+    links: SongPlatformLink[],
+  ) => {
+    setUserSong((current) =>
+      current?.id === songId
+        ? {
+            ...current,
+            platform,
+            link: url,
+            platformLinks: links,
+            recommendedPlatform: platform,
+          }
+        : current,
+    );
+    setSongSummaries((current) =>
+      current.map((summary) =>
+        summary.id === songId
+          ? {
+              ...summary,
+              platform,
+              link: url,
+              platformLinks: links,
+              recommendedPlatform: platform,
+            }
+          : summary,
+      ),
+    );
+    notify(
+      locale === "es"
+        ? `${platform} ahora controla la reproducción.`
+        : `${platform} now controls playback.`,
     );
   };
 
@@ -5905,7 +6395,9 @@ export function FirstListenApp({
           onClaimMission={() => void claimDailyMission()}
           communityPrograms={initialCommunityPrograms}
           onBoostSong={(songId) => void requestSongBoost(songId)}
-          onVerifiedPlatformLinkSaved={handleVerifiedPlatformLinkSaved}
+          onPlatformPresenceLinkRemoved={handlePlatformPresenceLinkRemoved}
+          onPlatformPresenceLinkSaved={handlePlatformPresenceLinkSaved}
+          onPrimaryPlatformChanged={handlePrimaryPlatformChanged}
           onListeningCredited={handleListeningCredited}
           externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
           onExternalRedirectPreferenceChange={(disabled) =>
@@ -5993,6 +6485,7 @@ export function FirstListenApp({
           onLocaleChange={onLocaleChange}
           onLogout={onLogout}
           onHelp={() => router.push("/help")}
+          onProfile={() => router.push("/profile")}
           onMenu={() => setMenuOpen(true)}
           onToggleTheme={toggleTheme}
           view={view}

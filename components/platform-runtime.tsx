@@ -143,6 +143,13 @@ function applyControlConfig(config: PlatformControlConfig) {
   root.dataset.showSecondaryPlatforms = String(
     config.discovery.platformResolution.showSecondaryPlatforms,
   );
+  root.dataset.platformPresenceEnabled = String(
+    config.discovery.platformPresence.enabled,
+  );
+  root.dataset.platformPresenceIconSize =
+    config.discovery.platformPresence.iconSize;
+  root.dataset.platformPresenceOrder =
+    config.discovery.platformPresence.platformOrder.join(",");
   for (const [field, enabled] of Object.entries(
     config.discovery.externalDiscovery,
   )) {

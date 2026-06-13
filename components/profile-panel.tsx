@@ -30,14 +30,19 @@ import {
 import { Logo } from "@/components/logo";
 import {
   compactClassificationLabel,
+  allPlatforms,
+  databasePlatform,
   displayPlatform,
+  isPrimaryPlatform,
 } from "@/lib/content-economy";
+import { detectMusicPlatform } from "@/lib/platform";
 import { createClient } from "@/lib/supabase/client";
 import type {
   CommunityActivity,
   CommunityNetwork,
   ConnectedPlatform,
   ConnectedPlatformAccount,
+  Platform,
 } from "@/lib/types";
 
 type ProfileSong = {
@@ -57,6 +62,23 @@ type ProfileSong = {
   can_archive: boolean;
   explicit_content: boolean;
   created_at: string;
+  platform_links?: ProfilePlatformLinkRow[] | null;
+};
+
+type ProfilePlatformLinkRow = {
+  platform?: string;
+  music_url?: string;
+  is_primary?: boolean;
+  resolution_source?: string;
+  confidence_score?: number;
+};
+
+type ProfilePlatformLink = {
+  platform: Platform;
+  url: string;
+  primary: boolean;
+  resolutionSource: string;
+  confidenceScore: number;
 };
 
 type RemovedSongHistory = {
@@ -120,6 +142,50 @@ function formatImpactDuration(seconds: number) {
   return `${minutes}m ${remainder}s`;
 }
 
+function profilePlatformFromDatabase(value: string | undefined, fallback: Platform) {
+  return (
+    allPlatforms.find((platform) => databasePlatform[platform] === value) ??
+    fallback
+  );
+}
+
+function databasePlatformToDisplay(value: string): Platform {
+  return displayPlatform[value] ?? profilePlatformFromDatabase(value, "Other");
+}
+
+function mapProfilePlatformLinks(song: ProfileSong): ProfilePlatformLink[] {
+  const fallbackPlatform = databasePlatformToDisplay(song.platform);
+  const rows = Array.isArray(song.platform_links) ? song.platform_links : [];
+  const links = rows.length
+    ? rows.map((link) => {
+        const platform = profilePlatformFromDatabase(
+          String(link.platform ?? song.platform),
+          fallbackPlatform,
+        );
+        return {
+          platform,
+          url: String(link.music_url ?? song.music_url),
+          primary: Boolean(link.is_primary),
+          resolutionSource: String(link.resolution_source ?? "submitted"),
+          confidenceScore: Number(link.confidence_score ?? 100),
+        };
+      })
+    : [
+        {
+          platform: fallbackPlatform,
+          url: song.music_url,
+          primary: true,
+          resolutionSource: "submitted",
+          confidenceScore: 100,
+        },
+      ];
+  return links.sort(
+    (left, right) =>
+      Number(right.primary) - Number(left.primary) ||
+      allPlatforms.indexOf(left.platform) - allPlatforms.indexOf(right.platform),
+  );
+}
+
 export function ProfilePanel({
   profile,
   songs,
@@ -175,6 +241,21 @@ export function ProfilePanel({
   const [managedSongs, setManagedSongs] = useState(songs);
   const [removedSongs, setRemovedSongs] = useState(removedSongHistory);
   const [managingSongId, setManagingSongId] = useState<string | null>(null);
+  const [platformEditorSongId, setPlatformEditorSongId] = useState<string | null>(
+    null,
+  );
+  const [platformEditorPlatform, setPlatformEditorPlatform] =
+    useState<Platform>("Spotify");
+  const [platformEditorUrl, setPlatformEditorUrl] = useState("");
+  const [platformEditorNote, setPlatformEditorNote] = useState("");
+  const [platformEditorMessage, setPlatformEditorMessage] = useState("");
+  const [platformLinksBySong, setPlatformLinksBySong] = useState<
+    Record<string, ProfilePlatformLink[]>
+  >(() =>
+    Object.fromEntries(
+      songs.map((song) => [song.song_id, mapProfilePlatformLinks(song)]),
+    ),
+  );
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -284,6 +365,179 @@ export function ProfilePanel({
     }
 
     setManagingSongId(null);
+  };
+
+  const openPlatformEditor = async (song: ProfileSong) => {
+    const nextOpen = platformEditorSongId === song.song_id ? null : song.song_id;
+    setPlatformEditorSongId(nextOpen);
+    setPlatformEditorMessage("");
+    setPlatformEditorUrl("");
+    setPlatformEditorNote("");
+    const primaryPlatform = databasePlatformToDisplay(song.platform);
+    setPlatformEditorPlatform(
+      allPlatforms.find((platform) => platform !== primaryPlatform) ??
+        "Spotify",
+    );
+    if (!nextOpen || platformLinksBySong[song.song_id]) return;
+
+    const supabase = createClient();
+    if (!supabase) return;
+    const { data, error } = await supabase.rpc("song_platform_links_json", {
+      target_song_id: song.song_id,
+    });
+    if (error || !Array.isArray(data)) return;
+    setPlatformLinksBySong((current) => ({
+      ...current,
+      [song.song_id]: mapProfilePlatformLinks({
+        ...song,
+        platform_links: data as ProfilePlatformLinkRow[],
+      }),
+    }));
+  };
+
+  const savePlatformDestination = async (song: ProfileSong) => {
+    setPlatformEditorMessage("");
+    if (!platformEditorUrl.trim()) {
+      setPlatformEditorMessage("Paste an official platform link.");
+      return;
+    }
+    const detection = detectMusicPlatform(platformEditorUrl);
+    if (
+      !detection.valid ||
+      (platformEditorPlatform !== "Other" &&
+        detection.platform !== platformEditorPlatform)
+    ) {
+      setPlatformEditorMessage(
+        `Detected: ${detection.platform ?? "unsupported"}. Choose the matching platform.`,
+      );
+      return;
+    }
+    const supabase = createClient();
+    if (!supabase) return;
+    setManagingSongId(song.song_id);
+    const { data, error } = await supabase.rpc(
+      "upsert_song_platform_presence_link",
+      {
+        target_song_id: song.song_id,
+        target_platform: databasePlatform[platformEditorPlatform],
+        target_music_url: platformEditorUrl.trim(),
+        presence_note: platformEditorNote.trim() || null,
+      },
+    );
+    setManagingSongId(null);
+    if (error) {
+      setPlatformEditorMessage(error.message);
+      return;
+    }
+    const row = data as ProfilePlatformLinkRow;
+    const savedPlatform = profilePlatformFromDatabase(
+      String(row.platform ?? databasePlatform[platformEditorPlatform]),
+      platformEditorPlatform,
+    );
+    setPlatformLinksBySong((current) => ({
+      ...current,
+      [song.song_id]: [
+        ...(current[song.song_id] ?? mapProfilePlatformLinks(song)).filter(
+          (link) => link.platform !== savedPlatform,
+        ),
+        {
+          platform: savedPlatform,
+          url: String(row.music_url ?? platformEditorUrl.trim()),
+          primary: Boolean(row.is_primary),
+          resolutionSource: String(row.resolution_source ?? "manual"),
+          confidenceScore: Number(row.confidence_score ?? 100),
+        },
+      ].sort(
+        (left, right) =>
+          Number(right.primary) - Number(left.primary) ||
+          allPlatforms.indexOf(left.platform) -
+            allPlatforms.indexOf(right.platform),
+      ),
+    }));
+    setPlatformEditorUrl("");
+    setPlatformEditorNote("");
+    setPlatformEditorMessage("Platform destination saved.");
+  };
+
+  const removePlatformDestination = async (
+    song: ProfileSong,
+    link: ProfilePlatformLink,
+  ) => {
+    const supabase = createClient();
+    if (!supabase) return;
+    setManagingSongId(song.song_id);
+    const { error } = await supabase.rpc("remove_song_platform_presence_link", {
+      target_song_id: song.song_id,
+      target_platform: databasePlatform[link.platform],
+    });
+    setManagingSongId(null);
+    if (error) {
+      setPlatformEditorMessage(error.message);
+      return;
+    }
+    setPlatformLinksBySong((current) => ({
+      ...current,
+      [song.song_id]: (current[song.song_id] ?? mapProfilePlatformLinks(song)).filter(
+        (item) => item.platform !== link.platform || item.primary,
+      ),
+    }));
+    setPlatformEditorMessage("Platform destination removed.");
+  };
+
+  const makePrimaryPlatform = async (
+    song: ProfileSong,
+    link: ProfilePlatformLink,
+  ) => {
+    if (!isPrimaryPlatform(link.platform)) {
+      setPlatformEditorMessage(
+        "This destination cannot be used as the primary playback source.",
+      );
+      return;
+    }
+    const supabase = createClient();
+    if (!supabase) return;
+    setManagingSongId(song.song_id);
+    const { data, error } = await supabase.rpc("set_song_primary_platform", {
+      target_song_id: song.song_id,
+      target_platform: databasePlatform[link.platform],
+    });
+    setManagingSongId(null);
+    if (error) {
+      setPlatformEditorMessage(error.message);
+      return;
+    }
+    const result = data as {
+      platform?: string;
+      music_url?: string;
+      platform_links?: ProfilePlatformLinkRow[];
+    };
+    const nextPlatform = profilePlatformFromDatabase(
+      String(result.platform ?? databasePlatform[link.platform]),
+      link.platform,
+    );
+    const nextUrl = String(result.music_url ?? link.url);
+    setManagedSongs((current) =>
+      current.map((item) =>
+        item.song_id === song.song_id
+          ? {
+              ...item,
+              platform: databasePlatform[nextPlatform],
+              music_url: nextUrl,
+              platform_links: result.platform_links ?? item.platform_links,
+            }
+          : item,
+      ),
+    );
+    setPlatformLinksBySong((current) => ({
+      ...current,
+      [song.song_id]: mapProfilePlatformLinks({
+        ...song,
+        platform: databasePlatform[nextPlatform],
+        music_url: nextUrl,
+        platform_links: result.platform_links,
+      }),
+    }));
+    setPlatformEditorMessage(`${nextPlatform} is now the Primary Platform.`);
   };
 
   return (
@@ -496,52 +750,7 @@ export function ProfilePanel({
           </form>
         </section>
 
-        <section className="account-card my-songs" id="community-activity">
-          <span className="eyebrow">Recent Community Activity</span>
-          <h2>Your creator connections</h2>
-          <div className="profile-activity-list">
-            {activity.map((item) => (
-              <article key={item.id}>
-                <span>
-                  {item.type === "follow" ? (
-                    <Users size={15} />
-                  ) : item.type === "review" ? (
-                    <MessageSquareText size={15} />
-                  ) : (
-                    <Headphones size={15} />
-                  )}
-                </span>
-                <div>
-                  <strong>
-                    {item.type === "follow"
-                      ? `You followed ${item.artistName}`
-                      : item.type === "review"
-                        ? `You reviewed ${item.songTitle ?? "a song"}`
-                        : `You supported ${item.songTitle ?? "a song"}`}
-                  </strong>
-                  <small>
-                    {item.visibility === "public"
-                      ? "Visible support"
-                      : "Anonymous support"}
-                  </small>
-                </div>
-                <Link
-                  data-artist-profile-button
-                  data-ui-component="artistProfileButton"
-                  href={`/artists/${item.artistId}`}
-                >
-                  View Artist
-                </Link>
-              </article>
-            ))}
-            {!activity.length && (
-              <div className="empty-state">
-                <p>Your listens, reviews, and follows will appear here.</p>
-                <Link href="/review">Support a creator</Link>
-              </div>
-            )}
-          </div>
-
+        <section className="account-card my-songs" id="submitted-songs">
           <div className="saved-song-heading">
             <span className="eyebrow">My Songs</span>
             <h2>Submitted songs</h2>
@@ -553,7 +762,16 @@ export function ProfilePanel({
             </div>
           ) : (
             <div className="song-table">
-              {managedSongs.map((song) => (
+              {managedSongs.map((song) => {
+                const editorOpen = platformEditorSongId === song.song_id;
+                const songPlatform = databasePlatformToDisplay(song.platform);
+                const links =
+                  platformLinksBySong[song.song_id] ??
+                  mapProfilePlatformLinks(song);
+                const addablePlatforms = allPlatforms.filter(
+                  (platform) => platform !== songPlatform,
+                );
+                return (
                 <article id={`song-${song.song_id}`} key={song.song_id}>
                   <div>
                     <strong>{song.title}</strong>
@@ -603,6 +821,23 @@ export function ProfilePanel({
                         <Archive size={14} /> Archive Song
                       </button>
                     )}
+                    <button
+                      aria-controls={`platform-presence-${song.song_id}`}
+                      aria-expanded={editorOpen}
+                      className="song-platform-presence-cta"
+                      data-ui-component="profilePlatformPresenceButton"
+                      disabled={managingSongId === song.song_id}
+                      onClick={() => void openPlatformEditor(song)}
+                      type="button"
+                    >
+                      <Music2 size={14} />
+                      <span>
+                        {editorOpen
+                          ? "Cerrar Plataformas"
+                          : "Agregar Plataformas"}
+                        <small>Spotify, Apple, TikTok, YouTube Music</small>
+                      </span>
+                    </button>
                     <a href={song.music_url} rel="noreferrer" target="_blank" aria-label={`Open ${song.title}`}>
                       <ExternalLink size={15} />
                     </a>
@@ -614,8 +849,141 @@ export function ProfilePanel({
                       Artist Profile
                     </Link>
                   </div>
+                  {editorOpen && (
+                    <div
+                      className="profile-platform-editor"
+                      id={`platform-presence-${song.song_id}`}
+                    >
+                      <div className="platform-editor-heading">
+                        <span className="eyebrow">Platform Presence</span>
+                        <strong>{song.title}</strong>
+                        <small>
+                          Primary playback source: {songPlatform}. Additional
+                          destinations open externally only.
+                        </small>
+                      </div>
+                      <div className="platform-disclaimer-card">
+                        <strong>💡 Important</strong>
+                        <p>
+                          Additional platforms must belong to the same song or
+                          video you are publishing. You can add them now or
+                          later from the song settings.
+                        </p>
+                      </div>
+                      <div className="platform-reminder-card">
+                        <strong>💡 Reminder</strong>
+                        <p>
+                          The Primary Platform controls the playback used by
+                          First Listen. Additional Platforms are discovery
+                          destinations only and must correspond to the same song
+                          or video.
+                        </p>
+                      </div>
+                      <div className="profile-platform-link-list">
+                        {links.map((link) => (
+                          <div key={`${song.song_id}-${link.platform}`}>
+                            <span>
+                              <Music2 size={14} />
+                              <strong>{link.platform}</strong>
+                              <small>
+                                {link.primary
+                                  ? "Primary Platform"
+                                  : "Additional Destination"}
+                              </small>
+                            </span>
+                            <div>
+                              <a href={link.url} rel="noreferrer" target="_blank">
+                                <ExternalLink size={13} /> Open
+                              </a>
+                              {!link.primary && isPrimaryPlatform(link.platform) && (
+                                <button
+                                  disabled={managingSongId === song.song_id}
+                                  onClick={() =>
+                                    void makePrimaryPlatform(song, link)
+                                  }
+                                  type="button"
+                                >
+                                  Make Primary
+                                </button>
+                              )}
+                              {!link.primary && (
+                                <button
+                                  disabled={managingSongId === song.song_id}
+                                  onClick={() =>
+                                    void removePlatformDestination(song, link)
+                                  }
+                                  type="button"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <form
+                        className="profile-platform-form"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void savePlatformDestination(song);
+                        }}
+                      >
+                        <label>
+                          Destination
+                          <select
+                            onChange={(event) =>
+                              setPlatformEditorPlatform(
+                                event.target.value as Platform,
+                              )
+                            }
+                            value={platformEditorPlatform}
+                          >
+                            {addablePlatforms.map((platform) => (
+                              <option key={platform} value={platform}>
+                                {platform}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          Official link
+                          <input
+                            onChange={(event) =>
+                              setPlatformEditorUrl(event.target.value)
+                            }
+                            placeholder="https://"
+                            type="url"
+                            value={platformEditorUrl}
+                          />
+                        </label>
+                        <label>
+                          Optional note
+                          <input
+                            maxLength={120}
+                            onChange={(event) =>
+                              setPlatformEditorNote(event.target.value)
+                            }
+                            placeholder="Official artist link"
+                            value={platformEditorNote}
+                          />
+                        </label>
+                        <button
+                          disabled={managingSongId === song.song_id}
+                          type="submit"
+                        >
+                          <Save size={14} /> Save Destination
+                        </button>
+                      </form>
+                      {platformEditorMessage && (
+                        <small className="form-message" role="status">
+                          {platformEditorMessage}
+                        </small>
+                      )}
+                    </div>
+                  )}
                 </article>
-              ))}
+                );
+              })}
             </div>
           )}
           {message && <p className="form-message" role="status">{message}</p>}
@@ -659,6 +1027,53 @@ export function ProfilePanel({
               <p>No removed songs.</p>
             )}
           </details>
+
+          <div className="profile-community-activity-section" id="community-activity">
+            <span className="eyebrow">Recent Community Activity</span>
+            <h2>Your creator connections</h2>
+            <div className="profile-activity-list">
+              {activity.map((item) => (
+                <article key={item.id}>
+                  <span>
+                    {item.type === "follow" ? (
+                      <Users size={15} />
+                    ) : item.type === "review" ? (
+                      <MessageSquareText size={15} />
+                    ) : (
+                      <Headphones size={15} />
+                    )}
+                  </span>
+                  <div>
+                    <strong>
+                      {item.type === "follow"
+                        ? `You followed ${item.artistName}`
+                        : item.type === "review"
+                          ? `You reviewed ${item.songTitle ?? "a song"}`
+                          : `You supported ${item.songTitle ?? "a song"}`}
+                    </strong>
+                    <small>
+                      {item.visibility === "public"
+                        ? "Visible support"
+                        : "Anonymous support"}
+                    </small>
+                  </div>
+                  <Link
+                    data-artist-profile-button
+                    data-ui-component="artistProfileButton"
+                    href={`/artists/${item.artistId}`}
+                  >
+                    View Artist
+                  </Link>
+                </article>
+              ))}
+              {!activity.length && (
+                <div className="empty-state">
+                  <p>Your listens, reviews, and follows will appear here.</p>
+                  <Link href="/review">Support a creator</Link>
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="saved-song-heading">
             <span className="eyebrow">Saved For Later</span>

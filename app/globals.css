@@ -20,6 +20,20 @@
   --shadow: 0 24px 70px rgba(22, 27, 21, 0.08);
   --radius-lg: 24px;
   --radius-md: 16px;
+  --platform-presence-icon-size: 34px;
+  --platform-presence-svg-size: 14px;
+}
+
+.sr-only {
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 .support-contact-strip,
@@ -127,6 +141,55 @@
 .verified-platform-form {
   grid-template-columns: 0.7fr 1.5fr 1fr auto;
   align-items: end;
+}
+
+.platform-presence-management-list {
+  display: grid;
+  gap: 10px;
+}
+
+.platform-presence-management-list article {
+  align-items: center;
+  background: color-mix(in srgb, var(--card) 72%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.platform-presence-management-list article > span,
+.platform-presence-management-list article > div,
+.platform-presence-management-list a,
+.platform-presence-management-list button {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.platform-presence-management-list article > span {
+  flex-wrap: wrap;
+}
+
+.platform-presence-management-list a,
+.platform-presence-management-list button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 900;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.platform-presence-management-list button {
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.platform-presence-management-list .danger-lite-button {
+  color: #a23b33;
 }
 
 .feedback-status-grid {
@@ -615,6 +678,27 @@ button {
   height: 38px;
   justify-content: center;
   width: 38px;
+}
+
+.topbar-profile-link {
+  align-items: center;
+  background: #eafdba;
+  border: 1px solid #cde891;
+  border-radius: 999px;
+  color: #151815;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 900;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.topbar-profile-link svg {
+  color: #536b16;
 }
 
 .menu-button,
@@ -2144,6 +2228,11 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   margin-top: 18px;
 }
 
+.song-performance-entry {
+  display: grid;
+  gap: 10px;
+}
+
 .song-performance-list article {
   align-items: center;
   background: #f8f9f5;
@@ -2151,7 +2240,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   border-radius: 14px;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(180px, 1fr) repeat(5, minmax(78px, auto)) auto;
+  grid-template-columns: minmax(180px, 1fr) repeat(5, minmax(78px, auto)) auto auto auto;
   padding: 13px;
 }
 
@@ -2270,6 +2359,32 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   color: var(--muted);
   font-size: 8px;
   text-transform: uppercase;
+}
+
+.platform-presence-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.platform-presence-row a {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  display: inline-flex;
+  height: var(--platform-presence-icon-size);
+  justify-content: center;
+  text-decoration: none;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  width: var(--platform-presence-icon-size);
+}
+
+.platform-presence-row a:hover {
+  border-color: var(--acid);
+  transform: translateY(-1px);
 }
 
 .recommended-platform-inline {
@@ -2418,6 +2533,176 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   font-size: 9px;
   line-height: 1.5;
   margin: 0;
+}
+
+.platform-guidance-card,
+.platform-direct-setup-card,
+.platform-disclaimer-card,
+.platform-reminder-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 14px;
+}
+
+.platform-guidance-card {
+  background: #fff8e8;
+}
+
+.platform-direct-setup-card {
+  background: #f7f8f4;
+}
+
+.platform-disclaimer-card {
+  background: #f7f8f4;
+  margin: 0;
+}
+
+.platform-reminder-card {
+  background: #f3f9df;
+  margin: 0;
+}
+
+.platform-guidance-title,
+.platform-guidance-actions,
+.platform-guidance-actions button {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.platform-guidance-title {
+  color: var(--dark);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.platform-guidance-card strong,
+.platform-direct-setup-card strong,
+.platform-disclaimer-card strong,
+.platform-reminder-card strong {
+  color: var(--dark);
+  font-size: 12px;
+}
+
+.platform-guidance-card p,
+.platform-direct-setup-card p,
+.platform-disclaimer-card p,
+.platform-reminder-card p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.platform-direct-setup-card label {
+  color: var(--muted);
+  display: grid;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 7px;
+  text-transform: uppercase;
+}
+
+.platform-direct-setup-card input {
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--text);
+  padding: 11px 12px;
+}
+
+.platform-guidance-actions {
+  flex-wrap: wrap;
+}
+
+.platform-guidance-actions button {
+  background: var(--dark);
+  border: 1px solid var(--dark);
+  border-radius: 999px;
+  color: white;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 900;
+  justify-content: center;
+  padding: 9px 12px;
+}
+
+.platform-guidance-actions .ghost-button,
+.platform-guidance-actions button:last-child:not(.primary-button) {
+  background: white;
+  border-color: var(--line);
+  color: var(--dark);
+}
+
+.platform-guidance-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.direct-playback-enabled {
+  background: #f3f9df;
+  border-color: #d4ec99;
+}
+
+.external-publication-dialog-backdrop {
+  align-items: center;
+  background: rgba(15, 18, 15, 0.58);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 80;
+}
+
+.external-publication-dialog {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 24px 80px rgba(15, 18, 15, 0.22);
+  display: grid;
+  gap: 14px;
+  max-width: 430px;
+  padding: 24px;
+  width: min(430px, 100%);
+}
+
+.external-publication-dialog h3 {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 28px;
+  letter-spacing: -0.04em;
+  margin: 0;
+}
+
+.external-publication-dialog p {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0;
+}
+
+.confirmation-math-grid {
+  background: #f7f8f4;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  gap: 10px 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 14px;
+}
+
+.confirmation-math-grid span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.confirmation-math-grid strong {
+  color: var(--dark);
+  font-size: 11px;
+  text-align: right;
 }
 
 .submit-form-card {
@@ -5329,6 +5614,16 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   background: #131714;
 }
 
+.theme-dark .topbar-profile-link {
+  background: #34441f;
+  border-color: #5f792d;
+  color: #f5ffe1;
+}
+
+.theme-dark .topbar-profile-link svg {
+  color: #c8ff4f;
+}
+
 .theme-dark .pwa-header-install-button {
   background: color-mix(in srgb, var(--accent) 22%, var(--surface-strong));
   color: var(--ink);
@@ -6956,6 +7251,14 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   transform: translateY(-1px);
 }
 
+.artist-platform-reveal .platform-presence-row a {
+  border-radius: 999px;
+  height: var(--platform-presence-icon-size);
+  justify-content: center;
+  padding: 0;
+  width: var(--platform-presence-icon-size);
+}
+
 .original-link {
   margin-left: 10px;
 }
@@ -7542,6 +7845,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
 .discovery-song-actions button,
 .discovery-song-actions a,
+.song-platform-manage-button,
 .song-boost-button {
   align-items: center;
   background: white;
@@ -8329,7 +8633,9 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   }
 
   .song-performance-title,
-  .song-performance-list article > a {
+  .song-performance-list article > a,
+  .song-platform-manage-button,
+  .song-boost-button {
     grid-column: 1 / -1;
   }
 
@@ -9329,6 +9635,18 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   gap: 8px;
 }
 
+.profile-community-activity-section {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 18px;
+}
+
+.profile-community-activity-section h2 {
+  margin: 0;
+}
+
 .profile-activity-list article,
 .artist-activity-list article,
 .top-supporter-list > a {
@@ -9393,6 +9711,12 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 .theme-dark .connected-platforms-card,
 .theme-dark .connected-platforms-list > div,
 .theme-dark .content-economy-education article,
+.theme-dark .platform-guidance-card,
+.theme-dark .platform-direct-setup-card,
+.theme-dark .platform-disclaimer-card,
+.theme-dark .platform-reminder-card,
+.theme-dark .external-publication-dialog,
+.theme-dark .confirmation-math-grid,
 .theme-dark .admin-pricing-grid article,
 .theme-dark .profile-activity-list article,
 .theme-dark .artist-activity-list article,
@@ -9414,9 +9738,26 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 }
 
 .theme-dark .external-redirect-dialog > div,
+.theme-dark .platform-direct-setup-card input,
 .theme-dark .admin-pricing-grid input {
   background: #202521;
   border-color: #353d36;
+  color: #eef2eb;
+}
+
+.theme-dark .platform-guidance-title,
+.theme-dark .platform-guidance-card strong,
+.theme-dark .platform-direct-setup-card strong,
+.theme-dark .platform-disclaimer-card strong,
+.theme-dark .platform-reminder-card strong,
+.theme-dark .confirmation-math-grid strong {
+  color: #eef2eb;
+}
+
+.theme-dark .platform-guidance-actions .ghost-button,
+.theme-dark .platform-guidance-actions button:last-child:not(.primary-button) {
+  background: #303731;
+  border-color: #424b44;
   color: #eef2eb;
 }
 
@@ -9526,6 +9867,114 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 .song-management-actions button:disabled {
   cursor: wait;
   opacity: 0.55;
+}
+
+.song-management-actions .song-platform-presence-cta {
+  background: #eafdba;
+  border-color: #cde891;
+  color: #151815;
+  gap: 8px;
+  padding: 9px 12px;
+}
+
+.song-platform-presence-cta > span {
+  display: grid;
+  gap: 2px;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.song-platform-presence-cta small {
+  color: #536b16;
+  display: block;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.profile-platform-editor {
+  background: color-mix(in srgb, var(--surface-strong) 82%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  padding: 14px;
+}
+
+.platform-editor-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.platform-editor-heading small {
+  color: var(--muted);
+}
+
+.profile-platform-link-list {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-platform-link-list > div {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px;
+}
+
+.profile-platform-link-list > div > span,
+.profile-platform-link-list > div > div {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-platform-link-list a,
+.profile-platform-link-list button,
+.profile-platform-form button {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--dark);
+  display: inline-flex;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 6px;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.profile-platform-form {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 0.8fr 1.6fr 1fr auto;
+}
+
+.profile-platform-form label {
+  color: var(--muted);
+  display: grid;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.profile-platform-form input,
+.profile-platform-form select {
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--text);
+  padding: 10px;
 }
 
 .removed-song-history {
@@ -9649,6 +10098,16 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   color: #eef2eb;
 }
 
+.theme-dark .song-management-actions .song-platform-presence-cta {
+  background: #34441f;
+  border-color: #5f792d;
+  color: #f5ffe1;
+}
+
+.theme-dark .song-platform-presence-cta small {
+  color: #c8ff4f;
+}
+
 @media (max-width: 420px) {
   .connected-platforms-heading {
     align-items: flex-start;
@@ -9725,6 +10184,15 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
   .song-management-actions {
     justify-content: flex-start;
+  }
+
+  .profile-platform-form {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-platform-link-list > div {
+    align-items: flex-start;
+    display: grid;
   }
 
   .admin-duplicate-stat-grid {
@@ -10139,6 +10607,24 @@ html[data-show-platform-recommendations="false"] .platform-recommendation-card {
 html[data-show-secondary-platforms="false"] .platform-reveal-inline,
 html[data-show-secondary-platforms="false"] .platform-chip-row {
   display: none;
+}
+
+html[data-platform-presence-enabled="false"] .platform-reveal-inline,
+html[data-platform-presence-enabled="false"] .platform-presence-manager-panel,
+html[data-platform-presence-enabled="false"] .artist-platform-reveal {
+  display: none;
+}
+
+html[data-platform-presence-icon-size="compact"] {
+  --platform-presence-icon-size: 34px;
+}
+
+html[data-platform-presence-icon-size="standard"] {
+  --platform-presence-icon-size: 40px;
+}
+
+html[data-platform-presence-icon-size="large"] {
+  --platform-presence-icon-size: 48px;
 }
 
 html[data-external-discovery-show-external-songs="false"] [data-external-feed-kind="external_song"],

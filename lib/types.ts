@@ -6,6 +6,19 @@ export type Platform =
   | "YouTube Music"
   | "SoundCloud"
   | "Apple Music"
+  | "TikTok"
+  | "Amazon Music"
+  | "Deezer"
+  | "Facebook Video"
+  | "Instagram"
+  | "Other";
+
+export type PrimaryPlatform =
+  | "Spotify"
+  | "YouTube"
+  | "YouTube Music"
+  | "SoundCloud"
+  | "Apple Music"
   | "TikTok";
 
 export type ContentClassification = "internal" | "external";

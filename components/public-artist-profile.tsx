@@ -86,10 +86,15 @@ type PublicSong = {
 const platformOrder: Record<Platform, number> = {
   "YouTube Music": 1,
   YouTube: 2,
-  "Apple Music": 3,
-  Spotify: 4,
+  Spotify: 3,
+  "Apple Music": 4,
   TikTok: 5,
   SoundCloud: 6,
+  "Amazon Music": 7,
+  Deezer: 8,
+  "Facebook Video": 9,
+  Instagram: 10,
+  Other: 11,
 };
 
 function PlatformIcon({ platform }: { platform: Platform }) {
@@ -98,6 +103,8 @@ function PlatformIcon({ platform }: { platform: Platform }) {
   if (platform === "Apple Music") return <Radio size={15} />;
   if (platform === "Spotify") return <Disc3 size={15} />;
   if (platform === "SoundCloud") return <Cloud size={15} />;
+  if (platform === "Amazon Music" || platform === "Deezer") return <Radio size={15} />;
+  if (platform === "Facebook Video" || platform === "Instagram") return <CirclePlay size={15} />;
   return <Music2 size={15} />;
 }
 
@@ -306,16 +313,14 @@ function ProfileSong({
           <section className="artist-platform-reveal">
             <span className="eyebrow">
               <Globe2 size={13} />
-              {spanish
-                ? "También disponible en estas plataformas"
-                : "Also Available on These Platforms"}
+              {spanish ? "Disponible en:" : "Available on:"}
             </span>
             <p>
               {spanish
-                ? "Gracias por escuchar. ¿Quieres seguir apoyando a este artista?"
-                : "Thanks for listening. Want to continue supporting this artist?"}
+                ? "Gracias por escuchar. Estos destinos no crean sesiones adicionales."
+                : "Thanks for listening. These destinations do not create extra playback sessions."}
             </p>
-            <div className="artist-song-links">
+            <div className="artist-song-links platform-presence-row">
               {[...song.platformLinks]
                 .sort(
                   (left, right) =>
@@ -329,9 +334,10 @@ function ProfileSong({
                     key={`${song.id}-${platformLink.platform}`}
                     rel="noreferrer"
                     target="_blank"
+                    title={platformLink.platform}
                   >
                     <PlatformIcon platform={platformLink.platform} />
-                    {platformLink.platform}
+                    <span className="sr-only">{platformLink.platform}</span>
                   </a>
                 ))}
             </div>

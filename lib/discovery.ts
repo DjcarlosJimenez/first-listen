@@ -10,6 +10,11 @@ export const preferredPlatformOrder: Platform[] = [
   "Apple Music",
   "TikTok",
   "SoundCloud",
+  "Amazon Music",
+  "Deezer",
+  "Facebook Video",
+  "Instagram",
+  "Other",
 ];
 
 export function sortPlatformLinks(links: SongPlatformLink[]) {
@@ -57,6 +62,18 @@ export function platformSearchUrl(
   }
   if (platform === "SoundCloud") {
     return `https://soundcloud.com/search?q=${query}`;
+  }
+  if (platform === "Amazon Music") {
+    return `https://music.amazon.com/search/${query}`;
+  }
+  if (platform === "Deezer") {
+    return `https://www.deezer.com/search/${query}`;
+  }
+  if (platform === "Facebook Video") {
+    return `https://www.facebook.com/search/videos/?q=${query}`;
+  }
+  if (platform === "Instagram") {
+    return `https://www.instagram.com/explore/search/keyword/?q=${query}`;
   }
   return `https://www.youtube.com/results?search_query=${query}`;
 }

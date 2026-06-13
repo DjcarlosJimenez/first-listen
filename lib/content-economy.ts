@@ -2,6 +2,7 @@ import type {
   ContentClassification,
   ContentEconomySetting,
   Platform,
+  PrimaryPlatform,
 } from "@/lib/types";
 
 export const databasePlatform: Record<Platform, string> = {
@@ -11,6 +12,11 @@ export const databasePlatform: Record<Platform, string> = {
   SoundCloud: "soundcloud",
   "Apple Music": "apple_music",
   TikTok: "tiktok",
+  "Amazon Music": "amazon_music",
+  Deezer: "deezer",
+  "Facebook Video": "facebook_video",
+  Instagram: "instagram",
+  Other: "other",
 };
 
 export const displayPlatform: Record<string, Platform> = {
@@ -20,9 +26,38 @@ export const displayPlatform: Record<string, Platform> = {
   soundcloud: "SoundCloud",
   apple_music: "Apple Music",
   tiktok: "TikTok",
+  amazon_music: "Amazon Music",
+  deezer: "Deezer",
+  facebook_video: "Facebook Video",
+  instagram: "Instagram",
+  other: "Other",
 };
 
-export const allPlatforms = Object.keys(databasePlatform) as Platform[];
+export const primaryPlatforms: PrimaryPlatform[] = [
+  "YouTube Music",
+  "YouTube",
+  "Spotify",
+  "Apple Music",
+  "TikTok",
+  "SoundCloud",
+];
+
+export const additionalPlatforms: Platform[] = [
+  "Amazon Music",
+  "Deezer",
+  "Facebook Video",
+  "Instagram",
+  "Other",
+];
+
+export const allPlatforms: Platform[] = [
+  ...primaryPlatforms,
+  ...additionalPlatforms,
+];
+
+export function isPrimaryPlatform(platform: Platform | null): platform is PrimaryPlatform {
+  return Boolean(platform && primaryPlatforms.includes(platform as PrimaryPlatform));
+}
 
 export function getContentClassification(
   platform: Platform,
@@ -52,7 +87,8 @@ export function compatibilityStatus(platform: Platform) {
   if (
     platform === "Spotify" ||
     platform === "Apple Music" ||
-    platform === "TikTok"
+    platform === "TikTok" ||
+    additionalPlatforms.includes(platform)
   ) {
     return "Discovery Only" as const;
   }
