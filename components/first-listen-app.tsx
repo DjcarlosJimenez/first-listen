@@ -129,6 +129,13 @@ export type View = "review" | "dashboard" | "submit";
 type BinaryAnswer = boolean | null;
 type Copy = ReturnType<typeof getCopy>;
 
+type RewardClaimFeedback = {
+  awarded: number;
+  beforeCredits: number;
+  afterCredits: number;
+  claimedAt: number;
+};
+
 type SubmissionDuplicate = {
   song_id: string;
   existing_title: string;
@@ -1363,6 +1370,9 @@ function ReviewView({
   previouslySupportedSongs,
   todaySupport,
   listeningBank,
+  claimingReward,
+  onClaimReward,
+  rewardClaimFeedback,
   autoPlayNextSong,
   onAutoPlayChange,
   externalRedirectNoticeDisabled,
@@ -1404,6 +1414,9 @@ function ReviewView({
   previouslySupportedSongs: DiscoverySong[];
   todaySupport: TodaySupportSummary;
   listeningBank: ListeningBankStatus;
+  claimingReward: boolean;
+  onClaimReward: () => void;
+  rewardClaimFeedback: RewardClaimFeedback | null;
   autoPlayNextSong: boolean;
   onAutoPlayChange: (enabled: boolean) => void;
   externalRedirectNoticeDisabled: boolean;
@@ -1463,6 +1476,7 @@ function ReviewView({
   const autoAdvanceStartedRef = useRef(false);
   const validListenRef = useRef(false);
   const completeListenRef = useRef(false);
+  const playerColumnRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setForm(emptyReview);
@@ -1863,7 +1877,7 @@ function ReviewView({
     <main className="content review-layout review-layout-content-first">
       <section className="review-card review-primary-flow">
         <div className="song-hero">
-          <div className="player-listening-column">
+          <div className="player-listening-column" ref={playerColumnRef}>
             <div className="cover-wrap">
               <ProviderPlayer
                 artist={song.artist}
@@ -2157,6 +2171,22 @@ function ReviewView({
           {listeningSession.warning && <small>{listeningSession.warning}</small>}
         </div>
 
+        <ReviewRewardVisibility
+          claiming={claimingReward}
+          claimFeedback={rewardClaimFeedback}
+          credits={reviewCredits}
+          locale={locale}
+          onClaim={onClaimReward}
+          onContinueListening={() => {
+            playerColumnRef.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          }}
+          status={listeningBank}
+          unlimitedCredits={unlimitedCredits}
+        />
+
         <div className="review-form">
           <div className="form-heading">
             <div>
@@ -2443,6 +2473,145 @@ function ReviewView({
       </div>
     </section>
     </>
+  );
+}
+
+function ReviewRewardVisibility({
+  status,
+  credits,
+  claiming,
+  onClaim,
+  onContinueListening,
+  claimFeedback,
+  locale,
+  unlimitedCredits,
+}: {
+  status: ListeningBankStatus;
+  credits: number;
+  claiming: boolean;
+  onClaim: () => void;
+  onContinueListening: () => void;
+  claimFeedback: RewardClaimFeedback | null;
+  locale: InterfaceLocale;
+  unlimitedCredits: boolean;
+}) {
+  const spanish = locale === "es";
+  const exchangeSeconds = Math.max(1, status.minutesPerCredit * 60);
+  const ready = status.rewardsEnabled && status.availableRewardCredits > 0;
+  const progressSeconds = ready
+    ? exchangeSeconds
+    : status.bankSeconds % exchangeSeconds;
+  const progress = Math.min(
+    100,
+    Math.round((progressSeconds / exchangeSeconds) * 100),
+  );
+  const remainingMinutes = Math.ceil(status.secondsToNextCredit / 60);
+
+  return (
+    <section
+      aria-live="polite"
+      className={ready ? "review-reward-card ready" : "review-reward-card"}
+    >
+      <div className="review-reward-copy">
+        <span className="eyebrow">
+          <Sparkles size={13} />{" "}
+          {spanish ? "Progreso de recompensa" : "Reward Progress"}
+        </span>
+        <h3>
+          {ready
+            ? spanish
+              ? "Token listo para reclamar"
+              : "Token Ready To Claim"
+            : spanish
+              ? "Sigue escuchando para ganar el proximo token"
+              : "Keep listening to earn the next token"}
+        </h3>
+        <p>
+          {ready
+            ? spanish
+              ? `Alcanzaste ${status.minutesPerCredit} minutos verificados. Reclama manualmente para ver tu token agregado.`
+              : `You have reached ${status.minutesPerCredit} verified minutes. Claim manually to see your token added.`
+            : spanish
+              ? `${remainingMinutes} min restantes para el proximo token.`
+              : `${remainingMinutes} min remaining until the next token.`}
+        </p>
+      </div>
+
+      <div className="review-reward-stats">
+        <div>
+          <span>{spanish ? "Banco de Tiempo" : "Time Bank"}</span>
+          <strong>{formatPreciseMinutes(status.bankSeconds)}</strong>
+        </div>
+        <div>
+          <span>{spanish ? "Recompensas disponibles" : "Available Rewards"}</span>
+          <strong>{status.availableRewardCredits}</strong>
+        </div>
+        <div>
+          <span>{spanish ? "Tokens de Envio" : "Submission Tokens"}</span>
+          <strong>
+            {unlimitedCredits
+              ? spanish
+                ? "Ilimitados"
+                : "Unlimited"
+              : credits}
+          </strong>
+        </div>
+      </div>
+
+      <div className="review-reward-progress">
+        <div className="progress-track" aria-label={`${progress}% toward the next token`}>
+          <i style={{ width: `${progress}%` }} />
+        </div>
+        <small>
+          {status.minutesPerCredit}{" "}
+          {spanish ? "minutos verificados = 1 token" : "verified minutes = 1 token"}
+        </small>
+      </div>
+
+      <div className="review-reward-actions">
+        <button
+          className="review-claim-token-button"
+          disabled={claiming || !ready}
+          onClick={onClaim}
+          type="button"
+        >
+          {claiming
+            ? spanish
+              ? "Reclamando..."
+              : "Claiming..."
+            : spanish
+              ? "Reclamar token"
+              : "Claim Token"}{" "}
+          <ArrowRight size={15} />
+        </button>
+        <button
+          className="review-continue-listening-button"
+          onClick={onContinueListening}
+          type="button"
+        >
+          {spanish ? "Continuar escuchando" : "Continue Listening"}
+        </button>
+      </div>
+
+      {claimFeedback && (
+        <div className="review-reward-claim-feedback">
+          <strong>
+            🎉 +{claimFeedback.awarded}{" "}
+            {claimFeedback.awarded === 1
+              ? spanish
+                ? "Token otorgado"
+                : "Token Awarded"
+              : spanish
+                ? "Tokens otorgados"
+                : "Tokens Awarded"}
+          </strong>
+          <span>
+            {spanish ? "Tokens de Envio" : "Submission Tokens"}:{" "}
+            {claimFeedback.beforeCredits} → {claimFeedback.afterCredits}
+          </span>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -5014,6 +5183,8 @@ export function FirstListenApp({
     setExternalRedirectNoticeDisabled,
   ] = useState(initialExternalRedirectNoticeDisabled);
   const [claimingReward, setClaimingReward] = useState(false);
+  const [rewardClaimFeedback, setRewardClaimFeedback] =
+    useState<RewardClaimFeedback | null>(null);
   const [claimingMission, setClaimingMission] = useState(false);
   const [dailyMission, setDailyMission] =
     useState<DailyMissionStatus | null>(initialDailyMission);
@@ -5168,6 +5339,15 @@ export function FirstListenApp({
     setToast(message);
     window.setTimeout(() => setToast(""), 3200);
   };
+
+  useEffect(() => {
+    if (!rewardClaimFeedback) return;
+    const timeout = window.setTimeout(
+      () => setRewardClaimFeedback(null),
+      9000,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [rewardClaimFeedback]);
 
   const changeAutoPlayNextSong = async (enabled: boolean) => {
     setAutoPlayNextSong(enabled);
@@ -5497,6 +5677,7 @@ export function FirstListenApp({
       );
       return;
     }
+    const beforeCredits = reviewCount;
     setClaimingReward(true);
     const { data, error } = await supabase.rpc("claim_listening_reward");
     setClaimingReward(false);
@@ -5512,8 +5693,11 @@ export function FirstListenApp({
     }
     const bankSeconds = Number(result.bank_seconds ?? 0);
     const creditsAwarded = Number(result.credits_awarded ?? 1);
+    const afterCredits = Number(
+      result.credits_balance ?? beforeCredits + creditsAwarded,
+    );
     const exchangeSeconds = listeningBank.minutesPerCredit * 60;
-    setReviewCount(Number(result.credits_balance ?? reviewCount + creditsAwarded));
+    setReviewCount(afterCredits);
     setTotalCreditsEarned((current) => current + creditsAwarded);
     setListeningBank((current) => ({
       ...current,
@@ -5523,6 +5707,12 @@ export function FirstListenApp({
       ),
       secondsToNextCredit: secondsToNextReward(bankSeconds, exchangeSeconds),
     }));
+    setRewardClaimFeedback({
+      awarded: creditsAwarded,
+      beforeCredits,
+      afterCredits,
+      claimedAt: Date.now(),
+    });
     notify(
       locale === "es"
         ? "Recompensa reclamada. Se agregó un token a tu cuenta."
@@ -5765,6 +5955,9 @@ export function FirstListenApp({
         previouslySupportedSongs={initialPreviouslySupportedSongs}
         todaySupport={todaySupport}
         listeningBank={listeningBank}
+        claimingReward={claimingReward}
+        onClaimReward={() => void claimListeningReward()}
+        rewardClaimFeedback={rewardClaimFeedback}
         autoPlayNextSong={autoPlayNextSong}
         onAutoPlayChange={(enabled) => void changeAutoPlayNextSong(enabled)}
         externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
