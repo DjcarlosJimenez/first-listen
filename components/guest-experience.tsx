@@ -43,6 +43,7 @@ import {
   useState,
 } from "react";
 import { LanguageSelector } from "@/components/language-selector";
+import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import {
   ArtistNameLink,
   ArtistProfileButton,
@@ -452,6 +453,7 @@ function GuestTopbar({
       </div>
       <div className="topbar-actions">
         <LanguageSelector compact locale={locale} onChange={onLocaleChange} />
+        <PwaInstallButton compact locale={locale} />
         <span className="app-status-pill">{spanish ? "Beta pública" : "Public Beta"}</span>
         <span className="app-founder-pill"><i /> {spanish ? "Programa fundador activo" : "Founding Artists Program Active"}</span>
         <Link className="help-button" href="/help" aria-label="Help Center">

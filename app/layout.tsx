@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { PlatformRuntime } from "@/components/platform-runtime";
-import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
+import { PwaInstallProvider } from "@/components/pwa-install-prompt";
 import {
   defaultPlatformControlConfig,
   mapPlatformControlState,
@@ -88,9 +88,10 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <PlatformRuntime initialState={initialState} />
-        <PwaInstallPrompt />
-        {children}
+        <PwaInstallProvider>
+          <PlatformRuntime initialState={initialState} />
+          {children}
+        </PwaInstallProvider>
       </body>
     </html>
   );

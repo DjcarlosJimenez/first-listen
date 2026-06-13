@@ -23,6 +23,7 @@ import {
 import { FormEvent, useState } from "react";
 import { LanguageSelector } from "@/components/language-selector";
 import { Logo } from "@/components/logo";
+import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import { growthStages, type InterfaceLocale } from "@/lib/catalog";
 import { getCopy } from "@/lib/i18n";
 
@@ -143,6 +144,7 @@ export function PublicLanding({
         </nav>
         <div className="landing-actions">
           <LanguageSelector compact locale={locale} onChange={onLocaleChange} />
+          <PwaInstallButton compact locale={locale} />
           <span className="beta-pill">{copy.common.publicBeta}</span>
           <button className="landing-login" onClick={onLogin}>{copy.common.login}</button>
           <button className="landing-signup" onClick={onSignUp}>

@@ -1,12 +1,32 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Download, Share2, Smartphone, X } from "lucide-react";
+import type { InterfaceLocale } from "@/lib/catalog";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
+
+type PwaInstallContextValue = {
+  installed: boolean;
+  installing: boolean;
+  iosSafari: boolean;
+  nativePromptAvailable: boolean;
+  requestInstall: () => Promise<void>;
+  dismissInstructions: () => void;
+};
+
+const PwaInstallContext = createContext<PwaInstallContextValue | null>(null);
 
 const DISMISS_KEY = "first-listen-install-dismissed-at";
 const DISMISS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -37,21 +57,31 @@ function isIosSafari() {
 }
 
 function recentlyDismissed() {
-  const value = window.localStorage.getItem(DISMISS_KEY);
-  if (!value) return false;
-  const dismissedAt = Number(value);
-  return Number.isFinite(dismissedAt) && Date.now() - dismissedAt < DISMISS_WINDOW_MS;
+  try {
+    const value = window.localStorage.getItem(DISMISS_KEY);
+    if (!value) return false;
+    const dismissedAt = Number(value);
+    return Number.isFinite(dismissedAt) && Date.now() - dismissedAt < DISMISS_WINDOW_MS;
+  } catch {
+    return false;
+  }
 }
 
-export function PwaInstallPrompt() {
+function markDismissed() {
+  try {
+    window.localStorage.setItem(DISMISS_KEY, String(Date.now()));
+  } catch {
+    // Some private browsing modes can block localStorage. The prompt can still hide for this session.
+  }
+}
+
+export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const [promptEvent, setPromptEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
   const [iosSafari, setIosSafari] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [installing, setInstalling] = useState(false);
-
-  const canShowInstructions = useMemo(() => !installed, [installed]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -83,11 +113,13 @@ export function PwaInstallPrompt() {
     const onInstalled = () => {
       setInstalled(true);
       setVisible(false);
+      setPromptEvent(null);
       document.documentElement.dataset.pwaStandalone = "true";
     };
     const onDisplayModeChange = (event: MediaQueryListEvent) => {
       setInstalled(event.matches);
       document.documentElement.dataset.pwaStandalone = String(event.matches);
+      if (event.matches) setVisible(false);
     };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
@@ -109,28 +141,108 @@ export function PwaInstallPrompt() {
     };
   }, []);
 
-  if (installed || !visible || (!promptEvent && !canShowInstructions)) {
-    return null;
-  }
-
-  const dismiss = () => {
-    window.localStorage.setItem(DISMISS_KEY, String(Date.now()));
+  const dismissInstructions = useCallback(() => {
+    markDismissed();
     setVisible(false);
-  };
+  }, []);
 
-  const install = async () => {
-    if (!promptEvent) return;
+  const requestInstall = useCallback(async () => {
+    if (installed) return;
+    if (!promptEvent) {
+      setVisible(true);
+      return;
+    }
     setInstalling(true);
     await promptEvent.prompt();
     const choice = await promptEvent.userChoice;
     setInstalling(false);
+    setPromptEvent(null);
     if (choice.outcome === "accepted") {
       setInstalled(true);
       setVisible(false);
+      document.documentElement.dataset.pwaStandalone = "true";
       return;
     }
-    dismiss();
-  };
+    setVisible(true);
+  }, [installed, promptEvent]);
+
+  const value = useMemo<PwaInstallContextValue>(
+    () => ({
+      installed,
+      installing,
+      iosSafari,
+      nativePromptAvailable: Boolean(promptEvent),
+      requestInstall,
+      dismissInstructions,
+    }),
+    [dismissInstructions, installed, installing, iosSafari, promptEvent, requestInstall],
+  );
+
+  return (
+    <PwaInstallContext.Provider value={value}>
+      {children}
+      <PwaInstallPrompt visible={visible} />
+    </PwaInstallContext.Provider>
+  );
+}
+
+function usePwaInstall() {
+  const value = useContext(PwaInstallContext);
+  if (!value) {
+    throw new Error("PwaInstall components must be used inside PwaInstallProvider.");
+  }
+  return value;
+}
+
+export function PwaInstallButton({
+  className = "pwa-header-install-button",
+  compact = false,
+  locale = "en",
+}: {
+  className?: string;
+  compact?: boolean;
+  locale?: InterfaceLocale;
+}) {
+  const { installed, installing, nativePromptAvailable, requestInstall } =
+    usePwaInstall();
+  if (installed) return null;
+
+  const spanish = locale === "es";
+  const label = spanish ? "Instalar First Listen" : "Install First Listen";
+  const hint = nativePromptAvailable
+    ? spanish
+      ? "Abrir instalacion de la app"
+      : "Open app install prompt"
+    : spanish
+      ? "Mostrar instrucciones para instalar"
+      : "Show install instructions";
+
+  return (
+    <button
+      aria-label={label}
+      className={className}
+      disabled={installing}
+      onClick={() => void requestInstall()}
+      title={hint}
+      type="button"
+    >
+      <Smartphone size={compact ? 15 : 16} />
+      <span>{installing ? (spanish ? "Instalando..." : "Installing...") : label}</span>
+    </button>
+  );
+}
+
+function PwaInstallPrompt({ visible }: { visible: boolean }) {
+  const {
+    dismissInstructions,
+    installed,
+    installing,
+    iosSafari,
+    nativePromptAvailable,
+    requestInstall,
+  } = usePwaInstall();
+
+  if (installed || !visible) return null;
 
   return (
     <aside className="pwa-install-card" aria-live="polite">
@@ -139,7 +251,7 @@ export function PwaInstallPrompt() {
       </div>
       <div>
         <strong>Install First Listen</strong>
-        {promptEvent ? (
+        {nativePromptAvailable ? (
           <span>
             Add the First Listen icon to your home screen and reopen the app
             without searching for the website.
@@ -158,17 +270,20 @@ export function PwaInstallPrompt() {
         )}
       </div>
       <div className="pwa-install-actions">
-        {promptEvent && (
-          <button disabled={installing} onClick={() => void install()} type="button">
+        {nativePromptAvailable ? (
+          <button disabled={installing} onClick={() => void requestInstall()} type="button">
             <Download size={14} /> {installing ? "Installing..." : "Install"}
           </button>
-        )}
-        {!promptEvent && (
-          <button onClick={dismiss} type="button">
+        ) : (
+          <button onClick={dismissInstructions} type="button">
             Got it
           </button>
         )}
-        <button aria-label="Dismiss install prompt" onClick={dismiss} type="button">
+        <button
+          aria-label="Dismiss install prompt"
+          onClick={dismissInstructions}
+          type="button"
+        >
           <X size={14} />
         </button>
       </div>

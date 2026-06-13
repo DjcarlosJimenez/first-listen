@@ -2699,6 +2699,40 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   padding: 8px 10px;
 }
 
+.pwa-header-install-button {
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 68%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-strong));
+  color: var(--dark);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 900;
+  gap: 7px;
+  height: 34px;
+  letter-spacing: -0.01em;
+  padding: 0 11px;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  white-space: nowrap;
+}
+
+.pwa-header-install-button:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 28%, var(--surface-strong));
+  transform: translateY(-1px);
+}
+
+.pwa-header-install-button:disabled {
+  cursor: wait;
+  opacity: 0.74;
+}
+
+.pwa-header-install-button svg {
+  color: var(--acid-dark);
+  flex: 0 0 auto;
+}
+
 .app-founder-pill {
   background: #eafdba;
   color: #526a16;
@@ -5153,6 +5187,11 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
 .theme-dark .topbar {
   background: #131714;
+}
+
+.theme-dark .pwa-header-install-button {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-strong));
+  color: var(--ink);
 }
 
 .theme-dark .help-button,
@@ -7732,6 +7771,16 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
     margin-left: auto;
   }
 
+  .pwa-header-install-button {
+    padding: 0 9px;
+  }
+
+  .pwa-header-install-button span {
+    max-width: 104px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .help-button {
     display: none;
   }
@@ -8006,6 +8055,10 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
   .topbar-actions .language-selector select {
     height: 34px;
+  }
+
+  .pwa-header-install-button span {
+    max-width: 72px;
   }
 
   .mobile-logo .brand-name {

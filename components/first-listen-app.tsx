@@ -63,6 +63,7 @@ import {
   useState,
 } from "react";
 import { LanguageSelector } from "@/components/language-selector";
+import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import {
   ArtistNameLink,
   ArtistProfileButton,
@@ -718,6 +719,7 @@ function Topbar({
       </div>
       <div className="topbar-actions">
         <LanguageSelector compact locale={locale} onChange={onLocaleChange} />
+        <PwaInstallButton compact locale={locale} />
         <span className="app-status-pill">{copy.common.publicBeta}</span>
         <span className="app-founder-pill"><i /> {copy.common.founderActive}</span>
         <button
