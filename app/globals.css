@@ -7904,6 +7904,220 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   line-height: 0.9;
 }
 
+.discovery-navigation-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.discovery-navigation-grid,
+.genre-navigation-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.discovery-nav-card,
+.genre-nav-card {
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 14px;
+}
+
+.discovery-nav-card.active,
+.genre-nav-card:has(.discovery-genre-list) {
+  border-color: rgba(200, 255, 79, 0.42);
+  box-shadow: 0 18px 42px rgba(37, 45, 33, 0.08);
+}
+
+.discovery-nav-card-icon {
+  align-items: center;
+  background: var(--dark);
+  border-radius: 12px;
+  color: var(--acid);
+  display: flex;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.discovery-nav-card h4,
+.genre-nav-card h4 {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 24px;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  margin: 0 0 5px;
+}
+
+.discovery-nav-card p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+  margin: 0 0 7px;
+}
+
+.discovery-nav-card small,
+.genre-nav-card small {
+  color: var(--success-fg);
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.discovery-nav-actions {
+  display: grid;
+  gap: 6px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+}
+
+.discovery-nav-actions button {
+  align-items: center;
+  background: var(--control-surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 8px;
+  font-weight: 900;
+  gap: 6px;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 10px;
+  text-transform: uppercase;
+}
+
+.discovery-nav-actions button:first-child {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: var(--acid);
+}
+
+.discovery-nav-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.discovery-queue-panel,
+.discovery-catalog-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.discovery-queue-copy {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+  margin: -4px 0 0;
+}
+
+.discovery-queue-grid {
+  display: grid;
+}
+
+.discovery-queue-controls {
+  align-items: center;
+  background: var(--control-surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+}
+
+.discovery-queue-controls span,
+.discovery-queue-controls strong {
+  align-items: center;
+  display: inline-flex;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.discovery-queue-controls span {
+  color: var(--success-fg);
+}
+
+.discovery-queue-controls button {
+  align-items: center;
+  background: var(--dark);
+  border: 1px solid var(--dark);
+  border-radius: 999px;
+  color: var(--acid);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 8px;
+  font-weight: 900;
+  gap: 5px;
+  justify-content: center;
+  margin-left: auto;
+  min-height: 32px;
+  padding: 7px 11px;
+  text-transform: uppercase;
+}
+
+.discovery-queue-controls button + button {
+  background: var(--control-surface);
+  border-color: var(--line);
+  color: var(--ink);
+  margin-left: 0;
+}
+
+.discovery-queue-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.discovery-catalog-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.discovery-catalog-limit-note,
+.discovery-scalability-note {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.discovery-scalability-note {
+  background: var(--surface-muted);
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.genre-nav-card {
+  grid-template-columns: 1fr;
+}
+
+.genre-nav-card header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.genre-nav-card header > span {
+  font-size: 28px;
+}
+
+.discovery-genre-list {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+}
+
 .random-discovery-actions {
   align-items: center;
   display: grid;
@@ -8739,6 +8953,9 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   }
 
   .discovery-song-grid,
+  .discovery-navigation-grid,
+  .discovery-catalog-grid,
+  .genre-navigation-grid,
   .top-ten-grid,
   .community-program-grid,
   .admin-spotlight-grid {
@@ -8756,6 +8973,26 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
   .discovery-hub-stats span {
     min-height: 78px;
+  }
+
+  .discovery-nav-card,
+  .genre-nav-card {
+    grid-template-columns: 1fr;
+  }
+
+  .discovery-nav-card-icon {
+    height: 36px;
+    width: 36px;
+  }
+
+  .discovery-queue-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .discovery-queue-controls button {
+    margin-left: 0;
+    width: 100%;
   }
 
   .genre-discovery-row header {
@@ -10733,6 +10970,22 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   order: 1 !important;
 }
 
+.dashboard-discovery > .discovery-navigation-panel {
+  order: 2 !important;
+}
+
+.dashboard-discovery > .discovery-queue-panel {
+  order: 3 !important;
+}
+
+.dashboard-discovery > .discovery-catalog-panel {
+  order: 4 !important;
+}
+
+.dashboard-discovery > .discovery-scalability-note {
+  order: 5 !important;
+}
+
 .dashboard-discovery > [data-platform-module="top_results"] {
   order: 2 !important;
 }
@@ -10767,6 +11020,42 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
 .dashboard-discovery > [data-platform-module="most_listened"] {
   order: 105 !important;
+}
+
+.discovery-navigation-grid > [data-platform-module="top_results"] {
+  order: 1 !important;
+}
+
+.discovery-navigation-grid > [data-platform-module="internal_playback"] {
+  order: 2 !important;
+}
+
+.discovery-navigation-grid > [data-platform-module="random"] {
+  order: 3 !important;
+}
+
+.discovery-navigation-grid > [data-platform-module="external_discovery"] {
+  order: 4 !important;
+}
+
+.discovery-navigation-grid > [data-platform-module="genres"] {
+  order: 5 !important;
+}
+
+.discovery-navigation-grid > [data-platform-module="trending"] {
+  order: 6 !important;
+}
+
+.discovery-navigation-grid > [data-platform-module="newest_songs"] {
+  order: 7 !important;
+}
+
+.discovery-navigation-grid > [data-platform-module="most_supported"] {
+  order: 8 !important;
+}
+
+.discovery-navigation-grid > [data-platform-module="most_listened"] {
+  order: 9 !important;
 }
 
 html[data-review-layout-density="compact"] .content {
