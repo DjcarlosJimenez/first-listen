@@ -7840,6 +7840,156 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   margin: 12px 0;
 }
 
+.discovery-hub-hero {
+  background:
+    radial-gradient(circle at 12% 18%, rgba(200, 255, 79, 0.2), transparent 28%),
+    linear-gradient(135deg, #151815 0%, #202520 100%);
+  border: 1px solid rgba(200, 255, 79, 0.28);
+  border-radius: 20px;
+  color: #f7f9f0;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(240px, 0.85fr);
+  margin-bottom: 4px;
+  overflow: hidden;
+  padding: 22px;
+  position: relative;
+}
+
+.discovery-hub-hero .eyebrow {
+  color: var(--acid);
+}
+
+.discovery-hub-hero h2 {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: clamp(38px, 6vw, 68px);
+  letter-spacing: -0.075em;
+  line-height: 0.9;
+  margin: 10px 0;
+}
+
+.discovery-hub-hero p {
+  color: rgba(247, 249, 240, 0.82);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 640px;
+}
+
+.discovery-hub-stats {
+  align-self: stretch;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.discovery-hub-stats span {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 15px;
+  color: rgba(247, 249, 240, 0.76);
+  display: grid;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 6px;
+  min-height: 96px;
+  padding: 14px;
+  text-transform: uppercase;
+}
+
+.discovery-hub-stats strong {
+  color: var(--acid);
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 38px;
+  line-height: 0.9;
+}
+
+.random-discovery-actions {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr);
+  margin-top: 16px;
+}
+
+.random-discovery-actions .primary-button {
+  min-height: 42px;
+}
+
+.random-discovery-actions p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.discovery-genre-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.genre-discovery-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.genre-discovery-row {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+}
+
+.genre-discovery-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.genre-discovery-row header {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.genre-discovery-row header div,
+.genre-discovery-row button {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.genre-discovery-row header span {
+  font-size: 24px;
+}
+
+.genre-discovery-row h4 {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+  margin: 0;
+}
+
+.genre-discovery-row button {
+  background: var(--control-surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  text-transform: uppercase;
+}
+
+.genre-discovery-row button:hover {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: var(--acid);
+}
+
 .discovery-section .panel-heading {
   gap: 18px;
 }
@@ -8595,6 +8745,28 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
     grid-template-columns: 1fr;
   }
 
+  .discovery-hub-hero,
+  .random-discovery-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .discovery-hub-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .discovery-hub-stats span {
+    min-height: 78px;
+  }
+
+  .genre-discovery-row header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .genre-discovery-row button {
+    width: 100%;
+  }
+
   .review-complete-card {
     grid-row: 2;
     min-height: 480px;
@@ -8603,19 +8775,40 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
 @media (max-width: 560px) {
   .topbar {
-    padding: 0 15px;
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+    min-width: 0;
   }
 
   .topbar-actions .language-selector select {
     height: 34px;
   }
 
-  .pwa-header-install-button span {
-    max-width: 72px;
+  .topbar-profile-link,
+  .pwa-header-install-button,
+  .session-button {
+    flex: 0 0 auto;
+    height: 34px;
+    justify-content: center;
+    padding: 0;
+    width: 34px;
   }
 
-  .mobile-logo .brand-name {
-    font-size: 13px;
+  .topbar-profile-link span,
+  .pwa-header-install-button span,
+  .mobile-logo .brand-name,
+  .app-status-pill {
+    display: none;
+  }
+
+  .app-status-pill {
+    font-size: 7px;
+    padding: 7px 6px;
+    white-space: nowrap;
   }
 
   .session-button b {
@@ -8626,6 +8819,13 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
     justify-content: center;
     padding: 0;
     width: 38px;
+  }
+
+  .app-main,
+  .content,
+  .topbar {
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 
   .content {
@@ -8679,6 +8879,21 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
   .binary-choice button {
     flex: 1;
+  }
+
+  .discovery-song-card {
+    grid-template-columns: 1fr;
+  }
+
+  .discovery-song-cover {
+    grid-row: auto;
+    max-width: 118px;
+  }
+
+  .discovery-song-actions button,
+  .discovery-song-actions a {
+    min-width: 0;
+    white-space: normal;
   }
 
   .rating-options {
@@ -10323,6 +10538,15 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 }
 
 @media (max-width: 420px) {
+  .mobile-logo .brand-name,
+  .app-status-pill {
+    display: none;
+  }
+
+  .topbar-actions {
+    gap: 5px;
+  }
+
   .connected-platforms-heading {
     align-items: flex-start;
     display: grid;
@@ -10499,6 +10723,50 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 [data-platform-module="newest_songs"] {
   display: var(--module-display-newest_songs, block);
   order: var(--module-order-newest_songs, 12);
+}
+
+.dashboard-discovery > .discovery-hub-hero {
+  order: 0 !important;
+}
+
+.dashboard-discovery > [data-platform-module="spotlight"] {
+  order: 1 !important;
+}
+
+.dashboard-discovery > [data-platform-module="top_results"] {
+  order: 2 !important;
+}
+
+.dashboard-discovery > [data-platform-module="internal_playback"] {
+  order: 3 !important;
+}
+
+.dashboard-discovery > [data-platform-module="external_discovery"] {
+  order: 4 !important;
+}
+
+.dashboard-discovery > .discovery-random-panel {
+  order: 100 !important;
+}
+
+.dashboard-discovery > .discovery-genre-panel {
+  order: 101 !important;
+}
+
+.dashboard-discovery > [data-platform-module="trending"] {
+  order: 102 !important;
+}
+
+.dashboard-discovery > [data-platform-module="newest_songs"] {
+  order: 103 !important;
+}
+
+.dashboard-discovery > [data-platform-module="most_supported"] {
+  order: 104 !important;
+}
+
+.dashboard-discovery > [data-platform-module="most_listened"] {
+  order: 105 !important;
 }
 
 html[data-review-layout-density="compact"] .content {
@@ -10811,6 +11079,10 @@ html[data-external-discovery-placement="bottom"] [data-platform-module="external
 
 html[data-external-discovery-placement="hidden"] [data-platform-module="external_discovery"] {
   display: none;
+}
+
+html .dashboard-discovery > [data-platform-module="external_discovery"] {
+  order: 4 !important;
 }
 
 html[data-show-platform-recommendations="false"] .recommended-platform-inline,

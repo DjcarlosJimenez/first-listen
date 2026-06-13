@@ -205,6 +205,7 @@ type ContentEconomyRow = {
 
 function mapDiscoveryRow(row: DiscoveryRow): DiscoverySong {
   const platform = platformLabels[row.platform] ?? "YouTube";
+  const extended = row as DiscoveryRow & Partial<ExternalDiscoveryRow>;
   return {
     id: row.song_id,
     artistId: row.artist_id,
@@ -225,6 +226,10 @@ function mapDiscoveryRow(row: DiscoveryRow): DiscoverySong {
     hookScore: Number(row.hook_score ?? 0),
     totalListeningSeconds: Number(row.total_listening_seconds ?? 0),
     completionRate: Number(row.completion_rate ?? 0),
+    submittedAt: extended.submitted_at ?? undefined,
+    commentsCount: Number(extended.comments_count ?? 0),
+    likesCount: Number(extended.likes_count ?? 0),
+    followersCount: Number(extended.followers_count ?? 0),
     badge: row.badge,
     position:
       row.slot_number === undefined
@@ -315,7 +320,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
     supabase.rpc("get_listening_bank_status_v2"),
     supabase.rpc("get_spotlight_songs"),
     supabase.rpc("get_top_ten_songs"),
-    supabase.rpc("get_external_discovery_feed", { feed_limit: 24 }),
+    supabase.rpc("get_external_discovery_feed", { feed_limit: 48 }),
     supabase.rpc("get_daily_mission_status"),
     supabase.rpc("get_active_community_programs"),
     supabase.rpc("get_followed_artists", { queue_limit: 8 }),

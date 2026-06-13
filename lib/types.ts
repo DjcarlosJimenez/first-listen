@@ -200,6 +200,10 @@ export type DiscoverySong = {
   hookScore: number;
   totalListeningSeconds: number;
   completionRate: number;
+  submittedAt?: string;
+  commentsCount?: number;
+  likesCount?: number;
+  followersCount?: number;
   badge?: string;
   feedKind?: string;
   position?: number;

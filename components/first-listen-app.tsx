@@ -56,6 +56,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   FormEvent,
+  ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -2764,6 +2765,168 @@ function ListeningBankPanel({
   );
 }
 
+const DISCOVERY_HEARD_HISTORY_KEY = "first-listen-discovery-heard-history";
+const RECENTLY_HEARD_WINDOW_MS = 1000 * 60 * 60 * 24;
+
+function readDiscoveryHeardHistory(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(DISCOVERY_HEARD_HISTORY_KEY) ?? "{}",
+    );
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, number>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDiscoveryHeardHistory(history: Record<string, number>) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    DISCOVERY_HEARD_HISTORY_KEY,
+    JSON.stringify(history),
+  );
+}
+
+function mergeDiscoverySongs(...groups: DiscoverySong[][]) {
+  const map = new Map<string, DiscoverySong>();
+  for (const group of groups) {
+    for (const song of group) {
+      const existing = map.get(song.id);
+      map.set(song.id, {
+        ...existing,
+        ...song,
+        platformLinks: song.platformLinks?.length
+          ? song.platformLinks
+          : existing?.platformLinks,
+        submittedAt: song.submittedAt ?? existing?.submittedAt,
+        commentsCount: song.commentsCount ?? existing?.commentsCount,
+        likesCount: song.likesCount ?? existing?.likesCount,
+        followersCount: song.followersCount ?? existing?.followersCount,
+      });
+    }
+  }
+  return Array.from(map.values());
+}
+
+function isInternalDiscoverySong(song: DiscoverySong) {
+  return !isExternalPlatform(song.platform);
+}
+
+function hasExternalDiscoveryDestination(song: DiscoverySong) {
+  return (
+    isExternalPlatform(song.platform) ||
+    (song.platformLinks ?? []).some((link) => isExternalPlatform(link.platform))
+  );
+}
+
+function supportScore(song: DiscoverySong) {
+  return (
+    (song.likesCount ?? 0) * 3 +
+    (song.followersCount ?? 0) * 4 +
+    song.reviewsReceived * 2 +
+    Math.min(50, song.hookScore)
+  );
+}
+
+function trendScore(song: DiscoverySong) {
+  return (
+    song.hookScore * 1.2 +
+    song.completionRate * 0.5 +
+    supportScore(song) +
+    Math.min(100, song.totalListeningSeconds / 60)
+  );
+}
+
+function exposureScore(song: DiscoverySong) {
+  return (
+    song.reviewsReceived * 8 +
+    Math.min(100, song.totalListeningSeconds / 60) +
+    supportScore(song) * 0.5
+  );
+}
+
+function sortDiscoverySongs(
+  songs: DiscoverySong[],
+  sorter: (left: DiscoverySong, right: DiscoverySong) => number,
+  limit = 8,
+) {
+  return [...songs].sort(sorter).slice(0, limit);
+}
+
+function smartDiscoveryPick(
+  songs: DiscoverySong[],
+  heardHistory: Record<string, number>,
+) {
+  if (!songs.length) return null;
+  const now = Date.now();
+  const ranked = [...songs].sort((left, right) => {
+    const leftHeardAt = heardHistory[left.id] ?? 0;
+    const rightHeardAt = heardHistory[right.id] ?? 0;
+    const leftRecentlyHeard =
+      leftHeardAt > 0 && now - leftHeardAt < RECENTLY_HEARD_WINDOW_MS;
+    const rightRecentlyHeard =
+      rightHeardAt > 0 && now - rightHeardAt < RECENTLY_HEARD_WINDOW_MS;
+    if (leftRecentlyHeard !== rightRecentlyHeard) {
+      return leftRecentlyHeard ? 1 : -1;
+    }
+    if (Boolean(leftHeardAt) !== Boolean(rightHeardAt)) {
+      return leftHeardAt ? 1 : -1;
+    }
+    const exposureDifference = exposureScore(left) - exposureScore(right);
+    if (Math.abs(exposureDifference) > 0.1) return exposureDifference;
+    return right.hookScore - left.hookScore;
+  });
+  const replayPool = ranked.slice(0, Math.min(6, ranked.length));
+  return replayPool[Math.floor(Math.random() * replayPool.length)] ?? ranked[0];
+}
+
+function submittedTime(song: DiscoverySong) {
+  if (!song.submittedAt) return 0;
+  const time = new Date(song.submittedAt).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function normalizedGenreKey(genre: string) {
+  return genre.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+function discoveryGenreLabel(locale: InterfaceLocale, genre: string) {
+  if (locale === "es") {
+    if (genre === "Regional Mexican") return "Regional Mexicano";
+    if (genre === "Hip Hop") return "Hip-Hop";
+  }
+  return genre === "Hip Hop" ? "Hip-Hop" : optionLabel(locale, genre);
+}
+
+function discoveryGenreEmoji(genre: string) {
+  const emojiByGenre: Record<string, string> = {
+    Bachata: "🎶",
+    Cumbia: "💃",
+    "Hip Hop": "🎤",
+    "Regional Mexican": "🤠",
+    Chilena: "🥁",
+    Reggaeton: "🔥",
+    Salsa: "🎺",
+  };
+  return emojiByGenre[genre] ?? "🎵";
+}
+
+function discoveryContextIcon(kind: string) {
+  if (kind === "top") return <Trophy size={13} />;
+  if (kind === "external") return <ExternalLink size={13} />;
+  if (kind === "internal") return <Headphones size={13} />;
+  if (kind === "trending") return <Rocket size={13} />;
+  if (kind === "new") return <CalendarDays size={13} />;
+  if (kind === "support") return <ThumbsUp size={13} />;
+  if (kind === "listened") return <Gauge size={13} />;
+  if (kind === "genre") return <Music2 size={13} />;
+  if (kind === "random") return <Play size={13} />;
+  return <Sparkles size={13} />;
+}
+
 function DiscoverySongCard({
   song,
   active,
@@ -2771,6 +2934,8 @@ function DiscoverySongCard({
   onListeningCredited,
   locale,
   topTen,
+  contextKind = topTen ? "top" : "spotlight",
+  contextLabel,
   externalRedirectNoticeDisabled,
   onExternalRedirectPreferenceChange,
 }: {
@@ -2785,6 +2950,8 @@ function DiscoverySongCard({
   ) => void;
   locale: InterfaceLocale;
   topTen?: boolean;
+  contextKind?: string;
+  contextLabel?: string;
   externalRedirectNoticeDisabled: boolean;
   onExternalRedirectPreferenceChange: (disabled: boolean) => void;
 }) {
@@ -3044,14 +3211,15 @@ function DiscoverySongCard({
       </div>
       <div className="discovery-song-copy">
         <span className="eyebrow">
-          {topTen ? <Trophy size={13} /> : <Sparkles size={13} />}
-          {topTen
-            ? spanish
-              ? "Ranking orgánico"
-              : "Organic ranking"
-            : spanish
-              ? "Seleccion editorial"
-              : "Editorial selection"}
+          {discoveryContextIcon(contextKind)}
+          {contextLabel ??
+            (topTen
+              ? spanish
+                ? "Ranking orgánico"
+                : "Organic ranking"
+              : spanish
+                ? "Selección editorial"
+                : "Editorial selection")}
         </span>
         <h4>{song.title}</h4>
         <ArtistNameLink artistId={song.artistId} name={song.artist} />
@@ -3223,6 +3391,574 @@ function DiscoverySongCard({
 }
 
 function DiscoverySections({
+  spotlightSongs,
+  topTenSongs,
+  externalDiscoverySongs,
+  locale,
+  onListeningCredited,
+  externalRedirectNoticeDisabled,
+  onExternalRedirectPreferenceChange,
+}: {
+  spotlightSongs: DiscoverySong[];
+  topTenSongs: DiscoverySong[];
+  externalDiscoverySongs: DiscoverySong[];
+  locale: InterfaceLocale;
+  onListeningCredited: (
+    seconds: number,
+    becameValid: boolean,
+    becameComplete: boolean,
+    completionRate: number,
+  ) => void;
+  externalRedirectNoticeDisabled: boolean;
+  onExternalRedirectPreferenceChange: (disabled: boolean) => void;
+}) {
+  const [activeCardKey, setActiveCardKey] = useState<string | null>(null);
+  const [heardHistory, setHeardHistory] = useState<Record<string, number>>({});
+  const [randomSong, setRandomSong] = useState<DiscoverySong | null>(null);
+  const spanish = locale === "es";
+  const spotlightIds = new Set(spotlightSongs.map((song) => song.id));
+  const visibleTopTenSongs = topTenSongs.filter(
+    (song) => !spotlightIds.has(song.id),
+  );
+  const allDiscoverySongs = useMemo(
+    () =>
+      mergeDiscoverySongs(
+        spotlightSongs,
+        topTenSongs,
+        externalDiscoverySongs,
+      ),
+    [externalDiscoverySongs, spotlightSongs, topTenSongs],
+  );
+  const internalPlaybackSongs = useMemo(
+    () =>
+      sortDiscoverySongs(
+        allDiscoverySongs.filter(isInternalDiscoverySong),
+        (left, right) =>
+          exposureScore(left) - exposureScore(right) ||
+          trendScore(right) - trendScore(left),
+        4,
+      ),
+    [allDiscoverySongs],
+  );
+  const externalPlatformSongs = useMemo(
+    () =>
+      sortDiscoverySongs(
+        allDiscoverySongs.filter(hasExternalDiscoveryDestination),
+        (left, right) =>
+          Number(right.feedKind === "external_song") -
+            Number(left.feedKind === "external_song") ||
+          submittedTime(right) - submittedTime(left) ||
+          trendScore(right) - trendScore(left),
+        4,
+      ),
+    [allDiscoverySongs],
+  );
+  const trendingSongs = useMemo(() => {
+    const explicitTrending = allDiscoverySongs.filter(
+      (song) => song.feedKind === "trending_external",
+    );
+    return sortDiscoverySongs(
+      explicitTrending.length ? explicitTrending : allDiscoverySongs,
+      (left, right) => trendScore(right) - trendScore(left),
+      4,
+    );
+  }, [allDiscoverySongs]);
+  const newestSongs = useMemo(
+    () =>
+      sortDiscoverySongs(
+        allDiscoverySongs,
+        (left, right) => submittedTime(right) - submittedTime(left),
+        4,
+      ),
+    [allDiscoverySongs],
+  );
+  const mostSupportedSongs = useMemo(
+    () =>
+      sortDiscoverySongs(
+        allDiscoverySongs,
+        (left, right) => supportScore(right) - supportScore(left),
+        4,
+      ),
+    [allDiscoverySongs],
+  );
+  const mostListenedSongs = useMemo(
+    () =>
+      sortDiscoverySongs(
+        allDiscoverySongs,
+        (left, right) =>
+          right.totalListeningSeconds - left.totalListeningSeconds ||
+          right.completionRate - left.completionRate,
+        4,
+      ),
+    [allDiscoverySongs],
+  );
+  const genreSections = useMemo(() => {
+    const grouped = new Map<string, DiscoverySong[]>();
+    for (const song of allDiscoverySongs) {
+      const genre = song.genre || "Other";
+      grouped.set(genre, [...(grouped.get(genre) ?? []), song]);
+    }
+    const priorityGenres = [
+      "Cumbia",
+      "Regional Mexican",
+      "Hip Hop",
+      "Bachata",
+      "Chilena",
+    ];
+    return Array.from(grouped.entries())
+      .sort(([left], [right]) => {
+        const leftPriority = priorityGenres.indexOf(left);
+        const rightPriority = priorityGenres.indexOf(right);
+        if (leftPriority !== -1 || rightPriority !== -1) {
+          if (leftPriority === -1) return 1;
+          if (rightPriority === -1) return -1;
+          return leftPriority - rightPriority;
+        }
+        return left.localeCompare(right);
+      })
+      .slice(0, 6)
+      .map(([genre, songs]) => ({
+        genre,
+        songs: sortDiscoverySongs(
+          songs,
+          (left, right) =>
+            exposureScore(left) - exposureScore(right) ||
+            trendScore(right) - trendScore(left),
+          2,
+        ),
+      }))
+      .filter((section) => section.songs.length > 0);
+  }, [allDiscoverySongs]);
+  const randomCandidate =
+    randomSong && allDiscoverySongs.some((song) => song.id === randomSong.id)
+      ? randomSong
+      : smartDiscoveryPick(allDiscoverySongs, heardHistory);
+
+  useEffect(() => {
+    setHeardHistory(readDiscoveryHeardHistory());
+  }, []);
+
+  const markSongHeard = useCallback((song: DiscoverySong) => {
+    const timestamp = Date.now();
+    setHeardHistory((current) => {
+      const next = { ...current, [song.id]: timestamp };
+      writeDiscoveryHeardHistory(next);
+      return next;
+    });
+  }, []);
+
+  const toggleDiscoveryCard = useCallback(
+    (cardKey: string, song: DiscoverySong) => {
+      if (activeCardKey !== cardKey) markSongHeard(song);
+      setActiveCardKey((current) => (current === cardKey ? null : cardKey));
+    },
+    [activeCardKey, markSongHeard],
+  );
+
+  const openDiscoveryCard = useCallback(
+    (cardKey: string, song: DiscoverySong) => {
+      markSongHeard(song);
+      setActiveCardKey(cardKey);
+    },
+    [markSongHeard],
+  );
+
+  const playRandomSong = () => {
+    const selected = smartDiscoveryPick(allDiscoverySongs, heardHistory);
+    if (!selected) return;
+    setRandomSong(selected);
+    openDiscoveryCard(`random-${selected.id}`, selected);
+  };
+
+  const playGenre = (genre: string, songs: DiscoverySong[]) => {
+    const selected = smartDiscoveryPick(songs, heardHistory) ?? songs[0];
+    if (!selected) return;
+    openDiscoveryCard(
+      `genre-${normalizedGenreKey(genre)}-${selected.id}`,
+      selected,
+    );
+  };
+
+  const renderSongSection = ({
+    badge,
+    cardContextKind,
+    cardContextLabel,
+    description,
+    emptyText,
+    module,
+    songs,
+    title,
+    topTen,
+  }: {
+    badge: ReactNode;
+    cardContextKind: string;
+    cardContextLabel: string;
+    description: string;
+    emptyText: string;
+    module: string;
+    songs: DiscoverySong[];
+    title: string;
+    topTen?: boolean;
+  }) => (
+    <section className="panel discovery-section" data-platform-module={module}>
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">{badge}</span>
+          <h3>{title}</h3>
+        </div>
+        <small>{description}</small>
+      </div>
+      {songs.length ? (
+        <div className="discovery-song-grid">
+          {songs.map((song) => {
+            const cardKey = `${module}-${song.id}`;
+            return (
+              <DiscoverySongCard
+                active={activeCardKey === cardKey}
+                contextKind={cardContextKind}
+                contextLabel={cardContextLabel}
+                externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
+                key={cardKey}
+                locale={locale}
+                onExternalRedirectPreferenceChange={
+                  onExternalRedirectPreferenceChange
+                }
+                onListeningCredited={onListeningCredited}
+                onPlay={() => toggleDiscoveryCard(cardKey, song)}
+                song={song}
+                topTen={topTen}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <p className="discovery-empty">{emptyText}</p>
+      )}
+    </section>
+  );
+
+  return (
+    <div className="dashboard-discovery">
+      <section className="discovery-hub-hero">
+        <div>
+          <span className="eyebrow">
+            <Sparkles size={13} />
+            {spanish ? "Centro de descubrimiento" : "Discovery hub"}
+          </span>
+          <h2>{spanish ? "Descubrir más música" : "Discover more music"}</h2>
+          <p>
+            {spanish
+              ? "Encuentra canciones para escuchar, artistas para apoyar y nuevos lanzamientos antes de revisar las estadísticas."
+              : "Find songs to play, artists to support, and new releases before digging into analytics."}
+          </p>
+        </div>
+        <div className="discovery-hub-stats">
+          <span>
+            <strong>{allDiscoverySongs.length}</strong>
+            {spanish ? "canciones" : "songs"}
+          </span>
+          <span>
+            <strong>{internalPlaybackSongs.length}</strong>
+            {spanish ? "reproducen aquí" : "play here"}
+          </span>
+          <span>
+            <strong>{genreSections.length}</strong>
+            {spanish ? "géneros" : "genres"}
+          </span>
+        </div>
+      </section>
+
+      {renderSongSection({
+        badge: (
+          <>
+            <Sparkles size={13} />
+            {spanish ? "Destacadas" : "Featured"}
+          </>
+        ),
+        cardContextKind: "spotlight",
+        cardContextLabel: spanish ? "Selección editorial" : "Editorial pick",
+        description: spanish
+          ? "Seleccionadas por First Listen"
+          : "Selected by First Listen",
+        emptyText: spanish
+          ? "Las próximas canciones destacadas aparecerán aquí."
+          : "The next featured songs will appear here.",
+        module: "spotlight",
+        songs: spotlightSongs,
+        title: spanish
+          ? "Destacadas por First Listen"
+          : "Featured by First Listen",
+      })}
+
+      {renderSongSection({
+        badge: (
+          <>
+            <Trophy size={13} />
+            Top 10
+          </>
+        ),
+        cardContextKind: "top",
+        cardContextLabel: spanish ? "Resultados reales" : "Real results",
+        description: spanish
+          ? "Impulsadas por oyentes reales"
+          : "Driven by real listener engagement",
+        emptyText: spanish
+          ? "El Top 10 aparecerá cuando haya suficientes respuestas y reproducciones."
+          : "Top 10 will appear after songs receive enough responses and plays.",
+        module: "top_results",
+        songs: visibleTopTenSongs,
+        title: spanish ? "Top 10 por resultados" : "Top 10 by results",
+        topTen: true,
+      })}
+
+      {renderSongSection({
+        badge: (
+          <>
+            <Headphones size={13} />
+            {spanish ? "Reproduce aquí" : "Play here"}
+          </>
+        ),
+        cardContextKind: "internal",
+        cardContextLabel: spanish
+          ? "Cuenta para Banco de Tiempo"
+          : "Counts toward Time Bank",
+        description: spanish
+          ? "Descubre música y avanza hacia tokens"
+          : "Discover music and progress toward tokens",
+        emptyText: spanish
+          ? "Aún no hay canciones con reproducción dentro de First Listen."
+          : "No songs with First Listen playback are available yet.",
+        module: "internal_playback",
+        songs: internalPlaybackSongs,
+        title: spanish
+          ? "Reproducción dentro de First Listen"
+          : "Playback inside First Listen",
+      })}
+
+      {renderSongSection({
+        badge: (
+          <>
+            <ExternalLink size={13} />
+            {spanish ? "Plataformas" : "Platforms"}
+          </>
+        ),
+        cardContextKind: "external",
+        cardContextLabel: spanish
+          ? "Abre fuera de First Listen"
+          : "Opens outside First Listen",
+        description: "Spotify / YouTube Music / Apple / SoundCloud",
+        emptyText: spanish
+          ? "Las plataformas externas aparecerán cuando los artistas agreguen enlaces."
+          : "External platforms will appear as artists add links.",
+        module: "external_discovery",
+        songs: externalPlatformSongs,
+        title: spanish ? "Plataformas externas" : "External platforms",
+      })}
+
+      <section className="panel discovery-section discovery-random-panel">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">
+              <Play size={13} /> {spanish ? "MODO ALEATORIO" : "RANDOM MODE"}
+            </span>
+            <h3>
+              {spanish ? "Descubrir sin filtros" : "Discover without filters"}
+            </h3>
+          </div>
+          <small>
+            {spanish
+              ? "Prioriza canciones poco escuchadas"
+              : "Prioritizes underexposed songs"}
+          </small>
+        </div>
+        <div className="random-discovery-actions">
+          <button
+            className="primary-button"
+            onClick={playRandomSong}
+            type="button"
+          >
+            <Play size={15} />
+            {spanish ? "Descubrir sin filtros" : "Discover without filters"}
+          </button>
+          <p>
+            {spanish
+              ? "Si ya escuchaste todo, First Listen mezcla contenido nuevo y canciones que necesitan más apoyo."
+              : "When the catalog is exhausted, First Listen mixes new songs with older songs that still need support."}
+          </p>
+        </div>
+        {randomCandidate ? (
+          <div className="discovery-song-grid">
+            <DiscoverySongCard
+              active={activeCardKey === `random-${randomCandidate.id}`}
+              contextKind="random"
+              contextLabel={
+                spanish ? "Descubrimiento aleatorio" : "Random discovery"
+              }
+              externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
+              key={`random-${randomCandidate.id}`}
+              locale={locale}
+              onExternalRedirectPreferenceChange={
+                onExternalRedirectPreferenceChange
+              }
+              onListeningCredited={onListeningCredited}
+              onPlay={() =>
+                toggleDiscoveryCard(
+                  `random-${randomCandidate.id}`,
+                  randomCandidate,
+                )
+              }
+              song={randomCandidate}
+            />
+          </div>
+        ) : (
+          <p className="discovery-empty">
+            {spanish
+              ? "Agrega canciones para activar el modo aleatorio."
+              : "Add songs to activate random discovery."}
+          </p>
+        )}
+      </section>
+
+      {genreSections.length > 0 && (
+        <section className="panel discovery-section discovery-genre-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">
+                <Music2 size={13} /> {spanish ? "Géneros" : "Genres"}
+              </span>
+              <h3>{spanish ? "Reproducir por género" : "Play by genre"}</h3>
+            </div>
+            <small>
+              {spanish
+                ? "Crece automáticamente con el catálogo"
+                : "Expands automatically with the catalog"}
+            </small>
+          </div>
+          <div className="genre-discovery-stack">
+            {genreSections.map(({ genre, songs }) => (
+              <div className="genre-discovery-row" key={genre}>
+                <header>
+                  <div>
+                    <span aria-hidden>{discoveryGenreEmoji(genre)}</span>
+                    <h4>{discoveryGenreLabel(locale, genre)}</h4>
+                  </div>
+                  <button onClick={() => playGenre(genre, songs)} type="button">
+                    <Play size={14} />
+                    {spanish ? "Reproducir género" : "Play genre"}
+                  </button>
+                </header>
+                <div className="discovery-song-grid genre-discovery-grid">
+                  {songs.map((song) => {
+                    const cardKey = `genre-${normalizedGenreKey(genre)}-${song.id}`;
+                    return (
+                      <DiscoverySongCard
+                        active={activeCardKey === cardKey}
+                        contextKind="genre"
+                        contextLabel={discoveryGenreLabel(locale, genre)}
+                        externalRedirectNoticeDisabled={
+                          externalRedirectNoticeDisabled
+                        }
+                        key={cardKey}
+                        locale={locale}
+                        onExternalRedirectPreferenceChange={
+                          onExternalRedirectPreferenceChange
+                        }
+                        onListeningCredited={onListeningCredited}
+                        onPlay={() => toggleDiscoveryCard(cardKey, song)}
+                        song={song}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {renderSongSection({
+        badge: (
+          <>
+            <Rocket size={13} />
+            {spanish ? "Tendencias" : "Trending"}
+          </>
+        ),
+        cardContextKind: "trending",
+        cardContextLabel: spanish ? "Creciendo rápido" : "Fast-growing",
+        description: spanish
+          ? "Actividad reciente de la comunidad"
+          : "Recent community activity",
+        emptyText: spanish
+          ? "Las tendencias aparecerán cuando haya actividad reciente."
+          : "Trending songs will appear after recent activity.",
+        module: "trending",
+        songs: trendingSongs,
+        title: spanish ? "Tendencias" : "Trending",
+      })}
+
+      {renderSongSection({
+        badge: (
+          <>
+            <CalendarDays size={13} />
+            {spanish ? "Nuevo" : "New"}
+          </>
+        ),
+        cardContextKind: "new",
+        cardContextLabel: spanish ? "Nuevo lanzamiento" : "New release",
+        description: spanish ? "Publicadas recientemente" : "Recently published",
+        emptyText: spanish
+          ? "Los nuevos lanzamientos aparecerán aquí."
+          : "New releases will appear here.",
+        module: "newest_songs",
+        songs: newestSongs,
+        title: spanish ? "Nuevos lanzamientos" : "New releases",
+      })}
+
+      {renderSongSection({
+        badge: (
+          <>
+            <ThumbsUp size={13} />
+            {spanish ? "Apoyo" : "Support"}
+          </>
+        ),
+        cardContextKind: "support",
+        cardContextLabel: spanish ? "Apoyo de la comunidad" : "Community support",
+        description: spanish
+          ? "Más guardadas, seguidas y apoyadas"
+          : "Most saved, followed, and supported",
+        emptyText: spanish
+          ? "Las canciones más apoyadas aparecerán con más actividad."
+          : "Most supported songs will appear with more activity.",
+        module: "most_supported",
+        songs: mostSupportedSongs,
+        title: spanish ? "Más apoyadas" : "Most supported",
+      })}
+
+      {renderSongSection({
+        badge: (
+          <>
+            <Gauge size={13} />
+            {spanish ? "Escuchadas" : "Listened"}
+          </>
+        ),
+        cardContextKind: "listened",
+        cardContextLabel: spanish ? "Mayor tiempo reproducido" : "Most play time",
+        description: spanish
+          ? "Mayor actividad de reproducción"
+          : "Highest listening activity",
+        emptyText: spanish
+          ? "Las canciones más escuchadas aparecerán cuando haya más reproducciones."
+          : "Most listened songs will appear after more playback activity.",
+        module: "most_listened",
+        songs: mostListenedSongs,
+        title: spanish ? "Más escuchadas" : "Most listened",
+      })}
+    </div>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function LegacyDiscoverySections({
   spotlightSongs,
   topTenSongs,
   externalDiscoverySongs,
