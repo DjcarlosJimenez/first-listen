@@ -99,7 +99,6 @@ import {
   economySettingFor,
   isPrimaryPlatform,
   isExternalPlatform,
-  nextEconomyActivation,
   primaryPlatforms,
   submissionTokenCost,
 } from "@/lib/content-economy";
@@ -508,87 +507,6 @@ function ProviderClassificationBadge({
         ? compactClassificationLabel(platform)
         : contentClassificationLabel(platform)}
     </span>
-  );
-}
-
-function EconomyNotice({
-  settings,
-  locale,
-}: {
-  settings: ContentEconomySetting[];
-  locale: InterfaceLocale;
-}) {
-  const [now, setNow] = useState(() => Date.now());
-  const nextActivation = nextEconomyActivation(settings, now);
-  const externalSettings = settings.filter(
-    (setting) => setting.classification === "external",
-  );
-  const effectiveCosts = Array.from(
-    new Set(
-      externalSettings.map((setting) =>
-        submissionTokenCost(settings, setting.platform, now),
-      ),
-    ),
-  ).sort((left, right) => left - right);
-  const betaActive = externalSettings.some(
-    (setting) =>
-      submissionTokenCost(settings, setting.platform, now) ===
-      setting.currentTokenCost,
-  );
-  const effectiveCostLabel =
-    effectiveCosts.length > 1
-      ? `${effectiveCosts[0]}-${effectiveCosts.at(-1)}`
-      : `${effectiveCosts[0] ?? 1}`;
-
-  useEffect(() => {
-    if (!settings.some((setting) => setting.activationAt)) return;
-    const interval = window.setInterval(() => setNow(Date.now()), 60000);
-    return () => window.clearInterval(interval);
-  }, [settings]);
-
-  const daysRemaining = nextActivation?.activationAt
-    ? Math.max(
-        0,
-        Math.ceil(
-          (new Date(nextActivation.activationAt).getTime() - now) / 86400000,
-        ),
-      )
-    : null;
-  const spanish = locale === "es";
-
-  return (
-    <section className="economy-notice" aria-label="Founder Beta pricing">
-      <span>
-        <ShieldCheck size={15} />
-        <strong>
-          {betaActive
-            ? spanish
-              ? "Periodo Founder Beta"
-              : "Founder Beta Period"
-            : spanish
-              ? "Economia de Contenido Activa"
-              : "Content Economy Active"}
-        </strong>
-      </span>
-      <p>
-        {spanish
-          ? `El contenido externo cuesta actualmente ${effectiveCostLabel} ${effectiveCostLabel === "1" ? "token" : "tokens"}. La actividad en plataformas externas no cuenta como escucha válida.`
-          : `External Content currently costs ${effectiveCostLabel} ${effectiveCostLabel === "1" ? "token" : "tokens"}. Activity on external platforms does not count as a valid listen.`}
-      </p>
-      <span className="economy-countdown">
-        {daysRemaining === null
-          ? betaActive
-            ? spanish
-              ? "Fecha de actualizacion pendiente"
-              : "Economy update date not scheduled"
-            : spanish
-              ? "Precios programados activos"
-              : "Scheduled pricing active"
-          : spanish
-            ? `${daysRemaining} dias restantes`
-            : `${daysRemaining} days remaining`}
-      </span>
-    </section>
   );
 }
 
@@ -6490,7 +6408,6 @@ export function FirstListenApp({
           onToggleTheme={toggleTheme}
           view={view}
         />
-        <EconomyNotice locale={locale} settings={contentEconomy} />
         <OfflineCommunitySummary
           locale={locale}
           notifications={notifications}
