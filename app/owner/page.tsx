@@ -69,7 +69,7 @@ export default async function OwnerControlCenterPage() {
     { data: users },
     { data: songs },
     { data: reports },
-    { data: feedback },
+    { data: feedback, error: feedbackError },
   ] = await Promise.all([
     supabase.rpc("admin_get_control_center"),
     supabase.rpc("admin_list_users", { result_limit: 1000 }),
@@ -135,6 +135,13 @@ export default async function OwnerControlCenterPage() {
           </Link>
         </div>
       </header>
+      {feedbackError && (
+        <section className="admin-content">
+          <div className="admin-notice" role="alert">
+            Feedback Inbox is unavailable: {feedbackError.message}
+          </div>
+        </section>
+      )}
       <SuperAdminControlCenter
         initialData={controlCenterData as ControlCenterPayload}
         feedback={(feedback ?? []) as OwnerFeedbackRow[]}
