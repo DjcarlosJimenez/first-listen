@@ -3960,6 +3960,7 @@ function DiscoverySongCard({
   const completeListenRef = useRef(false);
   const scrolledForPlaybackRef = useRef(false);
   const queueEndedRef = useRef(false);
+  const queueAdvanceTimeoutRef = useRef<number | null>(null);
   const spanish = locale === "es";
   const platformLinks = getPrimaryPlatformLinks(song);
   const recommendedPlatform =
@@ -4018,6 +4019,10 @@ function DiscoverySongCard({
 
   useEffect(() => {
     if (active) return;
+    if (queueAdvanceTimeoutRef.current !== null) {
+      window.clearTimeout(queueAdvanceTimeoutRef.current);
+      queueAdvanceTimeoutRef.current = null;
+    }
     scrolledForPlaybackRef.current = false;
     listeningSessionRef.current = null;
     startingSessionRef.current = false;
@@ -4038,8 +4043,21 @@ function DiscoverySongCard({
   }, [active]);
 
   useEffect(() => {
+    if (queueAdvanceTimeoutRef.current !== null) {
+      window.clearTimeout(queueAdvanceTimeoutRef.current);
+      queueAdvanceTimeoutRef.current = null;
+    }
     queueEndedRef.current = false;
   }, [active, song.id]);
+
+  useEffect(
+    () => () => {
+      if (queueAdvanceTimeoutRef.current !== null) {
+        window.clearTimeout(queueAdvanceTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   const handleDiscoveryTelemetry = useCallback(
     async (snapshot: ProviderTelemetrySnapshot) => {
@@ -4064,7 +4082,10 @@ function DiscoverySongCard({
         !queueEndedRef.current
       ) {
         queueEndedRef.current = true;
-        window.setTimeout(onQueueEnded, 700);
+        queueAdvanceTimeoutRef.current = window.setTimeout(() => {
+          queueAdvanceTimeoutRef.current = null;
+          onQueueEnded();
+        }, 700);
       }
       const sampleAt = Date.now();
       const liveEligible =

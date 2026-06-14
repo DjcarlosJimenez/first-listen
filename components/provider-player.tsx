@@ -387,6 +387,10 @@ export function ProviderPlayer({
   const onTelemetryRef = useRef(onTelemetry);
   const onReadyRef = useRef(onReady);
   const autoPlayRef = useRef(autoPlay);
+  const debugEnabledRef = useRef(false);
+  const autoplayRetryTimersRef = useRef<number[]>([]);
+  const autoplayRetryTokenRef = useRef(0);
+  const lastActivePlaybackLogRef = useRef({ at: 0, target: "" });
   const lastInteractionAtRef = useRef(Date.now());
   const previousPlaybackStateRef = useRef<PlaybackState>("unknown");
   const previousPlaybackTargetRef = useRef<{
@@ -431,8 +435,61 @@ export function ProviderPlayer({
   }, [autoPlay]);
 
   useEffect(() => {
+    debugEnabledRef.current = debugEnabled;
+  }, [debugEnabled]);
+
+  useEffect(() => {
     latestYouTubeTargetRef.current = youtubeTargetKey;
   }, [youtubeTargetKey]);
+
+  const clearAutoplayRetryTimers = useCallback(() => {
+    autoplayRetryTokenRef.current += 1;
+    autoplayRetryTimersRef.current.forEach((timer) =>
+      window.clearTimeout(timer),
+    );
+    autoplayRetryTimersRef.current = [];
+  }, []);
+
+  const scheduleYouTubeAutoplayRetries = useCallback(
+    (player: YouTubePlayer, targetKey: string | null) => {
+      if (!targetKey) return;
+      clearAutoplayRetryTimers();
+      const token = autoplayRetryTokenRef.current;
+      const retryDelays = [0, 250, 750, 1500, 2500, 4000, 6000];
+      autoplayRetryTimersRef.current = retryDelays.map((delay) =>
+        window.setTimeout(() => {
+          if (
+            token !== autoplayRetryTokenRef.current ||
+            latestYouTubeTargetRef.current !== targetKey ||
+            youtubePlaybackTargetRef.current !== targetKey
+          ) {
+            return;
+          }
+          try {
+            const state = mapYouTubeState(player.getPlayerState());
+            if (state === "playing" || state === "ended") return;
+            setShowAutoplayFallback(false);
+            player.playVideo();
+          } catch (error) {
+            if (debugEnabledRef.current) {
+              console.info("[First Listen player] YouTube autoplay retry deferred", {
+                error,
+                targetKey,
+              });
+            }
+          }
+        }, delay),
+      );
+    },
+    [clearAutoplayRetryTimers],
+  );
+
+  useEffect(
+    () => () => {
+      clearAutoplayRetryTimers();
+    },
+    [clearAutoplayRetryTimers],
+  );
 
   useEffect(() => {
     providerLogRef.current = {
@@ -567,6 +624,26 @@ export function ProviderPlayer({
       setShowAutoplayFallback(false);
       return;
     }
+    if (embed?.telemetry === "youtube_iframe_api" && youtubePlayerRef.current) {
+      const timeout = window.setTimeout(() => {
+        if (!youtubePlayerRef.current) return;
+        const targetKey = latestYouTubeTargetRef.current;
+        try {
+          const state = mapYouTubeState(youtubePlayerRef.current.getPlayerState());
+          if (state !== "playing" && state !== "ended") {
+            scheduleYouTubeAutoplayRetries(
+              youtubePlayerRef.current,
+              targetKey,
+            );
+          }
+        } catch {
+          // If YouTube cannot expose state yet, keep retrying without showing a tap prompt.
+          scheduleYouTubeAutoplayRetries(youtubePlayerRef.current, targetKey);
+        }
+        setShowAutoplayFallback(false);
+      }, 2500);
+      return () => window.clearTimeout(timeout);
+    }
     if (
       embed?.telemetry !== "youtube_iframe_api" &&
       embed?.telemetry !== "spotify_iframe_api" &&
@@ -578,7 +655,13 @@ export function ProviderPlayer({
       setShowAutoplayFallback(true);
     }, 2500);
     return () => window.clearTimeout(timeout);
-  }, [autoPlay, embed?.telemetry, playbackState, status]);
+  }, [
+    autoPlay,
+    embed?.telemetry,
+    playbackState,
+    scheduleYouTubeAutoplayRetries,
+    status,
+  ]);
 
   const requestPlayback = useCallback(() => {
     setShowAutoplayFallback(false);
@@ -888,7 +971,15 @@ export function ProviderPlayer({
           true,
         );
 
-        if (nextState === "playing") {
+        const logKey = `${providerLogRef.current.platform}:${latestYouTubeTargetRef.current ?? iframeSrc}`;
+        const now = Date.now();
+        if (
+          nextState === "playing" &&
+          debugEnabledRef.current &&
+          (lastActivePlaybackLogRef.current.target !== logKey ||
+            now - lastActivePlaybackLogRef.current.at > 30000)
+        ) {
+          lastActivePlaybackLogRef.current = { at: now, target: logKey };
           console.info("[First Listen player] Provider reports active playback", {
             audioOutputVerified: false,
             currentTime: nextCurrentTime,
@@ -933,14 +1024,10 @@ export function ProviderPlayer({
               onReadyRef.current?.();
               refreshTelemetry(event.target);
               if (autoPlayRef.current) {
-                try {
-                  event.target.playVideo();
-                } catch (error) {
-                  console.info(
-                    "[First Listen player] Browser deferred autoplay",
-                    error,
-                  );
-                }
+                scheduleYouTubeAutoplayRetries(
+                  event.target,
+                  latestYouTubeTargetRef.current,
+                );
               }
               console.info("[First Listen player] Provider ready", {
                 embedGeneratedAt: initialLog.embedGeneratedAt,
@@ -997,6 +1084,7 @@ export function ProviderPlayer({
     initializationAttempt,
     loadedEmbedSrc,
     playerMountedAt,
+    scheduleYouTubeAutoplayRetries,
     youtubeTelemetryActive,
   ]);
 
@@ -1034,8 +1122,7 @@ export function ProviderPlayer({
       }
 
       if (autoPlay) {
-        player.playVideo();
-        window.setTimeout(() => youtubePlayerRef.current?.playVideo(), 350);
+        scheduleYouTubeAutoplayRetries(player, youtubeTargetKey);
       }
 
       console.info("[First Listen player] Loaded next YouTube item in-place", {
@@ -1051,7 +1138,7 @@ export function ProviderPlayer({
         title,
         youtubeTargetKey,
       });
-      if (autoPlay) setShowAutoplayFallback(true);
+      if (autoPlay) setShowAutoplayFallback(false);
     }
   }, [
     autoPlay,
@@ -1059,6 +1146,7 @@ export function ProviderPlayer({
     emitTelemetry,
     muted,
     platform,
+    scheduleYouTubeAutoplayRetries,
     status,
     title,
     volume,
