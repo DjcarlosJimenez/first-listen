@@ -137,6 +137,7 @@ const SOUNDCLOUD_API_SRC = "https://w.soundcloud.com/player/api.js";
 const SPOTIFY_API_SRC = "https://open.spotify.com/embed/iframe-api/v1";
 const MAX_INITIALIZATION_ATTEMPTS = 3;
 const ACTIVE_PLAYBACK_EVENT = "first-listen:active-playback";
+const PLAYBACK_COMMAND_EVENT = "first-listen:playback-command";
 let youtubeApiPromise: Promise<YouTubeApi> | null = null;
 let soundCloudApiPromise: Promise<SoundCloudApi> | null = null;
 let spotifyApiPromise: Promise<SpotifyIframeApi> | null = null;
@@ -321,6 +322,7 @@ export function ProviderPlayer({
   onTelemetry,
   onReady,
   autoPlay = false,
+  controlChannel,
   skipExternalRedirectWarning = false,
   onExternalRedirectPreferenceChange,
 }: {
@@ -334,6 +336,7 @@ export function ProviderPlayer({
   onTelemetry?: (snapshot: ProviderTelemetrySnapshot) => void;
   onReady?: () => void;
   autoPlay?: boolean;
+  controlChannel?: string;
   skipExternalRedirectWarning?: boolean;
   onExternalRedirectPreferenceChange?: (disabled: boolean) => void;
 }) {
@@ -502,6 +505,38 @@ export function ProviderPlayer({
       console.info("[First Listen player] Playback request was deferred", error);
     }
   }, []);
+
+  const pausePlayback = useCallback(() => {
+    try {
+      youtubePlayerRef.current?.pauseVideo();
+      spotifyControllerRef.current?.pause();
+      soundCloudWidgetRef.current?.pause();
+      setPlaybackState((current) =>
+        current === "playing" ? "paused" : current,
+      );
+    } catch (error) {
+      console.info("[First Listen player] Pause request was deferred", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!controlChannel) return;
+    const handleCommand = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          channel?: string;
+          command?: "pause" | "play";
+        }>
+      ).detail;
+      if (detail?.channel !== controlChannel) return;
+      if (detail.command === "play") requestPlayback();
+      if (detail.command === "pause") pausePlayback();
+    };
+
+    window.addEventListener(PLAYBACK_COMMAND_EVENT, handleCommand);
+    return () =>
+      window.removeEventListener(PLAYBACK_COMMAND_EVENT, handleCommand);
+  }, [controlChannel, pausePlayback, requestPlayback]);
 
   useEffect(() => {
     const pauseForAnotherPlayer = (event: Event) => {

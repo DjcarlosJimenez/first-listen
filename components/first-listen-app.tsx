@@ -178,9 +178,16 @@ type WorkspacePlaybackContext = {
   panel: WorkspacePanel;
   source: "review" | "discovery";
 };
+type WorkspacePlaybackControls = {
+  autoPlayEnabled?: boolean;
+  nextEnabled?: boolean;
+  onAutoPlayChange?: (enabled: boolean) => void;
+  onNext?: () => void;
+};
 type WorkspacePlaybackRequest = {
   autoPlay?: boolean;
   context: WorkspacePlaybackContext;
+  controls?: WorkspacePlaybackControls;
   onReady?: () => void;
   onTelemetry?: (snapshot: ProviderTelemetrySnapshot) => void;
   queue?: WorkspaceActiveQueue | null;
@@ -189,9 +196,12 @@ type WorkspacePlaybackRequest = {
   songLoadedAt?: string | null;
 };
 type WorkspacePlaybackController = {
+  activeControlChannel: string | null;
   activeContext: WorkspacePlaybackContext | null;
+  activeControls: WorkspacePlaybackControls | null;
   activeQueue: WorkspaceActiveQueue | null;
   activeSong: WorkspacePlayableSong | null;
+  activeTelemetry: ProviderTelemetrySnapshot | null;
   activeWorkspacePanel: WorkspacePanel;
   queueMode: WorkspaceQueueMode;
   registerPlaybackSlot: (
@@ -730,12 +740,14 @@ function WorkspacePlayerHost({
   externalRedirectNoticeDisabled,
   locale,
   onExternalRedirectPreferenceChange,
+  onPlaybackTelemetry,
   playback,
   slotElement,
 }: {
   externalRedirectNoticeDisabled: boolean;
   locale: InterfaceLocale;
   onExternalRedirectPreferenceChange: (disabled: boolean) => void;
+  onPlaybackTelemetry: (snapshot: ProviderTelemetrySnapshot) => void;
   playback: WorkspacePlaybackRequest | null;
   slotElement: HTMLDivElement | null;
 }) {
@@ -777,10 +789,14 @@ function WorkspacePlayerHost({
               link={playback.song.link}
               locale={locale}
               onReady={playback.onReady}
-              onTelemetry={playback.onTelemetry}
+              onTelemetry={(snapshot) => {
+                onPlaybackTelemetry(snapshot);
+                playback.onTelemetry?.(snapshot);
+              }}
               platform={playback.song.platform}
               songLoadedAt={playback.songLoadedAt ?? null}
               title={playback.song.title}
+              controlChannel={playback.slotId}
               skipExternalRedirectWarning={externalRedirectNoticeDisabled}
               onExternalRedirectPreferenceChange={
                 onExternalRedirectPreferenceChange
@@ -817,6 +833,9 @@ function WorkspaceShellTop({
   const spanish = locale === "es";
   const activeSong = controller.activeSong;
   const activeContext = controller.activeContext;
+  const activeControls = controller.activeControls;
+  const activeQueue = controller.activeQueue;
+  const activeTelemetry = controller.activeTelemetry;
   const exchangeSeconds = Math.max(1, status.minutesPerCredit * 60);
   const ready = status.rewardsEnabled && status.availableRewardCredits > 0;
   const progressSeconds = ready
@@ -830,6 +849,33 @@ function WorkspaceShellTop({
     todaySupport.listeningSeconds,
     status.todaySeconds,
   );
+  const visiblePlayedSeconds =
+    activeSong && activeTelemetry
+      ? Math.max(0, activeTelemetry.currentTime)
+      : timePlayedToday;
+  const queuePosition = activeQueue
+    ? `${activeQueue.currentIndex + 1}/${activeQueue.total}`
+    : activeSong
+      ? "1/1"
+      : "-";
+  const remainingSongs = activeQueue
+    ? Math.max(0, activeQueue.total - activeQueue.currentIndex - 1)
+    : 0;
+  const playbackState = activeTelemetry?.playbackState ?? "unknown";
+  const nextEnabled = Boolean(
+    activeControls?.onNext && activeControls.nextEnabled !== false,
+  );
+  const sendPlaybackCommand = (command: "pause" | "play") => {
+    if (!controller.activeControlChannel) return;
+    window.dispatchEvent(
+      new CustomEvent("first-listen:playback-command", {
+        detail: {
+          channel: controller.activeControlChannel,
+          command,
+        },
+      }),
+    );
+  };
 
   return (
     <section
@@ -881,6 +927,66 @@ function WorkspaceShellTop({
             </div>
           )}
         </div>
+        <div className="workspace-playback-controls" aria-live="polite">
+          <div className="workspace-playback-buttons">
+            <button
+              disabled={!activeSong}
+              onClick={() => sendPlaybackCommand("play")}
+              type="button"
+            >
+              <Play size={14} fill="currentColor" />
+              {spanish ? "Play" : "Play"}
+            </button>
+            <button
+              disabled={!activeSong}
+              onClick={() => sendPlaybackCommand("pause")}
+              type="button"
+            >
+              <Pause size={14} />
+              {spanish ? "Pausa" : "Pause"}
+            </button>
+            <button
+              disabled={!nextEnabled}
+              onClick={() => activeControls?.onNext?.()}
+              type="button"
+            >
+              <SkipForward size={14} />
+              {spanish ? "Siguiente canción" : "Next Song"}
+            </button>
+            <button
+              className={activeControls?.autoPlayEnabled ? "active" : ""}
+              disabled={!activeControls?.onAutoPlayChange}
+              onClick={() =>
+                activeControls?.onAutoPlayChange?.(
+                  !activeControls.autoPlayEnabled,
+                )
+              }
+              type="button"
+            >
+              {activeControls?.autoPlayEnabled ? (
+                <Pause size={14} />
+              ) : (
+                <Play size={14} />
+              )}
+              AutoPlay
+            </button>
+          </div>
+          <div className="workspace-queue-strip">
+            <span>
+              <ListMusic size={13} />
+              {activeContext?.label ??
+                (spanish ? "Cola pendiente" : "Pending queue")}
+            </span>
+            <strong>{queuePosition}</strong>
+            <small>
+              {remainingSongs}{" "}
+              {spanish ? "canciones restantes" : "songs remaining"}
+            </small>
+            <small>
+              {spanish ? "Estado" : "State"}: {playbackState}
+            </small>
+          </div>
+        </div>
       </div>
 
       <div className="workspace-status-bars">
@@ -899,7 +1005,7 @@ function WorkspaceShellTop({
               <Headphones size={13} />{" "}
               {spanish ? "Tiempo reproducido" : "Time Played"}
             </span>
-            <strong>{formatClock(timePlayedToday)}</strong>
+            <strong>{formatClock(visiblePlayedSeconds)}</strong>
           </div>
           <div>
             <span>
@@ -1756,6 +1862,7 @@ function ReviewView({
   platformConfig,
   onNavigateDiscoveryDestination,
   workspacePlayback,
+  showCommunityDiscovery = true,
 }: {
   reviewCount: number;
   reviewCredits: number;
@@ -1803,6 +1910,7 @@ function ReviewView({
     destination?: DiscoveryDestination,
   ) => void;
   workspacePlayback: WorkspacePlaybackController;
+  showCommunityDiscovery?: boolean;
 }) {
   const { requestPlayback } = workspacePlayback;
   const reviewerProfile = useMemo(
@@ -1861,6 +1969,9 @@ function ReviewView({
   const validListenRef = useRef(false);
   const completeListenRef = useRef(false);
   const playerColumnRef = useRef<HTMLDivElement | null>(null);
+  const advanceToNextSongRef = useRef<
+    ((continuePlayback?: boolean) => Promise<void>) | null
+  >(null);
 
   useEffect(() => {
     setForm(emptyReview);
@@ -2121,6 +2232,13 @@ function ReviewView({
         panel: { type: "review" },
         source: "review",
       },
+      controls: {
+        autoPlayEnabled: autoPlayNextSong,
+        nextEnabled: true,
+        onAutoPlayChange,
+        onNext: () =>
+          void advanceToNextSongRef.current?.(autoPlayNextSong),
+      },
       onTelemetry: handleListeningTelemetry,
       queue: {
         currentIndex: queueIndex,
@@ -2136,9 +2254,11 @@ function ReviewView({
     });
   }, [
     autoPlayCurrentSong,
+    autoPlayNextSong,
     handleListeningTelemetry,
     locale,
     matchedQueue,
+    onAutoPlayChange,
     reviewPlayerSlotId,
     song,
     songLoadedAt,
@@ -2224,6 +2344,10 @@ function ReviewView({
   }, [flushListeningTelemetry, notify, onAdvanceSong, song]);
 
   useEffect(() => {
+    advanceToNextSongRef.current = advanceToNextSong;
+  }, [advanceToNextSong]);
+
+  useEffect(() => {
     if (autoAdvanceCountdown === null) return;
     const timeout = window.setTimeout(() => {
       if (autoAdvanceCountdown === 1) {
@@ -2298,6 +2422,16 @@ function ReviewView({
 
   return (
     <>
+    <WorkspaceQueueOverview
+      locale={locale}
+      queueIndex={queueIndex}
+      queueModeLabel={
+        locale === "es"
+          ? "Lista de canciones por escuchar"
+          : "Review queue"
+      }
+      songs={matchedQueue}
+    />
     <main className="content review-layout review-layout-content-first">
       <section className="review-card review-primary-flow">
         <div className="song-hero">
@@ -2856,22 +2990,119 @@ function ReviewView({
         </div>
       </aside>
     </main>
-    <section className="content review-community-hub">
-      <DiscoverySections
-        externalDiscoverySongs={externalDiscoverySongs}
-        locale={locale}
-        onNavigateDestination={onNavigateDiscoveryDestination}
-        platformConfig={platformConfig}
-        onListeningCredited={onListeningCredited}
-        spotlightSongs={spotlightSongs}
-        topTenSongs={topTenSongs}
-        workspacePlayback={workspacePlayback}
-      />
-      <div data-platform-module="community_activity">
-        <CommunityPulse locale={locale} />
-      </div>
-    </section>
+    {showCommunityDiscovery && (
+      <section className="content review-community-hub">
+        <DiscoverySections
+          externalDiscoverySongs={externalDiscoverySongs}
+          locale={locale}
+          onNavigateDestination={onNavigateDiscoveryDestination}
+          platformConfig={platformConfig}
+          onListeningCredited={onListeningCredited}
+          spotlightSongs={spotlightSongs}
+          topTenSongs={topTenSongs}
+          workspacePlayback={workspacePlayback}
+        />
+        <div data-platform-module="community_activity">
+          <CommunityPulse locale={locale} />
+        </div>
+      </section>
+    )}
     </>
+  );
+}
+
+function WorkspaceQueueOverview({
+  locale,
+  queueIndex,
+  queueModeLabel,
+  songs,
+}: {
+  locale: InterfaceLocale;
+  queueIndex: number;
+  queueModeLabel: string;
+  songs: Song[];
+}) {
+  const spanish = locale === "es";
+  const currentSong = songs[queueIndex] ?? null;
+  const upcomingSongs = songs.slice(queueIndex + 1, queueIndex + 5);
+
+  return (
+    <section className="content workspace-queue-overview">
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">
+            <ListMusic size={13} />
+            {spanish ? "Cola" : "Queue"}
+          </span>
+          <h2>{spanish ? "Canción actual" : "Current song"}</h2>
+        </div>
+        <small>
+          {currentSong
+            ? `${queueIndex + 1}/${songs.length}`
+            : spanish
+              ? "Sin canciones activas"
+              : "No active songs"}
+        </small>
+      </div>
+      <div className="workspace-queue-grid">
+        <div className="workspace-current-song">
+          {currentSong ? (
+            <>
+              <Image
+                alt=""
+                height={64}
+                src={currentSong.coverUrl}
+                unoptimized
+                width={64}
+              />
+              <span>
+                <strong>{currentSong.title}</strong>
+                <small>
+                  {currentSong.artist} / {optionLabel(locale, currentSong.genre)}
+                </small>
+              </span>
+            </>
+          ) : (
+            <span>
+              <strong>
+                {spanish ? "Elige una canción para empezar" : "Choose a song to start"}
+              </strong>
+              <small>
+                {spanish
+                  ? "La cola aparecerá cuando haya canciones disponibles."
+                  : "The queue appears when songs are available."}
+              </small>
+            </span>
+          )}
+        </div>
+        <div className="workspace-queue-meta">
+          <div>
+            <span>{spanish ? "Tipo de cola" : "Queue type"}</span>
+            <strong>{queueModeLabel}</strong>
+          </div>
+          <div>
+            <span>{spanish ? "Próximas" : "Upcoming"}</span>
+            <strong>{Math.max(0, songs.length - queueIndex - 1)}</strong>
+          </div>
+        </div>
+      </div>
+      {upcomingSongs.length > 0 && (
+        <div className="workspace-upcoming-row" aria-label={spanish ? "Próximas canciones" : "Upcoming songs"}>
+          {upcomingSongs.map((song) => (
+            <span key={song.id}>
+              <Image
+                alt=""
+                height={34}
+                src={song.coverUrl}
+                unoptimized
+                width={34}
+              />
+              <b>{song.title}</b>
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -3439,6 +3670,7 @@ function DiscoverySongCard({
     warning: "",
   });
   const playerRef = useRef<HTMLDivElement>(null);
+  const togglePlayerRef = useRef<(() => Promise<void>) | null>(null);
   const listeningSessionRef = useRef<string | null>(null);
   const startingSessionRef = useRef(false);
   const heartbeatInFlightRef = useRef(false);
@@ -3713,6 +3945,16 @@ function DiscoverySongCard({
         panel: { type: "dashboard" },
         source: "discovery",
       },
+      controls: {
+        autoPlayEnabled: queueActive,
+        nextEnabled: queueActive ? queueSkipReady : false,
+        onAutoPlayChange: queueActive
+          ? (enabled) => {
+              if (!enabled) void togglePlayerRef.current?.();
+            }
+          : undefined,
+        onNext: queueActive ? onQueueNext : undefined,
+      },
       onReady: scrollPlayerIntoView,
       onTelemetry: handleDiscoveryTelemetry,
       queue: workspaceQueue ?? null,
@@ -3726,15 +3968,18 @@ function DiscoverySongCard({
     handleDiscoveryTelemetry,
     playbackQueueMode,
     playbackSlotId,
+    queueActive,
+    queueSkipReady,
     scrollPlayerIntoView,
     song,
     spanish,
     topTen,
+    onQueueNext,
     requestPlayback,
     workspaceQueue,
   ]);
 
-  const togglePlayer = async () => {
+  const togglePlayer = useCallback(async () => {
     if (active && listeningSessionRef.current) {
       const supabase = createClient();
       if (supabase) {
@@ -3757,7 +4002,11 @@ function DiscoverySongCard({
       }
     }
     onPlay();
-  };
+  }, [active, onPlay, playbackSlotId, song.id, stopPlayback]);
+
+  useEffect(() => {
+    togglePlayerRef.current = togglePlayer;
+  }, [togglePlayer]);
 
   return (
     <article
@@ -6573,6 +6822,7 @@ function PlatformPresenceManagerPanel({
 
 function DashboardView({
   discoveryDestination,
+  workspaceContentOnly = false,
   setView,
   founder,
   totalCreditsEarned,
@@ -6604,6 +6854,7 @@ function DashboardView({
   workspacePlayback,
 }: {
   discoveryDestination?: DiscoveryDestination;
+  workspaceContentOnly?: boolean;
   setView: (view: View) => void;
   founder: boolean;
   totalCreditsEarned: number;
@@ -6653,7 +6904,7 @@ function DashboardView({
     string | null
   >(null);
 
-  if (discoveryDestination) {
+  if (workspaceContentOnly || discoveryDestination) {
     return (
       <main className="content dashboard-discovery-destination">
         <DiscoverySections
@@ -8338,6 +8589,10 @@ export function FirstListenApp({
   const [workspacePlayback, setWorkspacePlayback] =
     useState<WorkspacePlaybackRequest | null>(null);
   const workspacePlaybackRef = useRef<WorkspacePlaybackRequest | null>(null);
+  const [workspacePlaybackControls, setWorkspacePlaybackControls] =
+    useState<WorkspacePlaybackControls | null>(null);
+  const [workspacePlaybackTelemetry, setWorkspacePlaybackTelemetry] =
+    useState<ProviderTelemetrySnapshot | null>(null);
   const [playbackSlots, setPlaybackSlots] = useState<
     Map<string, HTMLDivElement>
   >(() => new Map());
@@ -8369,6 +8624,8 @@ export function FirstListenApp({
       setActiveWorkspacePanel(request.context.panel);
       setQueueMode(request.context.mode);
       setWorkspacePlayback(request);
+      setWorkspacePlaybackControls(request.controls ?? null);
+      setWorkspacePlaybackTelemetry(null);
     },
     [],
   );
@@ -8377,6 +8634,8 @@ export function FirstListenApp({
     const current = workspacePlaybackRef.current;
     if (slotId && current?.slotId !== slotId) return;
     setWorkspacePlayback(null);
+    setWorkspacePlaybackControls(null);
+    setWorkspacePlaybackTelemetry(null);
     setActiveSong(null);
     setWorkspaceActiveQueue(null);
     setActiveContext(null);
@@ -8384,9 +8643,12 @@ export function FirstListenApp({
 
   const workspacePlaybackController = useMemo<WorkspacePlaybackController>(
     () => ({
+      activeControlChannel: workspacePlayback?.slotId ?? null,
       activeContext,
+      activeControls: workspacePlaybackControls,
       activeQueue,
       activeSong,
+      activeTelemetry: workspacePlaybackTelemetry,
       activeWorkspacePanel,
       queueMode,
       registerPlaybackSlot,
@@ -8402,6 +8664,9 @@ export function FirstListenApp({
       registerPlaybackSlot,
       requestWorkspacePlayback,
       stopWorkspacePlayback,
+      workspacePlayback,
+      workspacePlaybackControls,
+      workspacePlaybackTelemetry,
     ],
   );
   const workspacePlaybackSlot =
@@ -9213,6 +9478,7 @@ export function FirstListenApp({
           onListeningCredited={handleListeningCredited}
           platformConfig={platformConfig}
           workspacePlayback={workspacePlaybackController}
+          workspaceContentOnly
         />
       );
     }
@@ -9274,6 +9540,7 @@ export function FirstListenApp({
         platformConfig={platformConfig}
         onNavigateDiscoveryDestination={changeDiscoveryDestination}
         workspacePlayback={workspacePlaybackController}
+        showCommunityDiscovery={false}
       />
     );
   })();
@@ -9337,6 +9604,7 @@ export function FirstListenApp({
           onExternalRedirectPreferenceChange={(disabled) =>
             void changeExternalRedirectPreference(disabled)
           }
+          onPlaybackTelemetry={setWorkspacePlaybackTelemetry}
           playback={workspacePlayback}
           slotElement={workspacePlaybackSlot}
         />

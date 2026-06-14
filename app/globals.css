@@ -735,6 +735,88 @@ button {
   display: none;
 }
 
+.workspace-playback-controls {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, auto);
+  padding-top: 14px;
+}
+
+.workspace-playback-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  min-width: 0;
+}
+
+.workspace-playback-buttons button {
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.workspace-playback-buttons button:first-child,
+.workspace-playback-buttons button.active {
+  background: var(--acid);
+  border-color: transparent;
+  color: #151815;
+}
+
+.workspace-playback-buttons button:disabled {
+  background: var(--surface-strong);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.workspace-queue-strip {
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: flex;
+  gap: 10px;
+  justify-self: end;
+  min-height: 38px;
+  min-width: 0;
+  padding: 0 14px;
+}
+
+.workspace-queue-strip span {
+  align-items: center;
+  color: var(--muted-strong);
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 900;
+  gap: 6px;
+  letter-spacing: 0.04em;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+.workspace-queue-strip strong {
+  color: var(--ink);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.workspace-queue-strip small {
+  color: var(--muted-strong);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .workspace-player-empty-state {
   align-items: center;
   color: #dbe4d8;
@@ -853,6 +935,106 @@ button {
 
 .workspace-center-panel {
   min-width: 0;
+}
+
+.workspace-queue-overview {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--soft-shadow);
+  display: grid;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.workspace-queue-grid {
+  align-items: stretch;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.35fr);
+}
+
+.workspace-current-song,
+.workspace-queue-meta {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.workspace-current-song {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.workspace-current-song img,
+.workspace-upcoming-row img {
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.workspace-current-song span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.workspace-current-song strong,
+.workspace-upcoming-row b {
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-current-song small,
+.workspace-queue-meta span {
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.workspace-queue-meta {
+  display: grid;
+  gap: 10px;
+}
+
+.workspace-queue-meta div {
+  display: grid;
+  gap: 4px;
+}
+
+.workspace-queue-meta strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.workspace-upcoming-row {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.workspace-upcoming-row span {
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  max-width: 260px;
+  min-width: 0;
+  padding: 6px 10px 6px 6px;
+}
+
+.workspace-upcoming-row b {
+  font-size: 12px;
+  max-width: 190px;
 }
 
 .workspace-right-panel-placeholder {
@@ -9118,8 +9300,16 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   }
 
   .workspace-player-panel,
+  .workspace-playback-controls,
   .workspace-reward-status-bar {
     grid-template-columns: 1fr;
+  }
+
+  .workspace-queue-strip {
+    border-radius: 18px;
+    flex-wrap: wrap;
+    justify-self: stretch;
+    padding: 10px 12px;
   }
 
   .workspace-persistent-player-slot {
@@ -9128,6 +9318,14 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
   .workspace-session-status-bar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace-queue-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-upcoming-row span {
+    max-width: 220px;
   }
 
   .page-title {
