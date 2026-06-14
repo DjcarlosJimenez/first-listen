@@ -6,6 +6,7 @@ import {
   SuperAdminControlCenter,
   type ControlCenterPayload,
 } from "@/components/super-admin-control-center";
+import { hasOwnerAccess } from "@/lib/admin-access";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -59,10 +60,10 @@ export default async function OwnerControlCenterPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, founder_number")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "super_admin") redirect("/review");
+  if (!hasOwnerAccess(profile, user.email)) redirect("/review");
 
   const [
     { data: controlCenterData, error: controlError },

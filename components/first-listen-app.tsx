@@ -9571,7 +9571,8 @@ type FirstListenAppProps = {
   contentEconomy: ContentEconomySetting[];
   initialDailyMission: DailyMissionStatus | null;
   initialCommunityPrograms: CommunityProgram[];
-  role: "super_admin" | "admin" | "moderator" | "user";
+  ownerAccess: boolean;
+  adminAccess: boolean;
   initialUserSong: Song | null;
   initialSongSummaries: SongDashboardSummary[];
   initialSongReviews: Review[];
@@ -9608,7 +9609,8 @@ export function FirstListenApp({
   contentEconomy,
   initialDailyMission,
   initialCommunityPrograms,
-  role,
+  ownerAccess,
+  adminAccess,
   initialUserSong,
   initialSongSummaries,
   initialSongReviews,
@@ -10514,7 +10516,7 @@ export function FirstListenApp({
           notify={notify}
           onSubmitted={handleSongSubmitted}
           reviewCount={reviewCount}
-          unlimitedCredits={role === "super_admin"}
+          unlimitedCredits={ownerAccess}
           contentEconomy={contentEconomy}
         />
       );
@@ -10534,7 +10536,7 @@ export function FirstListenApp({
         reviewCount={reviewCount}
         reviewCredits={reviewCount}
         setView={changeView}
-        unlimitedCredits={role === "super_admin"}
+        unlimitedCredits={ownerAccess}
         approvedListeningSeconds={listeningBank.bankSeconds}
         onListeningCredited={handleListeningCredited}
         onAdvanceSong={advanceReviewQueue}
@@ -10567,9 +10569,9 @@ export function FirstListenApp({
         founderFree={founderFree}
         reviewCount={reviewCount}
         setView={changeView}
-        unlimitedCredits={role === "super_admin"}
-        adminAccess={role === "super_admin" || role === "admin"}
-        ownerAccess={role === "super_admin"}
+        unlimitedCredits={ownerAccess}
+        adminAccess={adminAccess}
+        ownerAccess={ownerAccess}
         onAdmin={() => router.push("/admin")}
         onOwner={() => router.push("/owner")}
         view={view}
@@ -10599,7 +10601,7 @@ export function FirstListenApp({
           status={listeningBank}
           todaySupport={todaySupport}
           credits={reviewCount}
-          unlimitedCredits={role === "super_admin"}
+          unlimitedCredits={ownerAccess}
           claimingReward={claimingReward}
           rewardClaimFeedback={rewardClaimFeedback}
           onClaimReward={() => void claimListeningReward()}
@@ -10647,13 +10649,13 @@ export function FirstListenApp({
                 </button>
               );
             })}
-            {role === "super_admin" && (
+            {ownerAccess && (
               <button onClick={() => router.push("/owner")}>
                 <Gauge size={19} />
                 Owner Control Center
               </button>
             )}
-            {(role === "super_admin" || role === "admin") && (
+            {adminAccess && (
               <button onClick={() => router.push("/admin")}>
                 <ShieldCheck size={19} />
                 Admin Panel
@@ -10686,7 +10688,7 @@ export function FirstListenApp({
             >
               <Icon size={20} />
               <span>{shortMobileLabel(locale, item.id)}</span>
-              {item.id === "submit" && reviewCount < 1 && !founderFree && role !== "super_admin" && <i />}
+              {item.id === "submit" && reviewCount < 1 && !founderFree && !ownerAccess && <i />}
             </button>
           );
         })}

@@ -1,5 +1,10 @@
 import { redirect } from "next/navigation";
 import { AdminPanel } from "@/components/admin-panel";
+import {
+  canAccessAdminRoute,
+  hasAdminAccess,
+  hasOwnerAccess,
+} from "@/lib/admin-access";
 import { mapPlatformThemeRow } from "@/lib/platform-theme";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,6 +25,8 @@ type AdminDirectoryUser = {
   completed_reviews: number;
   created_at: string;
 };
+
+type AdminRole = "super_admin" | "admin" | "moderator";
 
 type AdminSection =
   | "control"
@@ -50,23 +57,30 @@ export async function AdminPageContent({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, founder_number")
     .eq("id", user.id)
     .single();
-  const allowedRoles = allowModerator
-    ? ["super_admin", "admin", "moderator"]
-    : ["super_admin", "admin"];
-  if (!profile || !allowedRoles.includes(profile.role)) {
+  if (
+    !profile ||
+    !canAccessAdminRoute(profile, user.email, { allowModerator })
+  ) {
     redirect("/review");
   }
-  const isModerator = profile.role === "moderator";
+  const ownerAccess = hasOwnerAccess(profile, user.email);
+  const adminAccess = hasAdminAccess(profile, user.email);
+  const effectiveRole: AdminRole = ownerAccess
+    ? "super_admin"
+    : adminAccess
+      ? "admin"
+      : "moderator";
+  const isModerator = effectiveRole === "moderator";
   await supabase.rpc("refresh_creator_activity_status", {
     target_user_id: null,
   });
   const effectiveInitialSection =
-    profile.role === "super_admin"
+    effectiveRole === "super_admin"
       ? initialSection
-      : profile.role === "admin"
+      : effectiveRole === "admin"
         ? [
             "songs",
             "reports",
@@ -209,7 +223,7 @@ export async function AdminPageContent({
       )}
       announcements={(announcements ?? []) as never}
       communityHealth={(communityHealth ?? null) as never}
-      role={profile.role}
+      role={effectiveRole}
       songs={enrichedSongs}
       statistics={(statistics as {
         users: number;

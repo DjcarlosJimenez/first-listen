@@ -8,6 +8,7 @@ import type {
 import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
 import { getInitials, platformLabels } from "@/lib/discovery";
 import { safeCoverUrl } from "@/lib/media";
+import { hasAdminAccess, hasOwnerAccess } from "@/lib/admin-access";
 import {
   defaultPlatformControlConfig,
   mapPlatformControlState,
@@ -708,6 +709,8 @@ export async function ProtectedAppPage({
       }),
     ),
   };
+  const ownerAccess = hasOwnerAccess(profile, user.email);
+  const adminAccess = hasAdminAccess(profile, user.email);
 
   return (
     <ProtectedAppEntry
@@ -731,7 +734,8 @@ export async function ProtectedAppPage({
         genres: (profile.genre_preferences ?? []) as Genre[],
         locale: (profile.interface_language === "es" ? "es" : "en") as InterfaceLocale,
         onboardingCompleted: Boolean(profile.onboarding_completed),
-        role: profile.role,
+        ownerAccess,
+        adminAccess,
         communityVisibility:
           profile.community_visibility === "anonymous" ? "anonymous" : "public",
         autoplayNextSong: Boolean(profile.autoplay_next_song),

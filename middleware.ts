@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { canAccessAdminRoute, hasOwnerAccess } from "@/lib/admin-access";
 
 const privatePaths = [
   "/dashboard",
@@ -7,6 +8,7 @@ const privatePaths = [
   "/submit",
   "/profile",
   "/admin",
+  "/owner",
   "/reset-password",
 ];
 const authPaths = ["/login", "/signup"];
@@ -59,7 +61,7 @@ export async function middleware(request: NextRequest) {
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, account_status, force_password_change")
+      .select("role, founder_number, account_status, force_password_change")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -76,13 +78,19 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/change-password", request.url));
     }
 
+    if (path.startsWith("/owner")) {
+      if (!hasOwnerAccess(profile, user.email)) {
+        return NextResponse.redirect(new URL("/review", request.url));
+      }
+    }
+
     if (path.startsWith("/admin")) {
-      const role = profile?.role ?? "";
       const isModerationPath = path.startsWith("/admin/reports");
-      const allowed = isModerationPath
-        ? ["super_admin", "admin", "moderator"].includes(role)
-        : ["super_admin", "admin"].includes(role);
-      if (!allowed) {
+      if (
+        !canAccessAdminRoute(profile, user.email, {
+          allowModerator: isModerationPath,
+        })
+      ) {
         return NextResponse.redirect(new URL("/review", request.url));
       }
     }
@@ -102,6 +110,7 @@ export const config = {
     "/submit/:path*",
     "/profile/:path*",
     "/admin/:path*",
+    "/owner/:path*",
     "/change-password",
     "/reset-password",
     "/login",

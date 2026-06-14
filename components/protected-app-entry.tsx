@@ -39,7 +39,8 @@ type ProfileSeed = {
   genres: Genre[];
   locale: InterfaceLocale;
   onboardingCompleted: boolean;
-  role: "super_admin" | "admin" | "moderator" | "user";
+  ownerAccess: boolean;
+  adminAccess: boolean;
   communityVisibility: "public" | "anonymous";
   autoplayNextSong: boolean;
   externalRedirectNoticeDisabled: boolean;
@@ -178,7 +179,8 @@ export function ProtectedAppEntry({
       locale={locale}
       onLocaleChange={changeLocale}
       onLogout={logout}
-      role={profile.role}
+      ownerAccess={profile.ownerAccess}
+      adminAccess={profile.adminAccess}
     />
   );
 }
