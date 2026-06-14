@@ -310,6 +310,50 @@ function heartbeatPlaybackState(
   return isPlaybackCompleted(snapshot) ? completedAs : snapshot.playbackState;
 }
 
+function normalizeWorkspaceTelemetry(
+  snapshot: ProviderTelemetrySnapshot,
+  previous: ProviderTelemetrySnapshot | null,
+  elapsedSeconds: number,
+) {
+  const next = { ...snapshot };
+  if (
+    previous?.playbackState === "playing" &&
+    snapshot.playbackState === "ready"
+  ) {
+    next.playbackState = "completed";
+    next.currentTime =
+      previous.duration > 0
+        ? previous.duration
+        : Math.max(previous.currentTime, snapshot.currentTime);
+    next.duration = Math.max(previous.duration, snapshot.duration);
+    return next;
+  }
+
+  if (snapshot.playbackState === "playing" && previous) {
+    const previousTime = Math.max(0, previous.currentTime);
+    const providerTime = Math.max(0, snapshot.currentTime);
+    if (providerTime <= previousTime + 0.05 && elapsedSeconds > 0) {
+      next.currentTime = previousTime + elapsedSeconds;
+    }
+    next.duration = Math.max(previous.duration, snapshot.duration);
+  }
+
+  if (
+    next.playbackState === "playing" &&
+    next.duration > 0 &&
+    next.currentTime >= Math.max(0, next.duration - 0.75)
+  ) {
+    next.playbackState = "completed";
+    next.currentTime = next.duration;
+  }
+
+  if (next.duration > 0) {
+    next.currentTime = Math.min(next.currentTime, next.duration);
+  }
+
+  return next;
+}
+
 function workspacePanelForRoute(
   view: View,
   discoveryDestination?: DiscoveryDestination,
@@ -846,7 +890,7 @@ function WorkspacePlayerHost({
   onPlaybackTelemetry: (
     snapshot: ProviderTelemetrySnapshot,
     playback: WorkspacePlaybackRequest,
-  ) => void;
+  ) => ProviderTelemetrySnapshot | null;
   playback: WorkspacePlaybackRequest | null;
   slotElement: HTMLDivElement | null;
 }) {
@@ -889,8 +933,11 @@ function WorkspacePlayerHost({
               locale={locale}
               onReady={playback.onReady}
               onTelemetry={(snapshot) => {
-                onPlaybackTelemetry(snapshot, playback);
-                playback.onTelemetry?.(snapshot);
+                const normalizedSnapshot = onPlaybackTelemetry(
+                  snapshot,
+                  playback,
+                );
+                playback.onTelemetry?.(normalizedSnapshot ?? snapshot);
               }}
               platform={playback.song.platform}
               songLoadedAt={playback.songLoadedAt ?? null}
@@ -9185,6 +9232,10 @@ export function FirstListenApp({
     useRef<WorkspacePlaybackControls | null>(null);
   const [workspacePlaybackTelemetry, setWorkspacePlaybackTelemetry] =
     useState<ProviderTelemetrySnapshot | null>(null);
+  const workspacePlaybackTelemetryRef =
+    useRef<ProviderTelemetrySnapshot | null>(null);
+  const workspaceTelemetryUpdatedAtRef = useRef(0);
+  const workspaceTelemetryTargetRef = useRef("");
   const workspaceAutoAdvanceTargetRef = useRef("");
   const workspaceAutoAdvanceTimerRef = useRef<number | null>(null);
   const [playbackSlots, setPlaybackSlots] = useState<
@@ -9232,6 +9283,9 @@ export function FirstListenApp({
       );
       if (!sameTarget) {
         workspaceAutoAdvanceTargetRef.current = "";
+        workspacePlaybackTelemetryRef.current = null;
+        workspaceTelemetryUpdatedAtRef.current = 0;
+        workspaceTelemetryTargetRef.current = workspacePlaybackTargetKey(request);
         if (workspaceAutoAdvanceTimerRef.current !== null) {
           window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
           workspaceAutoAdvanceTimerRef.current = null;
@@ -9249,6 +9303,10 @@ export function FirstListenApp({
       setWorkspacePlaybackTelemetry((current) =>
         sameTarget ? current : initialWorkspaceTelemetry(),
       );
+      if (!sameTarget) {
+        workspacePlaybackTelemetryRef.current = initialWorkspaceTelemetry();
+        workspaceTelemetryUpdatedAtRef.current = Date.now();
+      }
     },
     [],
   );
@@ -9259,15 +9317,35 @@ export function FirstListenApp({
       request: WorkspacePlaybackRequest,
     ) => {
       if (!sameWorkspacePlaybackTarget(workspacePlaybackRef.current, request)) {
-        return;
+        return null;
       }
-      setWorkspacePlaybackTelemetry(snapshot);
-      if (!isPlaybackCompleted(snapshot)) {
+      const targetKey = workspacePlaybackTargetKey(request);
+      const now = Date.now();
+      const previous =
+        workspaceTelemetryTargetRef.current === targetKey
+          ? workspacePlaybackTelemetryRef.current
+          : null;
+      const elapsedSeconds =
+        previous && workspaceTelemetryUpdatedAtRef.current > 0
+          ? Math.max(
+              0,
+              Math.min(5, (now - workspaceTelemetryUpdatedAtRef.current) / 1000),
+            )
+          : 0;
+      const normalizedSnapshot = normalizeWorkspaceTelemetry(
+        snapshot,
+        previous,
+        elapsedSeconds,
+      );
+      workspaceTelemetryTargetRef.current = targetKey;
+      workspaceTelemetryUpdatedAtRef.current = now;
+      workspacePlaybackTelemetryRef.current = normalizedSnapshot;
+      setWorkspacePlaybackTelemetry(normalizedSnapshot);
+      if (!isPlaybackCompleted(normalizedSnapshot)) {
         workspaceAutoAdvanceTargetRef.current = "";
-        return;
+        return normalizedSnapshot;
       }
       const controls = workspacePlaybackControlsRef.current;
-      const targetKey = workspacePlaybackTargetKey(request);
       const shouldAdvance =
         controls?.autoPlayEnabled !== false && Boolean(controls?.onNext);
       if (
@@ -9275,7 +9353,7 @@ export function FirstListenApp({
         workspaceAutoAdvanceTargetRef.current === targetKey ||
         workspaceAutoAdvanceTimerRef.current !== null
       ) {
-        return;
+        return normalizedSnapshot;
       }
       workspaceAutoAdvanceTargetRef.current = targetKey;
       workspaceAutoAdvanceTimerRef.current = window.setTimeout(() => {
@@ -9284,9 +9362,33 @@ export function FirstListenApp({
         if (workspacePlaybackTargetKey(currentPlayback) !== targetKey) return;
         workspacePlaybackControlsRef.current?.onNext?.();
       }, 700);
+      return normalizedSnapshot;
     },
     [],
   );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const request = workspacePlaybackRef.current;
+      const snapshot = workspacePlaybackTelemetryRef.current;
+      if (!request || !snapshot || snapshot.playbackState !== "playing") {
+        return;
+      }
+      const syntheticSnapshot: ProviderTelemetrySnapshot = {
+        ...snapshot,
+        pageFocused: document.hasFocus(),
+        pageVisible: document.visibilityState === "visible",
+      };
+      const normalizedSnapshot = handleWorkspacePlaybackTelemetry(
+        syntheticSnapshot,
+        request,
+      );
+      if (normalizedSnapshot) {
+        request.onTelemetry?.(normalizedSnapshot);
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [handleWorkspacePlaybackTelemetry]);
 
   const stopWorkspacePlayback = useCallback((slotId?: string) => {
     const current = workspacePlaybackRef.current;
@@ -9294,6 +9396,9 @@ export function FirstListenApp({
     setWorkspacePlayback(null);
     workspacePlaybackRef.current = null;
     workspacePlaybackControlsRef.current = null;
+    workspacePlaybackTelemetryRef.current = null;
+    workspaceTelemetryUpdatedAtRef.current = 0;
+    workspaceTelemetryTargetRef.current = "";
     workspaceAutoAdvanceTargetRef.current = "";
     if (workspaceAutoAdvanceTimerRef.current !== null) {
       window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
