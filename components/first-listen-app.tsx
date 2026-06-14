@@ -54,6 +54,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import {
   FormEvent,
   ReactNode,
@@ -142,8 +143,74 @@ export type View = "review" | "dashboard" | "submit";
 export type DiscoveryDestination =
   | { type: "genres" }
   | { slug: string; type: "genre" };
+type WorkspaceQueueMode =
+  | "review"
+  | "discovery"
+  | "genre"
+  | "random"
+  | "top10";
+type WorkspacePanel =
+  | { type: View }
+  | { destination: DiscoveryDestination; type: "discover" }
+  | { type: "profile" };
+type WorkspacePlayableSong = {
+  artist: string;
+  artistId?: string;
+  coverUrl: string;
+  id: string;
+  link: string;
+  platform: Platform;
+  title: string;
+};
+type WorkspaceActiveQueue = {
+  currentIndex: number;
+  id: string;
+  mode: WorkspaceQueueMode;
+  songs: WorkspacePlayableSong[];
+  title: string;
+  total: number;
+};
+type WorkspacePlaybackContext = {
+  label: string;
+  mode: WorkspaceQueueMode;
+  panel: WorkspacePanel;
+  source: "review" | "discovery";
+};
+type WorkspacePlaybackRequest = {
+  autoPlay?: boolean;
+  context: WorkspacePlaybackContext;
+  onReady?: () => void;
+  onTelemetry?: (snapshot: ProviderTelemetrySnapshot) => void;
+  queue?: WorkspaceActiveQueue | null;
+  slotId: string;
+  song: WorkspacePlayableSong;
+  songLoadedAt?: string | null;
+};
+type WorkspacePlaybackController = {
+  activeContext: WorkspacePlaybackContext | null;
+  activeQueue: WorkspaceActiveQueue | null;
+  activeSong: WorkspacePlayableSong | null;
+  activeWorkspacePanel: WorkspacePanel;
+  queueMode: WorkspaceQueueMode;
+  registerPlaybackSlot: (
+    slotId: string,
+    element: HTMLDivElement | null,
+  ) => void;
+  requestPlayback: (request: WorkspacePlaybackRequest) => void;
+  stopPlayback: (slotId?: string) => void;
+};
 type BinaryAnswer = boolean | null;
 type Copy = ReturnType<typeof getCopy>;
+
+function workspacePanelForRoute(
+  view: View,
+  discoveryDestination?: DiscoveryDestination,
+): WorkspacePanel {
+  if (discoveryDestination) {
+    return { destination: discoveryDestination, type: "discover" };
+  }
+  return { type: view };
+}
 
 type RewardClaimFeedback = {
   awarded: number;
@@ -592,6 +659,99 @@ function ReviewProgress({
               : "Save listening time and claim tokens manually."}
       </p>
     </div>
+  );
+}
+
+function WorkspacePlaybackSlot({
+  className,
+  controller,
+  slotId,
+}: {
+  className?: string;
+  controller: WorkspacePlaybackController;
+  slotId: string;
+}) {
+  const slotRef = useRef<HTMLDivElement | null>(null);
+  const { registerPlaybackSlot } = controller;
+
+  useEffect(() => {
+    registerPlaybackSlot(slotId, slotRef.current);
+    return () => registerPlaybackSlot(slotId, null);
+  }, [registerPlaybackSlot, slotId]);
+
+  return (
+    <div
+      className={className}
+      data-workspace-player-slot={slotId}
+      ref={slotRef}
+    />
+  );
+}
+
+function WorkspacePlayerHost({
+  externalRedirectNoticeDisabled,
+  locale,
+  onExternalRedirectPreferenceChange,
+  playback,
+  slotElement,
+}: {
+  externalRedirectNoticeDisabled: boolean;
+  locale: InterfaceLocale;
+  onExternalRedirectPreferenceChange: (disabled: boolean) => void;
+  playback: WorkspacePlaybackRequest | null;
+  slotElement: HTMLDivElement | null;
+}) {
+  const parkingRef = useRef<HTMLDivElement | null>(null);
+  const [hostElement, setHostElement] = useState<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const element = document.createElement("div");
+    element.className = "workspace-player-host";
+    setHostElement(element);
+    return () => {
+      element.remove();
+      setHostElement(null);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hostElement) return;
+    const target = slotElement ?? parkingRef.current;
+    if (target && hostElement.parentElement !== target) {
+      target.appendChild(hostElement);
+    }
+  }, [hostElement, slotElement]);
+
+  return (
+    <>
+      <div
+        aria-hidden="true"
+        className="workspace-player-parking"
+        ref={parkingRef}
+      />
+      {playback && hostElement
+        ? createPortal(
+            <ProviderPlayer
+              key={`${playback.context.source}:${playback.song.id}`}
+              artist={playback.song.artist}
+              autoPlay={playback.autoPlay ?? false}
+              coverUrl={playback.song.coverUrl}
+              link={playback.song.link}
+              locale={locale}
+              onReady={playback.onReady}
+              onTelemetry={playback.onTelemetry}
+              platform={playback.song.platform}
+              songLoadedAt={playback.songLoadedAt ?? null}
+              title={playback.song.title}
+              skipExternalRedirectWarning={externalRedirectNoticeDisabled}
+              onExternalRedirectPreferenceChange={
+                onExternalRedirectPreferenceChange
+              }
+            />,
+            hostElement,
+          )
+        : null}
+    </>
   );
 }
 
@@ -1380,9 +1540,8 @@ function ReviewView({
   rewardClaimFeedback,
   autoPlayNextSong,
   onAutoPlayChange,
-  externalRedirectNoticeDisabled,
-  onExternalRedirectPreferenceChange,
   platformConfig,
+  workspacePlayback,
 }: {
   reviewCount: number;
   reviewCredits: number;
@@ -1425,10 +1584,10 @@ function ReviewView({
   rewardClaimFeedback: RewardClaimFeedback | null;
   autoPlayNextSong: boolean;
   onAutoPlayChange: (enabled: boolean) => void;
-  externalRedirectNoticeDisabled: boolean;
-  onExternalRedirectPreferenceChange: (disabled: boolean) => void;
   platformConfig: PlatformControlConfig;
+  workspacePlayback: WorkspacePlaybackController;
 }) {
+  const { requestPlayback } = workspacePlayback;
   const reviewerProfile = useMemo(
     () => ({ languages: listenerLanguages, genrePreferences, activityScore }),
     [activityScore, genrePreferences, listenerLanguages],
@@ -1440,6 +1599,7 @@ function ReviewView({
   const queueIndex = 0;
   const song = matchedQueue[queueIndex];
   const externalContent = song ? isExternalPlatform(song.platform) : false;
+  const reviewPlayerSlotId = song ? `review:${song.id}` : "review:empty";
   const songLoadedAt = useMemo(
     () => (song ? new Date().toISOString() : null),
     [song],
@@ -1734,6 +1894,40 @@ function ReviewView({
     [autoPlayNextSong, locale, onListeningCredited, song],
   );
 
+  useEffect(() => {
+    if (!song) return;
+    requestPlayback({
+      autoPlay: autoPlayCurrentSong,
+      context: {
+        label: locale === "es" ? "Escuchar y apoyar artistas" : "Review Songs",
+        mode: "review",
+        panel: { type: "review" },
+        source: "review",
+      },
+      onTelemetry: handleListeningTelemetry,
+      queue: {
+        currentIndex: queueIndex,
+        id: "review",
+        mode: "review",
+        songs: matchedQueue,
+        title: locale === "es" ? "Lista de canciones por escuchar" : "Review queue",
+        total: matchedQueue.length,
+      },
+      slotId: reviewPlayerSlotId,
+      song,
+      songLoadedAt,
+    });
+  }, [
+    autoPlayCurrentSong,
+    handleListeningTelemetry,
+    locale,
+    matchedQueue,
+    reviewPlayerSlotId,
+    song,
+    songLoadedAt,
+    requestPlayback,
+  ]);
+
   const flushListeningTelemetry = useCallback(async () => {
     const snapshot = latestTelemetryRef.current;
     if (!snapshot || snapshot.playbackState !== "playing") return;
@@ -1892,20 +2086,9 @@ function ReviewView({
         <div className="song-hero">
           <div className="player-listening-column" ref={playerColumnRef}>
             <div className="cover-wrap">
-              <ProviderPlayer
-                artist={song.artist}
-                autoPlay={autoPlayCurrentSong}
-                coverUrl={song.coverUrl}
-                link={song.link}
-                locale={locale}
-                platform={song.platform}
-                songLoadedAt={songLoadedAt}
-                title={song.title}
-                onTelemetry={handleListeningTelemetry}
-                skipExternalRedirectWarning={externalRedirectNoticeDisabled}
-                onExternalRedirectPreferenceChange={
-                  onExternalRedirectPreferenceChange
-                }
+              <WorkspacePlaybackSlot
+                controller={workspacePlayback}
+                slotId={reviewPlayerSlotId}
               />
               {autoAdvanceCountdown !== null && (
                 <div className="auto-advance-overlay" role="status">
@@ -2459,15 +2642,12 @@ function ReviewView({
     <section className="content review-community-hub">
       <DiscoverySections
         externalDiscoverySongs={externalDiscoverySongs}
-        externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
         locale={locale}
         platformConfig={platformConfig}
         onListeningCredited={onListeningCredited}
-        onExternalRedirectPreferenceChange={
-          onExternalRedirectPreferenceChange
-        }
         spotlightSongs={spotlightSongs}
         topTenSongs={topTenSongs}
+        workspacePlayback={workspacePlayback}
       />
       <div data-platform-module="community_activity">
         <CommunityPulse locale={locale} />
@@ -2946,11 +3126,19 @@ type DiscoveryQueueState = {
   id: string;
   title: string;
   description: string;
+  mode: WorkspaceQueueMode;
   songs: DiscoverySong[];
   sourceSongs: DiscoverySong[];
   currentIndex: number;
   cycle: number;
 };
+
+function workspaceQueueModeForDiscoveryId(id: string): WorkspaceQueueMode {
+  if (id === "random") return "random";
+  if (id === "top_results") return "top10";
+  if (id.startsWith("genre-")) return "genre";
+  return "discovery";
+}
 
 function rankDiscoveryQueue(
   songs: DiscoverySong[],
@@ -2993,13 +3181,13 @@ function DiscoverySongCard({
   topTen,
   contextKind = topTen ? "top" : "spotlight",
   contextLabel,
-  externalRedirectNoticeDisabled,
-  onExternalRedirectPreferenceChange,
   queueLabel,
   queueIndex,
   queueLength,
   onQueueNext,
   onQueueEnded,
+  workspaceQueue,
+  workspacePlayback,
 }: {
   song: DiscoverySong;
   active: boolean;
@@ -3014,14 +3202,15 @@ function DiscoverySongCard({
   topTen?: boolean;
   contextKind?: string;
   contextLabel?: string;
-  externalRedirectNoticeDisabled: boolean;
-  onExternalRedirectPreferenceChange: (disabled: boolean) => void;
   queueLabel?: string;
   queueIndex?: number;
   queueLength?: number;
   onQueueNext?: () => void;
   onQueueEnded?: () => void;
+  workspaceQueue?: WorkspaceActiveQueue | null;
+  workspacePlayback: WorkspacePlaybackController;
 }) {
+  const { requestPlayback, stopPlayback } = workspacePlayback;
   const [details, setDetails] = useState<"reviews" | "statistics" | null>(null);
   const [listenState, setListenState] = useState({
     liveSeconds: 0,
@@ -3051,6 +3240,16 @@ function DiscoverySongCard({
       ? song.recommendedPlatform
       : null;
   const queueActive = Boolean(queueLabel && queueLength && queueLength > 0);
+  const playbackQueueMode =
+    workspaceQueue?.mode ??
+    (contextKind === "genre"
+      ? "genre"
+      : contextKind === "random"
+        ? "random"
+        : contextKind === "top"
+          ? "top10"
+          : "discovery");
+  const playbackSlotId = `discovery:${playbackQueueMode}:${song.id}`;
   const skipProgressSeconds = Math.max(
     listenState.liveSeconds,
     listenState.verifiedSeconds,
@@ -3278,6 +3477,45 @@ function DiscoverySongCard({
     ],
   );
 
+  useEffect(() => {
+    if (!active) return;
+    requestPlayback({
+      autoPlay: true,
+      context: {
+        label:
+          contextLabel ??
+          (topTen
+            ? spanish
+              ? "Top 10 por resultados"
+              : "Top 10"
+            : spanish
+              ? "Descubrir música"
+              : "Discover Music"),
+        mode: playbackQueueMode,
+        panel: { type: "dashboard" },
+        source: "discovery",
+      },
+      onReady: scrollPlayerIntoView,
+      onTelemetry: handleDiscoveryTelemetry,
+      queue: workspaceQueue ?? null,
+      slotId: playbackSlotId,
+      song,
+      songLoadedAt: null,
+    });
+  }, [
+    active,
+    contextLabel,
+    handleDiscoveryTelemetry,
+    playbackQueueMode,
+    playbackSlotId,
+    scrollPlayerIntoView,
+    song,
+    spanish,
+    topTen,
+    requestPlayback,
+    workspaceQueue,
+  ]);
+
   const togglePlayer = async () => {
     if (active && listeningSessionRef.current) {
       const supabase = createClient();
@@ -3286,6 +3524,9 @@ function DiscoverySongCard({
           target_session_id: listeningSessionRef.current,
         });
       }
+    }
+    if (active) {
+      stopPlayback(playbackSlotId);
     }
     if (!active) {
       setDetails(null);
@@ -3406,21 +3647,9 @@ function DiscoverySongCard({
       </div>
       {active && (
         <div className="discovery-inline-player" ref={playerRef}>
-          <ProviderPlayer
-            artist={song.artist}
-            autoPlay
-            coverUrl={song.coverUrl}
-            link={song.link}
-            locale={locale}
-            onReady={scrollPlayerIntoView}
-            onTelemetry={handleDiscoveryTelemetry}
-            platform={song.platform}
-            songLoadedAt={null}
-            title={song.title}
-            skipExternalRedirectWarning={externalRedirectNoticeDisabled}
-            onExternalRedirectPreferenceChange={
-              onExternalRedirectPreferenceChange
-            }
+          <WorkspacePlaybackSlot
+            controller={workspacePlayback}
+            slotId={playbackSlotId}
           />
           <div className="discovery-listen-progress" aria-live="polite">
             <span>
@@ -3539,8 +3768,7 @@ function DiscoverySections({
   locale,
   platformConfig,
   onListeningCredited,
-  externalRedirectNoticeDisabled,
-  onExternalRedirectPreferenceChange,
+  workspacePlayback,
 }: {
   destination?: DiscoveryDestination;
   spotlightSongs: DiscoverySong[];
@@ -3554,8 +3782,7 @@ function DiscoverySections({
     becameComplete: boolean,
     completionRate: number,
   ) => void;
-  externalRedirectNoticeDisabled: boolean;
-  onExternalRedirectPreferenceChange: (disabled: boolean) => void;
+  workspacePlayback: WorkspacePlaybackController;
 }) {
   type DiscoveryCategoryConfig = {
     key: DiscoveryCategoryKey;
@@ -3830,6 +4057,7 @@ function DiscoverySections({
         currentIndex: 0,
         description,
         id,
+        mode: workspaceQueueModeForDiscoveryId(id),
         songs: queueSongs,
         sourceSongs: songs,
         title,
@@ -4169,15 +4397,12 @@ function DiscoverySections({
                 contextLabel={
                   spanish ? "Seleccion editorial" : "Editorial pick"
                 }
-                externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
                 key={cardKey}
                 locale={locale}
-                onExternalRedirectPreferenceChange={
-                  onExternalRedirectPreferenceChange
-                }
                 onListeningCredited={onListeningCredited}
                 onPlay={() => toggleDiscoveryCard(cardKey, song)}
                 song={song}
+                workspacePlayback={workspacePlayback}
               />
             );
           })}
@@ -4210,16 +4435,13 @@ function DiscoverySections({
                 active={activeCardKey === cardKey}
                 contextKind={config.contextKind}
                 contextLabel={config.contextLabel}
-                externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
                 key={cardKey}
                 locale={locale}
-                onExternalRedirectPreferenceChange={
-                  onExternalRedirectPreferenceChange
-                }
                 onListeningCredited={onListeningCredited}
                 onPlay={() => toggleDiscoveryCard(cardKey, song)}
                 song={song}
                 topTen={config.key === "top_results"}
+                workspacePlayback={workspacePlayback}
               />
             );
           })}
@@ -4350,6 +4572,14 @@ function DiscoverySections({
 
   const renderActiveQueuePanel = () => {
     if (!activeQueue || !activeQueueSong) return null;
+    const workspaceQueue: WorkspaceActiveQueue = {
+      currentIndex: activeQueue.currentIndex,
+      id: activeQueue.id,
+      mode: activeQueue.mode,
+      songs: activeQueue.songs,
+      title: activeQueue.title,
+      total: activeQueue.songs.length,
+    };
 
     return (
       <section className="panel discovery-queue-panel">
@@ -4386,12 +4616,8 @@ function DiscoverySections({
                       : activeQueue.id
             }
             contextLabel={activeQueue.title}
-            externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
             key={`${activeQueue.id}-${activeQueue.cycle}-${activeQueueSong.id}`}
             locale={locale}
-            onExternalRedirectPreferenceChange={
-              onExternalRedirectPreferenceChange
-            }
             onListeningCredited={onListeningCredited}
             onPlay={stopDiscoveryQueue}
             onQueueEnded={advanceDiscoveryQueue}
@@ -4401,6 +4627,8 @@ function DiscoverySections({
             queueLength={activeQueue.songs.length}
             song={activeQueueSong}
             topTen={activeQueue.id === "top_results"}
+            workspacePlayback={workspacePlayback}
+            workspaceQueue={workspaceQueue}
           />
         </div>
       </section>
@@ -4826,8 +5054,7 @@ function ExpandedDiscoverySections({
   externalDiscoverySongs,
   locale,
   onListeningCredited,
-  externalRedirectNoticeDisabled,
-  onExternalRedirectPreferenceChange,
+  workspacePlayback,
 }: {
   spotlightSongs: DiscoverySong[];
   topTenSongs: DiscoverySong[];
@@ -4839,8 +5066,7 @@ function ExpandedDiscoverySections({
     becameComplete: boolean,
     completionRate: number,
   ) => void;
-  externalRedirectNoticeDisabled: boolean;
-  onExternalRedirectPreferenceChange: (disabled: boolean) => void;
+  workspacePlayback: WorkspacePlaybackController;
 }) {
   const [activeCardKey, setActiveCardKey] = useState<string | null>(null);
   const [heardHistory, setHeardHistory] = useState<Record<string, number>>({});
@@ -5047,16 +5273,13 @@ function ExpandedDiscoverySections({
                 active={activeCardKey === cardKey}
                 contextKind={cardContextKind}
                 contextLabel={cardContextLabel}
-                externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
                 key={cardKey}
                 locale={locale}
-                onExternalRedirectPreferenceChange={
-                  onExternalRedirectPreferenceChange
-                }
                 onListeningCredited={onListeningCredited}
                 onPlay={() => toggleDiscoveryCard(cardKey, song)}
                 song={song}
                 topTen={topTen}
+                workspacePlayback={workspacePlayback}
               />
             );
           })}
@@ -5224,12 +5447,8 @@ function ExpandedDiscoverySections({
               contextLabel={
                 spanish ? "Descubrimiento aleatorio" : "Random discovery"
               }
-              externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
               key={`random-${randomCandidate.id}`}
               locale={locale}
-              onExternalRedirectPreferenceChange={
-                onExternalRedirectPreferenceChange
-              }
               onListeningCredited={onListeningCredited}
               onPlay={() =>
                 toggleDiscoveryCard(
@@ -5238,6 +5457,7 @@ function ExpandedDiscoverySections({
                 )
               }
               song={randomCandidate}
+              workspacePlayback={workspacePlayback}
             />
           </div>
         ) : (
@@ -5285,17 +5505,12 @@ function ExpandedDiscoverySections({
                         active={activeCardKey === cardKey}
                         contextKind="genre"
                         contextLabel={discoveryGenreLabel(locale, genre)}
-                        externalRedirectNoticeDisabled={
-                          externalRedirectNoticeDisabled
-                        }
                         key={cardKey}
                         locale={locale}
-                        onExternalRedirectPreferenceChange={
-                          onExternalRedirectPreferenceChange
-                        }
                         onListeningCredited={onListeningCredited}
                         onPlay={() => toggleDiscoveryCard(cardKey, song)}
                         song={song}
+                        workspacePlayback={workspacePlayback}
                       />
                     );
                   })}
@@ -5394,8 +5609,7 @@ function LegacyDiscoverySections({
   externalDiscoverySongs,
   locale,
   onListeningCredited,
-  externalRedirectNoticeDisabled,
-  onExternalRedirectPreferenceChange,
+  workspacePlayback,
 }: {
   spotlightSongs: DiscoverySong[];
   topTenSongs: DiscoverySong[];
@@ -5407,8 +5621,7 @@ function LegacyDiscoverySections({
     becameComplete: boolean,
     completionRate: number,
   ) => void;
-  externalRedirectNoticeDisabled: boolean;
-  onExternalRedirectPreferenceChange: (disabled: boolean) => void;
+  workspacePlayback: WorkspacePlaybackController;
 }) {
   const [activeSongId, setActiveSongId] = useState<string | null>(null);
   const spanish = locale === "es";
@@ -5453,13 +5666,8 @@ function LegacyDiscoverySections({
                     current === song.id ? null : song.id,
                   )
                 }
-                externalRedirectNoticeDisabled={
-                  externalRedirectNoticeDisabled
-                }
-                onExternalRedirectPreferenceChange={
-                  onExternalRedirectPreferenceChange
-                }
                 song={song}
+                workspacePlayback={workspacePlayback}
               />
             ))}
           </div>
@@ -5504,14 +5712,9 @@ function LegacyDiscoverySections({
                     current === song.id ? null : song.id,
                   )
                 }
-                externalRedirectNoticeDisabled={
-                  externalRedirectNoticeDisabled
-                }
-                onExternalRedirectPreferenceChange={
-                  onExternalRedirectPreferenceChange
-                }
                 song={song}
                 topTen
+                workspacePlayback={workspacePlayback}
               />
             ))}
           </div>
@@ -5548,14 +5751,8 @@ function LegacyDiscoverySections({
             {externalDiscoverySongs.slice(0, 12).map((song) => (
               <DiscoverySongCard
                 active={activeSongId === song.id}
-                externalRedirectNoticeDisabled={
-                  externalRedirectNoticeDisabled
-                }
                 key={`external-${song.badge ?? "feed"}-${song.id}-${song.position ?? 0}`}
                 locale={locale}
-                onExternalRedirectPreferenceChange={
-                  onExternalRedirectPreferenceChange
-                }
                 onListeningCredited={onListeningCredited}
                 onPlay={() =>
                   setActiveSongId((current) =>
@@ -5563,6 +5760,7 @@ function LegacyDiscoverySections({
                   )
                 }
                 song={song}
+                workspacePlayback={workspacePlayback}
               />
             ))}
           </div>
@@ -6160,9 +6358,8 @@ function DashboardView({
   onPlatformPresenceLinkRemoved,
   onPrimaryPlatformChanged,
   onListeningCredited,
-  externalRedirectNoticeDisabled,
-  onExternalRedirectPreferenceChange,
   platformConfig,
+  workspacePlayback,
 }: {
   discoveryDestination?: DiscoveryDestination;
   setView: (view: View) => void;
@@ -6204,9 +6401,8 @@ function DashboardView({
     becameComplete: boolean,
     completionRate: number,
   ) => void;
-  externalRedirectNoticeDisabled: boolean;
-  onExternalRedirectPreferenceChange: (disabled: boolean) => void;
   platformConfig: PlatformControlConfig;
+  workspacePlayback: WorkspacePlaybackController;
 }) {
   const [managedPlatformSongId, setManagedPlatformSongId] = useState<
     string | null
@@ -6218,15 +6414,12 @@ function DashboardView({
         <DiscoverySections
           destination={discoveryDestination}
           externalDiscoverySongs={externalDiscoverySongs}
-          externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
           locale={locale}
           platformConfig={platformConfig}
           onListeningCredited={onListeningCredited}
-          onExternalRedirectPreferenceChange={
-            onExternalRedirectPreferenceChange
-          }
           spotlightSongs={spotlightSongs}
           topTenSongs={topTenSongs}
+          workspacePlayback={workspacePlayback}
         />
       </main>
     );
@@ -6252,15 +6445,12 @@ function DashboardView({
         <DiscoverySections
           destination={discoveryDestination}
           externalDiscoverySongs={externalDiscoverySongs}
-          externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
           locale={locale}
           platformConfig={platformConfig}
           onListeningCredited={onListeningCredited}
-          onExternalRedirectPreferenceChange={
-            onExternalRedirectPreferenceChange
-          }
           spotlightSongs={spotlightSongs}
           topTenSongs={topTenSongs}
+          workspacePlayback={workspacePlayback}
         />
         <CommunityProgramsPanel locale={locale} programs={communityPrograms} />
         <section className="review-complete-card">
@@ -6329,15 +6519,12 @@ function DashboardView({
       <DiscoverySections
         destination={discoveryDestination}
         externalDiscoverySongs={externalDiscoverySongs}
-        externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
         locale={locale}
         platformConfig={platformConfig}
         onListeningCredited={onListeningCredited}
-        onExternalRedirectPreferenceChange={
-          onExternalRedirectPreferenceChange
-        }
         spotlightSongs={spotlightSongs}
           topTenSongs={topTenSongs}
+        workspacePlayback={workspacePlayback}
         />
         <CommunityProgramsPanel locale={locale} programs={communityPrograms} />
 
@@ -7884,10 +8071,100 @@ export function FirstListenApp({
   const [genres] = useState<Genre[]>(genrePreferences);
   const [queueSongs, setQueueSongs] = useState<Song[]>([]);
   const [queueLoading, setQueueLoading] = useState(true);
+  const [activeSong, setActiveSong] =
+    useState<WorkspacePlayableSong | null>(null);
+  const [activeQueue, setWorkspaceActiveQueue] =
+    useState<WorkspaceActiveQueue | null>(null);
+  const [activeContext, setActiveContext] =
+    useState<WorkspacePlaybackContext | null>(null);
+  const [activeWorkspacePanel, setActiveWorkspacePanel] =
+    useState<WorkspacePanel>(() =>
+      workspacePanelForRoute(initialView, discoveryDestination),
+    );
+  const [queueMode, setQueueMode] =
+    useState<WorkspaceQueueMode>("review");
+  const [workspacePlayback, setWorkspacePlayback] =
+    useState<WorkspacePlaybackRequest | null>(null);
+  const workspacePlaybackRef = useRef<WorkspacePlaybackRequest | null>(null);
+  const [playbackSlots, setPlaybackSlots] = useState<
+    Map<string, HTMLDivElement>
+  >(() => new Map());
+
+  useEffect(() => {
+    workspacePlaybackRef.current = workspacePlayback;
+  }, [workspacePlayback]);
+
+  const registerPlaybackSlot = useCallback(
+    (slotId: string, element: HTMLDivElement | null) => {
+      setPlaybackSlots((current) => {
+        const next = new Map(current);
+        if (element) {
+          next.set(slotId, element);
+        } else {
+          next.delete(slotId);
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const requestWorkspacePlayback = useCallback(
+    (request: WorkspacePlaybackRequest) => {
+      setActiveSong(request.song);
+      setWorkspaceActiveQueue(request.queue ?? null);
+      setActiveContext(request.context);
+      setActiveWorkspacePanel(request.context.panel);
+      setQueueMode(request.context.mode);
+      setWorkspacePlayback(request);
+    },
+    [],
+  );
+
+  const stopWorkspacePlayback = useCallback((slotId?: string) => {
+    const current = workspacePlaybackRef.current;
+    if (slotId && current?.slotId !== slotId) return;
+    setWorkspacePlayback(null);
+    setActiveSong(null);
+    setWorkspaceActiveQueue(null);
+    setActiveContext(null);
+  }, []);
+
+  const workspacePlaybackController = useMemo<WorkspacePlaybackController>(
+    () => ({
+      activeContext,
+      activeQueue,
+      activeSong,
+      activeWorkspacePanel,
+      queueMode,
+      registerPlaybackSlot,
+      requestPlayback: requestWorkspacePlayback,
+      stopPlayback: stopWorkspacePlayback,
+    }),
+    [
+      activeContext,
+      activeQueue,
+      activeSong,
+      activeWorkspacePanel,
+      queueMode,
+      registerPlaybackSlot,
+      requestWorkspacePlayback,
+      stopWorkspacePlayback,
+    ],
+  );
+  const workspacePlaybackSlot = workspacePlayback?.slotId
+    ? (playbackSlots.get(workspacePlayback.slotId) ?? null)
+    : null;
 
   useEffect(() => {
     setView(initialView);
   }, [initialView]);
+
+  useEffect(() => {
+    setActiveWorkspacePanel(
+      workspacePanelForRoute(initialView, discoveryDestination),
+    );
+  }, [discoveryDestination, initialView]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -8652,11 +8929,8 @@ export function FirstListenApp({
           onPlatformPresenceLinkSaved={handlePlatformPresenceLinkSaved}
           onPrimaryPlatformChanged={handlePrimaryPlatformChanged}
           onListeningCredited={handleListeningCredited}
-          externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
-          onExternalRedirectPreferenceChange={(disabled) =>
-            void changeExternalRedirectPreference(disabled)
-          }
           platformConfig={platformConfig}
+          workspacePlayback={workspacePlaybackController}
         />
       );
     }
@@ -8706,11 +8980,8 @@ export function FirstListenApp({
         rewardClaimFeedback={rewardClaimFeedback}
         autoPlayNextSong={autoPlayNextSong}
         onAutoPlayChange={(enabled) => void changeAutoPlayNextSong(enabled)}
-        externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
-        onExternalRedirectPreferenceChange={(disabled) =>
-          void changeExternalRedirectPreference(disabled)
-        }
         platformConfig={platformConfig}
+        workspacePlayback={workspacePlaybackController}
       />
     );
   })();
@@ -8753,6 +9024,15 @@ export function FirstListenApp({
           summary={notificationSummary}
         />
         {viewContent}
+        <WorkspacePlayerHost
+          externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
+          locale={locale}
+          onExternalRedirectPreferenceChange={(disabled) =>
+            void changeExternalRedirectPreference(disabled)
+          }
+          playback={workspacePlayback}
+          slotElement={workspacePlaybackSlot}
+        />
       </div>
 
       <div className={menuOpen ? "mobile-drawer open" : "mobile-drawer"}>

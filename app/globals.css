@@ -5984,6 +5984,21 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   width: 100%;
 }
 
+.workspace-player-parking {
+  height: 180px;
+  left: -10000px;
+  overflow: hidden;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  width: 320px;
+}
+
+.workspace-player-host {
+  height: 100%;
+  width: 100%;
+}
+
 .provider-player-debug {
   bottom: 8px;
   left: 8px;
