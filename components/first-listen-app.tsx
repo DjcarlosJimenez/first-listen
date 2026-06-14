@@ -91,7 +91,11 @@ import {
   type SongLanguage,
 } from "@/lib/catalog";
 import { getCopy, optionLabel } from "@/lib/i18n";
-import { hasOwnerAccess } from "@/lib/admin-access";
+import {
+  hasAdminAccess,
+  hasOwnerAccess,
+  isFounderOneIdentity,
+} from "@/lib/admin-access";
 import {
   getDiscoveryLinks,
   getPrimaryPlatformLinks,
@@ -1738,6 +1742,82 @@ function WorkspaceQueuePanel({
                 : "Your queue will appear here once you start a song."}
           </p>
         )}
+      </div>
+    </section>
+  );
+}
+
+function FounderAccessDiagnostics({
+  accountEmail,
+  adminAccess,
+  clientAdminAccess,
+  clientOwnerAccess,
+  effectiveAdminAccess,
+  effectiveOwnerAccess,
+  founderNumber,
+  ownerAccess,
+  profileRole,
+  view,
+}: {
+  accountEmail: string;
+  adminAccess: boolean;
+  clientAdminAccess: boolean;
+  clientOwnerAccess: boolean;
+  effectiveAdminAccess: boolean;
+  effectiveOwnerAccess: boolean;
+  founderNumber: number | null;
+  ownerAccess: boolean;
+  profileRole: string | null;
+  view: View;
+}) {
+  const [path, setPath] = useState("");
+
+  useEffect(() => {
+    setPath(window.location.pathname);
+  }, [view]);
+
+  const rows = [
+    ["role", profileRole ?? "null"],
+    ["founder_number", founderNumber === null ? "null" : String(founderNumber)],
+    ["hasOwnerAccess_server", String(ownerAccess)],
+    ["hasAdminAccess_server", String(adminAccess)],
+    ["hasOwnerAccess_client", String(clientOwnerAccess)],
+    ["hasAdminAccess_client", String(clientAdminAccess)],
+    ["effectiveOwnerAccess", String(effectiveOwnerAccess)],
+    ["effectiveAdminAccess", String(effectiveAdminAccess)],
+    ["ownerMenuVisible", String(effectiveOwnerAccess)],
+    ["adminMenuVisible", String(effectiveAdminAccess)],
+    ["workspaceView", view],
+    ["path", path || "loading"],
+    [
+      "emailFallbackMatch",
+      String(accountEmail.trim().toLowerCase() === "djemas81@gmail.com"),
+    ],
+  ];
+
+  return (
+    <section
+      className="admin-notice"
+      style={{
+        margin: "12px 40px 0",
+        borderColor: "#b8ff32",
+        background: "rgba(184, 255, 50, 0.08)",
+      }}
+    >
+      <strong>Founder access diagnostics temporary</strong>
+      <div
+        style={{
+          display: "grid",
+          gap: 6,
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          marginTop: 10,
+        }}
+      >
+        {rows.map(([label, value]) => (
+          <code key={label} style={{ whiteSpace: "normal" }}>
+            {label}: {value}
+          </code>
+        ))}
       </div>
     </section>
   );
@@ -9572,6 +9652,8 @@ type FirstListenAppProps = {
   contentEconomy: ContentEconomySetting[];
   initialDailyMission: DailyMissionStatus | null;
   initialCommunityPrograms: CommunityProgram[];
+  profileRole: string | null;
+  founderNumber: number | null;
   ownerAccess: boolean;
   adminAccess: boolean;
   initialUserSong: Song | null;
@@ -9610,6 +9692,8 @@ export function FirstListenApp({
   contentEconomy,
   initialDailyMission,
   initialCommunityPrograms,
+  profileRole,
+  founderNumber,
   ownerAccess,
   adminAccess,
   initialUserSong,
@@ -9620,8 +9704,19 @@ export function FirstListenApp({
 }: FirstListenAppProps) {
   const router = useRouter();
   const copy = getCopy(locale);
-  const effectiveOwnerAccess = ownerAccess || hasOwnerAccess(null, account.email);
-  const effectiveAdminAccess = adminAccess || effectiveOwnerAccess;
+  const accessProfile = {
+    founder_number: founderNumber,
+    role: profileRole,
+  };
+  const clientOwnerAccess = hasOwnerAccess(accessProfile, account.email);
+  const clientAdminAccess = hasAdminAccess(accessProfile, account.email);
+  const effectiveOwnerAccess = ownerAccess || clientOwnerAccess;
+  const effectiveAdminAccess =
+    adminAccess || clientAdminAccess || effectiveOwnerAccess;
+  const showFounderAccessDiagnostics = isFounderOneIdentity(
+    accessProfile,
+    account.email,
+  );
   const [view, setView] = useState<View>(initialView);
   const [reviewCount, setReviewCount] = useState(initialReviewCredits);
   const [totalCreditsEarned, setTotalCreditsEarned] = useState(initialTotalCreditsEarned);
@@ -10592,6 +10687,20 @@ export function FirstListenApp({
           onToggleTheme={toggleTheme}
           view={view}
         />
+        {showFounderAccessDiagnostics && (
+          <FounderAccessDiagnostics
+            accountEmail={account.email}
+            adminAccess={adminAccess}
+            clientAdminAccess={clientAdminAccess}
+            clientOwnerAccess={clientOwnerAccess}
+            effectiveAdminAccess={effectiveAdminAccess}
+            effectiveOwnerAccess={effectiveOwnerAccess}
+            founderNumber={founderNumber}
+            ownerAccess={ownerAccess}
+            profileRole={profileRole}
+            view={view}
+          />
+        )}
         <OfflineCommunitySummary
           locale={locale}
           notifications={notifications}

@@ -734,6 +734,11 @@ export async function ProtectedAppPage({
         genres: (profile.genre_preferences ?? []) as Genre[],
         locale: (profile.interface_language === "es" ? "es" : "en") as InterfaceLocale,
         onboardingCompleted: Boolean(profile.onboarding_completed),
+        role: profile.role ?? null,
+        founderNumber:
+          profile.founder_number === null
+            ? null
+            : Number(profile.founder_number),
         ownerAccess,
         adminAccess,
         communityVisibility:

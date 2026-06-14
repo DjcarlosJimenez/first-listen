@@ -39,6 +39,8 @@ type ProfileSeed = {
   genres: Genre[];
   locale: InterfaceLocale;
   onboardingCompleted: boolean;
+  role: string | null;
+  founderNumber: number | null;
   ownerAccess: boolean;
   adminAccess: boolean;
   communityVisibility: "public" | "anonymous";
@@ -179,6 +181,8 @@ export function ProtectedAppEntry({
       locale={locale}
       onLocaleChange={changeLocale}
       onLogout={logout}
+      profileRole={profile.role}
+      founderNumber={profile.founderNumber}
       ownerAccess={profile.ownerAccess}
       adminAccess={profile.adminAccess}
     />
