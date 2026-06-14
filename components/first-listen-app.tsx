@@ -142,7 +142,7 @@ import type {
   TodaySupportSummary,
 } from "@/lib/types";
 
-export type View = "review" | "dashboard" | "profile" | "submit";
+export type View = "queue" | "review" | "dashboard" | "profile" | "submit";
 export type DiscoveryDestination =
   | { type: "genres" }
   | { slug: string; type: "genre" };
@@ -215,6 +215,7 @@ function workspacePanelForRoute(
 }
 
 function workspacePathForView(view: View) {
+  if (view === "queue" || view === "review") return "/review";
   return view === "dashboard" ? "/dashboard" : `/${view}`;
 }
 
@@ -229,7 +230,7 @@ function workspacePathForDiscoveryDestination(
 function workspaceRouteFromPath(pathname: string):
   | { destination?: DiscoveryDestination; view: View }
   | null {
-  if (pathname === "/review") return { view: "review" };
+  if (pathname === "/review") return { view: "queue" };
   if (pathname === "/dashboard") return { view: "dashboard" };
   if (pathname === "/profile") return { view: "profile" };
   if (pathname === "/submit") return { view: "submit" };
@@ -491,6 +492,7 @@ function navItems(copy: Copy): Array<{ id: View; label: string; icon: typeof Hea
 }
 
 function shortMobileLabel(locale: InterfaceLocale, view: View) {
+  if (view === "queue") return locale === "es" ? "Cola" : "Queue";
   if (view === "review") return locale === "es" ? "Review" : "Review";
   if (view === "submit") return locale === "es" ? "Enviar" : "Submit";
   if (view === "profile") return locale === "es" ? "Perfil" : "Profile";
@@ -985,6 +987,249 @@ function WorkspaceShellTop({
   );
 }
 
+type WorkspaceQueuePreviewSong = {
+  artist: string;
+  artistId?: string;
+  coverUrl: string;
+  id: string;
+  platform: Platform;
+  title: string;
+};
+
+function previewSongFromReviewSong(song: Song): WorkspaceQueuePreviewSong {
+  return {
+    artist: song.artist,
+    artistId: song.artistId,
+    coverUrl: song.coverUrl,
+    id: song.id,
+    platform: song.platform,
+    title: song.title,
+  };
+}
+
+function WorkspaceQueueView({
+  locale,
+  queueLoading,
+  queueSongs,
+  workspacePlayback,
+  onDiscover,
+  onGenres,
+  onReview,
+  onSubmit,
+}: {
+  locale: InterfaceLocale;
+  queueLoading: boolean;
+  queueSongs: Song[];
+  workspacePlayback: WorkspacePlaybackController;
+  onDiscover: () => void;
+  onGenres: () => void;
+  onReview: () => void;
+  onSubmit: () => void;
+}) {
+  const spanish = locale === "es";
+  const activeQueue = workspacePlayback.activeQueue;
+  const activeSong = workspacePlayback.activeSong;
+  const reviewQueue = queueSongs.map(previewSongFromReviewSong);
+  const currentQueueSong = activeQueue
+    ? activeQueue.songs[activeQueue.currentIndex]
+    : null;
+  const currentSong =
+    currentQueueSong ??
+    activeSong ??
+    reviewQueue[0] ??
+    null;
+  const upcomingSongs = activeQueue
+    ? activeQueue.songs.slice(activeQueue.currentIndex + 1, activeQueue.currentIndex + 7)
+    : reviewQueue.slice(currentSong?.id === reviewQueue[0]?.id ? 1 : 0, 6);
+  const queueTitle =
+    activeQueue?.title ??
+    (activeSong
+      ? spanish
+        ? "Reproduccion actual"
+        : "Current playback"
+      : spanish
+        ? "Lista de canciones por escuchar"
+        : "Listening queue");
+  const queueModeLabel =
+    activeQueue?.mode === "genre"
+      ? spanish
+        ? "Genero"
+        : "Genre"
+      : activeQueue?.mode === "random"
+        ? spanish
+          ? "Aleatorio"
+          : "Random"
+        : activeQueue?.mode === "top10"
+          ? "Top 10"
+          : activeQueue?.mode === "discovery"
+            ? spanish
+              ? "Descubrimiento"
+              : "Discovery"
+            : activeSong
+              ? activeSong.platform
+              : spanish
+                ? "Por escuchar"
+                : "To listen";
+  const positionLabel = activeQueue
+    ? `${activeQueue.currentIndex + 1}/${activeQueue.total}`
+    : currentSong
+      ? `1/${Math.max(1, reviewQueue.length)}`
+      : "0/0";
+
+  return (
+    <main className="content workspace-queue-content">
+      <section className="panel workspace-queue-panel">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">
+              <ListMusic size={13} />
+              {spanish ? "Cola" : "Queue"}
+            </span>
+            <h3>{queueTitle}</h3>
+          </div>
+          <small>
+            {spanish ? "Posicion" : "Position"} {positionLabel}
+          </small>
+        </div>
+
+        <div className="workspace-queue-summary">
+          <div>
+            <span>{spanish ? "Cola activa" : "Active queue"}</span>
+            <strong>{queueModeLabel}</strong>
+          </div>
+          <div>
+            <span>{spanish ? "Canciones proximas" : "Upcoming songs"}</span>
+            <strong>{activeQueue?.total ?? reviewQueue.length}</strong>
+          </div>
+          <div>
+            <span>{spanish ? "Reproductor" : "Player"}</span>
+            <strong>
+              {activeSong
+                ? spanish
+                  ? "Activo"
+                  : "Active"
+                : spanish
+                  ? "Listo"
+                  : "Ready"}
+            </strong>
+          </div>
+        </div>
+
+        {queueLoading ? (
+          <div className="workspace-queue-empty">
+            <LoaderCircle size={18} />
+            <p>{spanish ? "Cargando cola..." : "Loading queue..."}</p>
+          </div>
+        ) : currentSong ? (
+          <div className="workspace-queue-current">
+            <Image
+              alt=""
+              height={96}
+              src={currentSong.coverUrl}
+              unoptimized
+              width={96}
+            />
+            <div>
+              <span className="eyebrow">
+                <Play size={13} />
+                {activeSong?.id === currentSong.id
+                  ? spanish
+                    ? "Sonando ahora"
+                    : "Now playing"
+                  : spanish
+                    ? "Siguiente para escuchar"
+                    : "Next to listen"}
+              </span>
+              <h3>{currentSong.title}</h3>
+              {currentSong.artistId ? (
+                <ArtistNameLink
+                  artistId={currentSong.artistId}
+                  name={currentSong.artist}
+                />
+              ) : (
+                <span>{currentSong.artist}</span>
+              )}
+              <small>{currentSong.platform}</small>
+            </div>
+          </div>
+        ) : (
+          <div className="workspace-queue-empty">
+            <Music2 size={22} />
+            <p>
+              {spanish
+                ? "No hay canciones en la cola todavia. Abre Descubrir Musica para empezar."
+                : "No songs are in the queue yet. Open Discover Music to start."}
+            </p>
+          </div>
+        )}
+
+        <div className="workspace-queue-actions">
+          <button className="primary-button" onClick={onDiscover} type="button">
+            <Sparkles size={15} />
+            {spanish ? "Descubrir musica" : "Discover music"}
+          </button>
+          <button className="secondary-button" onClick={onGenres} type="button">
+            <Music2 size={14} />
+            {spanish ? "Generos" : "Genres"}
+          </button>
+          <button className="secondary-button" onClick={onReview} type="button">
+            <Headphones size={14} />
+            {spanish ? "Escuchar y apoyar" : "Listen and support"}
+          </button>
+          <button className="secondary-button" onClick={onSubmit} type="button">
+            <Plus size={14} />
+            {spanish ? "Enviar cancion" : "Submit song"}
+          </button>
+        </div>
+
+        <div className="workspace-upcoming-list">
+          <div className="panel-heading compact">
+            <div>
+              <span className="eyebrow">
+                <ArrowRight size={13} />
+                {spanish ? "Proximas canciones" : "Upcoming songs"}
+              </span>
+            </div>
+            <small>
+              {activeQueue
+                ? activeQueue.title
+                : spanish
+                  ? "Cola por escuchar"
+                  : "Listening queue"}
+            </small>
+          </div>
+          {upcomingSongs.length ? (
+            upcomingSongs.map((song, index) => (
+              <article className="workspace-upcoming-row" key={song.id}>
+                <span>{index + 1}</span>
+                <Image
+                  alt=""
+                  height={42}
+                  src={song.coverUrl}
+                  unoptimized
+                  width={42}
+                />
+                <div>
+                  <strong>{song.title}</strong>
+                  <small>
+                    {song.artist} / {song.platform}
+                  </small>
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="discovery-empty">
+              {spanish
+                ? "Cuando inicies una cola, las proximas canciones apareceran aqui."
+                : "When you start a queue, upcoming songs will appear here."}
+            </p>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function Sidebar({
   view,
   setView,
@@ -1067,6 +1312,13 @@ function Topbar({
     review: {
       title: copy.app.topbar.reviewTitle,
       subtitle: copy.app.topbar.reviewSubtitle,
+    },
+    queue: {
+      title: locale === "es" ? "Cola" : "Queue",
+      subtitle:
+        locale === "es"
+          ? "Cancion actual, proximas canciones y cola activa."
+          : "Current song, upcoming songs, and active queue.",
     },
     dashboard: {
       title: copy.app.topbar.dashboardTitle,
@@ -6551,6 +6803,7 @@ function PlatformPresenceManagerPanel({
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function DashboardView({
   discoveryDestination,
   setView,
@@ -8206,7 +8459,7 @@ export function FirstListenApp({
   onLogout,
   account,
   discoveryDestination,
-  initialView = "review",
+  initialView = "queue",
   locale,
   onLocaleChange,
   listenerLanguages,
@@ -9112,6 +9365,17 @@ export function FirstListenApp({
     return true;
   };
 
+  void initialCommunityPrograms;
+  void initialSongReviews;
+  void claimingMission;
+  void songSummaries;
+  void userSong;
+  void claimDailyMission;
+  void requestSongBoost;
+  void handlePlatformPresenceLinkSaved;
+  void handlePlatformPresenceLinkRemoved;
+  void handlePrimaryPlatformChanged;
+
   const toggleTheme = () => {
     setDarkMode((current) => {
       const next = !current;
@@ -9160,40 +9424,35 @@ export function FirstListenApp({
   }, []);
 
   const viewContent = (() => {
-    if (view === "dashboard") {
+    if (view === "queue") {
       return (
-        <DashboardView
-          copy={copy}
-          discoveryDestination={workspaceDiscoveryDestination}
-          founder={founder}
+        <WorkspaceQueueView
           locale={locale}
-          listeningBank={listeningBank}
-          claimingReward={claimingReward}
-          notify={notify}
-          onClaimReward={() => void claimListeningReward()}
-          reviewCredits={reviewCount}
-          reviewQualityScore={averageReviewQuality}
-          setView={changeView}
-          song={userSong}
-          songSummaries={songSummaries}
-          songReviews={initialSongReviews}
-          totalCreditsEarned={totalCreditsEarned}
-          spotlightSongs={initialSpotlightSongs}
-          topTenSongs={initialTopTenSongs}
-          externalDiscoverySongs={initialExternalDiscoverySongs}
-          dailyMission={dailyMission}
-          claimingMission={claimingMission}
-          onClaimMission={() => void claimDailyMission()}
-          communityPrograms={initialCommunityPrograms}
-          onBoostSong={(songId) => void requestSongBoost(songId)}
-          onPlatformPresenceLinkRemoved={handlePlatformPresenceLinkRemoved}
-          onPlatformPresenceLinkSaved={handlePlatformPresenceLinkSaved}
-          onPrimaryPlatformChanged={handlePrimaryPlatformChanged}
-          onNavigateDiscoveryDestination={changeDiscoveryDestination}
-          onListeningCredited={handleListeningCredited}
-          platformConfig={platformConfig}
+          onDiscover={() => changeView("dashboard")}
+          onGenres={() => changeDiscoveryDestination({ type: "genres" })}
+          onReview={() => changeView("review")}
+          onSubmit={() => changeView("submit")}
+          queueLoading={queueLoading}
+          queueSongs={queueSongs}
           workspacePlayback={workspacePlaybackController}
         />
+      );
+    }
+    if (view === "dashboard") {
+      return (
+        <main className="content workspace-discovery-content">
+          <DiscoverySections
+            destination={workspaceDiscoveryDestination}
+            externalDiscoverySongs={initialExternalDiscoverySongs}
+            locale={locale}
+            onNavigateDestination={changeDiscoveryDestination}
+            onListeningCredited={handleListeningCredited}
+            platformConfig={platformConfig}
+            spotlightSongs={initialSpotlightSongs}
+            topTenSongs={initialTopTenSongs}
+            workspacePlayback={workspacePlaybackController}
+          />
+        </main>
       );
     }
     if (view === "profile") {
