@@ -227,6 +227,24 @@ function sameWorkspacePlaybackTarget(
   );
 }
 
+function initialWorkspaceTelemetry(): ProviderTelemetrySnapshot {
+  return {
+    currentTime: 0,
+    duration: 0,
+    lastInteractionAt: Date.now(),
+    muted: false,
+    pageFocused:
+      typeof document === "undefined" ? true : document.hasFocus(),
+    pageVisible:
+      typeof document === "undefined"
+        ? true
+        : document.visibilityState === "visible",
+    playbackState: "buffering",
+    supported: true,
+    volume: 100,
+  };
+}
+
 function workspacePanelForRoute(
   view: View,
   discoveryDestination?: DiscoveryDestination,
@@ -4248,7 +4266,7 @@ function DiscoverySongCard({
       },
       controls: {
         autoPlayEnabled: queueAutoPlayActive,
-        nextEnabled: queueActive ? queueSkipReady : false,
+        nextEnabled: queueActive,
         onAutoPlayChange: queueActive ? onQueueAutoPlayChange : undefined,
         onNext: queueActive ? onQueueNext : undefined,
       },
@@ -9188,7 +9206,7 @@ export function FirstListenApp({
       setWorkspacePlayback(request);
       setWorkspacePlaybackControls(request.controls ?? null);
       setWorkspacePlaybackTelemetry((current) =>
-        sameTarget ? current : null,
+        sameTarget ? current : initialWorkspaceTelemetry(),
       );
     },
     [],
