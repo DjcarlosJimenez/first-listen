@@ -91,6 +91,7 @@ import {
   type SongLanguage,
 } from "@/lib/catalog";
 import { getCopy, optionLabel } from "@/lib/i18n";
+import { hasOwnerAccess } from "@/lib/admin-access";
 import {
   getDiscoveryLinks,
   getPrimaryPlatformLinks,
@@ -9619,6 +9620,8 @@ export function FirstListenApp({
 }: FirstListenAppProps) {
   const router = useRouter();
   const copy = getCopy(locale);
+  const effectiveOwnerAccess = ownerAccess || hasOwnerAccess(null, account.email);
+  const effectiveAdminAccess = adminAccess || effectiveOwnerAccess;
   const [view, setView] = useState<View>(initialView);
   const [reviewCount, setReviewCount] = useState(initialReviewCredits);
   const [totalCreditsEarned, setTotalCreditsEarned] = useState(initialTotalCreditsEarned);
@@ -10516,7 +10519,7 @@ export function FirstListenApp({
           notify={notify}
           onSubmitted={handleSongSubmitted}
           reviewCount={reviewCount}
-          unlimitedCredits={ownerAccess}
+          unlimitedCredits={effectiveOwnerAccess}
           contentEconomy={contentEconomy}
         />
       );
@@ -10536,7 +10539,7 @@ export function FirstListenApp({
         reviewCount={reviewCount}
         reviewCredits={reviewCount}
         setView={changeView}
-        unlimitedCredits={ownerAccess}
+        unlimitedCredits={effectiveOwnerAccess}
         approvedListeningSeconds={listeningBank.bankSeconds}
         onListeningCredited={handleListeningCredited}
         onAdvanceSong={advanceReviewQueue}
@@ -10569,9 +10572,9 @@ export function FirstListenApp({
         founderFree={founderFree}
         reviewCount={reviewCount}
         setView={changeView}
-        unlimitedCredits={ownerAccess}
-        adminAccess={adminAccess}
-        ownerAccess={ownerAccess}
+        unlimitedCredits={effectiveOwnerAccess}
+        adminAccess={effectiveAdminAccess}
+        ownerAccess={effectiveOwnerAccess}
         onAdmin={() => router.push("/admin")}
         onOwner={() => router.push("/owner")}
         view={view}
@@ -10601,7 +10604,7 @@ export function FirstListenApp({
           status={listeningBank}
           todaySupport={todaySupport}
           credits={reviewCount}
-          unlimitedCredits={ownerAccess}
+          unlimitedCredits={effectiveOwnerAccess}
           claimingReward={claimingReward}
           rewardClaimFeedback={rewardClaimFeedback}
           onClaimReward={() => void claimListeningReward()}
@@ -10649,13 +10652,13 @@ export function FirstListenApp({
                 </button>
               );
             })}
-            {ownerAccess && (
+            {effectiveOwnerAccess && (
               <button onClick={() => router.push("/owner")}>
                 <Gauge size={19} />
                 Owner Control Center
               </button>
             )}
-            {adminAccess && (
+            {effectiveAdminAccess && (
               <button onClick={() => router.push("/admin")}>
                 <ShieldCheck size={19} />
                 Admin Panel
@@ -10688,7 +10691,7 @@ export function FirstListenApp({
             >
               <Icon size={20} />
               <span>{shortMobileLabel(locale, item.id)}</span>
-              {item.id === "submit" && reviewCount < 1 && !founderFree && !ownerAccess && <i />}
+              {item.id === "submit" && reviewCount < 1 && !founderFree && !effectiveOwnerAccess && <i />}
             </button>
           );
         })}

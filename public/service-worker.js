@@ -1,4 +1,4 @@
-const CACHE_VERSION = "first-listen-pwa-v1";
+const CACHE_VERSION = "first-listen-pwa-v2-owner-admin-access";
 const OFFLINE_URL = "/offline";
 const APP_SHELL = [
   OFFLINE_URL,
@@ -49,11 +49,22 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/") ||
-    url.pathname === "/manifest.webmanifest"
-  ) {
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request)),
+    );
+    return;
+  }
+
+  if (url.pathname.startsWith("/icons/") || url.pathname === "/manifest.webmanifest") {
     event.respondWith(
       caches.match(request).then((cached) => {
         const network = fetch(request)

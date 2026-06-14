@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { hasOwnerAccess } from "@/lib/admin-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,10 +15,10 @@ export async function POST(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, founder_number")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "super_admin") {
+  if (!hasOwnerAccess(profile, user.email)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
