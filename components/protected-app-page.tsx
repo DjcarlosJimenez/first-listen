@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { ProtectedAppEntry } from "@/components/protected-app-entry";
+import type { ProfilePanelProps } from "@/components/profile-panel";
 import type {
   DiscoveryDestination,
   View,
@@ -16,6 +17,10 @@ import type {
   CommunityNotification,
   CommunityNotificationSummary,
   CommunityProgram,
+  CommunityActivity,
+  CommunityNetwork,
+  ConnectedPlatform,
+  ConnectedPlatformAccount,
   ContentEconomySetting,
   DailyMissionStatus,
   DiscoverySong,
@@ -303,7 +308,7 @@ export async function ProtectedAppPage({
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "display_name, founder_number, founder_free_submissions_remaining, credits, total_review_credits_earned, review_quality_score, languages_understood, genre_preferences, interface_language, onboarding_completed, role, community_visibility, autoplay_next_song, external_redirect_notice_disabled",
+      "display_name, founder_number, founder_free_submissions_remaining, credits, total_review_credits_earned, review_quality_score, languages_understood, genre_preferences, interface_language, onboarding_completed, role, show_explicit_content, community_visibility, autoplay_next_song, external_redirect_notice_disabled",
     )
     .eq("id", user.id)
     .single();
@@ -326,6 +331,13 @@ export async function ProtectedAppPage({
     { data: notificationSummaryRows },
     { data: contentEconomyRows },
     { data: platformRuntimeRows },
+    { data: profileSongRows },
+    { data: savedSongRows },
+    { data: impactRows },
+    { data: networkRows },
+    { data: activityRows },
+    { data: connectedPlatformRows },
+    { data: removedSongHistoryRows },
   ] = await Promise.all([
     supabase
       .from("songs")
@@ -352,6 +364,20 @@ export async function ProtectedAppPage({
     supabase.rpc("get_my_community_notification_summary"),
     supabase.rpc("get_content_economy_settings"),
     supabase.rpc("get_platform_runtime"),
+    supabase.rpc("get_my_song_management"),
+    supabase.rpc("get_saved_songs"),
+    supabase.rpc("get_listener_impact_profile"),
+    supabase.rpc("get_my_community_network"),
+    supabase.rpc("get_my_recent_community_activity", {
+      activity_limit: 12,
+    }),
+    supabase
+      .from("connected_platform_accounts")
+      .select(
+        "platform, connection_status, provider_username, display_name, profile_url, avatar_url, creator_account, provider_verified, follower_count, following_count, content_count, likes_count, connected_at, last_synced_at",
+      )
+      .eq("user_id", user.id),
+    supabase.rpc("get_my_removed_song_history"),
   ]);
 
   const { data: reviewRows } = latestSong
@@ -594,6 +620,94 @@ export async function ProtectedAppPage({
   const platformConfig = platformRuntimeRows
     ? mapPlatformControlState(platformRuntimeRows).config
     : defaultPlatformControlConfig;
+  const networkRow = (
+    Array.isArray(networkRows) ? networkRows[0] : networkRows
+  ) as Record<string, unknown> | null;
+  const network: CommunityNetwork = {
+    followers: Number(networkRow?.followers ?? 0),
+    following: Number(networkRow?.following ?? 0),
+    artistsSupported: Number(networkRow?.artists_supported ?? 0),
+    visibleSupports: Number(networkRow?.visible_supports ?? 0),
+    anonymousSupports: Number(networkRow?.anonymous_supports ?? 0),
+    visibility:
+      networkRow?.community_visibility === "anonymous"
+        ? "anonymous"
+        : "public",
+    autoplayNextSong: Boolean(networkRow?.autoplay_next_song ?? true),
+  };
+  const profilePanel: ProfilePanelProps = {
+    profile: {
+      id: user.id,
+      displayName: profile.display_name,
+      email: user.email ?? "",
+      founder: profile.founder_number !== null,
+      role: profile.role,
+      credits: Number(profile.credits ?? 0),
+      founderSubmissionsRemaining: Number(
+        profile.founder_free_submissions_remaining ?? 0,
+      ),
+      showExplicitContent: Boolean(profile.show_explicit_content),
+      communityVisibility:
+        profile.community_visibility === "anonymous" ? "anonymous" : "public",
+      autoplayNextSong: Boolean(profile.autoplay_next_song),
+      externalRedirectNoticeDisabled: Boolean(
+        profile.external_redirect_notice_disabled,
+      ),
+    },
+    impact: (
+      Array.isArray(impactRows) ? impactRows[0] : impactRows
+    ) as ProfilePanelProps["impact"],
+    savedSongs: (savedSongRows ?? []) as ProfilePanelProps["savedSongs"],
+    songs: (profileSongRows ?? []) as ProfilePanelProps["songs"],
+    removedSongHistory: (
+      removedSongHistoryRows ?? []
+    ) as ProfilePanelProps["removedSongHistory"],
+    network,
+    activity: ((activityRows ?? []) as Array<Record<string, unknown>>).map(
+      (row) => ({
+        id: String(row.event_id),
+        type: String(row.event_type) as CommunityActivity["type"],
+        artistId: String(row.artist_id),
+        artistName: String(row.artist_name),
+        songId: row.song_id ? String(row.song_id) : undefined,
+        songTitle: row.song_title ? String(row.song_title) : undefined,
+        visibility: row.visibility === "anonymous" ? "anonymous" : "public",
+        createdAt: String(row.created_at),
+      }),
+    ),
+    connectedPlatforms: (
+      (connectedPlatformRows ?? []) as Array<Record<string, unknown>>
+    ).map(
+      (row): ConnectedPlatformAccount => ({
+        platform: String(row.platform) as ConnectedPlatform,
+        connectionStatus: String(
+          row.connection_status ?? "not_connected",
+        ) as ConnectedPlatformAccount["connectionStatus"],
+        username: row.provider_username
+          ? String(row.provider_username)
+          : undefined,
+        displayName: row.display_name ? String(row.display_name) : undefined,
+        profileUrl: row.profile_url ? String(row.profile_url) : undefined,
+        avatarUrl: row.avatar_url ? String(row.avatar_url) : undefined,
+        creatorAccount: Boolean(row.creator_account),
+        providerVerified: Boolean(row.provider_verified),
+        followerCount:
+          row.follower_count === null ? undefined : Number(row.follower_count),
+        followingCount:
+          row.following_count === null
+            ? undefined
+            : Number(row.following_count),
+        contentCount:
+          row.content_count === null ? undefined : Number(row.content_count),
+        likesCount:
+          row.likes_count === null ? undefined : Number(row.likes_count),
+        connectedAt: row.connected_at ? String(row.connected_at) : undefined,
+        lastSyncedAt: row.last_synced_at
+          ? String(row.last_synced_at)
+          : undefined,
+      }),
+    ),
+  };
 
   return (
     <ProtectedAppEntry
@@ -666,6 +780,7 @@ export async function ProtectedAppPage({
         dailyMission,
         communityPrograms,
         platformConfig,
+        profilePanel,
       }}
     />
   );

@@ -9,7 +9,6 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
-  ChevronDown,
   Clapperboard,
   CircleHelp,
   Clock3,
@@ -76,6 +75,10 @@ import {
   ProviderPlayer,
   type ProviderTelemetrySnapshot,
 } from "@/components/provider-player";
+import {
+  ProfilePanel,
+  type ProfilePanelProps,
+} from "@/components/profile-panel";
 import { SongActionBar } from "@/components/song-action-bar";
 import {
   feedbackFocusOptions,
@@ -139,7 +142,7 @@ import type {
   TodaySupportSummary,
 } from "@/lib/types";
 
-export type View = "review" | "dashboard" | "submit";
+export type View = "review" | "dashboard" | "profile" | "submit";
 export type DiscoveryDestination =
   | { type: "genres" }
   | { slug: string; type: "genre" };
@@ -151,8 +154,7 @@ type WorkspaceQueueMode =
   | "top10";
 type WorkspacePanel =
   | { type: View }
-  | { destination: DiscoveryDestination; type: "discover" }
-  | { type: "profile" };
+  | { destination: DiscoveryDestination; type: "discover" };
 type WorkspacePlayableSong = {
   artist: string;
   artistId?: string;
@@ -229,6 +231,7 @@ function workspaceRouteFromPath(pathname: string):
   | null {
   if (pathname === "/review") return { view: "review" };
   if (pathname === "/dashboard") return { view: "dashboard" };
+  if (pathname === "/profile") return { view: "profile" };
   if (pathname === "/submit") return { view: "submit" };
   if (pathname === "/discover/genres") {
     return { destination: { type: "genres" }, view: "dashboard" };
@@ -481,15 +484,16 @@ function secondsToNextReward(bankSeconds: number, exchangeSeconds: number) {
 
 function navItems(copy: Copy): Array<{ id: View; label: string; icon: typeof Headphones }> {
   return [
-    { id: "review", label: copy.app.nav.review, icon: Headphones },
     { id: "dashboard", label: copy.app.nav.dashboard, icon: Sparkles },
     { id: "submit", label: copy.app.nav.submit, icon: Plus },
+    { id: "profile", label: copy.app.topbar.profileTitle, icon: UserRound },
   ];
 }
 
 function shortMobileLabel(locale: InterfaceLocale, view: View) {
   if (view === "review") return locale === "es" ? "Review" : "Review";
   if (view === "submit") return locale === "es" ? "Enviar" : "Submit";
+  if (view === "profile") return locale === "es" ? "Perfil" : "Profile";
   return locale === "es" ? "Descubrir" : "Discover";
 }
 
@@ -789,34 +793,214 @@ function WorkspacePlayerHost({
   );
 }
 
+function WorkspaceShellTop({
+  controller,
+  status,
+  todaySupport,
+  credits,
+  unlimitedCredits,
+  claimingReward,
+  rewardClaimFeedback,
+  onClaimReward,
+  locale,
+}: {
+  controller: WorkspacePlaybackController;
+  status: ListeningBankStatus;
+  todaySupport: TodaySupportSummary;
+  credits: number;
+  unlimitedCredits: boolean;
+  claimingReward: boolean;
+  rewardClaimFeedback: RewardClaimFeedback | null;
+  onClaimReward: () => void;
+  locale: InterfaceLocale;
+}) {
+  const spanish = locale === "es";
+  const activeSong = controller.activeSong;
+  const activeContext = controller.activeContext;
+  const exchangeSeconds = Math.max(1, status.minutesPerCredit * 60);
+  const ready = status.rewardsEnabled && status.availableRewardCredits > 0;
+  const progressSeconds = ready
+    ? exchangeSeconds
+    : status.bankSeconds % exchangeSeconds;
+  const progress = Math.min(
+    100,
+    Math.round((progressSeconds / exchangeSeconds) * 100),
+  );
+  const timePlayedToday = Math.max(
+    todaySupport.listeningSeconds,
+    status.todaySeconds,
+  );
+
+  return (
+    <section
+      aria-label={
+        spanish ? "Reproductor de First Listen" : "First Listen workspace player"
+      }
+      className="workspace-top-area"
+    >
+      <div className="workspace-player-panel">
+        <div className="workspace-player-copy">
+          <span className="eyebrow">
+            <Radio size={13} />{" "}
+            {spanish ? "Reproductor persistente" : "Persistent player"}
+          </span>
+          <strong>
+            {activeSong
+              ? activeSong.title
+              : spanish
+                ? "Elige una cancion para empezar"
+                : "Choose a song to start"}
+          </strong>
+          <small>
+            {activeSong
+              ? `${activeSong.artist} / ${
+                  activeContext?.label ?? activeSong.platform
+                }`
+              : spanish
+                ? "El reproductor se mantiene activo al cambiar de seccion."
+                : "The player stays active while you switch sections."}
+          </small>
+        </div>
+        <div
+          className={
+            activeSong
+              ? "workspace-persistent-player-slot"
+              : "workspace-persistent-player-slot empty"
+          }
+        >
+          <WorkspacePlaybackSlot
+            controller={controller}
+            slotId="workspace:persistent"
+          />
+          {!activeSong && (
+            <div className="workspace-player-empty-state">
+              <Play size={22} />
+              <span>
+                {spanish ? "Listo para descubrir musica" : "Ready to discover music"}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="workspace-status-bars">
+        <div className="workspace-session-status-bar">
+          <div>
+            <span>
+              <CheckCircle2 size={13} />{" "}
+              {spanish ? "Sesion verificada" : "Verified Session"}
+            </span>
+            <strong>
+              {activeSong ? (spanish ? "Activa" : "Active") : (spanish ? "Lista" : "Ready")}
+            </strong>
+          </div>
+          <div>
+            <span>
+              <Headphones size={13} />{" "}
+              {spanish ? "Tiempo reproducido" : "Time Played"}
+            </span>
+            <strong>{formatClock(timePlayedToday)}</strong>
+          </div>
+          <div>
+            <span>
+              <Clock3 size={13} /> {spanish ? "Banco de Tiempo" : "Time Bank"}
+            </span>
+            <strong>{formatPreciseMinutes(status.bankSeconds)}</strong>
+          </div>
+          <div>
+            <span>
+              <Sparkles size={13} />{" "}
+              {spanish ? "Tokens de Envio" : "Submission Tokens"}
+            </span>
+            <strong>
+              {unlimitedCredits ? (spanish ? "Ilimitados" : "Unlimited") : credits}
+            </strong>
+          </div>
+        </div>
+
+        <div
+          className={
+            ready
+              ? "workspace-reward-status-bar ready"
+              : "workspace-reward-status-bar"
+          }
+        >
+          <div className="workspace-reward-copy">
+            <span>
+              <Target size={13} />{" "}
+              {spanish ? "Progreso de recompensa" : "Reward Progress"}
+            </span>
+            <strong>
+              {ready
+                ? spanish
+                  ? "Token listo para reclamar"
+                  : "Token ready to claim"
+                : `${Math.ceil(status.secondsToNextCredit / 60)} ${
+                    spanish ? "min restantes" : "min remaining"
+                  }`}
+            </strong>
+          </div>
+          <div className="workspace-reward-meter">
+            <div
+              aria-label={`${progress}% toward the next token`}
+              className="progress-track"
+            >
+              <i style={{ width: `${progress}%` }} />
+            </div>
+            <small>
+              {spanish ? "Recompensas disponibles" : "Available Rewards"}:{" "}
+              <b>{status.availableRewardCredits}</b> /{" "}
+              {formatPreciseMinutes(status.bankSeconds)} /{" "}
+              {unlimitedCredits
+                ? spanish
+                  ? "Tokens ilimitados"
+                  : "Unlimited tokens"
+                : `${credits} tokens`}
+            </small>
+          </div>
+          <button
+            disabled={claimingReward || !ready}
+            onClick={onClaimReward}
+            type="button"
+          >
+            {claimingReward
+              ? spanish
+                ? "Reclamando..."
+                : "Claiming..."
+              : spanish
+                ? "Reclamar token"
+                : "Claim token"}
+          </button>
+          {rewardClaimFeedback && (
+            <small className="workspace-reward-feedback">
+              +{rewardClaimFeedback.awarded}{" "}
+              {spanish ? "token otorgado" : "token awarded"}:{" "}
+              {rewardClaimFeedback.beforeCredits} -&gt;{" "}
+              {rewardClaimFeedback.afterCredits}
+            </small>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Sidebar({
   view,
   setView,
   reviewCount,
   founder,
   founderFree,
-  account,
-  onProfile,
   copy,
   unlimitedCredits,
-  adminAccess,
-  ownerAccess,
-  onAdmin,
-  onOwner,
 }: {
   view: View;
   setView: (view: View) => void;
   reviewCount: number;
   founder: boolean;
   founderFree: boolean;
-  account: AccountSummary;
-  onProfile: () => void;
   copy: Copy;
   unlimitedCredits: boolean;
-  adminAccess: boolean;
-  ownerAccess: boolean;
-  onAdmin: () => void;
-  onOwner: () => void;
 }) {
   return (
     <aside className="sidebar">
@@ -833,25 +1017,12 @@ function Sidebar({
             >
               <Icon size={19} />
               <span>{item.label}</span>
-              {item.id === "review" && <em>{unlimitedCredits ? "\u221e" : reviewCount}</em>}
               {item.id === "submit" && reviewCount < 1 && !founderFree && !unlimitedCredits && (
                 <LockKeyhole className="nav-lock" size={14} />
               )}
             </button>
           );
         })}
-        {ownerAccess && (
-          <button onClick={onOwner}>
-            <Gauge size={19} />
-            <span>Owner Control Center</span>
-          </button>
-        )}
-        {adminAccess && (
-          <button onClick={onAdmin}>
-            <ShieldCheck size={19} />
-            <span>Admin Panel</span>
-          </button>
-        )}
       </nav>
 
       <div className="sidebar-bottom">
@@ -864,22 +1035,6 @@ function Sidebar({
             </span>
           </div>
         )}
-        <div className="sidebar-card">
-          <div className="sidebar-card-icon"><Gauge size={18} /></div>
-          <strong>{copy.app.sidebar.keepHonest}</strong>
-          <p>{copy.app.sidebar.keepHonestBody}</p>
-          <button onClick={() => setView("review")}>
-            {copy.app.sidebar.reviewSong} <ArrowRight size={14} />
-          </button>
-        </div>
-        <button className="profile-row" onClick={onProfile}>
-          <span className="avatar">{account.initials}</span>
-          <span>
-            <strong>{account.displayName}</strong>
-            <small>{account.email || "Profile"}</small>
-          </span>
-          <ChevronDown size={15} />
-        </button>
       </div>
     </aside>
   );
@@ -920,6 +1075,10 @@ function Topbar({
     submit: {
       title: copy.app.topbar.submitTitle,
       subtitle: copy.app.topbar.submitSubtitle,
+    },
+    profile: {
+      title: copy.app.topbar.profileTitle,
+      subtitle: copy.app.topbar.profileSubtitle,
     },
   };
 
@@ -8040,6 +8199,7 @@ type FirstListenAppProps = {
   initialSongSummaries: SongDashboardSummary[];
   initialSongReviews: Review[];
   platformConfig: PlatformControlConfig;
+  profilePanel: ProfilePanelProps;
 };
 
 export function FirstListenApp({
@@ -8076,6 +8236,7 @@ export function FirstListenApp({
   initialSongSummaries,
   initialSongReviews,
   platformConfig = defaultPlatformControlConfig,
+  profilePanel,
 }: FirstListenAppProps) {
   const router = useRouter();
   const copy = getCopy(locale);
@@ -8223,9 +8384,11 @@ export function FirstListenApp({
       stopWorkspacePlayback,
     ],
   );
-  const workspacePlaybackSlot = workspacePlayback?.slotId
-    ? (playbackSlots.get(workspacePlayback.slotId) ?? null)
-    : null;
+  const workspacePlaybackSlot =
+    playbackSlots.get("workspace:persistent") ??
+    (workspacePlayback?.slotId
+      ? (playbackSlots.get(workspacePlayback.slotId) ?? null)
+      : null);
 
   useEffect(() => {
     setView(initialView);
@@ -9033,6 +9196,15 @@ export function FirstListenApp({
         />
       );
     }
+    if (view === "profile") {
+      return (
+        <ProfilePanel
+          {...profilePanel}
+          embedded
+          onNavigate={changeView}
+        />
+      );
+    }
     if (view === "submit") {
       return (
         <SubmitView
@@ -9089,18 +9261,12 @@ export function FirstListenApp({
   return (
     <div className={darkMode ? "app-shell theme-dark" : "app-shell"}>
       <Sidebar
-        account={account}
         copy={copy}
         founder={founder}
         founderFree={founderFree}
-        onProfile={() => router.push("/profile")}
         reviewCount={reviewCount}
         setView={changeView}
         unlimitedCredits={role === "super_admin"}
-        adminAccess={role === "super_admin" || role === "admin"}
-        ownerAccess={role === "super_admin"}
-        onAdmin={() => router.push("/admin")}
-        onOwner={() => router.push("/owner")}
         view={view}
       />
       <div className="app-main">
@@ -9111,7 +9277,7 @@ export function FirstListenApp({
           onLocaleChange={onLocaleChange}
           onLogout={onLogout}
           onHelp={() => router.push("/help")}
-          onProfile={() => router.push("/profile")}
+          onProfile={() => changeView("profile")}
           onMenu={() => setMenuOpen(true)}
           onToggleTheme={toggleTheme}
           view={view}
@@ -9120,10 +9286,27 @@ export function FirstListenApp({
           locale={locale}
           notifications={notifications}
           onDismiss={() => void dismissCommunitySummary()}
-          onViewActivity={() => router.push("/profile#community-activity")}
+          onViewActivity={() => changeView("profile")}
           summary={notificationSummary}
         />
-        {viewContent}
+        <WorkspaceShellTop
+          controller={workspacePlaybackController}
+          status={listeningBank}
+          todaySupport={todaySupport}
+          credits={reviewCount}
+          unlimitedCredits={role === "super_admin"}
+          claimingReward={claimingReward}
+          rewardClaimFeedback={rewardClaimFeedback}
+          onClaimReward={() => void claimListeningReward()}
+          locale={locale}
+        />
+        <div className="workspace-shell-grid">
+          <section className="workspace-center-panel">{viewContent}</section>
+          <aside
+            aria-hidden="true"
+            className="workspace-right-panel-placeholder"
+          />
+        </div>
         <WorkspacePlayerHost
           externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
           locale={locale}
@@ -9172,7 +9355,7 @@ export function FirstListenApp({
               <CircleHelp size={19} />
               Help Center
             </button>
-            <button onClick={() => router.push("/profile")}>
+            <button onClick={() => changeView("profile")}>
               <UserRound size={19} />
               {account.displayName}
             </button>

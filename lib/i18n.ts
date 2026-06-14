@@ -149,6 +149,8 @@ export const translations = {
         dashboardSubtitle: "Spotlight, Top 10, new releases, and artists to support.",
         submitTitle: "Submit a song",
         submitSubtitle: "Share a link. We never store your audio.",
+        profileTitle: "My Profile",
+        profileSubtitle: "Manage your songs, platforms, and listener settings.",
       },
       sidebar: {
         keepHonest: "Keep it honest",
@@ -387,6 +389,9 @@ export const translations = {
           "Spotlight, Top 10, nuevos lanzamientos y artistas para apoyar.",
         submitTitle: "Enviar canción",
         submitSubtitle: "Comparte un enlace. Nunca guardamos tu audio.",
+        profileTitle: "Mi Perfil",
+        profileSubtitle:
+          "Administra tus canciones, plataformas y ajustes de oyente.",
       },
       sidebar: {
         keepHonest: "Mantén la honestidad",

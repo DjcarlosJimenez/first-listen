@@ -50,7 +50,7 @@ import type {
   Platform,
 } from "@/lib/types";
 
-type ProfileSong = {
+export type ProfileSong = {
   song_id: string;
   title: string;
   artist_name: string;
@@ -70,7 +70,7 @@ type ProfileSong = {
   platform_links?: ProfilePlatformLinkRow[] | null;
 };
 
-type ProfilePlatformLinkRow = {
+export type ProfilePlatformLinkRow = {
   platform?: string;
   music_url?: string;
   is_primary?: boolean;
@@ -78,7 +78,7 @@ type ProfilePlatformLinkRow = {
   confidence_score?: number;
 };
 
-type ProfilePlatformLink = {
+export type ProfilePlatformLink = {
   platform: Platform;
   url: string;
   primary: boolean;
@@ -86,7 +86,7 @@ type ProfilePlatformLink = {
   confidenceScore: number;
 };
 
-type RemovedSongHistory = {
+export type RemovedSongHistory = {
   history_id: string;
   original_song_id: string;
   title: string;
@@ -98,7 +98,7 @@ type RemovedSongHistory = {
   created_at: string;
 };
 
-type SavedSong = {
+export type SavedSong = {
   song_id: string;
   artist_id: string;
   title: string;
@@ -108,6 +108,42 @@ type SavedSong = {
   genre: string;
   song_language: string;
   saved_at: string;
+};
+
+type ProfileNavigationTarget = "dashboard" | "profile" | "review" | "submit";
+
+export type ProfilePanelProps = {
+  profile: {
+    id: string;
+    displayName: string;
+    email: string;
+    founder: boolean;
+    role: string;
+    credits: number;
+    founderSubmissionsRemaining: number;
+    showExplicitContent: boolean;
+    communityVisibility: "public" | "anonymous";
+    autoplayNextSong: boolean;
+    externalRedirectNoticeDisabled: boolean;
+  };
+  songs: ProfileSong[];
+  savedSongs: SavedSong[];
+  impact: {
+    supporting_seconds: number;
+    songs_reviewed: number;
+    creators_supported: number;
+    valid_listens: number;
+    average_listening_seconds: number;
+    days_active: number;
+    community_points: number;
+    community_rank: string;
+  } | null;
+  network: CommunityNetwork;
+  activity: CommunityActivity[];
+  connectedPlatforms: ConnectedPlatformAccount[];
+  removedSongHistory: RemovedSongHistory[];
+  embedded?: boolean;
+  onNavigate?: (view: ProfileNavigationTarget) => void;
 };
 
 const platformDefinitions: Array<{
@@ -222,37 +258,9 @@ export function ProfilePanel({
   activity,
   connectedPlatforms,
   removedSongHistory,
-}: {
-  profile: {
-    id: string;
-    displayName: string;
-    email: string;
-    founder: boolean;
-    role: string;
-    credits: number;
-    founderSubmissionsRemaining: number;
-    showExplicitContent: boolean;
-    communityVisibility: "public" | "anonymous";
-    autoplayNextSong: boolean;
-    externalRedirectNoticeDisabled: boolean;
-  };
-  songs: ProfileSong[];
-  savedSongs: SavedSong[];
-  impact: {
-    supporting_seconds: number;
-    songs_reviewed: number;
-    creators_supported: number;
-    valid_listens: number;
-    average_listening_seconds: number;
-    days_active: number;
-    community_points: number;
-    community_rank: string;
-  } | null;
-  network: CommunityNetwork;
-  activity: CommunityActivity[];
-  connectedPlatforms: ConnectedPlatformAccount[];
-  removedSongHistory: RemovedSongHistory[];
-}) {
+  embedded = false,
+  onNavigate,
+}: ProfilePanelProps) {
   const locale = useInterfaceLocale();
   const spanish = locale === "es";
   const [name, setName] = useState(profile.displayName);
@@ -627,14 +635,16 @@ export function ProfilePanel({
   };
 
   return (
-    <main className="account-page">
-      <header className="account-header">
-        <Logo />
-        <div className="owner-header-actions">
-          <Link href="/help"><CircleHelp size={16} /> {spanish ? "¿Necesitas ayuda?" : "Need Help?"}</Link>
-          <Link href="/dashboard"><ArrowLeft size={16} /> {spanish ? "Descubrir música" : "Discover Music"}</Link>
-        </div>
-      </header>
+    <main className={embedded ? "account-page account-page-embedded" : "account-page"}>
+      {!embedded && (
+        <header className="account-header">
+          <Logo />
+          <div className="owner-header-actions">
+            <Link href="/help"><CircleHelp size={16} /> {spanish ? "¿Necesitas ayuda?" : "Need Help?"}</Link>
+            <Link href="/dashboard"><ArrowLeft size={16} /> {spanish ? "Descubrir música" : "Discover Music"}</Link>
+          </div>
+        </header>
+      )}
       <div className="account-grid">
         <section className="account-card">
           <span className="eyebrow">{spanish ? "Perfil" : "Profile"}</span>
@@ -851,7 +861,13 @@ export function ProfilePanel({
           {managedSongs.length === 0 ? (
             <div className="empty-state">
               <p>{spanish ? "Todavía no has enviado canciones." : "No songs submitted yet."}</p>
-              <Link href="/submit">{spanish ? "Enviar tu primera canción" : "Submit your first song"}</Link>
+              {onNavigate ? (
+                <button className="text-link-button" onClick={() => onNavigate("submit")} type="button">
+                  {spanish ? "Enviar tu primera canción" : "Submit your first song"}
+                </button>
+              ) : (
+                <Link href="/submit">{spanish ? "Enviar tu primera canción" : "Submit your first song"}</Link>
+              )}
             </div>
           ) : (
             <div className="song-table">
@@ -1221,7 +1237,13 @@ export function ProfilePanel({
               {!activity.length && (
                 <div className="empty-state">
                   <p>{spanish ? "Tus escuchas, comentarios y artistas seguidos aparecerán aquí." : "Your listens, reviews, and follows will appear here."}</p>
-                  <Link href="/review">{spanish ? "Apoyar a un creador" : "Support a creator"}</Link>
+                  {onNavigate ? (
+                    <button className="text-link-button" onClick={() => onNavigate("dashboard")} type="button">
+                      {spanish ? "Apoyar a un creador" : "Support a creator"}
+                    </button>
+                  ) : (
+                    <Link href="/review">{spanish ? "Apoyar a un creador" : "Support a creator"}</Link>
+                  )}
                 </div>
               )}
             </div>
@@ -1234,7 +1256,13 @@ export function ProfilePanel({
           {savedSongs.length === 0 ? (
             <div className="empty-state">
               <p>{spanish ? "Las canciones que guardes aparecerán aquí." : "Songs you save after reviews will appear here."}</p>
-              <Link href="/review">{spanish ? "Escuchar y descubrir música" : "Review and discover music"}</Link>
+              {onNavigate ? (
+                <button className="text-link-button" onClick={() => onNavigate("dashboard")} type="button">
+                  {spanish ? "Escuchar y descubrir música" : "Review and discover music"}
+                </button>
+              ) : (
+                <Link href="/review">{spanish ? "Escuchar y descubrir música" : "Review and discover music"}</Link>
+              )}
             </div>
           ) : (
             <div className="song-table">

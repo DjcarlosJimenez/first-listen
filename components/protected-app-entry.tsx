@@ -8,6 +8,7 @@ import {
   type View,
 } from "@/components/first-listen-app";
 import { Onboarding, type OnboardingPreferences } from "@/components/onboarding";
+import type { ProfilePanelProps } from "@/components/profile-panel";
 import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
 import type { PlatformControlConfig } from "@/lib/platform-control";
 import { createClient } from "@/lib/supabase/client";
@@ -58,6 +59,7 @@ type ProfileSeed = {
   dailyMission: DailyMissionStatus | null;
   communityPrograms: CommunityProgram[];
   platformConfig: PlatformControlConfig;
+  profilePanel: ProfilePanelProps;
 };
 
 export function ProtectedAppEntry({
@@ -170,6 +172,7 @@ export function ProtectedAppEntry({
       initialDailyMission={profile.dailyMission}
       initialCommunityPrograms={profile.communityPrograms}
       platformConfig={profile.platformConfig}
+      profilePanel={profile.profilePanel}
       initialView={initialView}
       listenerLanguages={languages}
       locale={locale}
