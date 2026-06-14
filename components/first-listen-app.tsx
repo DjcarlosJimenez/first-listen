@@ -104,6 +104,7 @@ import {
   submissionTokenCost,
 } from "@/lib/content-economy";
 import { safeCoverUrl } from "@/lib/media";
+import { discoveryGenreSlug } from "@/lib/discovery-routing";
 import { describeMatch, prioritizeReviewQueue } from "@/lib/matching";
 import { detectMusicPlatform } from "@/lib/platform";
 import { getProviderEmbed } from "@/lib/player";
@@ -138,6 +139,9 @@ import type {
 } from "@/lib/types";
 
 export type View = "review" | "dashboard" | "submit";
+export type DiscoveryDestination =
+  | { type: "genres" }
+  | { slug: string; type: "genre" };
 type BinaryAnswer = boolean | null;
 type Copy = ReturnType<typeof getCopy>;
 
@@ -2890,7 +2894,7 @@ function submittedTime(song: DiscoverySong) {
 }
 
 function normalizedGenreKey(genre: string) {
-  return genre.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return discoveryGenreSlug(genre);
 }
 
 function discoveryGenreLabel(locale: InterfaceLocale, genre: string) {
@@ -3528,6 +3532,7 @@ function DiscoverySongCard({
 }
 
 function DiscoverySections({
+  destination,
   spotlightSongs,
   topTenSongs,
   externalDiscoverySongs,
@@ -3537,6 +3542,7 @@ function DiscoverySections({
   externalRedirectNoticeDisabled,
   onExternalRedirectPreferenceChange,
 }: {
+  destination?: DiscoveryDestination;
   spotlightSongs: DiscoverySong[];
   topTenSongs: DiscoverySong[];
   externalDiscoverySongs: DiscoverySong[];
@@ -3574,7 +3580,7 @@ function DiscoverySections({
   );
   const [expandedCategory, setExpandedCategory] =
     useState<DiscoveryCategoryKey | null>(null);
-  const [expandedGenre, setExpandedGenre] = useState<string | null>(null);
+  const router = useRouter();
   const spanish = locale === "es";
   const discoveryHub = platformConfig.discovery.hub;
   const limits = discoveryHub.limits;
@@ -3627,16 +3633,22 @@ function DiscoverySections({
     [externalDiscoverySongs, spotlightSongs, topTenSongs],
   );
   const catalogLimit = Math.max(1, allDiscoverySongs.length);
-  const internalPlaybackSongs = useMemo(
+  const internalPlaybackCatalog = useMemo(
     () =>
-      sortDiscoverySongs(
-        allDiscoverySongs.filter(isQueuePlayableDiscoverySong),
+      [...allDiscoverySongs.filter(isQueuePlayableDiscoverySong)].sort(
         (left, right) =>
           exposureScore(left) - exposureScore(right) ||
           trendScore(right) - trendScore(left),
+      ),
+    [allDiscoverySongs],
+  );
+  const internalPlaybackSongs = useMemo(
+    () =>
+      internalPlaybackCatalog.slice(
+        0,
         Math.min(catalogLimit, queuePolicy.queueLength),
       ),
-    [allDiscoverySongs, catalogLimit, queuePolicy.queueLength],
+    [catalogLimit, internalPlaybackCatalog, queuePolicy.queueLength],
   );
   const topTenQueueSongs = useMemo(
     () =>
@@ -3705,7 +3717,7 @@ function DiscoverySections({
   );
   const genreSections = useMemo(() => {
     const grouped = new Map<string, DiscoverySong[]>();
-    for (const song of internalPlaybackSongs) {
+    for (const song of internalPlaybackCatalog) {
       const genre = song.genre || "Other";
       if (discoveryHub.genres.visibility[genre] === false) continue;
       grouped.set(genre, [...(grouped.get(genre) ?? []), song]);
@@ -3729,15 +3741,28 @@ function DiscoverySections({
           (left, right) =>
             exposureScore(left) - exposureScore(right) ||
             trendScore(right) - trendScore(left),
-          Math.min(Math.max(1, songs.length), queuePolicy.genreQueueSize),
+          Math.max(1, songs.length),
         ),
       }))
-      .filter((section) => section.songs.length > 0)
+      .map((section) => ({
+        ...section,
+        queueSongs: sortDiscoverySongs(
+          section.songs,
+          (left, right) =>
+            exposureScore(left) - exposureScore(right) ||
+            trendScore(right) - trendScore(left),
+          Math.min(
+            Math.max(1, section.songs.length),
+            queuePolicy.genreQueueSize,
+          ),
+        ),
+      }))
+      .filter((section) => section.queueSongs.length > 0)
       .slice(0, limits.genreCount);
   }, [
     discoveryHub.genres.order,
     discoveryHub.genres.visibility,
-    internalPlaybackSongs,
+    internalPlaybackCatalog,
     limits.genreCount,
     queuePolicy.genreQueueSize,
   ]);
@@ -3761,6 +3786,7 @@ function DiscoverySections({
       description,
       id,
       preserveOrder = false,
+      preferredSongId,
       songs,
       title,
     }: {
@@ -3769,11 +3795,21 @@ function DiscoverySections({
       description: string;
       songs: DiscoverySong[];
       preserveOrder?: boolean;
+      preferredSongId?: string;
     }) => {
       if (!songs.length) return;
       let queueSongs = preserveOrder
         ? [...songs]
         : rankDiscoveryQueue(songs, heardHistory, queueRankOptions);
+      if (preferredSongId) {
+        const selected = queueSongs.find((song) => song.id === preferredSongId);
+        if (selected) {
+          queueSongs = [
+            selected,
+            ...queueSongs.filter((song) => song.id !== preferredSongId),
+          ];
+        }
+      }
       if (id === "random" && queueSongs.length > 1) {
         const poolSize = Math.min(
           Math.max(1, queuePolicy.randomReplayPoolSize),
@@ -3789,7 +3825,6 @@ function DiscoverySections({
       const firstSong = queueSongs[0];
       setActiveCardKey(null);
       setExpandedCategory(null);
-      setExpandedGenre(null);
       setActiveQueue({
         cycle: 0,
         currentIndex: 0,
@@ -3865,12 +3900,7 @@ function DiscoverySections({
 
   const toggleCategory = (category: DiscoveryCategoryKey) => {
     setActiveQueue(null);
-    setExpandedGenre(null);
     setExpandedCategory((current) => (current === category ? null : category));
-  };
-
-  const toggleGenre = (genre: string) => {
-    setExpandedGenre((current) => (current === genre ? null : genre));
   };
 
   const playGenre = (genre: string, songs: DiscoverySong[]) => {
@@ -3880,6 +3910,31 @@ function DiscoverySections({
         : "Genre playback queue",
       id: `genre-${normalizedGenreKey(genre)}`,
       songs,
+      title: discoveryGenreLabel(locale, genre),
+    });
+  };
+
+  const playGenreSong = (
+    genre: string,
+    songs: DiscoverySong[],
+    selectedSong: DiscoverySong,
+  ) => {
+    const rankedSongs = rankDiscoveryQueue(
+      songs.filter((song) => song.id !== selectedSong.id),
+      heardHistory,
+      queueRankOptions,
+    );
+    const queueSongs = [selectedSong, ...rankedSongs].slice(
+      0,
+      Math.max(1, queuePolicy.genreQueueSize),
+    );
+    startDiscoveryQueue({
+      description: spanish
+        ? "Cola de canciones del genero"
+        : "Genre playback queue",
+      id: `genre-${normalizedGenreKey(genre)}`,
+      preferredSongId: selectedSong.id,
+      songs: queueSongs,
       title: discoveryGenreLabel(locale, genre),
     });
   };
@@ -4263,7 +4318,11 @@ function DiscoverySections({
                   ) : (
                     <button
                       disabled={primaryDisabled}
-                      onClick={() => toggleCategory(config.key)}
+                      onClick={() =>
+                        config.key === "genres"
+                          ? router.push("/discover/genres")
+                          : toggleCategory(config.key)
+                      }
                       type="button"
                     >
                       <ArrowRight size={14} />
@@ -4288,6 +4347,358 @@ function DiscoverySections({
       </section>
     );
   };
+
+  const renderActiveQueuePanel = () => {
+    if (!activeQueue || !activeQueueSong) return null;
+
+    return (
+      <section className="panel discovery-queue-panel">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">
+              <Play size={13} />
+              {spanish ? "Cola activa" : "Active queue"}
+            </span>
+            <h3>{activeQueue.title}</h3>
+          </div>
+          <small>
+            {activeQueue.currentIndex + 1}/{activeQueue.songs.length}
+            {activeQueue.cycle > 0
+              ? spanish
+                ? " - repeticion inteligente"
+                : " - smart replay"
+              : ""}
+          </small>
+        </div>
+        <p className="discovery-queue-copy">{activeQueue.description}</p>
+        <div className="discovery-queue-grid">
+          <DiscoverySongCard
+            active
+            contextKind={
+              activeQueue.id.startsWith("genre-")
+                ? "genre"
+                : activeQueue.id === "top_results"
+                  ? "top"
+                  : activeQueue.id === "external_discovery"
+                    ? "external"
+                    : activeQueue.id === "internal_playback"
+                      ? "internal"
+                      : activeQueue.id
+            }
+            contextLabel={activeQueue.title}
+            externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
+            key={`${activeQueue.id}-${activeQueue.cycle}-${activeQueueSong.id}`}
+            locale={locale}
+            onExternalRedirectPreferenceChange={
+              onExternalRedirectPreferenceChange
+            }
+            onListeningCredited={onListeningCredited}
+            onPlay={stopDiscoveryQueue}
+            onQueueEnded={advanceDiscoveryQueue}
+            onQueueNext={advanceDiscoveryQueue}
+            queueIndex={activeQueue.currentIndex + 1}
+            queueLabel={activeQueue.title}
+            queueLength={activeQueue.songs.length}
+            song={activeQueueSong}
+            topTen={activeQueue.id === "top_results"}
+          />
+        </div>
+      </section>
+    );
+  };
+
+  const renderGenreDestinationHero = ({
+    copy,
+    title,
+  }: {
+    copy: string;
+    title: string;
+  }) => (
+    <section className="discovery-destination-hero">
+      <div>
+        <div className="discovery-breadcrumbs">
+          <Link href="/dashboard">
+            {spanish ? "Descubrir música" : "Discover music"}
+          </Link>
+          <span>/</span>
+          <Link href="/discover/genres">
+            {spanish ? "Géneros" : "Genres"}
+          </Link>
+        </div>
+        <span className="eyebrow">
+          <Music2 size={13} />
+          {spanish ? "Destino de descubrimiento" : "Discovery destination"}
+        </span>
+        <h2>{title}</h2>
+        <p>{copy}</p>
+      </div>
+      <div className="discovery-hub-stats">
+        <span>
+          <strong>{genreSections.length}</strong>
+          {spanish ? "géneros visibles" : "visible genres"}
+        </span>
+        <span>
+          <strong>{internalPlaybackCatalog.length}</strong>
+          {spanish ? "reproducen aquí" : "play here"}
+        </span>
+        <span>
+          <strong>{queuePolicy.genreQueueSize}</strong>
+          {spanish ? "por cola" : "per queue"}
+        </span>
+      </div>
+    </section>
+  );
+
+  const renderGenresDestination = () => {
+    const genresEnabled = sectionVisible("genres");
+
+    return (
+      <div className="dashboard-discovery discovery-destination-view">
+        {renderGenreDestinationHero({
+          copy: spanish
+            ? "Elige un género para abrir una página dedicada con cola, canciones compactas y reproducción dentro de First Listen."
+            : "Choose a genre to open a dedicated page with queue controls, compact songs, and playback inside First Listen.",
+          title: spanish ? "Géneros" : "Genres",
+        })}
+
+        {renderActiveQueuePanel()}
+
+        <section className="panel discovery-destination-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">
+                <ListMusic size={13} />
+                {spanish ? "Navega por estilo" : "Browse by style"}
+              </span>
+              <h3>
+                {spanish
+                  ? "Elige una cola de género"
+                  : "Choose a genre queue"}
+              </h3>
+            </div>
+            <small>
+              {spanish
+                ? "Configurado por Owner Control Center"
+                : "Configured by Owner Control Center"}
+            </small>
+          </div>
+
+          {!genresEnabled ? (
+            <p className="discovery-empty">
+              {spanish
+                ? "Los géneros están ocultos por la configuración actual."
+                : "Genres are hidden by the current configuration."}
+            </p>
+          ) : genreSections.length ? (
+            <div className="genre-destination-grid">
+              {genreSections.map(({ genre, queueSongs, songs }) => (
+                <article className="genre-destination-card" key={genre}>
+                  <header>
+                    <span aria-hidden>{discoveryGenreEmoji(genre)}</span>
+                    <div>
+                      <h4>{discoveryGenreLabel(locale, genre)}</h4>
+                      <small>
+                        {songs.length} {spanish ? "canciones" : "songs"}
+                      </small>
+                    </div>
+                  </header>
+                  <p>
+                    {spanish
+                      ? "Abre una página dedicada o empieza una cola con canciones que pueden reproducirse dentro de First Listen."
+                      : "Open a dedicated page or start a queue with songs playable inside First Listen."}
+                  </p>
+                  <div className="discovery-nav-actions">
+                    <button
+                      disabled={!queueSongs.length}
+                      onClick={() => playGenre(genre, queueSongs)}
+                      type="button"
+                    >
+                      <Play size={14} />
+                      {spanish ? "Reproducir género" : "Play genre"}
+                    </button>
+                    <Link href={`/discover/genre/${discoveryGenreSlug(genre)}`}>
+                      <ArrowRight size={14} />
+                      {spanish ? "Ver canciones" : "View songs"}
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="discovery-empty">
+              {spanish
+                ? "Los géneros aparecerán cuando haya canciones reproducibles dentro de First Listen."
+                : "Genres will appear when playable songs are available inside First Listen."}
+            </p>
+          )}
+        </section>
+      </div>
+    );
+  };
+
+  const renderGenreSongRows = (
+    genre: string,
+    songs: DiscoverySong[],
+  ) => {
+    if (!songs.length) {
+      return (
+        <p className="discovery-empty">
+          {spanish
+            ? "Aún no hay canciones disponibles para este género."
+            : "No songs are available for this genre yet."}
+        </p>
+      );
+    }
+
+    return (
+      <div className="discovery-compact-list">
+        {songs.map((song) => (
+          <article className="discovery-compact-row" key={song.id}>
+            <Image
+              alt=""
+              height={54}
+              src={song.coverUrl}
+              unoptimized
+              width={54}
+            />
+            <div>
+              <h4>{song.title}</h4>
+              <ArtistNameLink artistId={song.artistId} name={song.artist} />
+              <small>
+                {song.platform} / {optionLabel(locale, song.language)}
+              </small>
+            </div>
+            <button
+              onClick={() => playGenreSong(genre, songs, song)}
+              type="button"
+            >
+              <Play size={14} />
+              {spanish ? "Escuchar" : "Listen"}
+            </button>
+          </article>
+        ))}
+      </div>
+    );
+  };
+
+  const renderGenreDetailDestination = () => {
+    const genresEnabled = sectionVisible("genres");
+    const destinationSlug =
+      destination?.type === "genre" ? destination.slug : "";
+    const activeGenreSection =
+      genreSections.find(
+        (section) => discoveryGenreSlug(section.genre) === destinationSlug,
+      ) ?? null;
+
+    if (!genresEnabled || !activeGenreSection) {
+      return (
+        <div className="dashboard-discovery discovery-destination-view">
+          {renderGenreDestinationHero({
+            copy: spanish
+              ? "Este género no está visible o no tiene canciones reproducibles dentro de First Listen."
+              : "This genre is not visible or does not have playable songs inside First Listen.",
+            title: spanish ? "Género no disponible" : "Genre unavailable",
+          })}
+          <section className="panel discovery-destination-panel">
+            <p className="discovery-empty">
+              {spanish
+                ? "Vuelve a la lista de géneros para elegir una cola disponible."
+                : "Return to the genre list to choose an available queue."}
+            </p>
+            <Link className="secondary-button" href="/discover/genres">
+              <ArrowRight size={14} />
+              {spanish ? "Ver géneros" : "View genres"}
+            </Link>
+          </section>
+        </div>
+      );
+    }
+
+    return (
+      <div className="dashboard-discovery discovery-destination-view">
+        {renderGenreDestinationHero({
+          copy: spanish
+            ? "Una cola enfocada en este género. Elige una canción o reproduce la cola completa."
+            : "A focused queue for this genre. Pick a song or play the full queue.",
+          title: `${discoveryGenreEmoji(activeGenreSection.genre)} ${discoveryGenreLabel(
+            locale,
+            activeGenreSection.genre,
+          )}`,
+        })}
+
+        <section className="panel discovery-destination-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">
+                <Headphones size={13} />
+                {spanish ? "Cola del género" : "Genre queue"}
+              </span>
+              <h3>
+                {discoveryGenreLabel(locale, activeGenreSection.genre)}
+              </h3>
+            </div>
+            <small>
+              {activeGenreSection.songs.length}{" "}
+              {spanish ? "canciones" : "songs"}
+            </small>
+          </div>
+          <div className="genre-destination-actions">
+            <button
+              className="primary-button"
+              disabled={!activeGenreSection.queueSongs.length}
+              onClick={() =>
+                playGenre(
+                  activeGenreSection.genre,
+                  activeGenreSection.queueSongs,
+                )
+              }
+              type="button"
+            >
+              <Play size={15} />
+              {spanish ? "Reproducir género" : "Play genre"}
+            </button>
+            <Link className="secondary-button" href="/discover/genres">
+              <ListMusic size={14} />
+              {spanish ? "Todos los géneros" : "All genres"}
+            </Link>
+          </div>
+        </section>
+
+        {renderActiveQueuePanel()}
+
+        <section className="panel discovery-destination-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">
+                <ListMusic size={13} />
+                {spanish ? "Canciones" : "Songs"}
+              </span>
+              <h3>
+                {spanish ? "Lista compacta" : "Compact list"}
+              </h3>
+            </div>
+            <small>
+              {spanish
+                ? "Un solo reproductor por cola"
+                : "One player per queue"}
+            </small>
+          </div>
+          {renderGenreSongRows(
+            activeGenreSection.genre,
+            activeGenreSection.songs,
+          )}
+        </section>
+      </div>
+    );
+  };
+
+  if (destination?.type === "genres") {
+    return renderGenresDestination();
+  }
+
+  if (destination?.type === "genre") {
+    return renderGenreDetailDestination();
+  }
 
   return (
     <div className="dashboard-discovery">
@@ -4324,60 +4735,7 @@ function DiscoverySections({
       {spotlightIndex !== -1 && renderSpotlightSection()}
       {renderNavigationPanel(navigationConfigsAfterSpotlight, "after-spotlight")}
 
-      {activeQueue && activeQueueSong && (
-        <section className="panel discovery-queue-panel">
-          <div className="panel-heading">
-            <div>
-              <span className="eyebrow">
-                <Play size={13} />
-                {spanish ? "Cola activa" : "Active queue"}
-              </span>
-              <h3>{activeQueue.title}</h3>
-            </div>
-            <small>
-              {activeQueue.currentIndex + 1}/{activeQueue.songs.length}
-              {activeQueue.cycle > 0
-                ? spanish
-                  ? " - repeticion inteligente"
-                  : " - smart replay"
-                : ""}
-            </small>
-          </div>
-          <p className="discovery-queue-copy">{activeQueue.description}</p>
-          <div className="discovery-queue-grid">
-            <DiscoverySongCard
-              active
-              contextKind={
-                activeQueue.id.startsWith("genre-")
-                  ? "genre"
-                  : activeQueue.id === "top_results"
-                    ? "top"
-                    : activeQueue.id === "external_discovery"
-                      ? "external"
-                      : activeQueue.id === "internal_playback"
-                        ? "internal"
-                  : activeQueue.id
-              }
-              contextLabel={activeQueue.title}
-              externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
-              key={`${activeQueue.id}-${activeQueue.cycle}-${activeQueueSong.id}`}
-              locale={locale}
-              onExternalRedirectPreferenceChange={
-                onExternalRedirectPreferenceChange
-              }
-              onListeningCredited={onListeningCredited}
-              onPlay={stopDiscoveryQueue}
-              onQueueEnded={advanceDiscoveryQueue}
-              onQueueNext={advanceDiscoveryQueue}
-              queueIndex={activeQueue.currentIndex + 1}
-              queueLabel={activeQueue.title}
-              queueLength={activeQueue.songs.length}
-              song={activeQueueSong}
-              topTen={activeQueue.id === "top_results"}
-            />
-          </div>
-        </section>
-      )}
+      {renderActiveQueuePanel()}
 
       {expandedCategory === "genres" && (
         <section className="panel discovery-catalog-panel">
@@ -4397,7 +4755,7 @@ function DiscoverySections({
           </div>
           {genreSections.length ? (
             <div className="genre-navigation-grid">
-              {genreSections.map(({ genre, songs }) => (
+              {genreSections.map(({ genre, queueSongs, songs }) => (
                 <article className="genre-nav-card" key={genre}>
                   <header>
                     <span aria-hidden>{discoveryGenreEmoji(genre)}</span>
@@ -4409,32 +4767,23 @@ function DiscoverySections({
                     </div>
                   </header>
                   <div className="discovery-nav-actions">
-                    <button onClick={() => playGenre(genre, songs)} type="button">
+                    <button
+                      onClick={() => playGenre(genre, queueSongs)}
+                      type="button"
+                    >
                       <Play size={14} />
                       {spanish ? "Reproducir genero" : "Play genre"}
                     </button>
-                    <button onClick={() => toggleGenre(genre)} type="button">
+                    <button
+                      onClick={() =>
+                        router.push(`/discover/genre/${discoveryGenreSlug(genre)}`)
+                      }
+                      type="button"
+                    >
                       <ListMusic size={14} />
                       {spanish ? "Ver canciones" : "View songs"}
                     </button>
                   </div>
-                  {expandedGenre === genre && (
-                    <div className="discovery-genre-list">
-                      {renderCatalogSongs(songs, {
-                        contextKind: "genre",
-                        contextLabel: discoveryGenreLabel(locale, genre),
-                        description: "",
-                        emptyText: spanish
-                          ? "Aun no hay canciones en este genero."
-                          : "No songs are available in this genre yet.",
-                        icon: null,
-                        key: "genres",
-                        primaryLabel: "",
-                        songs,
-                        title: discoveryGenreLabel(locale, genre),
-                      })}
-                    </div>
-                  )}
                 </article>
               ))}
             </div>
@@ -5784,6 +6133,7 @@ function PlatformPresenceManagerPanel({
 }
 
 function DashboardView({
+  discoveryDestination,
   setView,
   founder,
   totalCreditsEarned,
@@ -5814,6 +6164,7 @@ function DashboardView({
   onExternalRedirectPreferenceChange,
   platformConfig,
 }: {
+  discoveryDestination?: DiscoveryDestination;
   setView: (view: View) => void;
   founder: boolean;
   totalCreditsEarned: number;
@@ -5861,6 +6212,26 @@ function DashboardView({
     string | null
   >(null);
 
+  if (discoveryDestination) {
+    return (
+      <main className="content dashboard-discovery-destination">
+        <DiscoverySections
+          destination={discoveryDestination}
+          externalDiscoverySongs={externalDiscoverySongs}
+          externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
+          locale={locale}
+          platformConfig={platformConfig}
+          onListeningCredited={onListeningCredited}
+          onExternalRedirectPreferenceChange={
+            onExternalRedirectPreferenceChange
+          }
+          spotlightSongs={spotlightSongs}
+          topTenSongs={topTenSongs}
+        />
+      </main>
+    );
+  }
+
   const reviews = songReviews;
   if (!song) {
     return (
@@ -5879,6 +6250,7 @@ function DashboardView({
           onClaim={onClaimMission}
         />
         <DiscoverySections
+          destination={discoveryDestination}
           externalDiscoverySongs={externalDiscoverySongs}
           externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
           locale={locale}
@@ -5955,6 +6327,7 @@ function DashboardView({
           onClaim={onClaimMission}
         />
       <DiscoverySections
+        destination={discoveryDestination}
         externalDiscoverySongs={externalDiscoverySongs}
         externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}
         locale={locale}
@@ -7380,6 +7753,7 @@ function SubmitView({
 type FirstListenAppProps = {
   onLogout: () => void;
   account: AccountSummary;
+  discoveryDestination?: DiscoveryDestination;
   initialView?: View;
   locale: InterfaceLocale;
   onLocaleChange: (locale: InterfaceLocale) => void;
@@ -7415,6 +7789,7 @@ type FirstListenAppProps = {
 export function FirstListenApp({
   onLogout,
   account,
+  discoveryDestination,
   initialView = "review",
   locale,
   onLocaleChange,
@@ -8235,7 +8610,12 @@ export function FirstListenApp({
 
   const changeView = (nextView: View) => {
     setMenuOpen(false);
-    if (nextView === view) return;
+    if (nextView === view) {
+      if (nextView === "dashboard" && discoveryDestination) {
+        router.push("/dashboard");
+      }
+      return;
+    }
     const debug =
       new URLSearchParams(window.location.search).get("debug") === "1";
     router.push(`/${nextView}${debug ? "?debug=1" : ""}`);
@@ -8246,6 +8626,7 @@ export function FirstListenApp({
       return (
         <DashboardView
           copy={copy}
+          discoveryDestination={discoveryDestination}
           founder={founder}
           locale={locale}
           listeningBank={listeningBank}

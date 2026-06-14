@@ -2,7 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { FirstListenApp, type View } from "@/components/first-listen-app";
+import {
+  FirstListenApp,
+  type DiscoveryDestination,
+  type View,
+} from "@/components/first-listen-app";
 import { Onboarding, type OnboardingPreferences } from "@/components/onboarding";
 import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
 import type { PlatformControlConfig } from "@/lib/platform-control";
@@ -57,9 +61,11 @@ type ProfileSeed = {
 };
 
 export function ProtectedAppEntry({
+  discoveryDestination,
   initialView,
   profile,
 }: {
+  discoveryDestination?: DiscoveryDestination;
   initialView: View;
   profile: ProfileSeed;
 }) {
@@ -135,6 +141,7 @@ export function ProtectedAppEntry({
 
   return (
     <FirstListenApp
+      discoveryDestination={discoveryDestination}
       genrePreferences={genres}
       account={profile.account}
       initialFounder={profile.founder}

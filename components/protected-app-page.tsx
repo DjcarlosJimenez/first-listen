@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { ProtectedAppEntry } from "@/components/protected-app-entry";
-import type { View } from "@/components/first-listen-app";
+import type {
+  DiscoveryDestination,
+  View,
+} from "@/components/first-listen-app";
 import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
 import { getInitials, platformLabels } from "@/lib/discovery";
 import { safeCoverUrl } from "@/lib/media";
@@ -278,12 +281,24 @@ function mapPlatformLinks(
   }));
 }
 
-export async function ProtectedAppPage({ initialView }: { initialView: View }) {
+export async function ProtectedAppPage({
+  discoveryDestination,
+  initialView,
+  loginRedirectPath,
+}: {
+  discoveryDestination?: DiscoveryDestination;
+  initialView: View;
+  loginRedirectPath?: string;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=/${initialView}`);
+  if (!user) {
+    redirect(
+      `/login?next=${encodeURIComponent(loginRedirectPath ?? `/${initialView}`)}`,
+    );
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -582,6 +597,7 @@ export async function ProtectedAppPage({ initialView }: { initialView: View }) {
 
   return (
     <ProtectedAppEntry
+      discoveryDestination={discoveryDestination}
       initialView={initialView}
       profile={{
         account: {
