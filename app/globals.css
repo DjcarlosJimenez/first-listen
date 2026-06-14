@@ -692,6 +692,9 @@ button {
   gap: 18px;
   grid-template-columns: minmax(220px, 0.7fr) minmax(300px, 1.3fr);
   padding: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 
 .workspace-player-copy {
@@ -878,6 +881,17 @@ button {
 .workspace-reward-status-bar strong {
   color: var(--ink);
   font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-top-area.playing .workspace-session-status-bar strong,
+.workspace-top-area.playing .workspace-reward-status-bar strong {
+  text-shadow: 0 0 18px rgba(200, 255, 79, 0.18);
+}
+
+.workspace-top-area.playing .progress-track i {
+  box-shadow: 0 0 18px rgba(200, 255, 79, 0.32);
+  transition: width 0.35s ease;
 }
 
 .workspace-reward-status-bar {

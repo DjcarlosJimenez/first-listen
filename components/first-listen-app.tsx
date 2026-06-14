@@ -809,6 +809,25 @@ function WorkspacePlayerHost({
   );
 }
 
+function workspacePlaybackStateLabel(
+  state: ProviderTelemetrySnapshot["playbackState"] | null | undefined,
+  locale: InterfaceLocale,
+  activeSong: WorkspacePlayableSong | null,
+) {
+  const spanish = locale === "es";
+  if (!activeSong) return spanish ? "Lista" : "Ready";
+  if (state === "playing") return spanish ? "Reproduciendo" : "Playing";
+  if (state === "paused") return spanish ? "Pausado" : "Paused";
+  if (state === "ended") return spanish ? "Completada" : "Completed";
+  if (state === "buffering" || state === "unknown") {
+    return spanish ? "Cargando" : "Loading";
+  }
+  if (state === "cued" || state === "unstarted") {
+    return spanish ? "Lista para reproducir" : "Ready to play";
+  }
+  return spanish ? "Cargando" : "Loading";
+}
+
 function WorkspaceShellTop({
   controller,
   status,
@@ -836,11 +855,16 @@ function WorkspaceShellTop({
   const activeControls = controller.activeControls;
   const activeQueue = controller.activeQueue;
   const activeTelemetry = controller.activeTelemetry;
+  const liveSessionSeconds =
+    activeSong && activeTelemetry?.playbackState === "playing"
+      ? Math.max(0, activeTelemetry.currentTime)
+      : 0;
+  const visibleBankSeconds = status.bankSeconds + liveSessionSeconds;
   const exchangeSeconds = Math.max(1, status.minutesPerCredit * 60);
   const ready = status.rewardsEnabled && status.availableRewardCredits > 0;
   const progressSeconds = ready
     ? exchangeSeconds
-    : status.bankSeconds % exchangeSeconds;
+    : visibleBankSeconds % exchangeSeconds;
   const progress = Math.min(
     100,
     Math.round((progressSeconds / exchangeSeconds) * 100),
@@ -861,7 +885,11 @@ function WorkspaceShellTop({
   const remainingSongs = activeQueue
     ? Math.max(0, activeQueue.total - activeQueue.currentIndex - 1)
     : 0;
-  const playbackState = activeTelemetry?.playbackState ?? "unknown";
+  const playbackState = workspacePlaybackStateLabel(
+    activeTelemetry?.playbackState,
+    locale,
+    activeSong,
+  );
   const nextEnabled = Boolean(
     activeControls?.onNext && activeControls.nextEnabled !== false,
   );
@@ -882,7 +910,11 @@ function WorkspaceShellTop({
       aria-label={
         spanish ? "Reproductor de First Listen" : "First Listen workspace player"
       }
-      className="workspace-top-area"
+      className={
+        activeTelemetry?.playbackState === "playing"
+          ? "workspace-top-area playing"
+          : "workspace-top-area"
+      }
     >
       <div className="workspace-player-panel">
         <div className="workspace-player-copy">
@@ -997,7 +1029,7 @@ function WorkspaceShellTop({
               {spanish ? "Sesion verificada" : "Verified Session"}
             </span>
             <strong>
-              {activeSong ? (spanish ? "Activa" : "Active") : (spanish ? "Lista" : "Ready")}
+              {playbackState}
             </strong>
           </div>
           <div>
@@ -1011,7 +1043,7 @@ function WorkspaceShellTop({
             <span>
               <Clock3 size={13} /> {spanish ? "Banco de Tiempo" : "Time Bank"}
             </span>
-            <strong>{formatPreciseMinutes(status.bankSeconds)}</strong>
+            <strong>{formatPreciseMinutes(visibleBankSeconds)}</strong>
           </div>
           <div>
             <span>
@@ -1056,7 +1088,7 @@ function WorkspaceShellTop({
             <small>
               {spanish ? "Recompensas disponibles" : "Available Rewards"}:{" "}
               <b>{status.availableRewardCredits}</b> /{" "}
-              {formatPreciseMinutes(status.bankSeconds)} /{" "}
+              {formatPreciseMinutes(visibleBankSeconds)} /{" "}
               {unlimitedCredits
                 ? spanish
                   ? "Tokens ilimitados"
@@ -4467,6 +4499,25 @@ function DiscoverySections({
     limits.genreCount,
     queuePolicy.genreQueueSize,
   ]);
+  const continuousDiscoverySongs = useMemo(
+    () =>
+      mergeDiscoverySongs(
+        visibleSpotlightSongs.filter(isQueuePlayableDiscoverySong),
+        topTenQueueSongs,
+        newestSongs.filter(isQueuePlayableDiscoverySong),
+        trendingSongs.filter(isQueuePlayableDiscoverySong),
+        internalPlaybackCatalog,
+        randomQueueSongs,
+      ).filter(isQueuePlayableDiscoverySong),
+    [
+      internalPlaybackCatalog,
+      newestSongs,
+      randomQueueSongs,
+      topTenQueueSongs,
+      trendingSongs,
+      visibleSpotlightSongs,
+    ],
+  );
   const activeQueueSong = activeQueue?.songs[activeQueue.currentIndex] ?? null;
 
   useEffect(() => {
@@ -4550,7 +4601,7 @@ function DiscoverySections({
   const advanceDiscoveryQueue = useCallback(() => {
     if (!activeQueue) return;
     const nextIndex = activeQueue.currentIndex + 1;
-    const replaySongs = rankDiscoveryQueue(
+    let replaySongs = rankDiscoveryQueue(
       activeQueue.sourceSongs,
       heardHistory,
       queueRankOptions,
@@ -4568,24 +4619,65 @@ function DiscoverySections({
       );
       replaySongs.unshift(firstSong);
     }
+    const unplayedContinuousSongs = rankDiscoveryQueue(
+      continuousDiscoverySongs.filter(
+        (song) => !activeQueue.songs.some((queued) => queued.id === song.id),
+      ),
+      heardHistory,
+      queueRankOptions,
+    );
+    const shouldContinueDiscovery =
+      activeQueue.id !== "random" &&
+      nextIndex >= activeQueue.songs.length &&
+      unplayedContinuousSongs.length > 0;
+    if (shouldContinueDiscovery) {
+      replaySongs = [
+        ...unplayedContinuousSongs,
+        ...rankDiscoveryQueue(
+          continuousDiscoverySongs.filter((song) =>
+            activeQueue.songs.some((queued) => queued.id === song.id),
+          ),
+          heardHistory,
+          queueRankOptions,
+        ),
+      ];
+    }
     const nextQueue =
       nextIndex < activeQueue.songs.length
         ? { ...activeQueue, currentIndex: nextIndex }
         : {
             ...activeQueue,
+            description: shouldContinueDiscovery
+              ? spanish
+                ? "Seguimos con canciones reproducibles dentro de First Listen."
+                : "Continuing with songs playable inside First Listen."
+              : activeQueue.description,
+            id: shouldContinueDiscovery
+              ? "continuous_discovery"
+              : activeQueue.id,
             currentIndex: 0,
             cycle: activeQueue.cycle + 1,
-            songs: replaySongs,
+            songs: replaySongs.length ? replaySongs : activeQueue.songs,
+            sourceSongs: shouldContinueDiscovery
+              ? continuousDiscoverySongs
+              : activeQueue.sourceSongs,
+            title: shouldContinueDiscovery
+              ? spanish
+                ? "Descubrimiento continuo"
+                : "Continuous discovery"
+              : activeQueue.title,
           };
     const nextSong = nextQueue.songs[nextQueue.currentIndex] ?? null;
     setActiveQueue(nextQueue);
     if (nextSong) markSongHeard(nextSong);
   }, [
     activeQueue,
+    continuousDiscoverySongs,
     heardHistory,
     markSongHeard,
     queuePolicy.randomReplayPoolSize,
     queueRankOptions,
+    spanish,
   ]);
 
   const stopDiscoveryQueue = useCallback(() => {
@@ -4705,6 +4797,36 @@ function DiscoverySections({
       title: discoveryGenreLabel(locale, genre),
     });
   };
+
+  useEffect(() => {
+    if (
+      destination ||
+      activeCardKey ||
+      activeQueue ||
+      workspacePlayback.activeSong ||
+      !continuousDiscoverySongs.length
+    ) {
+      return;
+    }
+
+    startDiscoveryQueue({
+      description: spanish
+        ? "Una cola viva con canciones que pueden reproducirse dentro de First Listen."
+        : "A live queue of songs playable inside First Listen.",
+      id: "continuous_discovery",
+      preserveOrder: true,
+      songs: continuousDiscoverySongs,
+      title: spanish ? "Descubrimiento continuo" : "Continuous discovery",
+    });
+  }, [
+    activeCardKey,
+    activeQueue,
+    continuousDiscoverySongs,
+    destination,
+    spanish,
+    startDiscoveryQueue,
+    workspacePlayback.activeSong,
+  ]);
 
   const rawCategoryConfigs: DiscoveryCategoryConfig[] = [
     {
