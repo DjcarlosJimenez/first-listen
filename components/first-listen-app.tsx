@@ -364,6 +364,264 @@ function workspacePanelForRoute(
   return { type: view };
 }
 
+function useWorkspacePlaybackMachine({
+  discoveryDestination,
+  initialView,
+}: {
+  discoveryDestination?: DiscoveryDestination;
+  initialView: View;
+}) {
+  const [activeSong, setActiveSong] =
+    useState<WorkspacePlayableSong | null>(null);
+  const [activeQueue, setWorkspaceActiveQueue] =
+    useState<WorkspaceActiveQueue | null>(null);
+  const [activeContext, setActiveContext] =
+    useState<WorkspacePlaybackContext | null>(null);
+  const [activeWorkspacePanel, setActiveWorkspacePanel] =
+    useState<WorkspacePanel>(() =>
+      workspacePanelForRoute(initialView, discoveryDestination),
+    );
+  const [queueMode, setQueueMode] =
+    useState<WorkspaceQueueMode>("review");
+  const [workspacePlayback, setWorkspacePlayback] =
+    useState<WorkspacePlaybackRequest | null>(null);
+  const workspacePlaybackRef = useRef<WorkspacePlaybackRequest | null>(null);
+  const [workspacePlaybackControls, setWorkspacePlaybackControls] =
+    useState<WorkspacePlaybackControls | null>(null);
+  const workspacePlaybackControlsRef =
+    useRef<WorkspacePlaybackControls | null>(null);
+  const [workspacePlaybackTelemetry, setWorkspacePlaybackTelemetry] =
+    useState<ProviderTelemetrySnapshot | null>(null);
+  const workspacePlaybackTelemetryRef =
+    useRef<ProviderTelemetrySnapshot | null>(null);
+  const workspaceTelemetryUpdatedAtRef = useRef(0);
+  const workspaceTelemetryTargetRef = useRef("");
+  const workspaceAutoAdvanceTargetRef = useRef("");
+  const workspaceAutoAdvanceTimerRef = useRef<number | null>(null);
+  const [playbackSlots, setPlaybackSlots] = useState<
+    Map<string, HTMLDivElement>
+  >(() => new Map());
+
+  useEffect(() => {
+    workspacePlaybackRef.current = workspacePlayback;
+  }, [workspacePlayback]);
+
+  useEffect(() => {
+    workspacePlaybackControlsRef.current = workspacePlaybackControls;
+  }, [workspacePlaybackControls]);
+
+  useEffect(
+    () => () => {
+      if (workspaceAutoAdvanceTimerRef.current !== null) {
+        window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const registerPlaybackSlot = useCallback(
+    (slotId: string, element: HTMLDivElement | null) => {
+      setPlaybackSlots((current) => {
+        const next = new Map(current);
+        if (element) {
+          next.set(slotId, element);
+        } else {
+          next.delete(slotId);
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const requestWorkspacePlayback = useCallback(
+    (request: WorkspacePlaybackRequest) => {
+      const previousPlayback = workspacePlaybackRef.current;
+      const sameTarget = sameWorkspacePlaybackTarget(
+        previousPlayback,
+        request,
+      );
+      if (!sameTarget) {
+        workspaceAutoAdvanceTargetRef.current = "";
+        workspacePlaybackTelemetryRef.current = null;
+        workspaceTelemetryUpdatedAtRef.current = 0;
+        workspaceTelemetryTargetRef.current =
+          workspacePlaybackTargetKey(request);
+        if (workspaceAutoAdvanceTimerRef.current !== null) {
+          window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
+          workspaceAutoAdvanceTimerRef.current = null;
+        }
+      }
+      workspacePlaybackRef.current = request;
+      setActiveSong(request.song);
+      setWorkspaceActiveQueue(request.queue ?? null);
+      setActiveContext(request.context);
+      setActiveWorkspacePanel(request.context.panel);
+      setQueueMode(request.context.mode);
+      setWorkspacePlayback(request);
+      workspacePlaybackControlsRef.current = request.controls ?? null;
+      setWorkspacePlaybackControls(request.controls ?? null);
+      setWorkspacePlaybackTelemetry((current) =>
+        sameTarget ? current : initialWorkspaceTelemetry(),
+      );
+      if (!sameTarget) {
+        workspacePlaybackTelemetryRef.current = initialWorkspaceTelemetry();
+        workspaceTelemetryUpdatedAtRef.current = Date.now();
+      }
+    },
+    [],
+  );
+
+  const handleWorkspacePlaybackTelemetry = useCallback(
+    (
+      snapshot: ProviderTelemetrySnapshot,
+      request: WorkspacePlaybackRequest,
+    ) => {
+      if (!sameWorkspacePlaybackTarget(workspacePlaybackRef.current, request)) {
+        return null;
+      }
+      const targetKey = workspacePlaybackTargetKey(request);
+      const now = Date.now();
+      const previous =
+        workspaceTelemetryTargetRef.current === targetKey
+          ? workspacePlaybackTelemetryRef.current
+          : null;
+      const elapsedSeconds =
+        previous && workspaceTelemetryUpdatedAtRef.current > 0
+          ? Math.max(
+              0,
+              Math.min(5, (now - workspaceTelemetryUpdatedAtRef.current) / 1000),
+            )
+          : 0;
+      const normalizedSnapshot = normalizeWorkspaceTelemetry(
+        snapshot,
+        previous,
+        elapsedSeconds,
+      );
+      workspaceTelemetryTargetRef.current = targetKey;
+      workspaceTelemetryUpdatedAtRef.current = now;
+      workspacePlaybackTelemetryRef.current = normalizedSnapshot;
+      setWorkspacePlaybackTelemetry(normalizedSnapshot);
+      if (!isPlaybackCompleted(normalizedSnapshot)) {
+        workspaceAutoAdvanceTargetRef.current = "";
+        return normalizedSnapshot;
+      }
+      const controls = workspacePlaybackControlsRef.current;
+      const shouldAdvance =
+        controls?.autoPlayEnabled !== false && Boolean(controls?.onNext);
+      if (
+        !shouldAdvance ||
+        workspaceAutoAdvanceTargetRef.current === targetKey ||
+        workspaceAutoAdvanceTimerRef.current !== null
+      ) {
+        return normalizedSnapshot;
+      }
+      workspaceAutoAdvanceTargetRef.current = targetKey;
+      workspaceAutoAdvanceTimerRef.current = window.setTimeout(() => {
+        workspaceAutoAdvanceTimerRef.current = null;
+        const currentPlayback = workspacePlaybackRef.current;
+        if (workspacePlaybackTargetKey(currentPlayback) !== targetKey) return;
+        workspacePlaybackControlsRef.current?.onNext?.();
+      }, 700);
+      return normalizedSnapshot;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const request = workspacePlaybackRef.current;
+      const snapshot = workspacePlaybackTelemetryRef.current;
+      if (!request || !snapshot || snapshot.playbackState !== "playing") {
+        return;
+      }
+      const syntheticSnapshot: ProviderTelemetrySnapshot = {
+        ...snapshot,
+        pageFocused: document.hasFocus(),
+        pageVisible: document.visibilityState === "visible",
+      };
+      const normalizedSnapshot = handleWorkspacePlaybackTelemetry(
+        syntheticSnapshot,
+        request,
+      );
+      if (normalizedSnapshot) {
+        request.onTelemetry?.(normalizedSnapshot);
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [handleWorkspacePlaybackTelemetry]);
+
+  const stopWorkspacePlayback = useCallback((slotId?: string) => {
+    const current = workspacePlaybackRef.current;
+    if (slotId && current?.slotId !== slotId) return;
+    setWorkspacePlayback(null);
+    workspacePlaybackRef.current = null;
+    workspacePlaybackControlsRef.current = null;
+    workspacePlaybackTelemetryRef.current = null;
+    workspaceTelemetryUpdatedAtRef.current = 0;
+    workspaceTelemetryTargetRef.current = "";
+    workspaceAutoAdvanceTargetRef.current = "";
+    if (workspaceAutoAdvanceTimerRef.current !== null) {
+      window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
+      workspaceAutoAdvanceTimerRef.current = null;
+    }
+    setWorkspacePlaybackControls(null);
+    setWorkspacePlaybackTelemetry(null);
+    setActiveSong(null);
+    setWorkspaceActiveQueue(null);
+    setActiveContext(null);
+  }, []);
+
+  const syncPanelForRoute = useCallback(
+    (view: View, destination?: DiscoveryDestination) => {
+      setActiveWorkspacePanel(workspacePanelForRoute(view, destination));
+    },
+    [],
+  );
+
+  const workspacePlaybackController = useMemo<WorkspacePlaybackController>(
+    () => ({
+      activeControlChannel: workspacePlayback?.slotId ?? null,
+      activeContext,
+      activeControls: workspacePlaybackControls,
+      activeQueue,
+      activeSong,
+      activeTelemetry: workspacePlaybackTelemetry,
+      activeWorkspacePanel,
+      queueMode,
+      registerPlaybackSlot,
+      requestPlayback: requestWorkspacePlayback,
+      stopPlayback: stopWorkspacePlayback,
+    }),
+    [
+      activeContext,
+      activeQueue,
+      activeSong,
+      activeWorkspacePanel,
+      queueMode,
+      registerPlaybackSlot,
+      requestWorkspacePlayback,
+      stopWorkspacePlayback,
+      workspacePlayback,
+      workspacePlaybackControls,
+      workspacePlaybackTelemetry,
+    ],
+  );
+  const workspacePlaybackSlot =
+    playbackSlots.get("workspace:persistent") ??
+    (workspacePlayback?.slotId
+      ? (playbackSlots.get(workspacePlayback.slotId) ?? null)
+      : null);
+
+  return {
+    handlePlaybackTelemetry: handleWorkspacePlaybackTelemetry,
+    playback: workspacePlayback,
+    playbackSlot: workspacePlaybackSlot,
+    playbackController: workspacePlaybackController,
+    syncPanelForRoute,
+  };
+}
+
 function workspacePathForView(view: View) {
   return view === "dashboard" ? "/dashboard" : `/${view}`;
 }
@@ -4064,6 +4322,282 @@ function orderDiscoveryQueueForPlayback(
   return rankContinuousInternalReplayQueue(playableSongs, heardHistory, options);
 }
 
+type StartDiscoveryQueueRequest = {
+  id: string;
+  title: string;
+  description: string;
+  songs: DiscoverySong[];
+  preserveOrder?: boolean;
+  preferredSongId?: string;
+};
+
+function useWorkspaceQueueMachine({
+  onQueueStarted,
+  queueRankOptions,
+  randomReplayPoolSize,
+  spanish,
+}: {
+  onQueueStarted: () => void;
+  queueRankOptions: {
+    replayWindowHours?: number;
+    underexposedBoost?: number;
+  };
+  randomReplayPoolSize: number;
+  spanish: boolean;
+}) {
+  const [heardHistory, setHeardHistory] = useState<Record<string, number>>({});
+  const [activeQueue, setActiveQueue] = useState<DiscoveryQueueState | null>(
+    null,
+  );
+  const activeQueueRef = useRef<DiscoveryQueueState | null>(null);
+  const continuousDiscoverySongsRef = useRef<DiscoverySong[]>([]);
+
+  const setContinuousDiscoverySongs = useCallback((songs: DiscoverySong[]) => {
+    continuousDiscoverySongsRef.current = songs;
+  }, []);
+
+  useEffect(() => {
+    activeQueueRef.current = activeQueue;
+  }, [activeQueue]);
+
+  useEffect(() => {
+    setHeardHistory(readDiscoveryHeardHistory());
+  }, []);
+
+  const markSongConsumed = useCallback((song: DiscoverySong) => {
+    const timestamp = Date.now();
+    setHeardHistory((current) => {
+      const next = mergeDiscoveryHeardHistory(
+        readDiscoveryHeardHistory(),
+        current,
+        { [song.id]: timestamp },
+      );
+      writeDiscoveryHeardHistory(next);
+      return next;
+    });
+  }, []);
+
+  const startQueue = useCallback(
+    ({
+      description,
+      id,
+      preserveOrder = false,
+      preferredSongId,
+      songs,
+      title,
+    }: StartDiscoveryQueueRequest) => {
+      const playableInputSongs = filterInternalReplayPrioritySongs(songs);
+      if (!playableInputSongs.length) return;
+      const effectiveHeardHistory = mergeDiscoveryHeardHistory(
+        heardHistory,
+        readDiscoveryHeardHistory(),
+      );
+      let queueSongs = orderDiscoveryQueueForPlayback(
+        playableInputSongs,
+        effectiveHeardHistory,
+        queueRankOptions,
+        preserveOrder,
+      );
+      if (preferredSongId) {
+        const selected = queueSongs.find((song) => song.id === preferredSongId);
+        if (selected) {
+          queueSongs = [
+            selected,
+            ...queueSongs.filter((song) => song.id !== preferredSongId),
+          ];
+        }
+      }
+      if (id === "random" && queueSongs.length > 1) {
+        const poolSize = Math.min(
+          Math.max(1, randomReplayPoolSize),
+          queueSongs.length,
+        );
+        const pool = queueSongs.slice(0, poolSize);
+        const firstSong = pool[Math.floor(Math.random() * pool.length)];
+        queueSongs = [
+          firstSong,
+          ...queueSongs.filter((song) => song.id !== firstSong.id),
+        ];
+      }
+      const firstSong = queueSongs[0];
+      const nextQueue = {
+        autoPlayEnabled: true,
+        cycle: 0,
+        currentIndex: 0,
+        description,
+        id,
+        mode: workspaceQueueModeForDiscoveryId(id),
+        songs: queueSongs,
+        sourceSongs: playableInputSongs,
+        title,
+      };
+      onQueueStarted();
+      activeQueueRef.current = nextQueue;
+      setActiveQueue(nextQueue);
+      if (firstSong) markSongConsumed(firstSong);
+    },
+    [
+      heardHistory,
+      markSongConsumed,
+      onQueueStarted,
+      queueRankOptions,
+      randomReplayPoolSize,
+    ],
+  );
+
+  const advanceQueue = useCallback(() => {
+    const queue = activeQueueRef.current;
+    if (!queue) return;
+    const continuousDiscoverySongs = continuousDiscoverySongsRef.current;
+    const currentSong = queue.songs[queue.currentIndex] ?? null;
+    const effectiveHeardHistory = mergeDiscoveryHeardHistory(
+      heardHistory,
+      readDiscoveryHeardHistory(),
+      currentSong ? { [currentSong.id]: Date.now() } : {},
+    );
+    if (currentSong) markSongConsumed(currentSong);
+    const nextIndex = queue.currentIndex + 1;
+    let replaySongs = rankContinuousInternalReplayQueue(
+      queue.sourceSongs,
+      effectiveHeardHistory,
+      queueRankOptions,
+    );
+    if (queue.id === "random" && replaySongs.length > 1) {
+      const poolSize = Math.min(
+        Math.max(1, randomReplayPoolSize),
+        replaySongs.length,
+      );
+      const pool = replaySongs.slice(0, poolSize);
+      const firstSong = pool[Math.floor(Math.random() * pool.length)];
+      replaySongs.splice(
+        replaySongs.findIndex((song) => song.id === firstSong.id),
+        1,
+      );
+      replaySongs.unshift(firstSong);
+    }
+    const queuedIds = new Set(queue.songs.map((song) => song.id));
+    const unplayedContinuousSongs = rankContinuousInternalReplayQueue(
+      continuousDiscoverySongs.filter((song) => !queuedIds.has(song.id)),
+      effectiveHeardHistory,
+      queueRankOptions,
+    );
+    const continuousReplaySongs = rankContinuousInternalReplayQueue(
+      continuousDiscoverySongs,
+      effectiveHeardHistory,
+      queueRankOptions,
+    );
+    const shouldContinueDiscovery =
+      queue.id !== "random" &&
+      nextIndex >= queue.songs.length &&
+      (unplayedContinuousSongs.length > 0 || continuousReplaySongs.length > 0);
+    if (shouldContinueDiscovery) {
+      replaySongs = [
+        ...unplayedContinuousSongs,
+        ...continuousReplaySongs.filter(
+          (song) => !unplayedContinuousSongs.some((next) => next.id === song.id),
+        ),
+      ];
+    }
+    const nextSongs =
+      nextIndex < queue.songs.length
+        ? filterInternalReplayPrioritySongs(queue.songs)
+        : filterInternalReplayPrioritySongs(
+            replaySongs.length ? replaySongs : queue.songs,
+          );
+    if (!nextSongs.length) {
+      activeQueueRef.current = null;
+      setActiveQueue(null);
+      return;
+    }
+    const safeNextIndex =
+      nextIndex < nextSongs.length ? nextIndex : 0;
+    const nextQueue =
+      nextIndex < nextSongs.length
+        ? {
+            ...queue,
+            currentIndex: safeNextIndex,
+            songs: nextSongs,
+            sourceSongs: filterInternalReplayPrioritySongs(
+              queue.sourceSongs,
+            ),
+          }
+        : {
+            ...queue,
+            description: shouldContinueDiscovery
+              ? spanish
+                ? "Seguimos con canciones reproducibles dentro de First Listen."
+                : "Continuing with songs playable inside First Listen."
+              : queue.description,
+            id: shouldContinueDiscovery
+              ? "continuous_discovery"
+              : queue.id,
+            currentIndex: 0,
+            cycle: queue.cycle + 1,
+            songs: nextSongs,
+            sourceSongs: shouldContinueDiscovery
+              ? filterInternalReplayPrioritySongs(continuousDiscoverySongs)
+              : filterInternalReplayPrioritySongs(queue.sourceSongs),
+            title: shouldContinueDiscovery
+              ? spanish
+                ? "Descubrimiento continuo"
+                : "Continuous discovery"
+              : queue.title,
+          };
+    const nextSong = nextQueue.songs[nextQueue.currentIndex] ?? null;
+    activeQueueRef.current = nextQueue;
+    setActiveQueue(nextQueue);
+    if (nextSong) markSongConsumed(nextSong);
+  }, [
+    heardHistory,
+    markSongConsumed,
+    queueRankOptions,
+    randomReplayPoolSize,
+    spanish,
+  ]);
+
+  const stopQueue = useCallback(() => {
+    activeQueueRef.current = null;
+    setActiveQueue(null);
+  }, []);
+
+  const setQueueAutoPlay = useCallback((enabled: boolean) => {
+    setActiveQueue((current) => {
+      const next = current ? { ...current, autoPlayEnabled: enabled } : current;
+      activeQueueRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const activeQueueSong = activeQueue?.songs[activeQueue.currentIndex] ?? null;
+  const workspaceQueueForActiveQueue = useMemo<WorkspaceActiveQueue | null>(
+    () =>
+      activeQueue
+        ? {
+            currentIndex: activeQueue.currentIndex,
+            id: activeQueue.id,
+            mode: activeQueue.mode,
+            songs: activeQueue.songs,
+            title: activeQueue.title,
+            total: activeQueue.songs.length,
+          }
+        : null,
+    [activeQueue],
+  );
+
+  return {
+    activeQueue,
+    activeQueueSong,
+    advanceQueue,
+    heardHistory,
+    markSongConsumed,
+    setContinuousDiscoverySongs,
+    setQueueAutoPlay,
+    startQueue,
+    stopQueue,
+    workspaceQueueForActiveQueue,
+  };
+}
+
 function DiscoverySongCard({
   song,
   active,
@@ -4718,11 +5252,6 @@ function DiscoverySections({
   };
 
   const [activeCardKey, setActiveCardKey] = useState<string | null>(null);
-  const [heardHistory, setHeardHistory] = useState<Record<string, number>>({});
-  const [activeQueue, setActiveQueue] = useState<DiscoveryQueueState | null>(
-    null,
-  );
-  const activeQueueRef = useRef<DiscoveryQueueState | null>(null);
   const [expandedCategory, setExpandedCategory] =
     useState<DiscoveryCategoryKey | null>(null);
   const spanish = locale === "es";
@@ -4761,6 +5290,27 @@ function DiscoverySections({
     }),
     [queuePolicy.replayWindowHours, queuePolicy.underexposedBoost],
   );
+  const onDiscoveryQueueStarted = useCallback(() => {
+    setActiveCardKey(null);
+    setExpandedCategory(null);
+  }, []);
+  const {
+    activeQueue,
+    activeQueueSong,
+    advanceQueue: advanceDiscoveryQueue,
+    heardHistory,
+    markSongConsumed,
+    setContinuousDiscoverySongs,
+    setQueueAutoPlay: changeDiscoveryQueueAutoPlay,
+    startQueue: startDiscoveryQueue,
+    stopQueue: stopDiscoveryQueue,
+    workspaceQueueForActiveQueue,
+  } = useWorkspaceQueueMachine({
+    onQueueStarted: onDiscoveryQueueStarted,
+    queueRankOptions,
+    randomReplayPoolSize: queuePolicy.randomReplayPoolSize,
+    spanish,
+  });
 
   const spotlightIds = new Set(spotlightSongs.map((song) => song.id));
   const visibleTopTenSongs = topTenSongs.filter(
@@ -4964,248 +5514,17 @@ function DiscoverySections({
       visibleSpotlightSongs,
     ],
   );
-  const activeQueueSong = activeQueue?.songs[activeQueue.currentIndex] ?? null;
-  const workspaceQueueForActiveQueue = useMemo<WorkspaceActiveQueue | null>(
-    () =>
-      activeQueue
-        ? {
-            currentIndex: activeQueue.currentIndex,
-            id: activeQueue.id,
-            mode: activeQueue.mode,
-            songs: activeQueue.songs,
-            title: activeQueue.title,
-            total: activeQueue.songs.length,
-          }
-        : null,
-    [activeQueue],
-  );
-
   useEffect(() => {
-    activeQueueRef.current = activeQueue;
-  }, [activeQueue]);
-
-  useEffect(() => {
-    setHeardHistory(readDiscoveryHeardHistory());
-  }, []);
-
-  const markSongHeard = useCallback((song: DiscoverySong) => {
-    const timestamp = Date.now();
-    setHeardHistory((current) => {
-      const next = mergeDiscoveryHeardHistory(
-        readDiscoveryHeardHistory(),
-        current,
-        { [song.id]: timestamp },
-      );
-      writeDiscoveryHeardHistory(next);
-      return next;
-    });
-  }, []);
-
-  const startDiscoveryQueue = useCallback(
-    ({
-      description,
-      id,
-      preserveOrder = false,
-      preferredSongId,
-      songs,
-      title,
-    }: {
-      id: string;
-      title: string;
-      description: string;
-      songs: DiscoverySong[];
-      preserveOrder?: boolean;
-      preferredSongId?: string;
-    }) => {
-      const playableInputSongs = filterInternalReplayPrioritySongs(songs);
-      if (!playableInputSongs.length) return;
-      const effectiveHeardHistory = mergeDiscoveryHeardHistory(
-        heardHistory,
-        readDiscoveryHeardHistory(),
-      );
-      let queueSongs = orderDiscoveryQueueForPlayback(
-        playableInputSongs,
-        effectiveHeardHistory,
-        queueRankOptions,
-        preserveOrder,
-      );
-      if (preferredSongId) {
-        const selected = queueSongs.find((song) => song.id === preferredSongId);
-        if (selected) {
-          queueSongs = [
-            selected,
-            ...queueSongs.filter((song) => song.id !== preferredSongId),
-          ];
-        }
-      }
-      if (id === "random" && queueSongs.length > 1) {
-        const poolSize = Math.min(
-          Math.max(1, queuePolicy.randomReplayPoolSize),
-          queueSongs.length,
-        );
-        const pool = queueSongs.slice(0, poolSize);
-        const firstSong = pool[Math.floor(Math.random() * pool.length)];
-        queueSongs = [
-          firstSong,
-          ...queueSongs.filter((song) => song.id !== firstSong.id),
-        ];
-      }
-      const firstSong = queueSongs[0];
-      setActiveCardKey(null);
-      setExpandedCategory(null);
-      const nextQueue = {
-        autoPlayEnabled: true,
-        cycle: 0,
-        currentIndex: 0,
-        description,
-        id,
-        mode: workspaceQueueModeForDiscoveryId(id),
-        songs: queueSongs,
-        sourceSongs: playableInputSongs,
-        title,
-      };
-      activeQueueRef.current = nextQueue;
-      setActiveQueue(nextQueue);
-      if (firstSong) markSongHeard(firstSong);
-    },
-    [
-      heardHistory,
-      markSongHeard,
-      queuePolicy.randomReplayPoolSize,
-      queueRankOptions,
-    ],
-  );
-
-  const advanceDiscoveryQueue = useCallback(() => {
-    const queue = activeQueueRef.current;
-    if (!queue) return;
-    const currentSong = queue.songs[queue.currentIndex] ?? null;
-    const effectiveHeardHistory = mergeDiscoveryHeardHistory(
-      heardHistory,
-      readDiscoveryHeardHistory(),
-      currentSong ? { [currentSong.id]: Date.now() } : {},
-    );
-    if (currentSong) markSongHeard(currentSong);
-    const nextIndex = queue.currentIndex + 1;
-    let replaySongs = rankContinuousInternalReplayQueue(
-      queue.sourceSongs,
-      effectiveHeardHistory,
-      queueRankOptions,
-    );
-    if (queue.id === "random" && replaySongs.length > 1) {
-      const poolSize = Math.min(
-        Math.max(1, queuePolicy.randomReplayPoolSize),
-        replaySongs.length,
-      );
-      const pool = replaySongs.slice(0, poolSize);
-      const firstSong = pool[Math.floor(Math.random() * pool.length)];
-      replaySongs.splice(
-        replaySongs.findIndex((song) => song.id === firstSong.id),
-        1,
-      );
-      replaySongs.unshift(firstSong);
-    }
-    const queuedIds = new Set(queue.songs.map((song) => song.id));
-    const unplayedContinuousSongs = rankContinuousInternalReplayQueue(
-      continuousDiscoverySongs.filter((song) => !queuedIds.has(song.id)),
-      effectiveHeardHistory,
-      queueRankOptions,
-    );
-    const continuousReplaySongs = rankContinuousInternalReplayQueue(
-      continuousDiscoverySongs,
-      effectiveHeardHistory,
-      queueRankOptions,
-    );
-    const shouldContinueDiscovery =
-      queue.id !== "random" &&
-      nextIndex >= queue.songs.length &&
-      (unplayedContinuousSongs.length > 0 || continuousReplaySongs.length > 0);
-    if (shouldContinueDiscovery) {
-      replaySongs = [
-        ...unplayedContinuousSongs,
-        ...continuousReplaySongs.filter(
-          (song) => !unplayedContinuousSongs.some((next) => next.id === song.id),
-        ),
-      ];
-    }
-    const nextSongs =
-      nextIndex < queue.songs.length
-        ? filterInternalReplayPrioritySongs(queue.songs)
-        : filterInternalReplayPrioritySongs(
-            replaySongs.length ? replaySongs : queue.songs,
-          );
-    if (!nextSongs.length) {
-      activeQueueRef.current = null;
-      setActiveQueue(null);
-      return;
-    }
-    const safeNextIndex =
-      nextIndex < nextSongs.length ? nextIndex : 0;
-    const nextQueue =
-      nextIndex < nextSongs.length
-        ? {
-            ...queue,
-            currentIndex: safeNextIndex,
-            songs: nextSongs,
-            sourceSongs: filterInternalReplayPrioritySongs(
-              queue.sourceSongs,
-            ),
-          }
-        : {
-            ...queue,
-            description: shouldContinueDiscovery
-              ? spanish
-                ? "Seguimos con canciones reproducibles dentro de First Listen."
-                : "Continuing with songs playable inside First Listen."
-              : queue.description,
-            id: shouldContinueDiscovery
-              ? "continuous_discovery"
-              : queue.id,
-            currentIndex: 0,
-            cycle: queue.cycle + 1,
-            songs: nextSongs,
-            sourceSongs: shouldContinueDiscovery
-              ? filterInternalReplayPrioritySongs(continuousDiscoverySongs)
-              : filterInternalReplayPrioritySongs(queue.sourceSongs),
-            title: shouldContinueDiscovery
-              ? spanish
-                ? "Descubrimiento continuo"
-                : "Continuous discovery"
-              : queue.title,
-          };
-    const nextSong = nextQueue.songs[nextQueue.currentIndex] ?? null;
-    activeQueueRef.current = nextQueue;
-    setActiveQueue(nextQueue);
-    if (nextSong) markSongHeard(nextSong);
-  }, [
-    continuousDiscoverySongs,
-    heardHistory,
-    markSongHeard,
-    queuePolicy.randomReplayPoolSize,
-    queueRankOptions,
-    spanish,
-  ]);
-
-  const stopDiscoveryQueue = useCallback(() => {
-    activeQueueRef.current = null;
-    setActiveQueue(null);
-  }, []);
-
-  const changeDiscoveryQueueAutoPlay = useCallback((enabled: boolean) => {
-    setActiveQueue((current) => {
-      const next = current ? { ...current, autoPlayEnabled: enabled } : current;
-      activeQueueRef.current = next;
-      return next;
-    });
-  }, []);
+    setContinuousDiscoverySongs(continuousDiscoverySongs);
+  }, [continuousDiscoverySongs, setContinuousDiscoverySongs]);
 
   const toggleDiscoveryCard = useCallback(
     (cardKey: string, song: DiscoverySong) => {
-      setActiveQueue(null);
-      if (activeCardKey !== cardKey) markSongHeard(song);
+      stopDiscoveryQueue();
+      if (activeCardKey !== cardKey) markSongConsumed(song);
       setActiveCardKey((current) => (current === cardKey ? null : cardKey));
     },
-    [activeCardKey, markSongHeard],
+    [activeCardKey, markSongConsumed, stopDiscoveryQueue],
   );
 
   const playDiscoveryCardQueue = useCallback(
@@ -5267,7 +5586,7 @@ function DiscoverySections({
   );
 
   const toggleCategory = (category: DiscoveryCategoryKey) => {
-    setActiveQueue(null);
+    stopDiscoveryQueue();
     setExpandedCategory((current) => (current === category ? null : category));
   };
 
@@ -5570,7 +5889,7 @@ function DiscoverySections({
                 key={cardKey}
                 locale={locale}
                 onListeningCredited={onListeningCredited}
-                onSongConsumed={markSongHeard}
+                onSongConsumed={markSongConsumed}
                 onPlay={() =>
                   playDiscoveryCardQueue({
                     cardKey,
@@ -5626,7 +5945,7 @@ function DiscoverySections({
                 key={cardKey}
                 locale={locale}
                 onListeningCredited={onListeningCredited}
-                onSongConsumed={markSongHeard}
+                onSongConsumed={markSongConsumed}
                 onPlay={() =>
                   playDiscoveryCardQueue({
                     cardKey,
@@ -5812,7 +6131,7 @@ function DiscoverySections({
             key={`${activeQueue.id}-${activeQueue.cycle}-${activeQueueSong.id}`}
             locale={locale}
             onListeningCredited={onListeningCredited}
-            onSongConsumed={markSongHeard}
+            onSongConsumed={markSongConsumed}
             onQueueAutoPlayChange={changeDiscoveryQueueAutoPlay}
             onPlay={stopDiscoveryQueue}
             onQueueNext={advanceDiscoveryQueue}
@@ -9301,239 +9620,16 @@ export function FirstListenApp({
   const [queueLoading, setQueueLoading] = useState(true);
   const [workspaceDiscoveryDestination, setWorkspaceDiscoveryDestination] =
     useState<DiscoveryDestination | undefined>(discoveryDestination);
-  const [activeSong, setActiveSong] =
-    useState<WorkspacePlayableSong | null>(null);
-  const [activeQueue, setWorkspaceActiveQueue] =
-    useState<WorkspaceActiveQueue | null>(null);
-  const [activeContext, setActiveContext] =
-    useState<WorkspacePlaybackContext | null>(null);
-  const [activeWorkspacePanel, setActiveWorkspacePanel] =
-    useState<WorkspacePanel>(() =>
-      workspacePanelForRoute(initialView, discoveryDestination),
-    );
-  const [queueMode, setQueueMode] =
-    useState<WorkspaceQueueMode>("review");
-  const [workspacePlayback, setWorkspacePlayback] =
-    useState<WorkspacePlaybackRequest | null>(null);
-  const workspacePlaybackRef = useRef<WorkspacePlaybackRequest | null>(null);
-  const [workspacePlaybackControls, setWorkspacePlaybackControls] =
-    useState<WorkspacePlaybackControls | null>(null);
-  const workspacePlaybackControlsRef =
-    useRef<WorkspacePlaybackControls | null>(null);
-  const [workspacePlaybackTelemetry, setWorkspacePlaybackTelemetry] =
-    useState<ProviderTelemetrySnapshot | null>(null);
-  const workspacePlaybackTelemetryRef =
-    useRef<ProviderTelemetrySnapshot | null>(null);
-  const workspaceTelemetryUpdatedAtRef = useRef(0);
-  const workspaceTelemetryTargetRef = useRef("");
-  const workspaceAutoAdvanceTargetRef = useRef("");
-  const workspaceAutoAdvanceTimerRef = useRef<number | null>(null);
-  const [playbackSlots, setPlaybackSlots] = useState<
-    Map<string, HTMLDivElement>
-  >(() => new Map());
-
-  useEffect(() => {
-    workspacePlaybackRef.current = workspacePlayback;
-  }, [workspacePlayback]);
-
-  useEffect(() => {
-    workspacePlaybackControlsRef.current = workspacePlaybackControls;
-  }, [workspacePlaybackControls]);
-
-  useEffect(
-    () => () => {
-      if (workspaceAutoAdvanceTimerRef.current !== null) {
-        window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  const registerPlaybackSlot = useCallback(
-    (slotId: string, element: HTMLDivElement | null) => {
-      setPlaybackSlots((current) => {
-        const next = new Map(current);
-        if (element) {
-          next.set(slotId, element);
-        } else {
-          next.delete(slotId);
-        }
-        return next;
-      });
-    },
-    [],
-  );
-
-  const requestWorkspacePlayback = useCallback(
-    (request: WorkspacePlaybackRequest) => {
-      const previousPlayback = workspacePlaybackRef.current;
-      const sameTarget = sameWorkspacePlaybackTarget(
-        previousPlayback,
-        request,
-      );
-      if (!sameTarget) {
-        workspaceAutoAdvanceTargetRef.current = "";
-        workspacePlaybackTelemetryRef.current = null;
-        workspaceTelemetryUpdatedAtRef.current = 0;
-        workspaceTelemetryTargetRef.current = workspacePlaybackTargetKey(request);
-        if (workspaceAutoAdvanceTimerRef.current !== null) {
-          window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
-          workspaceAutoAdvanceTimerRef.current = null;
-        }
-      }
-      workspacePlaybackRef.current = request;
-      setActiveSong(request.song);
-      setWorkspaceActiveQueue(request.queue ?? null);
-      setActiveContext(request.context);
-      setActiveWorkspacePanel(request.context.panel);
-      setQueueMode(request.context.mode);
-      setWorkspacePlayback(request);
-      workspacePlaybackControlsRef.current = request.controls ?? null;
-      setWorkspacePlaybackControls(request.controls ?? null);
-      setWorkspacePlaybackTelemetry((current) =>
-        sameTarget ? current : initialWorkspaceTelemetry(),
-      );
-      if (!sameTarget) {
-        workspacePlaybackTelemetryRef.current = initialWorkspaceTelemetry();
-        workspaceTelemetryUpdatedAtRef.current = Date.now();
-      }
-    },
-    [],
-  );
-
-  const handleWorkspacePlaybackTelemetry = useCallback(
-    (
-      snapshot: ProviderTelemetrySnapshot,
-      request: WorkspacePlaybackRequest,
-    ) => {
-      if (!sameWorkspacePlaybackTarget(workspacePlaybackRef.current, request)) {
-        return null;
-      }
-      const targetKey = workspacePlaybackTargetKey(request);
-      const now = Date.now();
-      const previous =
-        workspaceTelemetryTargetRef.current === targetKey
-          ? workspacePlaybackTelemetryRef.current
-          : null;
-      const elapsedSeconds =
-        previous && workspaceTelemetryUpdatedAtRef.current > 0
-          ? Math.max(
-              0,
-              Math.min(5, (now - workspaceTelemetryUpdatedAtRef.current) / 1000),
-            )
-          : 0;
-      const normalizedSnapshot = normalizeWorkspaceTelemetry(
-        snapshot,
-        previous,
-        elapsedSeconds,
-      );
-      workspaceTelemetryTargetRef.current = targetKey;
-      workspaceTelemetryUpdatedAtRef.current = now;
-      workspacePlaybackTelemetryRef.current = normalizedSnapshot;
-      setWorkspacePlaybackTelemetry(normalizedSnapshot);
-      if (!isPlaybackCompleted(normalizedSnapshot)) {
-        workspaceAutoAdvanceTargetRef.current = "";
-        return normalizedSnapshot;
-      }
-      const controls = workspacePlaybackControlsRef.current;
-      const shouldAdvance =
-        controls?.autoPlayEnabled !== false && Boolean(controls?.onNext);
-      if (
-        !shouldAdvance ||
-        workspaceAutoAdvanceTargetRef.current === targetKey ||
-        workspaceAutoAdvanceTimerRef.current !== null
-      ) {
-        return normalizedSnapshot;
-      }
-      workspaceAutoAdvanceTargetRef.current = targetKey;
-      workspaceAutoAdvanceTimerRef.current = window.setTimeout(() => {
-        workspaceAutoAdvanceTimerRef.current = null;
-        const currentPlayback = workspacePlaybackRef.current;
-        if (workspacePlaybackTargetKey(currentPlayback) !== targetKey) return;
-        workspacePlaybackControlsRef.current?.onNext?.();
-      }, 700);
-      return normalizedSnapshot;
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      const request = workspacePlaybackRef.current;
-      const snapshot = workspacePlaybackTelemetryRef.current;
-      if (!request || !snapshot || snapshot.playbackState !== "playing") {
-        return;
-      }
-      const syntheticSnapshot: ProviderTelemetrySnapshot = {
-        ...snapshot,
-        pageFocused: document.hasFocus(),
-        pageVisible: document.visibilityState === "visible",
-      };
-      const normalizedSnapshot = handleWorkspacePlaybackTelemetry(
-        syntheticSnapshot,
-        request,
-      );
-      if (normalizedSnapshot) {
-        request.onTelemetry?.(normalizedSnapshot);
-      }
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [handleWorkspacePlaybackTelemetry]);
-
-  const stopWorkspacePlayback = useCallback((slotId?: string) => {
-    const current = workspacePlaybackRef.current;
-    if (slotId && current?.slotId !== slotId) return;
-    setWorkspacePlayback(null);
-    workspacePlaybackRef.current = null;
-    workspacePlaybackControlsRef.current = null;
-    workspacePlaybackTelemetryRef.current = null;
-    workspaceTelemetryUpdatedAtRef.current = 0;
-    workspaceTelemetryTargetRef.current = "";
-    workspaceAutoAdvanceTargetRef.current = "";
-    if (workspaceAutoAdvanceTimerRef.current !== null) {
-      window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
-      workspaceAutoAdvanceTimerRef.current = null;
-    }
-    setWorkspacePlaybackControls(null);
-    setWorkspacePlaybackTelemetry(null);
-    setActiveSong(null);
-    setWorkspaceActiveQueue(null);
-    setActiveContext(null);
-  }, []);
-
-  const workspacePlaybackController = useMemo<WorkspacePlaybackController>(
-    () => ({
-      activeControlChannel: workspacePlayback?.slotId ?? null,
-      activeContext,
-      activeControls: workspacePlaybackControls,
-      activeQueue,
-      activeSong,
-      activeTelemetry: workspacePlaybackTelemetry,
-      activeWorkspacePanel,
-      queueMode,
-      registerPlaybackSlot,
-      requestPlayback: requestWorkspacePlayback,
-      stopPlayback: stopWorkspacePlayback,
-    }),
-    [
-      activeContext,
-      activeQueue,
-      activeSong,
-      activeWorkspacePanel,
-      queueMode,
-      registerPlaybackSlot,
-      requestWorkspacePlayback,
-      stopWorkspacePlayback,
-      workspacePlayback,
-      workspacePlaybackControls,
-      workspacePlaybackTelemetry,
-    ],
-  );
-  const workspacePlaybackSlot =
-    playbackSlots.get("workspace:persistent") ??
-    (workspacePlayback?.slotId
-      ? (playbackSlots.get(workspacePlayback.slotId) ?? null)
-      : null);
+  const {
+    handlePlaybackTelemetry: handleWorkspacePlaybackTelemetry,
+    playback: workspacePlayback,
+    playbackController: workspacePlaybackController,
+    playbackSlot: workspacePlaybackSlot,
+    syncPanelForRoute,
+  } = useWorkspacePlaybackMachine({
+    discoveryDestination,
+    initialView,
+  });
 
   useEffect(() => {
     setView(initialView);
@@ -9541,10 +9637,8 @@ export function FirstListenApp({
   }, [discoveryDestination, initialView]);
 
   useEffect(() => {
-    setActiveWorkspacePanel(
-      workspacePanelForRoute(view, workspaceDiscoveryDestination),
-    );
-  }, [view, workspaceDiscoveryDestination]);
+    syncPanelForRoute(view, workspaceDiscoveryDestination);
+  }, [syncPanelForRoute, view, workspaceDiscoveryDestination]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
