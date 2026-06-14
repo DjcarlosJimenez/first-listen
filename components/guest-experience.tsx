@@ -1131,7 +1131,7 @@ export function GuestExperience() {
           : null;
 
       if (
-        snapshot.playbackState === "ended" &&
+        snapshot.playbackState === "completed" &&
         autoPlay &&
         !autoAdvanceStartedRef.current
       ) {
@@ -1148,13 +1148,13 @@ export function GuestExperience() {
         !guest ||
         !sessionId ||
         !snapshot.supported ||
-        !["playing", "ended"].includes(snapshot.playbackState) ||
+        !["playing", "completed"].includes(snapshot.playbackState) ||
         heartbeatInFlightRef.current
       ) {
         return;
       }
       const heartbeatDue =
-        snapshot.playbackState === "ended" ||
+        snapshot.playbackState === "completed" ||
         Date.now() - lastHeartbeatAtRef.current >= 10000;
       if (!heartbeatDue) return;
 
@@ -1169,7 +1169,10 @@ export function GuestExperience() {
           target_session_id: sessionId,
           playback_position_seconds: snapshot.currentTime,
           playback_duration_seconds: snapshot.duration,
-          playback_state: snapshot.playbackState,
+          playback_state:
+            snapshot.playbackState === "completed"
+              ? "ended"
+              : snapshot.playbackState,
           playback_muted: snapshot.muted,
           playback_volume: snapshot.volume,
           page_visible: snapshot.pageVisible,

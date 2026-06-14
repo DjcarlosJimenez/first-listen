@@ -229,6 +229,17 @@ function sameWorkspacePlaybackTarget(
   );
 }
 
+function workspacePlaybackTargetKey(playback: WorkspacePlaybackRequest | null) {
+  if (!playback) return "";
+  return [
+    playback.slotId,
+    playback.song.id,
+    playback.song.link,
+    playback.song.platform,
+    playback.context.source,
+  ].join("|");
+}
+
 function initialWorkspaceTelemetry(): ProviderTelemetrySnapshot {
   return {
     currentTime: 0,
@@ -241,10 +252,62 @@ function initialWorkspaceTelemetry(): ProviderTelemetrySnapshot {
       typeof document === "undefined"
         ? true
         : document.visibilityState === "visible",
-    playbackState: "buffering",
+    playbackState: "loading",
     supported: true,
     volume: 100,
   };
+}
+
+function isPlaybackCompleted(snapshot: ProviderTelemetrySnapshot) {
+  return snapshot.playbackState === "completed";
+}
+
+function isPlaybackCountingState(snapshot: ProviderTelemetrySnapshot) {
+  return snapshot.playbackState === "playing" || isPlaybackCompleted(snapshot);
+}
+
+function isTelemetryRewardEligible(snapshot: ProviderTelemetrySnapshot) {
+  return (
+    snapshot.supported &&
+    snapshot.muted === false &&
+    (snapshot.volume ?? 0) > 0
+  );
+}
+
+function calculateLiveTelemetryDelta(
+  snapshot: ProviderTelemetrySnapshot,
+  previous: { at: number; position: number } | null,
+  sampleAt: number,
+) {
+  if (
+    !isTelemetryRewardEligible(snapshot) ||
+    snapshot.playbackState !== "playing" ||
+    !previous ||
+    snapshot.currentTime < previous.position
+  ) {
+    return 0;
+  }
+  const wallDelta = Math.max(0, (sampleAt - previous.at) / 1000);
+  const positionDelta = Math.max(0, snapshot.currentTime - previous.position);
+  const delta = Math.min(positionDelta, wallDelta + 1);
+  return delta > 0 && delta <= 5 ? delta : 0;
+}
+
+function nextLiveTelemetrySample(
+  snapshot: ProviderTelemetrySnapshot,
+  sampleAt: number,
+) {
+  return isTelemetryRewardEligible(snapshot) &&
+    snapshot.playbackState === "playing"
+    ? { at: sampleAt, position: snapshot.currentTime }
+    : null;
+}
+
+function heartbeatPlaybackState(
+  snapshot: ProviderTelemetrySnapshot,
+  completedAs: "playing" | "ended",
+) {
+  return isPlaybackCompleted(snapshot) ? completedAs : snapshot.playbackState;
 }
 
 function workspacePanelForRoute(
@@ -854,13 +917,10 @@ function workspacePlaybackStateLabel(
   if (!activeSong) return spanish ? "Lista" : "Ready";
   if (state === "playing") return spanish ? "Reproduciendo" : "Playing";
   if (state === "paused") return spanish ? "Pausado" : "Paused";
-  if (state === "ended") return spanish ? "Completada" : "Completed";
-  if (state === "buffering" || state === "unknown") {
-    return spanish ? "Cargando" : "Loading";
-  }
-  if (state === "cued" || state === "unstarted") {
-    return spanish ? "Lista para reproducir" : "Ready to play";
-  }
+  if (state === "completed") return spanish ? "Completada" : "Completed";
+  if (state === "loading") return spanish ? "Cargando" : "Loading";
+  if (state === "ready") return spanish ? "Lista para reproducir" : "Ready to play";
+  if (state === "error") return spanish ? "Error de reproduccion" : "Playback error";
   return spanish ? "Cargando" : "Loading";
 }
 
@@ -2268,56 +2328,22 @@ function ReviewView({
       latestTelemetryRef.current = snapshot;
       if (!song) return;
       const sampleAt = Date.now();
-      const liveEligible =
-        snapshot.supported &&
-        snapshot.muted === false &&
-        (snapshot.volume ?? 0) > 0;
       const previousLiveSample = lastLiveSampleRef.current;
-      if (
-        liveEligible &&
-        (snapshot.playbackState === "playing" ||
-          snapshot.playbackState === "ended") &&
-        previousLiveSample &&
-        snapshot.currentTime >= previousLiveSample.position
-      ) {
-        const wallDelta = Math.max(
-          0,
-          (sampleAt - previousLiveSample.at) / 1000,
-        );
-        const positionDelta = Math.max(
-          0,
-          snapshot.currentTime - previousLiveSample.position,
-        );
-        const liveDelta = Math.min(positionDelta, wallDelta + 1);
-        if (liveDelta > 0 && liveDelta <= 5) {
-          currentLiveSecondsRef.current += liveDelta;
-          setListeningSession((current) => ({
-            ...current,
-            liveSeconds: currentLiveSecondsRef.current,
-          }));
-        }
+      const liveDelta = calculateLiveTelemetryDelta(
+        snapshot,
+        previousLiveSample,
+        sampleAt,
+      );
+      if (liveDelta > 0) {
+        currentLiveSecondsRef.current += liveDelta;
+        setListeningSession((current) => ({
+          ...current,
+          liveSeconds: currentLiveSecondsRef.current,
+        }));
       }
-      lastLiveSampleRef.current =
-        liveEligible && snapshot.playbackState === "playing"
-          ? { at: sampleAt, position: snapshot.currentTime }
-          : null;
+      lastLiveSampleRef.current = nextLiveTelemetrySample(snapshot, sampleAt);
 
-      const playbackEnded = snapshot.playbackState === "ended";
-      if (
-        snapshot.playbackState === "playing" &&
-        autoAdvanceStartedRef.current
-      ) {
-        autoAdvanceStartedRef.current = false;
-        setAutoAdvanceCountdown(null);
-      }
-      if (
-        playbackEnded &&
-        autoPlayNextSong &&
-        !autoAdvanceStartedRef.current
-      ) {
-        autoAdvanceStartedRef.current = true;
-        setAutoAdvanceCountdown(3);
-      }
+      const playbackEnded = isPlaybackCompleted(snapshot);
       const calculatedRequirement =
         snapshot.duration > 0
           ? Math.min(120, Math.max(30, Math.ceil(snapshot.duration * 0.25)))
@@ -2344,7 +2370,7 @@ function ReviewView({
         }));
         return;
       }
-      if (snapshot.playbackState !== "playing" && !playbackEnded) return;
+      if (!isPlaybackCountingState(snapshot)) return;
 
       const supabase = createClient();
       if (!supabase) return;
@@ -2410,7 +2436,7 @@ function ReviewView({
           target_session_id: sessionId,
           playback_position_seconds: snapshot.currentTime,
           playback_duration_seconds: snapshot.duration,
-          playback_state: playbackEnded ? "playing" : snapshot.playbackState,
+          playback_state: heartbeatPlaybackState(snapshot, "playing"),
           playback_muted: snapshot.muted,
           playback_volume: snapshot.volume,
           page_visible: snapshot.pageVisible,
@@ -2475,7 +2501,7 @@ function ReviewView({
         );
       }
     },
-    [autoPlayNextSong, locale, onListeningCredited, song],
+    [locale, onListeningCredited, song],
   );
 
   useEffect(() => {
@@ -3933,7 +3959,6 @@ function DiscoverySongCard({
   queueIndex,
   queueLength,
   onQueueNext,
-  onQueueEnded,
   onQueueAutoPlayChange,
   workspaceQueue,
   workspacePlayback,
@@ -3956,7 +3981,6 @@ function DiscoverySongCard({
   queueIndex?: number;
   queueLength?: number;
   onQueueNext?: () => void;
-  onQueueEnded?: () => void;
   onQueueAutoPlayChange?: (enabled: boolean) => void;
   workspaceQueue?: WorkspaceActiveQueue | null;
   workspacePlayback: WorkspacePlaybackController;
@@ -3985,8 +4009,6 @@ function DiscoverySongCard({
   const validListenRef = useRef(false);
   const completeListenRef = useRef(false);
   const scrolledForPlaybackRef = useRef(false);
-  const queueEndedRef = useRef(false);
-  const queueAdvanceTimeoutRef = useRef<number | null>(null);
   const spanish = locale === "es";
   const platformLinks = getPrimaryPlatformLinks(song);
   const recommendedPlatform =
@@ -4063,10 +4085,6 @@ function DiscoverySongCard({
 
   useEffect(() => {
     if (active) return;
-    if (queueAdvanceTimeoutRef.current !== null) {
-      window.clearTimeout(queueAdvanceTimeoutRef.current);
-      queueAdvanceTimeoutRef.current = null;
-    }
     scrolledForPlaybackRef.current = false;
     listeningSessionRef.current = null;
     startingSessionRef.current = false;
@@ -4086,23 +4104,6 @@ function DiscoverySongCard({
     });
   }, [active]);
 
-  useEffect(() => {
-    if (queueAdvanceTimeoutRef.current !== null) {
-      window.clearTimeout(queueAdvanceTimeoutRef.current);
-      queueAdvanceTimeoutRef.current = null;
-    }
-    queueEndedRef.current = false;
-  }, [active, song.id]);
-
-  useEffect(
-    () => () => {
-      if (queueAdvanceTimeoutRef.current !== null) {
-        window.clearTimeout(queueAdvanceTimeoutRef.current);
-      }
-    },
-    [],
-  );
-
   const handleDiscoveryTelemetry = useCallback(
     async (snapshot: ProviderTelemetrySnapshot) => {
       if (!active) return;
@@ -4119,52 +4120,21 @@ function DiscoverySongCard({
           playbackDurationSeconds: snapshot.duration,
         }));
       }
-      if (
-        snapshot.playbackState === "ended" &&
-        onQueueEnded &&
-        queueAutoPlayActive &&
-        !queueEndedRef.current
-      ) {
-        queueEndedRef.current = true;
-        queueAdvanceTimeoutRef.current = window.setTimeout(() => {
-          queueAdvanceTimeoutRef.current = null;
-          onQueueEnded();
-        }, 700);
-      }
       const sampleAt = Date.now();
-      const liveEligible =
-        snapshot.supported &&
-        snapshot.muted === false &&
-        (snapshot.volume ?? 0) > 0;
       const previous = lastLiveSampleRef.current;
-      if (
-        liveEligible &&
-        snapshot.playbackState === "playing" &&
-        previous &&
-        snapshot.currentTime >= previous.position
-      ) {
-        const wallDelta = Math.max(0, (sampleAt - previous.at) / 1000);
-        const positionDelta = Math.max(
-          0,
-          snapshot.currentTime - previous.position,
-        );
-        const delta = Math.min(positionDelta, wallDelta + 1);
-        if (delta > 0 && delta <= 5) {
-          liveSecondsRef.current += delta;
-          setListenState((current) => ({
-            ...current,
-            liveSeconds: liveSecondsRef.current,
-          }));
-        }
+      const delta = calculateLiveTelemetryDelta(snapshot, previous, sampleAt);
+      if (delta > 0) {
+        liveSecondsRef.current += delta;
+        setListenState((current) => ({
+          ...current,
+          liveSeconds: liveSecondsRef.current,
+        }));
       }
-      lastLiveSampleRef.current =
-        liveEligible && snapshot.playbackState === "playing"
-          ? { at: sampleAt, position: snapshot.currentTime }
-          : null;
+      lastLiveSampleRef.current = nextLiveTelemetrySample(snapshot, sampleAt);
 
       if (
         !snapshot.supported ||
-        !["playing", "ended"].includes(snapshot.playbackState)
+        !isPlaybackCountingState(snapshot)
       ) {
         if (!snapshot.supported) {
           setListenState((current) => ({
@@ -4203,7 +4173,7 @@ function DiscoverySongCard({
       const sessionId = listeningSessionRef.current;
       if (!sessionId || heartbeatInFlightRef.current) return;
       const heartbeatDue =
-        snapshot.playbackState === "ended" ||
+        isPlaybackCompleted(snapshot) ||
         Date.now() - lastHeartbeatAtRef.current >= 15000;
       if (!heartbeatDue) return;
 
@@ -4215,10 +4185,7 @@ function DiscoverySongCard({
           target_session_id: sessionId,
           playback_position_seconds: snapshot.currentTime,
           playback_duration_seconds: snapshot.duration,
-          playback_state:
-            snapshot.playbackState === "ended"
-              ? "playing"
-              : snapshot.playbackState,
+          playback_state: heartbeatPlaybackState(snapshot, "playing"),
           playback_muted: snapshot.muted,
           playback_volume: snapshot.volume,
           page_visible: snapshot.pageVisible,
@@ -4264,8 +4231,6 @@ function DiscoverySongCard({
     [
       active,
       onListeningCredited,
-      onQueueEnded,
-      queueAutoPlayActive,
       scrollPlayerIntoView,
       song.id,
       spanish,
@@ -5691,7 +5656,6 @@ function DiscoverySections({
             onListeningCredited={onListeningCredited}
             onQueueAutoPlayChange={changeDiscoveryQueueAutoPlay}
             onPlay={stopDiscoveryQueue}
-            onQueueEnded={advanceDiscoveryQueue}
             onQueueNext={advanceDiscoveryQueue}
             queueAutoPlayEnabled={activeQueue.autoPlayEnabled}
             queueIndex={activeQueue.currentIndex + 1}
@@ -9195,8 +9159,12 @@ export function FirstListenApp({
   const workspacePlaybackRef = useRef<WorkspacePlaybackRequest | null>(null);
   const [workspacePlaybackControls, setWorkspacePlaybackControls] =
     useState<WorkspacePlaybackControls | null>(null);
+  const workspacePlaybackControlsRef =
+    useRef<WorkspacePlaybackControls | null>(null);
   const [workspacePlaybackTelemetry, setWorkspacePlaybackTelemetry] =
     useState<ProviderTelemetrySnapshot | null>(null);
+  const workspaceAutoAdvanceTargetRef = useRef("");
+  const workspaceAutoAdvanceTimerRef = useRef<number | null>(null);
   const [playbackSlots, setPlaybackSlots] = useState<
     Map<string, HTMLDivElement>
   >(() => new Map());
@@ -9204,6 +9172,19 @@ export function FirstListenApp({
   useEffect(() => {
     workspacePlaybackRef.current = workspacePlayback;
   }, [workspacePlayback]);
+
+  useEffect(() => {
+    workspacePlaybackControlsRef.current = workspacePlaybackControls;
+  }, [workspacePlaybackControls]);
+
+  useEffect(
+    () => () => {
+      if (workspaceAutoAdvanceTimerRef.current !== null) {
+        window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const registerPlaybackSlot = useCallback(
     (slotId: string, element: HTMLDivElement | null) => {
@@ -9227,6 +9208,13 @@ export function FirstListenApp({
         previousPlayback,
         request,
       );
+      if (!sameTarget) {
+        workspaceAutoAdvanceTargetRef.current = "";
+        if (workspaceAutoAdvanceTimerRef.current !== null) {
+          window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
+          workspaceAutoAdvanceTimerRef.current = null;
+        }
+      }
       workspacePlaybackRef.current = request;
       setActiveSong(request.song);
       setWorkspaceActiveQueue(request.queue ?? null);
@@ -9234,6 +9222,7 @@ export function FirstListenApp({
       setActiveWorkspacePanel(request.context.panel);
       setQueueMode(request.context.mode);
       setWorkspacePlayback(request);
+      workspacePlaybackControlsRef.current = request.controls ?? null;
       setWorkspacePlaybackControls(request.controls ?? null);
       setWorkspacePlaybackTelemetry((current) =>
         sameTarget ? current : initialWorkspaceTelemetry(),
@@ -9251,6 +9240,28 @@ export function FirstListenApp({
         return;
       }
       setWorkspacePlaybackTelemetry(snapshot);
+      if (!isPlaybackCompleted(snapshot)) {
+        workspaceAutoAdvanceTargetRef.current = "";
+        return;
+      }
+      const controls = workspacePlaybackControlsRef.current;
+      const targetKey = workspacePlaybackTargetKey(request);
+      const shouldAdvance =
+        controls?.autoPlayEnabled !== false && Boolean(controls?.onNext);
+      if (
+        !shouldAdvance ||
+        workspaceAutoAdvanceTargetRef.current === targetKey ||
+        workspaceAutoAdvanceTimerRef.current !== null
+      ) {
+        return;
+      }
+      workspaceAutoAdvanceTargetRef.current = targetKey;
+      workspaceAutoAdvanceTimerRef.current = window.setTimeout(() => {
+        workspaceAutoAdvanceTimerRef.current = null;
+        const currentPlayback = workspacePlaybackRef.current;
+        if (workspacePlaybackTargetKey(currentPlayback) !== targetKey) return;
+        workspacePlaybackControlsRef.current?.onNext?.();
+      }, 700);
     },
     [],
   );
@@ -9259,6 +9270,13 @@ export function FirstListenApp({
     const current = workspacePlaybackRef.current;
     if (slotId && current?.slotId !== slotId) return;
     setWorkspacePlayback(null);
+    workspacePlaybackRef.current = null;
+    workspacePlaybackControlsRef.current = null;
+    workspaceAutoAdvanceTargetRef.current = "";
+    if (workspaceAutoAdvanceTimerRef.current !== null) {
+      window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
+      workspaceAutoAdvanceTimerRef.current = null;
+    }
     setWorkspacePlaybackControls(null);
     setWorkspacePlaybackTelemetry(null);
     setActiveSong(null);

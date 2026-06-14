@@ -150,7 +150,7 @@ function ProfileSong({
       if (
         !active ||
         !snapshot.supported ||
-        !["playing", "ended"].includes(snapshot.playbackState)
+        !["playing", "completed"].includes(snapshot.playbackState)
       ) {
         return;
       }
@@ -220,7 +220,10 @@ function ProfileSong({
       const params = {
         playback_position_seconds: snapshot.currentTime,
         playback_duration_seconds: snapshot.duration,
-        playback_state: snapshot.playbackState,
+        playback_state:
+          snapshot.playbackState === "completed"
+            ? "ended"
+            : snapshot.playbackState,
         playback_muted: snapshot.muted,
         playback_volume: snapshot.volume,
         page_visible: snapshot.pageVisible,

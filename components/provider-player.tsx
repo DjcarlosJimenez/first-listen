@@ -25,13 +25,12 @@ import type { Platform } from "@/lib/types";
 
 type PlayerStatus = "loading" | "ready" | "error";
 type PlaybackState =
-  | "unstarted"
-  | "ended"
+  | "loading"
+  | "ready"
+  | "completed"
   | "playing"
   | "paused"
-  | "buffering"
-  | "cued"
-  | "unknown";
+  | "error";
 
 export type ProviderTelemetrySnapshot = {
   supported: boolean;
@@ -306,13 +305,13 @@ function spotifyTrackUri(rawUrl: string) {
 }
 
 function mapYouTubeState(state: number): PlaybackState {
-  if (state === -1) return "unstarted";
-  if (state === 0) return "ended";
+  if (state === -1) return "ready";
+  if (state === 0) return "completed";
   if (state === 1) return "playing";
   if (state === 2) return "paused";
-  if (state === 3) return "buffering";
-  if (state === 5) return "cued";
-  return "unknown";
+  if (state === 3) return "loading";
+  if (state === 5) return "ready";
+  return "loading";
 }
 
 function timestamp() {
@@ -373,7 +372,7 @@ export function ProviderPlayer({
   const [providerReadyAt, setProviderReadyAt] = useState<string | null>(null);
   const [initializationAttempt, setInitializationAttempt] = useState(1);
   const [status, setStatus] = useState<PlayerStatus>("loading");
-  const [playbackState, setPlaybackState] = useState<PlaybackState>("unknown");
+  const [playbackState, setPlaybackState] = useState<PlaybackState>("loading");
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState<boolean | null>(null);
@@ -393,7 +392,7 @@ export function ProviderPlayer({
   const autoplayRetryTokenRef = useRef(0);
   const lastActivePlaybackLogRef = useRef({ at: 0, target: "" });
   const lastInteractionAtRef = useRef(Date.now());
-  const previousPlaybackStateRef = useRef<PlaybackState>("unknown");
+  const previousPlaybackStateRef = useRef<PlaybackState>("loading");
   const previousPlaybackTargetRef = useRef<{
     link: string;
     platform: Platform;
@@ -469,7 +468,7 @@ export function ProviderPlayer({
           }
           try {
             const state = mapYouTubeState(player.getPlayerState());
-            if (state === "playing" || state === "ended") return;
+            if (state === "playing" || state === "completed") return;
             setShowAutoplayFallback(false);
             player.playVideo();
           } catch (error) {
@@ -547,7 +546,7 @@ export function ProviderPlayer({
         nextState = "paused";
         setPlaybackState("paused");
       }
-      if (nextState === "playing" || nextState === "ended") {
+      if (nextState === "playing" || nextState === "completed") {
         clearAutoplayRetryTimers();
       }
       if (
@@ -609,7 +608,7 @@ export function ProviderPlayer({
 
     if (keepExistingYouTubePlayer) {
       setStatus("ready");
-      setPlaybackState("buffering");
+      setPlaybackState("loading");
       setCurrentTime(0);
       setDuration(0);
       setShowAutoplayFallback(false);
@@ -617,7 +616,7 @@ export function ProviderPlayer({
     }
 
     setStatus("loading");
-    setPlaybackState("unknown");
+    setPlaybackState("loading");
     setCurrentTime(0);
     setDuration(0);
     setMuted(null);
@@ -655,7 +654,7 @@ export function ProviderPlayer({
         const targetKey = latestYouTubeTargetRef.current;
         try {
           const state = mapYouTubeState(youtubePlayerRef.current.getPlayerState());
-          if (state !== "playing" && state !== "ended") {
+          if (state !== "playing" && state !== "completed") {
             scheduleYouTubeAutoplayRetries(
               youtubePlayerRef.current,
               targetKey,
@@ -787,6 +786,24 @@ export function ProviderPlayer({
       );
   }, [playbackInstanceId]);
 
+  const markProviderError = useCallback(
+    (supported = false) => {
+      clearAutoplayRetryTimers();
+      setStatus("error");
+      setPlaybackState("error");
+      setShowAutoplayFallback(false);
+      emitTelemetry("error", currentTime, duration, muted, volume, supported);
+    },
+    [
+      clearAutoplayRetryTimers,
+      currentTime,
+      duration,
+      emitTelemetry,
+      muted,
+      volume,
+    ],
+  );
+
   useEffect(() => {
     if (!clientOrigin) return;
     if (!embed) {
@@ -807,7 +824,7 @@ export function ProviderPlayer({
         });
         return;
       }
-      setStatus("error");
+      markProviderError(false);
       console.error("[First Listen player] Unsupported or invalid provider URL", {
         link,
         platform,
@@ -840,6 +857,7 @@ export function ProviderPlayer({
     title,
     externalContent,
     emitTelemetry,
+    markProviderError,
   ]);
 
   useEffect(() => {
@@ -853,7 +871,7 @@ export function ProviderPlayer({
 
     const uri = spotifyTrackUri(link);
     if (!uri) {
-      setStatus("error");
+      markProviderError(false);
       return;
     }
 
@@ -881,7 +899,7 @@ export function ProviderPlayer({
               setProviderReadyAt(readyAt);
               setStatus("ready");
               onReadyRef.current?.();
-              emitTelemetry("cued", 0, 0, null, null, false);
+              emitTelemetry("ready", 0, 0, null, null, false);
               if (autoPlay) {
                 try {
                   nextController.play();
@@ -905,9 +923,9 @@ export function ProviderPlayer({
                 nextPosition >= Math.max(0, nextDuration - 0.75) &&
                 event.data.isPaused;
               const nextState: PlaybackState = ended
-                ? "ended"
+                ? "completed"
                 : event.data.isBuffering
-                  ? "buffering"
+                  ? "loading"
                   : event.data.isPaused
                     ? "paused"
                     : "playing";
@@ -935,7 +953,7 @@ export function ProviderPlayer({
           link,
           title,
         });
-        setStatus("error");
+        markProviderError(false);
       });
 
     return () => {
@@ -947,7 +965,7 @@ export function ProviderPlayer({
         // Spotify may remove its iframe before React cleanup completes.
       }
     };
-  }, [autoPlay, embed, emitTelemetry, link, title]);
+  }, [autoPlay, embed, emitTelemetry, link, markProviderError, title]);
 
   useEffect(() => {
     if (!embed || status !== "loading") return;
@@ -966,7 +984,7 @@ export function ProviderPlayer({
         return;
       }
 
-      setStatus("error");
+      markProviderError(Boolean(embed && !externalContent));
       console.error("[First Listen player] Provider initialization failed", {
         embedUrl: embed.src,
         initializationAttempt,
@@ -979,9 +997,11 @@ export function ProviderPlayer({
     return () => window.clearTimeout(timeout);
   }, [
     embed,
+    externalContent,
     initializationAttempt,
     link,
     loadedEmbedSrc,
+    markProviderError,
     platform,
     status,
     title,
@@ -1055,7 +1075,7 @@ export function ProviderPlayer({
           events: {
             onError: (event) => {
               if (disposed) return;
-              setStatus("error");
+              markProviderError(true);
               console.error("[First Listen player] YouTube API error", {
                 code: event.data,
                 embedUrl: iframeSrc,
@@ -1115,7 +1135,7 @@ export function ProviderPlayer({
           setIframeLoadedAt(null);
           setInitializationAttempt((current) => current + 1);
         } else {
-          setStatus("error");
+          markProviderError(true);
         }
       });
 
@@ -1135,6 +1155,7 @@ export function ProviderPlayer({
     iframeLoadedAt,
     initializationAttempt,
     loadedEmbedSrc,
+    markProviderError,
     playerMountedAt,
     scheduleYouTubeAutoplayRetries,
     youtubeTelemetryActive,
@@ -1156,10 +1177,10 @@ export function ProviderPlayer({
     const player = youtubePlayerRef.current;
     youtubePlaybackTargetRef.current = youtubeTargetKey;
     setShowAutoplayFallback(false);
-    setPlaybackState("buffering");
+    setPlaybackState("loading");
     setCurrentTime(0);
     setDuration(0);
-    emitTelemetry("buffering", 0, 0, muted, volume, true);
+    emitTelemetry("loading", 0, 0, muted, volume, true);
 
     try {
       if (embed.youtubeVideoId) {
@@ -1276,13 +1297,13 @@ export function ProviderPlayer({
               if (disposed) return;
               const nextDuration = Math.max(0, durationMs / 1000);
               const nextMuted = nextVolume <= 0;
-              setPlaybackState("ended");
+              setPlaybackState("completed");
               setDuration(nextDuration);
               setCurrentTime(nextDuration);
               setMuted(nextMuted);
               setVolume(nextVolume);
               emitTelemetry(
-                "ended",
+                "completed",
                 nextDuration,
                 nextDuration,
                 nextMuted,
@@ -1292,7 +1313,7 @@ export function ProviderPlayer({
             });
           });
         };
-        const failed = () => setStatus("error");
+        const failed = () => markProviderError(true);
 
         widget.bind(api.Widget.Events.READY, ready);
         widget.bind(api.Widget.Events.PLAY, playing);
@@ -1308,7 +1329,7 @@ export function ProviderPlayer({
           platform,
           title,
         });
-        setStatus("error");
+        markProviderError(true);
       });
 
     return () => {
@@ -1321,7 +1342,15 @@ export function ProviderPlayer({
         );
       }
     };
-  }, [autoPlay, embed, emitTelemetry, loadedEmbedSrc, platform, title]);
+  }, [
+    autoPlay,
+    embed,
+    emitTelemetry,
+    loadedEmbedSrc,
+    markProviderError,
+    platform,
+    title,
+  ]);
 
   const playerLoaded = () => {
     if (!embed || !iframeSrc) return;
@@ -1343,7 +1372,7 @@ export function ProviderPlayer({
       setStatus("ready");
       onReadyRef.current?.();
       emitTelemetry(
-        "unknown",
+        "ready",
         0,
         0,
         null,
@@ -1360,7 +1389,7 @@ export function ProviderPlayer({
       setInitializationAttempt((current) => current + 1);
       return;
     }
-    setStatus("error");
+    markProviderError(Boolean(embed && !externalContent));
     console.error("[First Listen player] Provider iframe failed", {
       embedUrl: embed?.src,
       initializationAttempt,
@@ -1374,7 +1403,7 @@ export function ProviderPlayer({
     const opened = window.open(link, "_blank", "noopener,noreferrer");
     if (opened) opened.opener = null;
     setShowExternalConfirmation(false);
-    emitTelemetry("unknown", 0, 0, null, null, false);
+    emitTelemetry("ready", 0, 0, null, null, false);
   }, [emitTelemetry, link]);
 
   const requestExternalPlayback = () => {
