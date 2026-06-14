@@ -387,6 +387,7 @@ export function ProviderPlayer({
   const onTelemetryRef = useRef(onTelemetry);
   const onReadyRef = useRef(onReady);
   const autoPlayRef = useRef(autoPlay);
+  const manualPauseRef = useRef(false);
   const debugEnabledRef = useRef(false);
   const autoplayRetryTimersRef = useRef<number[]>([]);
   const autoplayRetryTokenRef = useRef(0);
@@ -459,6 +460,7 @@ export function ProviderPlayer({
       autoplayRetryTimersRef.current = retryDelays.map((delay) =>
         window.setTimeout(() => {
           if (
+            manualPauseRef.current ||
             token !== autoplayRetryTokenRef.current ||
             latestYouTubeTargetRef.current !== targetKey ||
             youtubePlaybackTargetRef.current !== targetKey
@@ -490,6 +492,10 @@ export function ProviderPlayer({
     },
     [clearAutoplayRetryTimers],
   );
+
+  useEffect(() => {
+    if (!autoPlay) clearAutoplayRetryTimers();
+  }, [autoPlay, clearAutoplayRetryTimers]);
 
   useEffect(() => {
     providerLogRef.current = {
@@ -530,6 +536,20 @@ export function ProviderPlayer({
       nextVolume: number | null,
       supported: boolean,
     ) => {
+      if (manualPauseRef.current && nextState === "playing") {
+        try {
+          youtubePlayerRef.current?.pauseVideo();
+          spotifyControllerRef.current?.pause();
+          soundCloudWidgetRef.current?.pause();
+        } catch {
+          // The provider may already be pausing; the telemetry state below is authoritative for First Listen.
+        }
+        nextState = "paused";
+        setPlaybackState("paused");
+      }
+      if (nextState === "playing" || nextState === "ended") {
+        clearAutoplayRetryTimers();
+      }
       if (
         nextState === "playing" &&
         previousPlaybackStateRef.current !== "playing"
@@ -554,7 +574,7 @@ export function ProviderPlayer({
         lastInteractionAt: lastInteractionAtRef.current,
       });
     },
-    [playbackInstanceId],
+    [clearAutoplayRetryTimers, playbackInstanceId],
   );
 
   useEffect(() => {
@@ -620,7 +640,12 @@ export function ProviderPlayer({
   }, [embed]);
 
   useEffect(() => {
-    if (!autoPlay || status !== "ready" || playbackState === "playing") {
+    if (
+      manualPauseRef.current ||
+      !autoPlay ||
+      status !== "ready" ||
+      playbackState === "playing"
+    ) {
       setShowAutoplayFallback(false);
       return;
     }
@@ -664,18 +689,28 @@ export function ProviderPlayer({
   ]);
 
   const requestPlayback = useCallback(() => {
+    manualPauseRef.current = false;
     setShowAutoplayFallback(false);
     lastInteractionAtRef.current = Date.now();
     try {
       youtubePlayerRef.current?.playVideo();
+      if (youtubePlayerRef.current) {
+        scheduleYouTubeAutoplayRetries(
+          youtubePlayerRef.current,
+          latestYouTubeTargetRef.current,
+        );
+      }
       spotifyControllerRef.current?.play();
       soundCloudWidgetRef.current?.play();
     } catch (error) {
       console.info("[First Listen player] Playback request was deferred", error);
     }
-  }, []);
+  }, [scheduleYouTubeAutoplayRetries]);
 
   const pausePlayback = useCallback(() => {
+    manualPauseRef.current = true;
+    clearAutoplayRetryTimers();
+    setShowAutoplayFallback(false);
     try {
       youtubePlayerRef.current?.pauseVideo();
       spotifyControllerRef.current?.pause();
@@ -683,10 +718,27 @@ export function ProviderPlayer({
       setPlaybackState((current) =>
         current === "playing" ? "paused" : current,
       );
+      emitTelemetry(
+        "paused",
+        currentTime,
+        duration,
+        muted,
+        volume,
+        Boolean(embed && !externalContent && embed.telemetry !== "spotify_iframe_api"),
+      );
     } catch (error) {
       console.info("[First Listen player] Pause request was deferred", error);
     }
-  }, []);
+  }, [
+    clearAutoplayRetryTimers,
+    currentTime,
+    duration,
+    embed,
+    emitTelemetry,
+    externalContent,
+    muted,
+    volume,
+  ]);
 
   useEffect(() => {
     if (!controlChannel) return;

@@ -180,9 +180,11 @@ type WorkspacePlaybackContext = {
 };
 type WorkspacePlaybackControls = {
   autoPlayEnabled?: boolean;
+  fairSkipLabel?: string;
   nextEnabled?: boolean;
   onAutoPlayChange?: (enabled: boolean) => void;
   onNext?: () => void;
+  validListenLabel?: string;
 };
 type WorkspacePlaybackRequest = {
   autoPlay?: boolean;
@@ -1061,6 +1063,12 @@ function WorkspaceShellTop({
             <small>
               {spanish ? "Estado" : "State"}: {playbackState}
             </small>
+            {activeControls?.validListenLabel && (
+              <small>{activeControls.validListenLabel}</small>
+            )}
+            {activeControls?.fairSkipLabel && (
+              <small>{activeControls.fairSkipLabel}</small>
+            )}
           </div>
         </div>
       </div>
@@ -4011,6 +4019,24 @@ function DiscoverySongCard({
   );
   const queueSkipReady =
     listenState.validListenRecorded || skipRemainingSeconds <= 0;
+  const validListenLabel = listenState.validListenRecorded
+    ? spanish
+      ? "Tiempo que cuenta"
+      : "Time counts toward rewards"
+    : spanish
+      ? `Tiempo que cuenta: ${formatClock(
+          Math.max(listenState.verifiedSeconds, listenState.liveSeconds),
+        )} / ${formatClock(skipRequirementSeconds)}`
+      : `Counting progress: ${formatClock(
+          Math.max(listenState.verifiedSeconds, listenState.liveSeconds),
+        )} / ${formatClock(skipRequirementSeconds)}`;
+  const fairSkipLabel = queueSkipReady
+    ? spanish
+      ? "Siguiente disponible"
+      : "Next available"
+    : spanish
+      ? `Siguiente en ${formatClock(skipRemainingSeconds)}`
+      : `Next in ${formatClock(skipRemainingSeconds)}`;
 
   const scrollPlayerIntoView = useCallback(() => {
     const player = playerRef.current;
@@ -4266,9 +4292,11 @@ function DiscoverySongCard({
       },
       controls: {
         autoPlayEnabled: queueAutoPlayActive,
+        fairSkipLabel: queueActive ? fairSkipLabel : undefined,
         nextEnabled: queueActive,
         onAutoPlayChange: queueActive ? onQueueAutoPlayChange : undefined,
         onNext: queueActive ? onQueueNext : undefined,
+        validListenLabel: queueActive ? validListenLabel : undefined,
       },
       onReady: scrollPlayerIntoView,
       onTelemetry: handleDiscoveryTelemetry,
@@ -4286,6 +4314,7 @@ function DiscoverySongCard({
     queueActive,
     queueAutoPlayActive,
     queueSkipReady,
+    fairSkipLabel,
     scrollPlayerIntoView,
     song,
     spanish,
@@ -4293,6 +4322,7 @@ function DiscoverySongCard({
     onQueueNext,
     onQueueAutoPlayChange,
     requestPlayback,
+    validListenLabel,
     workspaceQueue,
   ]);
 
