@@ -398,9 +398,17 @@ function useWorkspacePlaybackMachine({
   const workspaceTelemetryTargetRef = useRef("");
   const workspaceAutoAdvanceTargetRef = useRef("");
   const workspaceAutoAdvanceTimerRef = useRef<number | null>(null);
+  const workspaceAutoStartTimersRef = useRef<number[]>([]);
   const [playbackSlots, setPlaybackSlots] = useState<
     Map<string, HTMLDivElement>
   >(() => new Map());
+
+  const clearWorkspaceAutoStartTimers = useCallback(() => {
+    workspaceAutoStartTimersRef.current.forEach((timer) =>
+      window.clearTimeout(timer),
+    );
+    workspaceAutoStartTimersRef.current = [];
+  }, []);
 
   useEffect(() => {
     workspacePlaybackRef.current = workspacePlayback;
@@ -415,8 +423,9 @@ function useWorkspacePlaybackMachine({
       if (workspaceAutoAdvanceTimerRef.current !== null) {
         window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
       }
+      clearWorkspaceAutoStartTimers();
     },
-    [],
+    [clearWorkspaceAutoStartTimers],
   );
 
   const registerPlaybackSlot = useCallback(
@@ -447,6 +456,7 @@ function useWorkspacePlaybackMachine({
         workspaceTelemetryUpdatedAtRef.current = 0;
         workspaceTelemetryTargetRef.current =
           workspacePlaybackTargetKey(request);
+        clearWorkspaceAutoStartTimers();
         if (workspaceAutoAdvanceTimerRef.current !== null) {
           window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
           workspaceAutoAdvanceTimerRef.current = null;
@@ -468,8 +478,27 @@ function useWorkspacePlaybackMachine({
         workspacePlaybackTelemetryRef.current = initialWorkspaceTelemetry();
         workspaceTelemetryUpdatedAtRef.current = Date.now();
       }
+      if (!sameTarget && request.autoPlay) {
+        const targetKey = workspacePlaybackTargetKey(request);
+        workspaceAutoStartTimersRef.current = [120, 650, 1600, 3200].map(
+          (delay) =>
+            window.setTimeout(() => {
+              if (workspacePlaybackTargetKey(workspacePlaybackRef.current) !== targetKey) {
+                return;
+              }
+              window.dispatchEvent(
+                new CustomEvent("first-listen:playback-command", {
+                  detail: {
+                    channel: request.slotId,
+                    command: "play",
+                  },
+                }),
+              );
+            }, delay),
+        );
+      }
     },
-    [],
+    [clearWorkspaceAutoStartTimers],
   );
 
   const handleWorkspacePlaybackTelemetry = useCallback(
@@ -561,6 +590,7 @@ function useWorkspacePlaybackMachine({
     workspaceTelemetryUpdatedAtRef.current = 0;
     workspaceTelemetryTargetRef.current = "";
     workspaceAutoAdvanceTargetRef.current = "";
+    clearWorkspaceAutoStartTimers();
     if (workspaceAutoAdvanceTimerRef.current !== null) {
       window.clearTimeout(workspaceAutoAdvanceTimerRef.current);
       workspaceAutoAdvanceTimerRef.current = null;
@@ -570,7 +600,7 @@ function useWorkspacePlaybackMachine({
     setActiveSong(null);
     setWorkspaceActiveQueue(null);
     setActiveContext(null);
-  }, []);
+  }, [clearWorkspaceAutoStartTimers]);
 
   const syncPanelForRoute = useCallback(
     (view: View, destination?: DiscoveryDestination) => {
@@ -4656,6 +4686,7 @@ function DiscoverySongCard({
   const startingSessionRef = useRef(false);
   const heartbeatInFlightRef = useRef(false);
   const lastHeartbeatAtRef = useRef(0);
+  const latestTelemetryRef = useRef<ProviderTelemetrySnapshot | null>(null);
   const lastLiveSampleRef = useRef<{ at: number; position: number } | null>(
     null,
   );
@@ -4745,6 +4776,7 @@ function DiscoverySongCard({
     startingSessionRef.current = false;
     heartbeatInFlightRef.current = false;
     lastHeartbeatAtRef.current = 0;
+    latestTelemetryRef.current = null;
     lastLiveSampleRef.current = null;
     liveSecondsRef.current = 0;
     validListenRef.current = false;
@@ -4765,8 +4797,9 @@ function DiscoverySongCard({
   }, [song.id]);
 
   const handleDiscoveryTelemetry = useCallback(
-    async (snapshot: ProviderTelemetrySnapshot) => {
+    async (snapshot: ProviderTelemetrySnapshot, force = false) => {
       if (!active) return;
+      latestTelemetryRef.current = snapshot;
       if (
         snapshot.playbackState === "playing" &&
         !scrolledForPlaybackRef.current
@@ -4838,6 +4871,7 @@ function DiscoverySongCard({
       const sessionId = listeningSessionRef.current;
       if (!sessionId || heartbeatInFlightRef.current) return;
       const heartbeatDue =
+        force ||
         isPlaybackCompleted(snapshot) ||
         Date.now() - lastHeartbeatAtRef.current >= 15000;
       if (!heartbeatDue) return;
@@ -4907,6 +4941,31 @@ function DiscoverySongCard({
     ],
   );
 
+  const flushDiscoveryTelemetry = useCallback(async () => {
+    const snapshot = latestTelemetryRef.current;
+    if (!snapshot || !isPlaybackCountingState(snapshot)) return;
+    const waitingForHeartbeat = heartbeatInFlightRef.current;
+    for (
+      let attempt = 0;
+      attempt < 12 && heartbeatInFlightRef.current;
+      attempt += 1
+    ) {
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+    if (
+      waitingForHeartbeat &&
+      Date.now() - lastHeartbeatAtRef.current < 1000
+    ) {
+      return;
+    }
+    await handleDiscoveryTelemetry(snapshot, true);
+  }, [handleDiscoveryTelemetry]);
+
+  const advanceQueueAfterFlush = useCallback(async () => {
+    await flushDiscoveryTelemetry();
+    onQueueNext?.();
+  }, [flushDiscoveryTelemetry, onQueueNext]);
+
   useEffect(() => {
     if (!active) return;
     requestPlayback({
@@ -4930,7 +4989,7 @@ function DiscoverySongCard({
         fairSkipLabel: queueActive ? fairSkipLabel : undefined,
         nextEnabled: queueActive,
         onAutoPlayChange: queueActive ? onQueueAutoPlayChange : undefined,
-        onNext: queueActive ? onQueueNext : undefined,
+        onNext: queueActive ? () => void advanceQueueAfterFlush() : undefined,
         validListenLabel: queueActive ? validListenLabel : undefined,
       },
       onReady: scrollPlayerIntoView,
@@ -4955,6 +5014,7 @@ function DiscoverySongCard({
     spanish,
     topTen,
     onQueueNext,
+    advanceQueueAfterFlush,
     onQueueAutoPlayChange,
     requestPlayback,
     validListenLabel,
@@ -5135,7 +5195,7 @@ function DiscoverySongCard({
               </strong>
               <button
                 disabled={!queueSkipReady}
-                onClick={onQueueNext}
+                onClick={() => void advanceQueueAfterFlush()}
                 type="button"
               >
                 <SkipForward size={14} />
