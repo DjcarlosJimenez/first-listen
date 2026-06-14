@@ -214,6 +214,19 @@ type WorkspacePlaybackController = {
 type BinaryAnswer = boolean | null;
 type Copy = ReturnType<typeof getCopy>;
 
+function sameWorkspacePlaybackTarget(
+  current: WorkspacePlaybackRequest | null,
+  next: WorkspacePlaybackRequest,
+) {
+  return (
+    current?.slotId === next.slotId &&
+    current.song.id === next.song.id &&
+    current.song.link === next.song.link &&
+    current.song.platform === next.song.platform &&
+    current.context.source === next.context.source
+  );
+}
+
 function workspacePanelForRoute(
   view: View,
   discoveryDestination?: DiscoveryDestination,
@@ -747,7 +760,10 @@ function WorkspacePlayerHost({
   externalRedirectNoticeDisabled: boolean;
   locale: InterfaceLocale;
   onExternalRedirectPreferenceChange: (disabled: boolean) => void;
-  onPlaybackTelemetry: (snapshot: ProviderTelemetrySnapshot) => void;
+  onPlaybackTelemetry: (
+    snapshot: ProviderTelemetrySnapshot,
+    playback: WorkspacePlaybackRequest,
+  ) => void;
   playback: WorkspacePlaybackRequest | null;
   slotElement: HTMLDivElement | null;
 }) {
@@ -790,7 +806,7 @@ function WorkspacePlayerHost({
               locale={locale}
               onReady={playback.onReady}
               onTelemetry={(snapshot) => {
-                onPlaybackTelemetry(snapshot);
+                onPlaybackTelemetry(snapshot, playback);
                 playback.onTelemetry?.(snapshot);
               }}
               platform={playback.song.platform}
@@ -4536,6 +4552,7 @@ function DiscoverySections({
   const [activeQueue, setActiveQueue] = useState<DiscoveryQueueState | null>(
     null,
   );
+  const activeQueueRef = useRef<DiscoveryQueueState | null>(null);
   const [expandedCategory, setExpandedCategory] =
     useState<DiscoveryCategoryKey | null>(null);
   const spanish = locale === "es";
@@ -4778,6 +4795,24 @@ function DiscoverySections({
     ],
   );
   const activeQueueSong = activeQueue?.songs[activeQueue.currentIndex] ?? null;
+  const workspaceQueueForActiveQueue = useMemo<WorkspaceActiveQueue | null>(
+    () =>
+      activeQueue
+        ? {
+            currentIndex: activeQueue.currentIndex,
+            id: activeQueue.id,
+            mode: activeQueue.mode,
+            songs: activeQueue.songs,
+            title: activeQueue.title,
+            total: activeQueue.songs.length,
+          }
+        : null,
+    [activeQueue],
+  );
+
+  useEffect(() => {
+    activeQueueRef.current = activeQueue;
+  }, [activeQueue]);
 
   useEffect(() => {
     setHeardHistory(readDiscoveryHeardHistory());
@@ -4837,7 +4872,7 @@ function DiscoverySections({
       const firstSong = queueSongs[0];
       setActiveCardKey(null);
       setExpandedCategory(null);
-      setActiveQueue({
+      const nextQueue = {
         autoPlayEnabled: true,
         cycle: 0,
         currentIndex: 0,
@@ -4847,7 +4882,9 @@ function DiscoverySections({
         songs: queueSongs,
         sourceSongs: playableInputSongs,
         title,
-      });
+      };
+      activeQueueRef.current = nextQueue;
+      setActiveQueue(nextQueue);
       if (firstSong) markSongHeard(firstSong);
     },
     [
@@ -4859,14 +4896,15 @@ function DiscoverySections({
   );
 
   const advanceDiscoveryQueue = useCallback(() => {
-    if (!activeQueue) return;
-    const nextIndex = activeQueue.currentIndex + 1;
+    const queue = activeQueueRef.current;
+    if (!queue) return;
+    const nextIndex = queue.currentIndex + 1;
     let replaySongs = rankContinuousInternalReplayQueue(
-      activeQueue.sourceSongs,
+      queue.sourceSongs,
       heardHistory,
       queueRankOptions,
     );
-    if (activeQueue.id === "random" && replaySongs.length > 1) {
+    if (queue.id === "random" && replaySongs.length > 1) {
       const poolSize = Math.min(
         Math.max(1, queuePolicy.randomReplayPoolSize),
         replaySongs.length,
@@ -4879,7 +4917,7 @@ function DiscoverySections({
       );
       replaySongs.unshift(firstSong);
     }
-    const queuedIds = new Set(activeQueue.songs.map((song) => song.id));
+    const queuedIds = new Set(queue.songs.map((song) => song.id));
     const unplayedContinuousSongs = continuousDiscoverySongs.filter(
       (song) => !queuedIds.has(song.id),
     );
@@ -4889,8 +4927,8 @@ function DiscoverySections({
       queueRankOptions,
     );
     const shouldContinueDiscovery =
-      activeQueue.id !== "random" &&
-      nextIndex >= activeQueue.songs.length &&
+      queue.id !== "random" &&
+      nextIndex >= queue.songs.length &&
       (unplayedContinuousSongs.length > 0 || continuousReplaySongs.length > 0);
     if (shouldContinueDiscovery) {
       replaySongs = [
@@ -4901,12 +4939,13 @@ function DiscoverySections({
       ];
     }
     const nextSongs =
-      nextIndex < activeQueue.songs.length
-        ? filterQueuePlayableDiscoverySongs(activeQueue.songs)
+      nextIndex < queue.songs.length
+        ? filterQueuePlayableDiscoverySongs(queue.songs)
         : filterQueuePlayableDiscoverySongs(
-            replaySongs.length ? replaySongs : activeQueue.songs,
+            replaySongs.length ? replaySongs : queue.songs,
           );
     if (!nextSongs.length) {
+      activeQueueRef.current = null;
       setActiveQueue(null);
       return;
     }
@@ -4915,40 +4954,40 @@ function DiscoverySections({
     const nextQueue =
       nextIndex < nextSongs.length
         ? {
-            ...activeQueue,
+            ...queue,
             currentIndex: safeNextIndex,
             songs: nextSongs,
             sourceSongs: filterQueuePlayableDiscoverySongs(
-              activeQueue.sourceSongs,
+              queue.sourceSongs,
             ),
           }
         : {
-            ...activeQueue,
+            ...queue,
             description: shouldContinueDiscovery
               ? spanish
                 ? "Seguimos con canciones reproducibles dentro de First Listen."
                 : "Continuing with songs playable inside First Listen."
-              : activeQueue.description,
+              : queue.description,
             id: shouldContinueDiscovery
               ? "continuous_discovery"
-              : activeQueue.id,
+              : queue.id,
             currentIndex: 0,
-            cycle: activeQueue.cycle + 1,
+            cycle: queue.cycle + 1,
             songs: nextSongs,
             sourceSongs: shouldContinueDiscovery
               ? filterQueuePlayableDiscoverySongs(continuousDiscoverySongs)
-              : filterQueuePlayableDiscoverySongs(activeQueue.sourceSongs),
+              : filterQueuePlayableDiscoverySongs(queue.sourceSongs),
             title: shouldContinueDiscovery
               ? spanish
                 ? "Descubrimiento continuo"
                 : "Continuous discovery"
-              : activeQueue.title,
+              : queue.title,
           };
     const nextSong = nextQueue.songs[nextQueue.currentIndex] ?? null;
+    activeQueueRef.current = nextQueue;
     setActiveQueue(nextQueue);
     if (nextSong) markSongHeard(nextSong);
   }, [
-    activeQueue,
     continuousDiscoverySongs,
     heardHistory,
     markSongHeard,
@@ -4958,13 +4997,16 @@ function DiscoverySections({
   ]);
 
   const stopDiscoveryQueue = useCallback(() => {
+    activeQueueRef.current = null;
     setActiveQueue(null);
   }, []);
 
   const changeDiscoveryQueueAutoPlay = useCallback((enabled: boolean) => {
-    setActiveQueue((current) =>
-      current ? { ...current, autoPlayEnabled: enabled } : current,
-    );
+    setActiveQueue((current) => {
+      const next = current ? { ...current, autoPlayEnabled: enabled } : current;
+      activeQueueRef.current = next;
+      return next;
+    });
   }, []);
 
   const toggleDiscoveryCard = useCallback(
@@ -5536,15 +5578,9 @@ function DiscoverySections({
   };
 
   const renderActiveQueuePanel = () => {
-    if (!activeQueue || !activeQueueSong) return null;
-    const workspaceQueue: WorkspaceActiveQueue = {
-      currentIndex: activeQueue.currentIndex,
-      id: activeQueue.id,
-      mode: activeQueue.mode,
-      songs: activeQueue.songs,
-      title: activeQueue.title,
-      total: activeQueue.songs.length,
-    };
+    if (!activeQueue || !activeQueueSong || !workspaceQueueForActiveQueue) {
+      return null;
+    }
 
     return (
       <section className="panel discovery-queue-panel">
@@ -5595,7 +5631,7 @@ function DiscoverySections({
             song={activeQueueSong}
             topTen={activeQueue.id === "top_results"}
             workspacePlayback={workspacePlayback}
-            workspaceQueue={workspaceQueue}
+            workspaceQueue={workspaceQueueForActiveQueue}
           />
         </div>
       </section>
@@ -9117,6 +9153,12 @@ export function FirstListenApp({
 
   const requestWorkspacePlayback = useCallback(
     (request: WorkspacePlaybackRequest) => {
+      const previousPlayback = workspacePlaybackRef.current;
+      const sameTarget = sameWorkspacePlaybackTarget(
+        previousPlayback,
+        request,
+      );
+      workspacePlaybackRef.current = request;
       setActiveSong(request.song);
       setWorkspaceActiveQueue(request.queue ?? null);
       setActiveContext(request.context);
@@ -9124,7 +9166,22 @@ export function FirstListenApp({
       setQueueMode(request.context.mode);
       setWorkspacePlayback(request);
       setWorkspacePlaybackControls(request.controls ?? null);
-      setWorkspacePlaybackTelemetry(null);
+      setWorkspacePlaybackTelemetry((current) =>
+        sameTarget ? current : null,
+      );
+    },
+    [],
+  );
+
+  const handleWorkspacePlaybackTelemetry = useCallback(
+    (
+      snapshot: ProviderTelemetrySnapshot,
+      request: WorkspacePlaybackRequest,
+    ) => {
+      if (!sameWorkspacePlaybackTarget(workspacePlaybackRef.current, request)) {
+        return;
+      }
+      setWorkspacePlaybackTelemetry(snapshot);
     },
     [],
   );
@@ -10105,7 +10162,7 @@ export function FirstListenApp({
           onExternalRedirectPreferenceChange={(disabled) =>
             void changeExternalRedirectPreference(disabled)
           }
-          onPlaybackTelemetry={setWorkspacePlaybackTelemetry}
+          onPlaybackTelemetry={handleWorkspacePlaybackTelemetry}
           playback={workspacePlayback}
           slotElement={workspacePlaybackSlot}
         />
