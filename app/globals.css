@@ -8173,6 +8173,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 }
 
 .discovery-breadcrumbs a,
+.discovery-breadcrumbs button,
 .discovery-breadcrumbs span {
   color: rgba(247, 249, 240, 0.72);
   font-size: 9px;
@@ -8181,7 +8182,15 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   text-transform: uppercase;
 }
 
-.discovery-breadcrumbs a:hover {
+.discovery-breadcrumbs button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.discovery-breadcrumbs a:hover,
+.discovery-breadcrumbs button:hover {
   color: var(--acid);
 }
 

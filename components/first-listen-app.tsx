@@ -212,6 +212,40 @@ function workspacePanelForRoute(
   return { type: view };
 }
 
+function workspacePathForView(view: View) {
+  return view === "dashboard" ? "/dashboard" : `/${view}`;
+}
+
+function workspacePathForDiscoveryDestination(
+  destination?: DiscoveryDestination,
+) {
+  if (!destination) return "/dashboard";
+  if (destination.type === "genres") return "/discover/genres";
+  return `/discover/genre/${encodeURIComponent(destination.slug)}`;
+}
+
+function workspaceRouteFromPath(pathname: string):
+  | { destination?: DiscoveryDestination; view: View }
+  | null {
+  if (pathname === "/review") return { view: "review" };
+  if (pathname === "/dashboard") return { view: "dashboard" };
+  if (pathname === "/submit") return { view: "submit" };
+  if (pathname === "/discover/genres") {
+    return { destination: { type: "genres" }, view: "dashboard" };
+  }
+  const genreMatch = pathname.match(/^\/discover\/genre\/([^/]+)$/);
+  if (genreMatch) {
+    return {
+      destination: {
+        slug: decodeURIComponent(genreMatch[1]),
+        type: "genre",
+      },
+      view: "dashboard",
+    };
+  }
+  return null;
+}
+
 type RewardClaimFeedback = {
   awarded: number;
   beforeCredits: number;
@@ -1541,6 +1575,7 @@ function ReviewView({
   autoPlayNextSong,
   onAutoPlayChange,
   platformConfig,
+  onNavigateDiscoveryDestination,
   workspacePlayback,
 }: {
   reviewCount: number;
@@ -1585,6 +1620,9 @@ function ReviewView({
   autoPlayNextSong: boolean;
   onAutoPlayChange: (enabled: boolean) => void;
   platformConfig: PlatformControlConfig;
+  onNavigateDiscoveryDestination: (
+    destination?: DiscoveryDestination,
+  ) => void;
   workspacePlayback: WorkspacePlaybackController;
 }) {
   const { requestPlayback } = workspacePlayback;
@@ -2643,6 +2681,7 @@ function ReviewView({
       <DiscoverySections
         externalDiscoverySongs={externalDiscoverySongs}
         locale={locale}
+        onNavigateDestination={onNavigateDiscoveryDestination}
         platformConfig={platformConfig}
         onListeningCredited={onListeningCredited}
         spotlightSongs={spotlightSongs}
@@ -3767,6 +3806,7 @@ function DiscoverySections({
   externalDiscoverySongs,
   locale,
   platformConfig,
+  onNavigateDestination,
   onListeningCredited,
   workspacePlayback,
 }: {
@@ -3776,6 +3816,7 @@ function DiscoverySections({
   externalDiscoverySongs: DiscoverySong[];
   locale: InterfaceLocale;
   platformConfig: PlatformControlConfig;
+  onNavigateDestination: (destination?: DiscoveryDestination) => void;
   onListeningCredited: (
     seconds: number,
     becameValid: boolean,
@@ -3807,7 +3848,6 @@ function DiscoverySections({
   );
   const [expandedCategory, setExpandedCategory] =
     useState<DiscoveryCategoryKey | null>(null);
-  const router = useRouter();
   const spanish = locale === "es";
   const discoveryHub = platformConfig.discovery.hub;
   const limits = discoveryHub.limits;
@@ -4542,7 +4582,7 @@ function DiscoverySections({
                       disabled={primaryDisabled}
                       onClick={() =>
                         config.key === "genres"
-                          ? router.push("/discover/genres")
+                          ? onNavigateDestination({ type: "genres" })
                           : toggleCategory(config.key)
                       }
                       type="button"
@@ -4645,13 +4685,16 @@ function DiscoverySections({
     <section className="discovery-destination-hero">
       <div>
         <div className="discovery-breadcrumbs">
-          <Link href="/dashboard">
+          <button type="button" onClick={() => onNavigateDestination()}>
             {spanish ? "Descubrir música" : "Discover music"}
-          </Link>
+          </button>
           <span>/</span>
-          <Link href="/discover/genres">
+          <button
+            type="button"
+            onClick={() => onNavigateDestination({ type: "genres" })}
+          >
             {spanish ? "Géneros" : "Genres"}
-          </Link>
+          </button>
         </div>
         <span className="eyebrow">
           <Music2 size={13} />
@@ -4744,10 +4787,18 @@ function DiscoverySections({
                       <Play size={14} />
                       {spanish ? "Reproducir género" : "Play genre"}
                     </button>
-                    <Link href={`/discover/genre/${discoveryGenreSlug(genre)}`}>
+                    <button
+                      onClick={() =>
+                        onNavigateDestination({
+                          slug: discoveryGenreSlug(genre),
+                          type: "genre",
+                        })
+                      }
+                      type="button"
+                    >
                       <ArrowRight size={14} />
                       {spanish ? "Ver canciones" : "View songs"}
-                    </Link>
+                    </button>
                   </div>
                 </article>
               ))}
@@ -4833,10 +4884,14 @@ function DiscoverySections({
                 ? "Vuelve a la lista de géneros para elegir una cola disponible."
                 : "Return to the genre list to choose an available queue."}
             </p>
-            <Link className="secondary-button" href="/discover/genres">
+            <button
+              className="secondary-button"
+              onClick={() => onNavigateDestination({ type: "genres" })}
+              type="button"
+            >
               <ArrowRight size={14} />
               {spanish ? "Ver géneros" : "View genres"}
-            </Link>
+            </button>
           </section>
         </div>
       );
@@ -4885,10 +4940,14 @@ function DiscoverySections({
               <Play size={15} />
               {spanish ? "Reproducir género" : "Play genre"}
             </button>
-            <Link className="secondary-button" href="/discover/genres">
+            <button
+              className="secondary-button"
+              onClick={() => onNavigateDestination({ type: "genres" })}
+              type="button"
+            >
               <ListMusic size={14} />
               {spanish ? "Todos los géneros" : "All genres"}
-            </Link>
+            </button>
           </div>
         </section>
 
@@ -5004,7 +5063,10 @@ function DiscoverySections({
                     </button>
                     <button
                       onClick={() =>
-                        router.push(`/discover/genre/${discoveryGenreSlug(genre)}`)
+                        onNavigateDestination({
+                          slug: discoveryGenreSlug(genre),
+                          type: "genre",
+                        })
                       }
                       type="button"
                     >
@@ -6357,6 +6419,7 @@ function DashboardView({
   onPlatformPresenceLinkSaved,
   onPlatformPresenceLinkRemoved,
   onPrimaryPlatformChanged,
+  onNavigateDiscoveryDestination,
   onListeningCredited,
   platformConfig,
   workspacePlayback,
@@ -6395,6 +6458,9 @@ function DashboardView({
     url: string,
     links: SongPlatformLink[],
   ) => void;
+  onNavigateDiscoveryDestination: (
+    destination?: DiscoveryDestination,
+  ) => void;
   onListeningCredited: (
     seconds: number,
     becameValid: boolean,
@@ -6415,6 +6481,7 @@ function DashboardView({
           destination={discoveryDestination}
           externalDiscoverySongs={externalDiscoverySongs}
           locale={locale}
+          onNavigateDestination={onNavigateDiscoveryDestination}
           platformConfig={platformConfig}
           onListeningCredited={onListeningCredited}
           spotlightSongs={spotlightSongs}
@@ -6446,6 +6513,7 @@ function DashboardView({
           destination={discoveryDestination}
           externalDiscoverySongs={externalDiscoverySongs}
           locale={locale}
+          onNavigateDestination={onNavigateDiscoveryDestination}
           platformConfig={platformConfig}
           onListeningCredited={onListeningCredited}
           spotlightSongs={spotlightSongs}
@@ -6520,6 +6588,7 @@ function DashboardView({
         destination={discoveryDestination}
         externalDiscoverySongs={externalDiscoverySongs}
         locale={locale}
+        onNavigateDestination={onNavigateDiscoveryDestination}
         platformConfig={platformConfig}
         onListeningCredited={onListeningCredited}
         spotlightSongs={spotlightSongs}
@@ -8071,6 +8140,8 @@ export function FirstListenApp({
   const [genres] = useState<Genre[]>(genrePreferences);
   const [queueSongs, setQueueSongs] = useState<Song[]>([]);
   const [queueLoading, setQueueLoading] = useState(true);
+  const [workspaceDiscoveryDestination, setWorkspaceDiscoveryDestination] =
+    useState<DiscoveryDestination | undefined>(discoveryDestination);
   const [activeSong, setActiveSong] =
     useState<WorkspacePlayableSong | null>(null);
   const [activeQueue, setWorkspaceActiveQueue] =
@@ -8158,13 +8229,14 @@ export function FirstListenApp({
 
   useEffect(() => {
     setView(initialView);
-  }, [initialView]);
+    setWorkspaceDiscoveryDestination(discoveryDestination);
+  }, [discoveryDestination, initialView]);
 
   useEffect(() => {
     setActiveWorkspacePanel(
-      workspacePanelForRoute(initialView, discoveryDestination),
+      workspacePanelForRoute(view, workspaceDiscoveryDestination),
     );
-  }, [discoveryDestination, initialView]);
+  }, [view, workspaceDiscoveryDestination]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -8885,25 +8957,51 @@ export function FirstListenApp({
     });
   };
 
-  const changeView = (nextView: View) => {
-    setMenuOpen(false);
-    if (nextView === view) {
-      if (nextView === "dashboard" && discoveryDestination) {
-        router.push("/dashboard");
-      }
-      return;
-    }
+  const pushWorkspacePath = useCallback((path: string) => {
     const debug =
       new URLSearchParams(window.location.search).get("debug") === "1";
-    router.push(`/${nextView}${debug ? "?debug=1" : ""}`);
+    const nextPath = `${path}${debug ? "?debug=1" : ""}`;
+    const currentPath = `${window.location.pathname}${window.location.search}`;
+    if (currentPath === nextPath) return;
+    window.history.pushState({ firstListenWorkspace: true }, "", nextPath);
+  }, []);
+
+  const changeDiscoveryDestination = useCallback(
+    (destination?: DiscoveryDestination) => {
+      setMenuOpen(false);
+      setView("dashboard");
+      setWorkspaceDiscoveryDestination(destination);
+      pushWorkspacePath(workspacePathForDiscoveryDestination(destination));
+    },
+    [pushWorkspacePath],
+  );
+
+  const changeView = (nextView: View) => {
+    setMenuOpen(false);
+    setView(nextView);
+    setWorkspaceDiscoveryDestination(undefined);
+    pushWorkspacePath(workspacePathForView(nextView));
   };
+
+  useEffect(() => {
+    const syncWorkspaceRoute = () => {
+      const route = workspaceRouteFromPath(window.location.pathname);
+      if (!route) return;
+      setMenuOpen(false);
+      setView(route.view);
+      setWorkspaceDiscoveryDestination(route.destination);
+    };
+
+    window.addEventListener("popstate", syncWorkspaceRoute);
+    return () => window.removeEventListener("popstate", syncWorkspaceRoute);
+  }, []);
 
   const viewContent = (() => {
     if (view === "dashboard") {
       return (
         <DashboardView
           copy={copy}
-          discoveryDestination={discoveryDestination}
+          discoveryDestination={workspaceDiscoveryDestination}
           founder={founder}
           locale={locale}
           listeningBank={listeningBank}
@@ -8928,6 +9026,7 @@ export function FirstListenApp({
           onPlatformPresenceLinkRemoved={handlePlatformPresenceLinkRemoved}
           onPlatformPresenceLinkSaved={handlePlatformPresenceLinkSaved}
           onPrimaryPlatformChanged={handlePrimaryPlatformChanged}
+          onNavigateDiscoveryDestination={changeDiscoveryDestination}
           onListeningCredited={handleListeningCredited}
           platformConfig={platformConfig}
           workspacePlayback={workspacePlaybackController}
@@ -8981,6 +9080,7 @@ export function FirstListenApp({
         autoPlayNextSong={autoPlayNextSong}
         onAutoPlayChange={(enabled) => void changeAutoPlayNextSong(enabled)}
         platformConfig={platformConfig}
+        onNavigateDiscoveryDestination={changeDiscoveryDestination}
         workspacePlayback={workspacePlaybackController}
       />
     );
