@@ -3733,16 +3733,36 @@ function mergeDiscoverySongs(...groups: DiscoverySong[][]) {
   return Array.from(map.values());
 }
 
+const externalDiscoveryFallbackFeedKinds = new Set([
+  "external_song",
+  "external_artist",
+  "trending_external",
+]);
+
 function isInternalDiscoverySong(song: DiscoverySong) {
-  return isQueuePlayableDiscoverySong(song);
+  return isInternalReplayPrioritySong(song);
 }
 
 function isQueuePlayableDiscoverySong(song: DiscoverySong) {
   return Boolean(getProviderEmbed(song.link, song.platform, undefined, true));
 }
 
-function filterQueuePlayableDiscoverySongs(songs: DiscoverySong[]) {
-  return songs.filter(isQueuePlayableDiscoverySong);
+function isExternalDiscoveryFallbackSong(song: DiscoverySong) {
+  return (
+    isExternalPlatform(song.platform) ||
+    externalDiscoveryFallbackFeedKinds.has(song.feedKind ?? "")
+  );
+}
+
+function isInternalReplayPrioritySong(song: DiscoverySong) {
+  return (
+    isQueuePlayableDiscoverySong(song) &&
+    !isExternalDiscoveryFallbackSong(song)
+  );
+}
+
+function filterInternalReplayPrioritySongs(songs: DiscoverySong[]) {
+  return songs.filter(isInternalReplayPrioritySong);
 }
 
 function hasExternalDiscoveryDestination(song: DiscoverySong) {
@@ -3916,7 +3936,7 @@ function rankContinuousInternalReplayQueue(
     underexposedBoost?: number;
   } = {},
 ) {
-  const playableSongs = filterQueuePlayableDiscoverySongs(songs);
+  const playableSongs = filterInternalReplayPrioritySongs(songs);
   if (!playableSongs.length) return [];
 
   const now = Date.now();
@@ -4634,16 +4654,16 @@ function DiscoverySections({
   const allDiscoverySongs = useMemo(
     () =>
       mergeDiscoverySongs(
-        spotlightSongs,
-        topTenSongs,
         externalDiscoverySongs,
+        topTenSongs,
+        spotlightSongs,
       ),
     [externalDiscoverySongs, spotlightSongs, topTenSongs],
   );
   const catalogLimit = Math.max(1, allDiscoverySongs.length);
   const internalPlaybackCatalog = useMemo(
     () =>
-      [...allDiscoverySongs.filter(isQueuePlayableDiscoverySong)].sort(
+      [...filterInternalReplayPrioritySongs(allDiscoverySongs)].sort(
         (left, right) =>
           exposureScore(left) - exposureScore(right) ||
           trendScore(right) - trendScore(left),
@@ -4661,7 +4681,7 @@ function DiscoverySections({
   const topTenQueueSongs = useMemo(
     () =>
       visibleTopTenSongs
-        .filter(isQueuePlayableDiscoverySong)
+        .filter(isInternalReplayPrioritySong)
         .slice(0, limits.topTenCount),
     [limits.topTenCount, visibleTopTenSongs],
   );
@@ -4689,7 +4709,7 @@ function DiscoverySections({
     );
   }, [allDiscoverySongs, limits.trendingCount]);
   const trendingQueueSongs = useMemo(() => {
-    const playableSongs = filterQueuePlayableDiscoverySongs(allDiscoverySongs);
+    const playableSongs = filterInternalReplayPrioritySongs(allDiscoverySongs);
     const explicitTrending = playableSongs.filter(
       (song) => song.feedKind === "trending_external",
     );
@@ -4711,7 +4731,7 @@ function DiscoverySections({
   const newestQueueSongs = useMemo(
     () =>
       sortDiscoverySongs(
-        filterQueuePlayableDiscoverySongs(allDiscoverySongs),
+        filterInternalReplayPrioritySongs(allDiscoverySongs),
         (left, right) => submittedTime(right) - submittedTime(left),
         limits.newReleaseCount,
       ),
@@ -4740,7 +4760,7 @@ function DiscoverySections({
   const mostListenedQueueSongs = useMemo(
     () =>
       sortDiscoverySongs(
-        filterQueuePlayableDiscoverySongs(allDiscoverySongs),
+        filterInternalReplayPrioritySongs(allDiscoverySongs),
         (left, right) =>
           right.totalListeningSeconds - left.totalListeningSeconds ||
           right.completionRate - left.completionRate,
@@ -4808,15 +4828,15 @@ function DiscoverySections({
   const continuousDiscoverySongs = useMemo(
     () =>
       mergeDiscoverySongs(
-        visibleSpotlightSongs.filter(isQueuePlayableDiscoverySong),
+        visibleSpotlightSongs.filter(isInternalReplayPrioritySong),
         topTenQueueSongs,
         newestQueueSongs,
         trendingQueueSongs,
         mostListenedQueueSongs,
-        internalPlaybackSongs.filter(isQueuePlayableDiscoverySong),
+        internalPlaybackSongs.filter(isInternalReplayPrioritySong),
         internalPlaybackCatalog,
         randomQueueSongs,
-      ).filter(isQueuePlayableDiscoverySong),
+      ).filter(isInternalReplayPrioritySong),
     [
       internalPlaybackSongs,
       internalPlaybackCatalog,
@@ -4877,7 +4897,7 @@ function DiscoverySections({
       preserveOrder?: boolean;
       preferredSongId?: string;
     }) => {
-      const playableInputSongs = filterQueuePlayableDiscoverySongs(songs);
+      const playableInputSongs = filterInternalReplayPrioritySongs(songs);
       if (!playableInputSongs.length) return;
       let queueSongs = preserveOrder
         ? [...playableInputSongs]
@@ -4952,8 +4972,10 @@ function DiscoverySections({
       replaySongs.unshift(firstSong);
     }
     const queuedIds = new Set(queue.songs.map((song) => song.id));
-    const unplayedContinuousSongs = continuousDiscoverySongs.filter(
-      (song) => !queuedIds.has(song.id),
+    const unplayedContinuousSongs = rankContinuousInternalReplayQueue(
+      continuousDiscoverySongs.filter((song) => !queuedIds.has(song.id)),
+      heardHistory,
+      queueRankOptions,
     );
     const continuousReplaySongs = rankContinuousInternalReplayQueue(
       continuousDiscoverySongs,
@@ -4974,8 +4996,8 @@ function DiscoverySections({
     }
     const nextSongs =
       nextIndex < queue.songs.length
-        ? filterQueuePlayableDiscoverySongs(queue.songs)
-        : filterQueuePlayableDiscoverySongs(
+        ? filterInternalReplayPrioritySongs(queue.songs)
+        : filterInternalReplayPrioritySongs(
             replaySongs.length ? replaySongs : queue.songs,
           );
     if (!nextSongs.length) {
@@ -4991,7 +5013,7 @@ function DiscoverySections({
             ...queue,
             currentIndex: safeNextIndex,
             songs: nextSongs,
-            sourceSongs: filterQueuePlayableDiscoverySongs(
+            sourceSongs: filterInternalReplayPrioritySongs(
               queue.sourceSongs,
             ),
           }
@@ -5009,8 +5031,8 @@ function DiscoverySections({
             cycle: queue.cycle + 1,
             songs: nextSongs,
             sourceSongs: shouldContinueDiscovery
-              ? filterQueuePlayableDiscoverySongs(continuousDiscoverySongs)
-              : filterQueuePlayableDiscoverySongs(queue.sourceSongs),
+              ? filterInternalReplayPrioritySongs(continuousDiscoverySongs)
+              : filterInternalReplayPrioritySongs(queue.sourceSongs),
             title: shouldContinueDiscovery
               ? spanish
                 ? "Descubrimiento continuo"
@@ -5070,12 +5092,12 @@ function DiscoverySections({
       selectedSong: DiscoverySong;
       preserveOrder?: boolean;
     }) => {
-      if (!isQueuePlayableDiscoverySong(selectedSong)) {
+      if (!isInternalReplayPrioritySong(selectedSong)) {
         toggleDiscoveryCard(cardKey, selectedSong);
         return;
       }
 
-      const playableSongs = songs.filter(isQueuePlayableDiscoverySong);
+      const playableSongs = filterInternalReplayPrioritySongs(songs);
       const queueSongs = playableSongs.some(
         (song) => song.id === selectedSong.id,
       )
@@ -6137,9 +6159,9 @@ function ExpandedDiscoverySections({
   const allDiscoverySongs = useMemo(
     () =>
       mergeDiscoverySongs(
-        spotlightSongs,
-        topTenSongs,
         externalDiscoverySongs,
+        topTenSongs,
+        spotlightSongs,
       ),
     [externalDiscoverySongs, spotlightSongs, topTenSongs],
   );
@@ -6208,7 +6230,7 @@ function ExpandedDiscoverySections({
   );
   const genreSections = useMemo(() => {
     const grouped = new Map<string, DiscoverySong[]>();
-    for (const song of allDiscoverySongs) {
+    for (const song of internalPlaybackSongs) {
       const genre = song.genre || "Other";
       grouped.set(genre, [...(grouped.get(genre) ?? []), song]);
     }
@@ -6242,11 +6264,11 @@ function ExpandedDiscoverySections({
         ),
       }))
       .filter((section) => section.songs.length > 0);
-  }, [allDiscoverySongs]);
+  }, [internalPlaybackSongs]);
   const randomCandidate =
-    randomSong && allDiscoverySongs.some((song) => song.id === randomSong.id)
+    randomSong && internalPlaybackSongs.some((song) => song.id === randomSong.id)
       ? randomSong
-      : smartDiscoveryPick(allDiscoverySongs, heardHistory);
+      : smartDiscoveryPick(internalPlaybackSongs, heardHistory);
 
   useEffect(() => {
     setHeardHistory(readDiscoveryHeardHistory());
@@ -6278,7 +6300,7 @@ function ExpandedDiscoverySections({
   );
 
   const playRandomSong = () => {
-    const selected = smartDiscoveryPick(allDiscoverySongs, heardHistory);
+    const selected = smartDiscoveryPick(internalPlaybackSongs, heardHistory);
     if (!selected) return;
     setRandomSong(selected);
     openDiscoveryCard(`random-${selected.id}`, selected);
