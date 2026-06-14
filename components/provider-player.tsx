@@ -705,6 +705,56 @@ export function ProviderPlayer({
     [clearAutoplayRetryTimers, normalizeTelemetrySnapshot, playbackInstanceId],
   );
 
+  const readYouTubeTelemetry = useCallback(
+    (target: YouTubePlayer | null = youtubePlayerRef.current) => {
+      if (!target) return false;
+      try {
+        const nextState = mapYouTubeState(target.getPlayerState());
+        const nextCurrentTime = target.getCurrentTime();
+        const nextDuration = target.getDuration();
+        const nextMuted = target.isMuted();
+        const nextVolume = target.getVolume();
+
+        setMuted(nextMuted);
+        setVolume(nextVolume);
+        emitTelemetry(
+          nextState,
+          nextCurrentTime,
+          nextDuration,
+          nextMuted,
+          nextVolume,
+          true,
+        );
+
+        const logKey = `${providerLogRef.current.platform}:${latestYouTubeTargetRef.current ?? iframeSrc ?? ""}`;
+        const now = Date.now();
+        if (
+          nextState === "playing" &&
+          debugEnabledRef.current &&
+          (lastActivePlaybackLogRef.current.target !== logKey ||
+            now - lastActivePlaybackLogRef.current.at > 30000)
+        ) {
+          lastActivePlaybackLogRef.current = { at: now, target: logKey };
+          console.info("[First Listen player] Provider reports active playback", {
+            audioOutputVerified: false,
+            currentTime: nextCurrentTime,
+            duration: nextDuration,
+            embedUrl: iframeSrc,
+            muted: nextMuted,
+            platform: providerLogRef.current.platform,
+            title: providerLogRef.current.title,
+            volume: nextVolume,
+          });
+        }
+        return true;
+      } catch (error) {
+        console.warn("[First Listen player] Could not read YouTube telemetry", error);
+        return false;
+      }
+    },
+    [emitTelemetry, iframeSrc],
+  );
+
   useEffect(() => {
     const mountedAt = timestamp();
     const queryDebug =
@@ -1148,53 +1198,6 @@ export function ProviderPlayer({
 
     const initialLog = providerLogRef.current;
     let disposed = false;
-    let telemetryInterval: number | null = null;
-
-    const refreshTelemetry = (target: YouTubePlayer) => {
-      try {
-        const nextState = mapYouTubeState(target.getPlayerState());
-        const nextCurrentTime = target.getCurrentTime();
-        const nextDuration = target.getDuration();
-        const nextMuted = target.isMuted();
-        const nextVolume = target.getVolume();
-        setPlaybackState(nextState);
-        setCurrentTime(nextCurrentTime);
-        setDuration(nextDuration);
-        setMuted(nextMuted);
-        setVolume(nextVolume);
-        emitTelemetry(
-          nextState,
-          nextCurrentTime,
-          nextDuration,
-          nextMuted,
-          nextVolume,
-          true,
-        );
-
-        const logKey = `${providerLogRef.current.platform}:${latestYouTubeTargetRef.current ?? iframeSrc}`;
-        const now = Date.now();
-        if (
-          nextState === "playing" &&
-          debugEnabledRef.current &&
-          (lastActivePlaybackLogRef.current.target !== logKey ||
-            now - lastActivePlaybackLogRef.current.at > 30000)
-        ) {
-          lastActivePlaybackLogRef.current = { at: now, target: logKey };
-          console.info("[First Listen player] Provider reports active playback", {
-            audioOutputVerified: false,
-            currentTime: nextCurrentTime,
-            duration: nextDuration,
-            embedUrl: iframeSrc,
-            muted: nextMuted,
-            platform: providerLogRef.current.platform,
-            title: providerLogRef.current.title,
-            volume: nextVolume,
-          });
-        }
-      } catch (error) {
-        console.warn("[First Listen player] Could not read YouTube telemetry", error);
-      }
-    };
 
     loadYouTubeApi()
       .then((api) => {
@@ -1222,7 +1225,7 @@ export function ProviderPlayer({
               setProviderReadyAt(readyAt);
               setStatus("ready");
               onReadyRef.current?.();
-              refreshTelemetry(event.target);
+              readYouTubeTelemetry(event.target);
               if (autoPlayRef.current) {
                 scheduleYouTubeAutoplayRetries(
                   event.target,
@@ -1239,12 +1242,8 @@ export function ProviderPlayer({
                 songLoadedAt: initialLog.songLoadedAt,
                 title: initialLog.title,
               });
-              telemetryInterval = window.setInterval(
-                () => refreshTelemetry(event.target),
-                1000,
-              );
             },
-            onStateChange: (event) => refreshTelemetry(event.target),
+            onStateChange: (event) => readYouTubeTelemetry(event.target),
           },
         });
       })
@@ -1270,21 +1269,40 @@ export function ProviderPlayer({
     return () => {
       disposed = true;
       youtubePlayerRef.current = null;
-      if (telemetryInterval !== null) window.clearInterval(telemetryInterval);
       // Do not call player.destroy() here. The YouTube API removes the iframe
       // from the DOM, and React can then crash while reconciling that same node
       // during queue transitions.
     };
   }, [
-    emitTelemetry,
     iframeSrc,
     iframeLoadedAt,
     initializationAttempt,
     loadedEmbedSrc,
     markProviderError,
     playerMountedAt,
+    readYouTubeTelemetry,
     scheduleYouTubeAutoplayRetries,
     youtubeTelemetryActive,
+  ]);
+
+  useEffect(() => {
+    if (
+      !youtubeTelemetryActive ||
+      status !== "ready" ||
+      !youtubePlayerRef.current
+    ) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      readYouTubeTelemetry();
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [
+    readYouTubeTelemetry,
+    status,
+    youtubeTelemetryActive,
+    youtubeTargetKey,
   ]);
 
   useEffect(() => {
