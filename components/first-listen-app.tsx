@@ -993,6 +993,10 @@ function Sidebar({
   founderFree,
   copy,
   unlimitedCredits,
+  adminAccess,
+  ownerAccess,
+  onAdmin,
+  onOwner,
 }: {
   view: View;
   setView: (view: View) => void;
@@ -1001,6 +1005,10 @@ function Sidebar({
   founderFree: boolean;
   copy: Copy;
   unlimitedCredits: boolean;
+  adminAccess: boolean;
+  ownerAccess: boolean;
+  onAdmin: () => void;
+  onOwner: () => void;
 }) {
   return (
     <aside className="sidebar">
@@ -1023,6 +1031,18 @@ function Sidebar({
             </button>
           );
         })}
+        {ownerAccess && (
+          <button onClick={onOwner}>
+            <Gauge size={19} />
+            <span>Owner Control Center</span>
+          </button>
+        )}
+        {adminAccess && (
+          <button onClick={onAdmin}>
+            <ShieldCheck size={19} />
+            <span>Admin Panel</span>
+          </button>
+        )}
       </nav>
 
       <div className="sidebar-bottom">
@@ -9267,6 +9287,10 @@ export function FirstListenApp({
         reviewCount={reviewCount}
         setView={changeView}
         unlimitedCredits={role === "super_admin"}
+        adminAccess={role === "super_admin" || role === "admin"}
+        ownerAccess={role === "super_admin"}
+        onAdmin={() => router.push("/admin")}
+        onOwner={() => router.push("/owner")}
         view={view}
       />
       <div className="app-main">
