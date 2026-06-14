@@ -1219,7 +1219,7 @@ function WorkspaceQueuePanel({
             <Image
               alt={`${activeSong.title} cover`}
               height={54}
-              src={activeSong.coverUrl}
+              src={safeCoverUrl(activeSong.coverUrl)}
               unoptimized
               width={54}
             />
@@ -1278,7 +1278,7 @@ function WorkspaceQueuePanel({
                 <Image
                   alt={`${song.title} cover`}
                   height={38}
-                  src={song.coverUrl}
+                  src={safeCoverUrl(song.coverUrl)}
                   unoptimized
                   width={38}
                 />
@@ -4808,10 +4808,11 @@ function DiscoverySections({
       preserveOrder?: boolean;
       preferredSongId?: string;
     }) => {
-      if (!songs.length) return;
+      const playableInputSongs = filterQueuePlayableDiscoverySongs(songs);
+      if (!playableInputSongs.length) return;
       let queueSongs = preserveOrder
-        ? [...songs]
-        : rankDiscoveryQueue(songs, heardHistory, queueRankOptions);
+        ? [...playableInputSongs]
+        : rankDiscoveryQueue(playableInputSongs, heardHistory, queueRankOptions);
       if (preferredSongId) {
         const selected = queueSongs.find((song) => song.id === preferredSongId);
         if (selected) {
@@ -4844,7 +4845,7 @@ function DiscoverySections({
         id,
         mode: workspaceQueueModeForDiscoveryId(id),
         songs: queueSongs,
-        sourceSongs: songs,
+        sourceSongs: playableInputSongs,
         title,
       });
       if (firstSong) markSongHeard(firstSong);
@@ -4899,9 +4900,28 @@ function DiscoverySections({
         ),
       ];
     }
-    const nextQueue =
+    const nextSongs =
       nextIndex < activeQueue.songs.length
-        ? { ...activeQueue, currentIndex: nextIndex }
+        ? filterQueuePlayableDiscoverySongs(activeQueue.songs)
+        : filterQueuePlayableDiscoverySongs(
+            replaySongs.length ? replaySongs : activeQueue.songs,
+          );
+    if (!nextSongs.length) {
+      setActiveQueue(null);
+      return;
+    }
+    const safeNextIndex =
+      nextIndex < nextSongs.length ? nextIndex : 0;
+    const nextQueue =
+      nextIndex < nextSongs.length
+        ? {
+            ...activeQueue,
+            currentIndex: safeNextIndex,
+            songs: nextSongs,
+            sourceSongs: filterQueuePlayableDiscoverySongs(
+              activeQueue.sourceSongs,
+            ),
+          }
         : {
             ...activeQueue,
             description: shouldContinueDiscovery
@@ -4914,10 +4934,10 @@ function DiscoverySections({
               : activeQueue.id,
             currentIndex: 0,
             cycle: activeQueue.cycle + 1,
-            songs: replaySongs.length ? replaySongs : activeQueue.songs,
+            songs: nextSongs,
             sourceSongs: shouldContinueDiscovery
-              ? continuousDiscoverySongs
-              : activeQueue.sourceSongs,
+              ? filterQueuePlayableDiscoverySongs(continuousDiscoverySongs)
+              : filterQueuePlayableDiscoverySongs(activeQueue.sourceSongs),
             title: shouldContinueDiscovery
               ? spanish
                 ? "Descubrimiento continuo"

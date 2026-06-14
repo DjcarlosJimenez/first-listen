@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { isExternalPlatform } from "@/lib/content-economy";
+import { safeCoverUrl } from "@/lib/media";
 import { getProviderEmbed } from "@/lib/player";
 import type { Platform } from "@/lib/types";
 
@@ -654,7 +655,23 @@ export function ProviderPlayer({
   useEffect(() => {
     if (!clientOrigin) return;
     if (!embed) {
-      if (externalContent) return;
+      if (externalContent) {
+        setStatus("ready");
+        setPlaybackState("paused");
+        setCurrentTime(0);
+        setDuration(0);
+        setMuted(null);
+        setVolume(null);
+        setShowAutoplayFallback(false);
+        emitTelemetry("paused", 0, 0, null, null, false);
+        console.info("[First Listen player] External provider uses outbound playback", {
+          link,
+          platform,
+          songLoadedAt,
+          title,
+        });
+        return;
+      }
       setStatus("error");
       console.error("[First Listen player] Unsupported or invalid provider URL", {
         link,
@@ -687,6 +704,7 @@ export function ProviderPlayer({
     songLoadedAt,
     title,
     externalContent,
+    emitTelemetry,
   ]);
 
   useEffect(() => {
@@ -1246,7 +1264,7 @@ export function ProviderPlayer({
           fill
           priority
           sizes="(max-width: 760px) 100vw, 420px"
-          src={coverUrl}
+          src={safeCoverUrl(coverUrl)}
           unoptimized
         />
         <div className="external-player-action">
@@ -1334,7 +1352,7 @@ export function ProviderPlayer({
           fill
           priority
           sizes="(max-width: 760px) 100vw, 420px"
-          src={coverUrl}
+          src={safeCoverUrl(coverUrl)}
           unoptimized
         />
       )}
