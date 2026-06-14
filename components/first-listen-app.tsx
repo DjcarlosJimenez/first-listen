@@ -1146,6 +1146,165 @@ function WorkspaceShellTop({
   );
 }
 
+function workspaceQueueModeLabel(mode: WorkspaceQueueMode, locale: InterfaceLocale) {
+  const spanish = locale === "es";
+  if (mode === "review") return spanish ? "Lista de escucha" : "Review queue";
+  if (mode === "genre") return spanish ? "Genero" : "Genre";
+  if (mode === "random") return spanish ? "Aleatorio" : "Random";
+  if (mode === "top10") return "Top 10";
+  return spanish ? "Descubrimiento" : "Discovery";
+}
+
+function WorkspaceQueuePanel({
+  controller,
+  locale,
+}: {
+  controller: WorkspacePlaybackController;
+  locale: InterfaceLocale;
+}) {
+  const spanish = locale === "es";
+  const activeSong = controller.activeSong;
+  const activeQueue = controller.activeQueue;
+  const activeContext = controller.activeContext;
+  const activeControls = controller.activeControls;
+  const currentIndex = activeQueue?.currentIndex ?? 0;
+  const queueTotal = activeQueue?.total ?? (activeSong ? 1 : 0);
+  const remainingSongs = activeQueue
+    ? Math.max(0, activeQueue.total - activeQueue.currentIndex - 1)
+    : 0;
+  const queuePosition =
+    activeQueue && queueTotal > 0
+      ? `${activeQueue.currentIndex + 1}/${queueTotal}`
+      : activeSong
+        ? "1/1"
+        : "-";
+  const upcomingSongs =
+    activeQueue?.songs.slice(activeQueue.currentIndex + 1, currentIndex + 6) ??
+    [];
+  const sourceLabel =
+    activeQueue?.title ??
+    activeContext?.label ??
+    (spanish ? "Descubrimiento continuo" : "Continuous discovery");
+  const modeLabel = workspaceQueueModeLabel(
+    activeQueue?.mode ?? controller.queueMode,
+    locale,
+  );
+  const autoPlayOn = activeControls?.autoPlayEnabled !== false;
+
+  return (
+    <section className="workspace-station-panel" aria-live="polite">
+      <div className="workspace-station-heading">
+        <span className="eyebrow">
+          <Radio size={13} />
+          {spanish ? "Estacion continua" : "Continuous station"}
+        </span>
+        <strong>{sourceLabel}</strong>
+        <small>
+          {autoPlayOn
+            ? spanish
+              ? "AutoPlay activo"
+              : "AutoPlay on"
+            : spanish
+              ? "AutoPlay pausado"
+              : "AutoPlay paused"}
+        </small>
+      </div>
+
+      <div className="workspace-now-playing-card">
+        <span className="workspace-station-label">
+          {spanish ? "Sonando ahora" : "Now Playing"}
+        </span>
+        {activeSong ? (
+          <div className="workspace-station-song">
+            <Image
+              alt={`${activeSong.title} cover`}
+              height={54}
+              src={activeSong.coverUrl}
+              unoptimized
+              width={54}
+            />
+            <span>
+              <strong>{activeSong.title}</strong>
+              <small>{activeSong.artist}</small>
+            </span>
+          </div>
+        ) : (
+          <div className="workspace-station-empty">
+            <Play size={18} />
+            <span>
+              <strong>
+                {spanish ? "Lista para descubrir musica" : "Ready to discover"}
+              </strong>
+              <small>
+                {spanish
+                  ? "Elige una cancion para iniciar la estacion."
+                  : "Choose a song to start the station."}
+              </small>
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="workspace-station-metrics">
+        <div>
+          <span>{spanish ? "Posicion" : "Position"}</span>
+          <strong>{queuePosition}</strong>
+        </div>
+        <div>
+          <span>{spanish ? "Restantes" : "Remaining"}</span>
+          <strong>{remainingSongs}</strong>
+        </div>
+        <div>
+          <span>{spanish ? "Fuente" : "Source"}</span>
+          <strong>{modeLabel}</strong>
+        </div>
+      </div>
+
+      <div className="workspace-up-next-panel">
+        <div className="workspace-up-next-heading">
+          <span>{spanish ? "Sigue" : "Next"}</span>
+          <small>
+            {remainingSongs > upcomingSongs.length
+              ? `+${remainingSongs - upcomingSongs.length}`
+              : spanish
+                ? "Cola visible"
+                : "Visible queue"}
+          </small>
+        </div>
+        {upcomingSongs.length ? (
+          <ol>
+            {upcomingSongs.map((song, index) => (
+              <li key={`${song.id}-${index}`}>
+                <Image
+                  alt={`${song.title} cover`}
+                  height={38}
+                  src={song.coverUrl}
+                  unoptimized
+                  width={38}
+                />
+                <span>
+                  <strong>{song.title}</strong>
+                  <small>{song.artist}</small>
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>
+            {activeSong
+              ? spanish
+                ? "First Listen buscara mas canciones reproducibles para mantener la estacion activa."
+                : "First Listen will look for more playable songs to keep the station moving."
+              : spanish
+                ? "La cola aparecera aqui cuando inicies una cancion."
+                : "Your queue will appear here once you start a song."}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function Sidebar({
   view,
   setView,
@@ -9913,10 +10072,12 @@ export function FirstListenApp({
         />
         <div className="workspace-shell-grid">
           <section className="workspace-center-panel">{viewContent}</section>
-          <aside
-            aria-hidden="true"
-            className="workspace-right-panel-placeholder"
-          />
+          <aside className="workspace-right-panel">
+            <WorkspaceQueuePanel
+              controller={workspacePlaybackController}
+              locale={locale}
+            />
+          </aside>
         </div>
         <WorkspacePlayerHost
           externalRedirectNoticeDisabled={externalRedirectNoticeDisabled}

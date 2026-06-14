@@ -959,11 +959,171 @@ button {
 
 .workspace-shell-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  margin: 0 auto;
+  max-width: 1500px;
+  padding: 0 42px 70px;
 }
 
 .workspace-center-panel {
   min-width: 0;
+}
+
+.workspace-center-panel > .content,
+.workspace-center-panel > .account-page-embedded {
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.workspace-center-panel > .dashboard-discovery {
+  margin-top: 12px;
+}
+
+.workspace-right-panel {
+  min-width: 0;
+  padding-top: 12px;
+  position: sticky;
+  top: 18px;
+  z-index: 4;
+}
+
+.workspace-station-panel {
+  background:
+    linear-gradient(180deg, rgba(200, 255, 79, 0.08), transparent 32%),
+    var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--soft-shadow);
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.workspace-station-heading {
+  display: grid;
+  gap: 5px;
+}
+
+.workspace-station-heading strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.workspace-station-heading small,
+.workspace-station-label,
+.workspace-up-next-heading small,
+.workspace-station-metrics span,
+.workspace-station-song small,
+.workspace-station-empty small,
+.workspace-up-next-panel small {
+  color: var(--muted-strong);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.workspace-station-label,
+.workspace-station-metrics span,
+.workspace-up-next-heading span {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.workspace-now-playing-card,
+.workspace-up-next-panel {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.workspace-station-song,
+.workspace-station-empty,
+.workspace-up-next-panel li {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.workspace-station-song img,
+.workspace-up-next-panel img {
+  border-radius: 12px;
+  flex: 0 0 auto;
+  object-fit: cover;
+}
+
+.workspace-station-song span,
+.workspace-station-empty span,
+.workspace-up-next-panel li span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.workspace-station-song strong,
+.workspace-station-empty strong,
+.workspace-up-next-panel li strong {
+  color: var(--ink);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-station-empty svg {
+  color: var(--acid);
+}
+
+.workspace-station-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workspace-station-metrics div {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.workspace-station-metrics strong {
+  color: var(--acid);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-up-next-heading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.workspace-up-next-panel ol {
+  display: grid;
+  gap: 9px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.workspace-up-next-panel p {
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+  margin: 0;
 }
 
 .workspace-queue-overview {
@@ -9246,6 +9406,32 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
     grid-template-columns: minmax(180px, 0.7fr) minmax(260px, 1.3fr);
   }
 
+  .workspace-shell-grid {
+    grid-template-columns: 1fr;
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .workspace-right-panel {
+    order: -1;
+    padding-top: 10px;
+    position: static;
+  }
+
+  .workspace-station-panel {
+    grid-template-columns: minmax(180px, 0.65fr) minmax(240px, 1fr);
+  }
+
+  .workspace-station-heading,
+  .workspace-station-metrics {
+    grid-column: 1;
+  }
+
+  .workspace-now-playing-card,
+  .workspace-up-next-panel {
+    grid-column: 2;
+  }
+
   .review-layout,
   .review-complete-wrap,
   .submit-layout {
@@ -9328,9 +9514,26 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
     padding-right: 20px;
   }
 
+  .workspace-shell-grid {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
   .workspace-player-panel,
   .workspace-playback-controls,
   .workspace-reward-status-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-station-panel,
+  .workspace-station-heading,
+  .workspace-station-metrics,
+  .workspace-now-playing-card,
+  .workspace-up-next-panel {
+    grid-column: auto;
+  }
+
+  .workspace-station-panel {
     grid-template-columns: 1fr;
   }
 
