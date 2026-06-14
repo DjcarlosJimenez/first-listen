@@ -673,11 +673,20 @@ button {
 }
 
 .workspace-top-area {
+  background: linear-gradient(
+    180deg,
+    var(--bg) 0%,
+    color-mix(in srgb, var(--bg) 92%, transparent) 100%
+  );
+  backdrop-filter: blur(16px);
   display: grid;
   gap: 14px;
   margin: 22px auto 0;
   max-width: 1500px;
   padding: 0 42px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 
 .workspace-player-panel {
@@ -692,9 +701,6 @@ button {
   gap: 18px;
   grid-template-columns: minmax(220px, 0.7fr) minmax(300px, 1.3fr);
   padding: 16px;
-  position: sticky;
-  top: 0;
-  z-index: 30;
 }
 
 .workspace-player-copy {
