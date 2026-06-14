@@ -51,6 +51,13 @@ type YouTubePlayer = {
   getPlayerState: () => number;
   getVolume: () => number;
   isMuted: () => boolean;
+  loadPlaylist: (options: {
+    index?: number;
+    list: string;
+    listType?: "playlist";
+    startSeconds?: number;
+  }) => void;
+  loadVideoById: (videoId: string) => void;
   pauseVideo: () => void;
   playVideo: () => void;
 };
@@ -311,6 +318,10 @@ function timestamp() {
   return new Date().toISOString();
 }
 
+function isYouTubePlaybackPlatform(platform: Platform) {
+  return platform === "YouTube" || platform === "YouTube Music";
+}
+
 export function ProviderPlayer({
   artist,
   coverUrl,
@@ -366,6 +377,7 @@ export function ProviderPlayer({
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState<boolean | null>(null);
   const [volume, setVolume] = useState<number | null>(null);
+  const [youtubeFrameSrc, setYoutubeFrameSrc] = useState<string | null>(null);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [showAutoplayFallback, setShowAutoplayFallback] = useState(false);
   const [showExternalConfirmation, setShowExternalConfirmation] =
@@ -373,10 +385,37 @@ export function ProviderPlayer({
   const [disableFutureWarnings, setDisableFutureWarnings] = useState(false);
   const onTelemetryRef = useRef(onTelemetry);
   const onReadyRef = useRef(onReady);
+  const autoPlayRef = useRef(autoPlay);
   const lastInteractionAtRef = useRef(Date.now());
   const previousPlaybackStateRef = useRef<PlaybackState>("unknown");
+  const previousPlaybackTargetRef = useRef<{
+    link: string;
+    platform: Platform;
+  } | null>(null);
+  const youtubePlaybackTargetRef = useRef<string | null>(null);
+  const latestYouTubeTargetRef = useRef<string | null>(null);
+  const providerLogRef = useRef({
+    embedGeneratedAt: null as string | null,
+    link,
+    platform,
+    songLoadedAt,
+    title,
+  });
   const spanish = locale === "es";
   const externalContent = isExternalPlatform(platform);
+  const youtubeTelemetryActive = embed?.telemetry === "youtube_iframe_api";
+  const iframeSrc =
+    youtubeTelemetryActive
+      ? youtubeFrameSrc ?? embed.src
+      : embed?.src ?? null;
+  const youtubeTargetKey =
+    youtubeTelemetryActive
+      ? embed.youtubeVideoId
+        ? `video:${embed.youtubeVideoId}`
+        : embed.youtubePlaylistId
+          ? `playlist:${embed.youtubePlaylistId}`
+          : null
+      : null;
 
   useEffect(() => {
     onTelemetryRef.current = onTelemetry;
@@ -385,6 +424,24 @@ export function ProviderPlayer({
   useEffect(() => {
     onReadyRef.current = onReady;
   }, [onReady]);
+
+  useEffect(() => {
+    autoPlayRef.current = autoPlay;
+  }, [autoPlay]);
+
+  useEffect(() => {
+    latestYouTubeTargetRef.current = youtubeTargetKey;
+  }, [youtubeTargetKey]);
+
+  useEffect(() => {
+    providerLogRef.current = {
+      embedGeneratedAt: embedResult.generatedAt,
+      link,
+      platform,
+      songLoadedAt,
+      title,
+    };
+  }, [embedResult.generatedAt, link, platform, songLoadedAt, title]);
 
   useEffect(() => {
     const markInteraction = () => {
@@ -463,6 +520,24 @@ export function ProviderPlayer({
   }, [songLoadedAt, title]);
 
   useEffect(() => {
+    const previous = previousPlaybackTargetRef.current;
+    const keepExistingYouTubePlayer =
+      Boolean(youtubePlayerRef.current) &&
+      previous !== null &&
+      isYouTubePlaybackPlatform(previous.platform) &&
+      isYouTubePlaybackPlatform(platform);
+
+    previousPlaybackTargetRef.current = { link, platform };
+
+    if (keepExistingYouTubePlayer) {
+      setStatus("ready");
+      setPlaybackState("buffering");
+      setCurrentTime(0);
+      setDuration(0);
+      setShowAutoplayFallback(false);
+      return;
+    }
+
     setStatus("loading");
     setPlaybackState("unknown");
     setCurrentTime(0);
@@ -474,7 +549,17 @@ export function ProviderPlayer({
     setProviderReadyAt(null);
     setInitializationAttempt(1);
     setShowAutoplayFallback(false);
+    setYoutubeFrameSrc(null);
   }, [link, platform]);
+
+  useEffect(() => {
+    if (!embed || embed.telemetry !== "youtube_iframe_api") {
+      setYoutubeFrameSrc(null);
+      youtubePlaybackTargetRef.current = null;
+      return;
+    }
+    setYoutubeFrameSrc((current) => current ?? embed.src);
+  }, [embed]);
 
   useEffect(() => {
     if (!autoPlay || status !== "ready" || playbackState === "playing") {
@@ -751,14 +836,15 @@ export function ProviderPlayer({
 
   useEffect(() => {
     if (
-      !embed ||
-      embed.telemetry !== "youtube_iframe_api" ||
-      loadedEmbedSrc !== embed.src ||
+      !youtubeTelemetryActive ||
+      !iframeSrc ||
+      loadedEmbedSrc !== iframeSrc ||
       !iframeRef.current
     ) {
       return;
     }
 
+    const initialLog = providerLogRef.current;
     let disposed = false;
     let player: YouTubePlayer | null = null;
     let telemetryInterval: number | null = null;
@@ -789,10 +875,10 @@ export function ProviderPlayer({
             audioOutputVerified: false,
             currentTime: nextCurrentTime,
             duration: nextDuration,
-            embedUrl: embed.src,
+            embedUrl: iframeSrc,
             muted: nextMuted,
-            platform,
-            title,
+            platform: providerLogRef.current.platform,
+            title: providerLogRef.current.title,
             volume: nextVolume,
           });
         }
@@ -811,22 +897,24 @@ export function ProviderPlayer({
               setStatus("error");
               console.error("[First Listen player] YouTube API error", {
                 code: event.data,
-                embedUrl: embed.src,
+                embedUrl: iframeSrc,
                 initializationAttempt,
-                link,
-                platform,
-                title,
+                link: providerLogRef.current.link,
+                platform: providerLogRef.current.platform,
+                title: providerLogRef.current.title,
               });
             },
             onReady: (event) => {
               if (disposed) return;
               youtubePlayerRef.current = event.target;
+              youtubePlaybackTargetRef.current =
+                latestYouTubeTargetRef.current;
               const readyAt = timestamp();
               setProviderReadyAt(readyAt);
               setStatus("ready");
               onReadyRef.current?.();
               refreshTelemetry(event.target);
-              if (autoPlay) {
+              if (autoPlayRef.current) {
                 try {
                   event.target.playVideo();
                 } catch (error) {
@@ -837,14 +925,14 @@ export function ProviderPlayer({
                 }
               }
               console.info("[First Listen player] Provider ready", {
-                embedGeneratedAt: embedResult.generatedAt,
-                embedUrl: embed.src,
+                embedGeneratedAt: initialLog.embedGeneratedAt,
+                embedUrl: iframeSrc,
                 iframeLoadedAt,
                 initializationAttempt,
                 playerMountedAt,
                 providerReadyAt: readyAt,
-                songLoadedAt,
-                title,
+                songLoadedAt: initialLog.songLoadedAt,
+                title: initialLog.title,
               });
               telemetryInterval = window.setInterval(
                 () => refreshTelemetry(event.target),
@@ -858,12 +946,12 @@ export function ProviderPlayer({
       .catch((error) => {
         if (disposed) return;
         console.error("[First Listen player] YouTube telemetry unavailable", {
-          embedUrl: embed.src,
+          embedUrl: iframeSrc,
           error,
           initializationAttempt,
-          link,
-          platform,
-          title,
+          link: providerLogRef.current.link,
+          platform: providerLogRef.current.platform,
+          title: providerLogRef.current.title,
         });
         if (initializationAttempt < MAX_INITIALIZATION_ATTEMPTS) {
           setLoadedEmbedSrc(null);
@@ -885,18 +973,78 @@ export function ProviderPlayer({
       }
     };
   }, [
-    autoPlay,
-    embed,
-    embedResult.generatedAt,
     emitTelemetry,
+    iframeSrc,
     iframeLoadedAt,
     initializationAttempt,
-    link,
     loadedEmbedSrc,
-    platform,
     playerMountedAt,
-    songLoadedAt,
+    youtubeTelemetryActive,
+  ]);
+
+  useEffect(() => {
+    if (
+      !embed ||
+      embed.telemetry !== "youtube_iframe_api" ||
+      status !== "ready" ||
+      !youtubePlayerRef.current ||
+      !youtubeTargetKey
+    ) {
+      return;
+    }
+
+    if (youtubePlaybackTargetRef.current === youtubeTargetKey) return;
+
+    const player = youtubePlayerRef.current;
+    youtubePlaybackTargetRef.current = youtubeTargetKey;
+    setShowAutoplayFallback(false);
+    setPlaybackState("buffering");
+    setCurrentTime(0);
+    setDuration(0);
+    emitTelemetry("buffering", 0, 0, muted, volume, true);
+
+    try {
+      if (embed.youtubeVideoId) {
+        player.loadVideoById(embed.youtubeVideoId);
+      } else if (embed.youtubePlaylistId) {
+        player.loadPlaylist({
+          index: 0,
+          list: embed.youtubePlaylistId,
+          listType: "playlist",
+          startSeconds: 0,
+        });
+      }
+
+      if (autoPlay) {
+        player.playVideo();
+        window.setTimeout(() => youtubePlayerRef.current?.playVideo(), 350);
+      }
+
+      console.info("[First Listen player] Loaded next YouTube item in-place", {
+        autoPlay,
+        platform,
+        title,
+        youtubeTargetKey,
+      });
+    } catch (error) {
+      console.info("[First Listen player] YouTube in-place handoff deferred", {
+        error,
+        platform,
+        title,
+        youtubeTargetKey,
+      });
+      if (autoPlay) setShowAutoplayFallback(true);
+    }
+  }, [
+    autoPlay,
+    embed,
+    emitTelemetry,
+    muted,
+    platform,
+    status,
     title,
+    volume,
+    youtubeTargetKey,
   ]);
 
   useEffect(() => {
@@ -1018,12 +1166,12 @@ export function ProviderPlayer({
   }, [autoPlay, embed, emitTelemetry, loadedEmbedSrc, platform, title]);
 
   const playerLoaded = () => {
-    if (!embed) return;
+    if (!embed || !iframeSrc) return;
     const loadedAt = timestamp();
-    setLoadedEmbedSrc(embed.src);
+    setLoadedEmbedSrc(iframeSrc);
     setIframeLoadedAt(loadedAt);
     console.info("[First Listen player] Provider iframe loaded", {
-      embedUrl: embed.src,
+      embedUrl: iframeSrc,
       iframeLoadedAt: loadedAt,
       initializationAttempt,
       platform,
@@ -1199,16 +1347,16 @@ export function ProviderPlayer({
         </div>
       )}
 
-      {embed && embed.telemetry !== "spotify_iframe_api" && (
+      {embed && iframeSrc && embed.telemetry !== "spotify_iframe_api" && (
         <iframe
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           className={status === "ready" ? "ready" : ""}
-          key={`${embed.src}:${initializationAttempt}`}
+          key={`${iframeSrc}:${initializationAttempt}`}
           onError={playerFailed}
           onLoad={playerLoaded}
           ref={iframeRef}
           referrerPolicy="strict-origin-when-cross-origin"
-          src={embed.src}
+          src={iframeSrc}
           title={`${title} by ${artist} - ${embed.title}`}
         />
       )}

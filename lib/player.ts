@@ -10,6 +10,8 @@ export type ProviderEmbed = {
     | "spotify_iframe_api"
     | "soundcloud_widget_api"
     | "apple_embed_only";
+  youtubePlaylistId?: string | null;
+  youtubeVideoId?: string | null;
 };
 
 function youtubeVideoId(url: URL) {
@@ -67,6 +69,8 @@ export function getProviderEmbed(
           : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId ?? "")}?${params}`,
         title: `${platform} player`,
         telemetry: "youtube_iframe_api",
+        youtubePlaylistId: playlistId,
+        youtubeVideoId: videoId,
       };
     }
 

@@ -782,7 +782,7 @@ function WorkspacePlayerHost({
       {playback && hostElement
         ? createPortal(
             <ProviderPlayer
-              key={`${playback.context.source}:${playback.song.id}`}
+              key={playback.context.source}
               artist={playback.song.artist}
               autoPlay={playback.autoPlay ?? false}
               coverUrl={playback.song.coverUrl}
