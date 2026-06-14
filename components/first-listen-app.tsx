@@ -855,10 +855,17 @@ function WorkspaceShellTop({
   const activeControls = controller.activeControls;
   const activeQueue = controller.activeQueue;
   const activeTelemetry = controller.activeTelemetry;
-  const liveSessionSeconds =
-    activeSong && activeTelemetry?.playbackState === "playing"
+  const telemetryCurrentSeconds =
+    activeSong && activeTelemetry
       ? Math.max(0, activeTelemetry.currentTime)
       : 0;
+  const telemetryDurationSeconds =
+    activeSong && activeTelemetry
+      ? Math.max(0, activeTelemetry.duration)
+      : 0;
+  const playbackIsActive = activeTelemetry?.playbackState === "playing";
+  const liveSessionSeconds =
+    activeSong && playbackIsActive ? telemetryCurrentSeconds : 0;
   const visibleBankSeconds = status.bankSeconds + liveSessionSeconds;
   const exchangeSeconds = Math.max(1, status.minutesPerCredit * 60);
   const ready = status.rewardsEnabled && status.availableRewardCredits > 0;
@@ -873,10 +880,13 @@ function WorkspaceShellTop({
     todaySupport.listeningSeconds,
     status.todaySeconds,
   );
-  const visiblePlayedSeconds =
-    activeSong && activeTelemetry
-      ? Math.max(0, activeTelemetry.currentTime)
-      : timePlayedToday;
+  const visiblePlayedSeconds = timePlayedToday + liveSessionSeconds;
+  const currentProgressLabel =
+    telemetryDurationSeconds > 0
+      ? `${formatClock(telemetryCurrentSeconds)} / ${formatClock(
+          telemetryDurationSeconds,
+        )}`
+      : formatClock(telemetryCurrentSeconds);
   const queuePosition = activeQueue
     ? `${activeQueue.currentIndex + 1}/${activeQueue.total}`
     : activeSong
@@ -1022,7 +1032,7 @@ function WorkspaceShellTop({
       </div>
 
       <div className="workspace-status-bars">
-        <div className="workspace-session-status-bar">
+        <div className="workspace-session-status-bar" aria-live="polite">
           <div>
             <span>
               <CheckCircle2 size={13} />{" "}
@@ -1032,12 +1042,25 @@ function WorkspaceShellTop({
               {playbackState}
             </strong>
           </div>
+          <div className="workspace-live-counter">
+            <span>
+              <Radio size={13} /> {spanish ? "Tiempo en vivo" : "Time Live"}
+            </span>
+            <strong>{formatClock(liveSessionSeconds)}</strong>
+          </div>
           <div>
             <span>
               <Headphones size={13} />{" "}
               {spanish ? "Tiempo reproducido" : "Time Played"}
             </span>
             <strong>{formatClock(visiblePlayedSeconds)}</strong>
+          </div>
+          <div className="workspace-progress-counter">
+            <span>
+              <Clock3 size={13} />{" "}
+              {spanish ? "Progreso actual" : "Current Progress"}
+            </span>
+            <strong>{currentProgressLabel}</strong>
           </div>
           <div>
             <span>
@@ -4506,11 +4529,15 @@ function DiscoverySections({
         topTenQueueSongs,
         newestSongs.filter(isQueuePlayableDiscoverySong),
         trendingSongs.filter(isQueuePlayableDiscoverySong),
+        mostListenedSongs.filter(isQueuePlayableDiscoverySong),
+        internalPlaybackSongs.filter(isQueuePlayableDiscoverySong),
         internalPlaybackCatalog,
         randomQueueSongs,
       ).filter(isQueuePlayableDiscoverySong),
     [
+      internalPlaybackSongs,
       internalPlaybackCatalog,
+      mostListenedSongs,
       newestSongs,
       randomQueueSongs,
       topTenQueueSongs,
@@ -4619,12 +4646,9 @@ function DiscoverySections({
       );
       replaySongs.unshift(firstSong);
     }
-    const unplayedContinuousSongs = rankDiscoveryQueue(
-      continuousDiscoverySongs.filter(
-        (song) => !activeQueue.songs.some((queued) => queued.id === song.id),
-      ),
-      heardHistory,
-      queueRankOptions,
+    const queuedIds = new Set(activeQueue.songs.map((song) => song.id));
+    const unplayedContinuousSongs = continuousDiscoverySongs.filter(
+      (song) => !queuedIds.has(song.id),
     );
     const shouldContinueDiscovery =
       activeQueue.id !== "random" &&
@@ -4634,9 +4658,7 @@ function DiscoverySections({
       replaySongs = [
         ...unplayedContinuousSongs,
         ...rankDiscoveryQueue(
-          continuousDiscoverySongs.filter((song) =>
-            activeQueue.songs.some((queued) => queued.id === song.id),
-          ),
+          continuousDiscoverySongs.filter((song) => queuedIds.has(song.id)),
           heardHistory,
           queueRankOptions,
         ),
