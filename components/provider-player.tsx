@@ -44,6 +44,14 @@ export type ProviderTelemetrySnapshot = {
   lastInteractionAt: number;
 };
 
+type ProviderProgressSample = {
+  currentTime: number;
+  duration: number;
+  playbackState: PlaybackState;
+  sampledAt: number;
+  targetKey: string;
+};
+
 type YouTubePlayer = {
   destroy: () => void;
   getCurrentTime: () => number;
@@ -397,6 +405,14 @@ export function ProviderPlayer({
     link: string;
     platform: Platform;
   } | null>(null);
+  const providerProgressRef = useRef<ProviderProgressSample>({
+    currentTime: 0,
+    duration: 0,
+    playbackState: "loading",
+    sampledAt: 0,
+    targetKey: "",
+  });
+  const providerTelemetryTargetRef = useRef("");
   const youtubePlaybackTargetRef = useRef<string | null>(null);
   const latestYouTubeTargetRef = useRef<string | null>(null);
   const providerLogRef = useRef({
@@ -441,6 +457,11 @@ export function ProviderPlayer({
   useEffect(() => {
     latestYouTubeTargetRef.current = youtubeTargetKey;
   }, [youtubeTargetKey]);
+
+  useEffect(() => {
+    providerTelemetryTargetRef.current =
+      youtubeTargetKey ?? `${platform}:${link}`;
+  }, [link, platform, youtubeTargetKey]);
 
   const clearAutoplayRetryTimers = useCallback(() => {
     autoplayRetryTokenRef.current += 1;
@@ -526,6 +547,103 @@ export function ProviderPlayer({
     };
   }, []);
 
+  const normalizeTelemetrySnapshot = useCallback(
+    (
+      nextState: PlaybackState,
+      rawCurrentTime: number,
+      rawDuration: number,
+    ) => {
+      const now = Date.now();
+      const targetKey = providerTelemetryTargetRef.current;
+      const previous = providerProgressRef.current;
+      const targetChanged = previous.targetKey !== targetKey;
+      const currentTime = Number.isFinite(rawCurrentTime)
+        ? Math.max(0, rawCurrentTime)
+        : 0;
+      const duration = Number.isFinite(rawDuration)
+        ? Math.max(0, rawDuration)
+        : 0;
+
+      const baseSample: ProviderProgressSample = targetChanged
+        ? {
+            currentTime: 0,
+            duration: 0,
+            playbackState: "loading",
+            sampledAt: now,
+            targetKey,
+          }
+        : previous;
+
+      let normalizedState = nextState;
+      const normalizedDuration =
+        duration > 0 ? duration : baseSample.duration;
+      let normalizedCurrentTime = currentTime;
+
+      if (
+        !targetChanged &&
+        currentTime <= 0 &&
+        baseSample.currentTime > 0 &&
+        nextState !== "loading"
+      ) {
+        normalizedCurrentTime = baseSample.currentTime;
+      }
+
+      if (nextState === "playing") {
+        const elapsedSeconds =
+          baseSample.sampledAt > 0
+            ? Math.max(0, Math.min(5, (now - baseSample.sampledAt) / 1000))
+            : 0;
+        const providerProgressed =
+          currentTime > baseSample.currentTime + 0.05;
+
+        if (!providerProgressed && elapsedSeconds > 0) {
+          normalizedCurrentTime = Math.max(
+            normalizedCurrentTime,
+            baseSample.currentTime + elapsedSeconds,
+          );
+        }
+      }
+
+      if (nextState === "completed") {
+        normalizedCurrentTime =
+          normalizedDuration > 0
+            ? normalizedDuration
+            : Math.max(normalizedCurrentTime, baseSample.currentTime);
+      }
+
+      if (
+        normalizedState === "playing" &&
+        normalizedDuration > 0 &&
+        normalizedCurrentTime >= Math.max(0, normalizedDuration - 0.75)
+      ) {
+        normalizedState = "completed";
+        normalizedCurrentTime = normalizedDuration;
+      }
+
+      if (normalizedDuration > 0) {
+        normalizedCurrentTime = Math.min(
+          normalizedCurrentTime,
+          normalizedDuration,
+        );
+      }
+
+      providerProgressRef.current = {
+        currentTime: normalizedCurrentTime,
+        duration: normalizedDuration,
+        playbackState: normalizedState,
+        sampledAt: now,
+        targetKey,
+      };
+
+      return {
+        currentTime: normalizedCurrentTime,
+        duration: normalizedDuration,
+        playbackState: normalizedState,
+      };
+    },
+    [],
+  );
+
   const emitTelemetry = useCallback(
     (
       nextState: PlaybackState,
@@ -546,6 +664,17 @@ export function ProviderPlayer({
         nextState = "paused";
         setPlaybackState("paused");
       }
+      const normalized = normalizeTelemetrySnapshot(
+        nextState,
+        nextCurrentTime,
+        nextDuration,
+      );
+      nextState = normalized.playbackState;
+      nextCurrentTime = normalized.currentTime;
+      nextDuration = normalized.duration;
+      setPlaybackState(nextState);
+      setCurrentTime(nextCurrentTime);
+      setDuration(nextDuration);
       if (nextState === "playing" || nextState === "completed") {
         clearAutoplayRetryTimers();
       }
@@ -573,7 +702,7 @@ export function ProviderPlayer({
         lastInteractionAt: lastInteractionAtRef.current,
       });
     },
-    [clearAutoplayRetryTimers, playbackInstanceId],
+    [clearAutoplayRetryTimers, normalizeTelemetrySnapshot, playbackInstanceId],
   );
 
   useEffect(() => {
