@@ -3759,6 +3759,20 @@ function writeDiscoveryHeardHistory(history: Record<string, number>) {
   );
 }
 
+function mergeDiscoveryHeardHistory(
+  ...histories: Record<string, number>[]
+): Record<string, number> {
+  const merged: Record<string, number> = {};
+  for (const history of histories) {
+    for (const [songId, timestamp] of Object.entries(history)) {
+      const normalizedTimestamp = Number(timestamp);
+      if (!Number.isFinite(normalizedTimestamp)) continue;
+      merged[songId] = Math.max(merged[songId] ?? 0, normalizedTimestamp);
+    }
+  }
+  return merged;
+}
+
 function mergeDiscoverySongs(...groups: DiscoverySong[][]) {
   const map = new Map<string, DiscoverySong>();
   for (const group of groups) {
@@ -4013,11 +4027,49 @@ function rankContinuousInternalReplayQueue(
   ];
 }
 
+function orderDiscoveryQueueForPlayback(
+  songs: DiscoverySong[],
+  heardHistory: Record<string, number>,
+  options: {
+    replayWindowHours?: number;
+    underexposedBoost?: number;
+  } = {},
+  preserveOrder = false,
+) {
+  const playableSongs = filterInternalReplayPrioritySongs(songs);
+  if (!playableSongs.length) return [];
+  if (!preserveOrder) {
+    return rankDiscoveryQueue(playableSongs, heardHistory, options);
+  }
+
+  const now = Date.now();
+  const replayWindowMs =
+    Math.max(1, options.replayWindowHours ?? 24) * 60 * 60 * 1000;
+  const notRecentlyConsumed: DiscoverySong[] = [];
+  const recentlyConsumed: DiscoverySong[] = [];
+
+  for (const song of playableSongs) {
+    const heardAt = heardHistory[song.id] ?? 0;
+    if (heardAt > 0 && now - heardAt < replayWindowMs) {
+      recentlyConsumed.push(song);
+      continue;
+    }
+    notRecentlyConsumed.push(song);
+  }
+
+  if (notRecentlyConsumed.length) {
+    return [...notRecentlyConsumed, ...recentlyConsumed];
+  }
+
+  return rankContinuousInternalReplayQueue(playableSongs, heardHistory, options);
+}
+
 function DiscoverySongCard({
   song,
   active,
   onPlay,
   onListeningCredited,
+  onSongConsumed,
   locale,
   topTen,
   contextKind = topTen ? "top" : "spotlight",
@@ -4040,6 +4092,7 @@ function DiscoverySongCard({
     becameComplete: boolean,
     completionRate: number,
   ) => void;
+  onSongConsumed?: (song: DiscoverySong) => void;
   locale: InterfaceLocale;
   topTen?: boolean;
   contextKind?: string;
@@ -4075,6 +4128,7 @@ function DiscoverySongCard({
   const liveSecondsRef = useRef(0);
   const validListenRef = useRef(false);
   const completeListenRef = useRef(false);
+  const consumedSongRef = useRef(false);
   const scrolledForPlaybackRef = useRef(false);
   const spanish = locale === "es";
   const platformLinks = getPrimaryPlatformLinks(song);
@@ -4161,6 +4215,7 @@ function DiscoverySongCard({
     liveSecondsRef.current = 0;
     validListenRef.current = false;
     completeListenRef.current = false;
+    consumedSongRef.current = false;
     setListenState({
       liveSeconds: 0,
       verifiedSeconds: 0,
@@ -4170,6 +4225,10 @@ function DiscoverySongCard({
       warning: "",
     });
   }, [active]);
+
+  useEffect(() => {
+    consumedSongRef.current = false;
+  }, [song.id]);
 
   const handleDiscoveryTelemetry = useCallback(
     async (snapshot: ProviderTelemetrySnapshot) => {
@@ -4186,6 +4245,11 @@ function DiscoverySongCard({
           ...current,
           playbackDurationSeconds: snapshot.duration,
         }));
+      }
+      const playbackCompleted = isPlaybackCompleted(snapshot);
+      if (playbackCompleted && !consumedSongRef.current) {
+        consumedSongRef.current = true;
+        onSongConsumed?.(song);
       }
       const sampleAt = Date.now();
       const previous = lastLiveSampleRef.current;
@@ -4276,6 +4340,10 @@ function DiscoverySongCard({
       const becameComplete = complete && !completeListenRef.current;
       validListenRef.current = valid;
       completeListenRef.current = complete;
+      if ((becameComplete || playbackCompleted) && !consumedSongRef.current) {
+        consumedSongRef.current = true;
+        onSongConsumed?.(song);
+      }
       const seconds = Number(row.seconds_counted ?? 0);
       setListenState((current) => ({
         ...current,
@@ -4298,8 +4366,9 @@ function DiscoverySongCard({
     [
       active,
       onListeningCredited,
+      onSongConsumed,
       scrollPlayerIntoView,
-      song.id,
+      song,
       spanish,
     ],
   );
@@ -4922,7 +4991,11 @@ function DiscoverySections({
   const markSongHeard = useCallback((song: DiscoverySong) => {
     const timestamp = Date.now();
     setHeardHistory((current) => {
-      const next = { ...current, [song.id]: timestamp };
+      const next = mergeDiscoveryHeardHistory(
+        readDiscoveryHeardHistory(),
+        current,
+        { [song.id]: timestamp },
+      );
       writeDiscoveryHeardHistory(next);
       return next;
     });
@@ -4946,9 +5019,16 @@ function DiscoverySections({
     }) => {
       const playableInputSongs = filterInternalReplayPrioritySongs(songs);
       if (!playableInputSongs.length) return;
-      let queueSongs = preserveOrder
-        ? [...playableInputSongs]
-        : rankDiscoveryQueue(playableInputSongs, heardHistory, queueRankOptions);
+      const effectiveHeardHistory = mergeDiscoveryHeardHistory(
+        heardHistory,
+        readDiscoveryHeardHistory(),
+      );
+      let queueSongs = orderDiscoveryQueueForPlayback(
+        playableInputSongs,
+        effectiveHeardHistory,
+        queueRankOptions,
+        preserveOrder,
+      );
       if (preferredSongId) {
         const selected = queueSongs.find((song) => song.id === preferredSongId);
         if (selected) {
@@ -4999,10 +5079,17 @@ function DiscoverySections({
   const advanceDiscoveryQueue = useCallback(() => {
     const queue = activeQueueRef.current;
     if (!queue) return;
+    const currentSong = queue.songs[queue.currentIndex] ?? null;
+    const effectiveHeardHistory = mergeDiscoveryHeardHistory(
+      heardHistory,
+      readDiscoveryHeardHistory(),
+      currentSong ? { [currentSong.id]: Date.now() } : {},
+    );
+    if (currentSong) markSongHeard(currentSong);
     const nextIndex = queue.currentIndex + 1;
     let replaySongs = rankContinuousInternalReplayQueue(
       queue.sourceSongs,
-      heardHistory,
+      effectiveHeardHistory,
       queueRankOptions,
     );
     if (queue.id === "random" && replaySongs.length > 1) {
@@ -5021,12 +5108,12 @@ function DiscoverySections({
     const queuedIds = new Set(queue.songs.map((song) => song.id));
     const unplayedContinuousSongs = rankContinuousInternalReplayQueue(
       continuousDiscoverySongs.filter((song) => !queuedIds.has(song.id)),
-      heardHistory,
+      effectiveHeardHistory,
       queueRankOptions,
     );
     const continuousReplaySongs = rankContinuousInternalReplayQueue(
       continuousDiscoverySongs,
-      heardHistory,
+      effectiveHeardHistory,
       queueRankOptions,
     );
     const shouldContinueDiscovery =
@@ -5483,6 +5570,7 @@ function DiscoverySections({
                 key={cardKey}
                 locale={locale}
                 onListeningCredited={onListeningCredited}
+                onSongConsumed={markSongHeard}
                 onPlay={() =>
                   playDiscoveryCardQueue({
                     cardKey,
@@ -5538,6 +5626,7 @@ function DiscoverySections({
                 key={cardKey}
                 locale={locale}
                 onListeningCredited={onListeningCredited}
+                onSongConsumed={markSongHeard}
                 onPlay={() =>
                   playDiscoveryCardQueue({
                     cardKey,
@@ -5723,6 +5812,7 @@ function DiscoverySections({
             key={`${activeQueue.id}-${activeQueue.cycle}-${activeQueueSong.id}`}
             locale={locale}
             onListeningCredited={onListeningCredited}
+            onSongConsumed={markSongHeard}
             onQueueAutoPlayChange={changeDiscoveryQueueAutoPlay}
             onPlay={stopDiscoveryQueue}
             onQueueNext={advanceDiscoveryQueue}
