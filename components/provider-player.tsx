@@ -412,6 +412,8 @@ export function ProviderPlayer({
     sampledAt: 0,
     targetKey: "",
   });
+  const mutedRef = useRef<boolean | null>(null);
+  const volumeRef = useRef<number | null>(null);
   const providerTelemetryTargetRef = useRef("");
   const youtubePlaybackTargetRef = useRef<string | null>(null);
   const latestYouTubeTargetRef = useRef<string | null>(null);
@@ -453,6 +455,14 @@ export function ProviderPlayer({
   useEffect(() => {
     debugEnabledRef.current = debugEnabled;
   }, [debugEnabled]);
+
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
 
   useEffect(() => {
     latestYouTubeTargetRef.current = youtubeTargetKey;
@@ -889,6 +899,7 @@ export function ProviderPlayer({
     manualPauseRef.current = true;
     clearAutoplayRetryTimers();
     setShowAutoplayFallback(false);
+    const progress = providerProgressRef.current;
     try {
       youtubePlayerRef.current?.pauseVideo();
       spotifyControllerRef.current?.pause();
@@ -898,10 +909,10 @@ export function ProviderPlayer({
       );
       emitTelemetry(
         "paused",
-        currentTime,
-        duration,
-        muted,
-        volume,
+        progress.currentTime,
+        progress.duration,
+        mutedRef.current,
+        volumeRef.current,
         Boolean(embed && !externalContent && embed.telemetry !== "spotify_iframe_api"),
       );
     } catch (error) {
@@ -909,13 +920,9 @@ export function ProviderPlayer({
     }
   }, [
     clearAutoplayRetryTimers,
-    currentTime,
-    duration,
     embed,
     emitTelemetry,
     externalContent,
-    muted,
-    volume,
   ]);
 
   useEffect(() => {
@@ -968,19 +975,20 @@ export function ProviderPlayer({
   const markProviderError = useCallback(
     (supported = false) => {
       clearAutoplayRetryTimers();
+      const progress = providerProgressRef.current;
       setStatus("error");
       setPlaybackState("error");
       setShowAutoplayFallback(false);
-      emitTelemetry("error", currentTime, duration, muted, volume, supported);
+      emitTelemetry(
+        "error",
+        progress.currentTime,
+        progress.duration,
+        mutedRef.current,
+        volumeRef.current,
+        supported,
+      );
     },
-    [
-      clearAutoplayRetryTimers,
-      currentTime,
-      duration,
-      emitTelemetry,
-      muted,
-      volume,
-    ],
+    [clearAutoplayRetryTimers, emitTelemetry],
   );
 
   useEffect(() => {
@@ -1198,6 +1206,7 @@ export function ProviderPlayer({
 
     const initialLog = providerLogRef.current;
     let disposed = false;
+    let player: YouTubePlayer | null = null;
 
     loadYouTubeApi()
       .then((api) => {
@@ -1218,6 +1227,7 @@ export function ProviderPlayer({
             },
             onReady: (event) => {
               if (disposed) return;
+              player = event.target;
               youtubePlayerRef.current = event.target;
               youtubePlaybackTargetRef.current =
                 latestYouTubeTargetRef.current;
@@ -1268,12 +1278,23 @@ export function ProviderPlayer({
 
     return () => {
       disposed = true;
-      youtubePlayerRef.current = null;
-      // Do not call player.destroy() here. The YouTube API removes the iframe
-      // from the DOM, and React can then crash while reconciling that same node
-      // during queue transitions.
+      clearAutoplayRetryTimers();
+      const playerToDestroy = player ?? youtubePlayerRef.current;
+      if (youtubePlayerRef.current === playerToDestroy) {
+        youtubePlayerRef.current = null;
+      }
+      youtubePlaybackTargetRef.current = null;
+      window.setTimeout(() => {
+        try {
+          playerToDestroy?.destroy();
+        } catch {
+          // React may already have removed the iframe. The important part is
+          // releasing the YouTube API wrapper after React has reconciled.
+        }
+      }, 0);
     };
   }, [
+    clearAutoplayRetryTimers,
     iframeSrc,
     iframeLoadedAt,
     initializationAttempt,
