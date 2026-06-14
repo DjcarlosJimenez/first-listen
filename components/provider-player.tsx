@@ -1019,7 +1019,6 @@ export function ProviderPlayer({
 
     const initialLog = providerLogRef.current;
     let disposed = false;
-    let player: YouTubePlayer | null = null;
     let telemetryInterval: number | null = null;
 
     const refreshTelemetry = (target: YouTubePlayer) => {
@@ -1071,7 +1070,7 @@ export function ProviderPlayer({
     loadYouTubeApi()
       .then((api) => {
         if (disposed || !iframeRef.current) return;
-        player = new api.Player(iframeRef.current, {
+        new api.Player(iframeRef.current, {
           events: {
             onError: (event) => {
               if (disposed) return;
@@ -1143,11 +1142,9 @@ export function ProviderPlayer({
       disposed = true;
       youtubePlayerRef.current = null;
       if (telemetryInterval !== null) window.clearInterval(telemetryInterval);
-      try {
-        player?.destroy();
-      } catch {
-        // The provider can remove the iframe before React cleanup completes.
-      }
+      // Do not call player.destroy() here. The YouTube API removes the iframe
+      // from the DOM, and React can then crash while reconciling that same node
+      // during queue transitions.
     };
   }, [
     emitTelemetry,
