@@ -3580,6 +3580,7 @@ type DiscoveryQueueState = {
   sourceSongs: DiscoverySong[];
   currentIndex: number;
   cycle: number;
+  autoPlayEnabled: boolean;
 };
 
 function workspaceQueueModeForDiscoveryId(id: string): WorkspaceQueueMode {
@@ -3635,8 +3636,10 @@ function DiscoverySongCard({
   queueLength,
   onQueueNext,
   onQueueEnded,
+  onQueueAutoPlayChange,
   workspaceQueue,
   workspacePlayback,
+  queueAutoPlayEnabled,
 }: {
   song: DiscoverySong;
   active: boolean;
@@ -3656,8 +3659,10 @@ function DiscoverySongCard({
   queueLength?: number;
   onQueueNext?: () => void;
   onQueueEnded?: () => void;
+  onQueueAutoPlayChange?: (enabled: boolean) => void;
   workspaceQueue?: WorkspaceActiveQueue | null;
   workspacePlayback: WorkspacePlaybackController;
+  queueAutoPlayEnabled?: boolean;
 }) {
   const { requestPlayback, stopPlayback } = workspacePlayback;
   const [details, setDetails] = useState<"reviews" | "statistics" | null>(null);
@@ -3690,6 +3695,7 @@ function DiscoverySongCard({
       ? song.recommendedPlatform
       : null;
   const queueActive = Boolean(queueLabel && queueLength && queueLength > 0);
+  const queueAutoPlayActive = queueActive && queueAutoPlayEnabled !== false;
   const playbackQueueMode =
     workspaceQueue?.mode ??
     (contextKind === "genre"
@@ -3782,6 +3788,7 @@ function DiscoverySongCard({
       if (
         snapshot.playbackState === "ended" &&
         onQueueEnded &&
+        queueAutoPlayActive &&
         !queueEndedRef.current
       ) {
         queueEndedRef.current = true;
@@ -3921,6 +3928,7 @@ function DiscoverySongCard({
       active,
       onListeningCredited,
       onQueueEnded,
+      queueAutoPlayActive,
       scrollPlayerIntoView,
       song.id,
       spanish,
@@ -3946,13 +3954,9 @@ function DiscoverySongCard({
         source: "discovery",
       },
       controls: {
-        autoPlayEnabled: queueActive,
+        autoPlayEnabled: queueAutoPlayActive,
         nextEnabled: queueActive ? queueSkipReady : false,
-        onAutoPlayChange: queueActive
-          ? (enabled) => {
-              if (!enabled) void togglePlayerRef.current?.();
-            }
-          : undefined,
+        onAutoPlayChange: queueActive ? onQueueAutoPlayChange : undefined,
         onNext: queueActive ? onQueueNext : undefined,
       },
       onReady: scrollPlayerIntoView,
@@ -3969,12 +3973,14 @@ function DiscoverySongCard({
     playbackQueueMode,
     playbackSlotId,
     queueActive,
+    queueAutoPlayActive,
     queueSkipReady,
     scrollPlayerIntoView,
     song,
     spanish,
     topTen,
     onQueueNext,
+    onQueueAutoPlayChange,
     requestPlayback,
     workspaceQueue,
   ]);
@@ -4521,6 +4527,7 @@ function DiscoverySections({
       setActiveCardKey(null);
       setExpandedCategory(null);
       setActiveQueue({
+        autoPlayEnabled: true,
         cycle: 0,
         currentIndex: 0,
         description,
@@ -4585,6 +4592,12 @@ function DiscoverySections({
     setActiveQueue(null);
   }, []);
 
+  const changeDiscoveryQueueAutoPlay = useCallback((enabled: boolean) => {
+    setActiveQueue((current) =>
+      current ? { ...current, autoPlayEnabled: enabled } : current,
+    );
+  }, []);
+
   const toggleDiscoveryCard = useCallback(
     (cardKey: string, song: DiscoverySong) => {
       setActiveQueue(null);
@@ -4592,6 +4605,64 @@ function DiscoverySections({
       setActiveCardKey((current) => (current === cardKey ? null : cardKey));
     },
     [activeCardKey, markSongHeard],
+  );
+
+  const playDiscoveryCardQueue = useCallback(
+    ({
+      cardKey,
+      description,
+      id,
+      preserveOrder = false,
+      selectedSong,
+      songs,
+      title,
+    }: {
+      cardKey: string;
+      id: string;
+      title: string;
+      description: string;
+      songs: DiscoverySong[];
+      selectedSong: DiscoverySong;
+      preserveOrder?: boolean;
+    }) => {
+      if (!isQueuePlayableDiscoverySong(selectedSong)) {
+        toggleDiscoveryCard(cardKey, selectedSong);
+        return;
+      }
+
+      const playableSongs = songs.filter(isQueuePlayableDiscoverySong);
+      const queueSongs = playableSongs.some(
+        (song) => song.id === selectedSong.id,
+      )
+        ? playableSongs
+        : [selectedSong, ...playableSongs];
+
+      if (!queueSongs.length) {
+        toggleDiscoveryCard(cardKey, selectedSong);
+        return;
+      }
+
+      if (activeQueue?.id === id && activeQueueSong?.id === selectedSong.id) {
+        stopDiscoveryQueue();
+        return;
+      }
+
+      startDiscoveryQueue({
+        description,
+        id,
+        preserveOrder,
+        preferredSongId: selectedSong.id,
+        songs: queueSongs,
+        title,
+      });
+    },
+    [
+      activeQueue?.id,
+      activeQueueSong?.id,
+      startDiscoveryQueue,
+      stopDiscoveryQueue,
+      toggleDiscoveryCard,
+    ],
   );
 
   const toggleCategory = (category: DiscoveryCategoryKey) => {
@@ -4868,7 +4939,24 @@ function DiscoverySections({
                 key={cardKey}
                 locale={locale}
                 onListeningCredited={onListeningCredited}
-                onPlay={() => toggleDiscoveryCard(cardKey, song)}
+                onPlay={() =>
+                  playDiscoveryCardQueue({
+                    cardKey,
+                    description: spanish
+                      ? "Cola de canciones destacadas"
+                      : "Featured song queue",
+                    id: "spotlight",
+                    preserveOrder: true,
+                    selectedSong: song,
+                    songs: visibleSpotlightSongs,
+                    title: sectionTitle(
+                      "spotlight",
+                      spanish
+                        ? "Destacadas por First Listen"
+                        : "Featured by First Listen",
+                    ),
+                  })
+                }
                 song={song}
                 workspacePlayback={workspacePlayback}
               />
@@ -4906,7 +4994,17 @@ function DiscoverySections({
                 key={cardKey}
                 locale={locale}
                 onListeningCredited={onListeningCredited}
-                onPlay={() => toggleDiscoveryCard(cardKey, song)}
+                onPlay={() =>
+                  playDiscoveryCardQueue({
+                    cardKey,
+                    description: config.description,
+                    id: config.key,
+                    preserveOrder: config.preserveOrder,
+                    selectedSong: song,
+                    songs: config.queueSongs ?? config.songs,
+                    title: config.title,
+                  })
+                }
                 song={song}
                 topTen={config.key === "top_results"}
                 workspacePlayback={workspacePlayback}
@@ -5087,9 +5185,11 @@ function DiscoverySections({
             key={`${activeQueue.id}-${activeQueue.cycle}-${activeQueueSong.id}`}
             locale={locale}
             onListeningCredited={onListeningCredited}
+            onQueueAutoPlayChange={changeDiscoveryQueueAutoPlay}
             onPlay={stopDiscoveryQueue}
             onQueueEnded={advanceDiscoveryQueue}
             onQueueNext={advanceDiscoveryQueue}
+            queueAutoPlayEnabled={activeQueue.autoPlayEnabled}
             queueIndex={activeQueue.currentIndex + 1}
             queueLabel={activeQueue.title}
             queueLength={activeQueue.songs.length}
