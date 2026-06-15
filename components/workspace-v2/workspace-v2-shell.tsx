@@ -313,7 +313,6 @@ function WorkspaceV2ShellClient({
   const [logs, setLogs] = useState<InstrumentationLog[]>([]);
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastTransition, setLastTransition] = useState("BOOT");
-  const [nowMs, setNowMs] = useState(Date.now());
   const [signingOut, setSigningOut] = useState(false);
   const [pipelineDebug, setPipelineDebug] =
     useState<PlaybackPipelineDebug>(initialPipelineDebug);
@@ -326,7 +325,6 @@ function WorkspaceV2ShellClient({
   const heroRef = useRef<HTMLDivElement | null>(null);
   const playbackRef = useRef("");
   const queueRef = useRef("");
-  const sessionStartedAtRef = useRef<number | null>(null);
   const telemetryRef = useRef("");
   const validationRef = useRef("");
 
@@ -465,11 +463,6 @@ function WorkspaceV2ShellClient({
   }, [initialQueue, loadQueue, recordError, recordTransition]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
-    return () => window.clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
     const updateCollapsedState = () => {
       const mobile = window.matchMedia("(max-width: 900px)").matches;
       const threshold = mobile ? 90 : 260;
@@ -601,15 +594,11 @@ function WorkspaceV2ShellClient({
   const positionCurrent = controller.position.current;
   const positionTotal = controller.position.total;
   const remainingCount = controller.remainingSongs.length;
-  const elapsedSeconds = sessionStartedAtRef.current
-    ? Math.max(0, Math.floor((nowMs - sessionStartedAtRef.current) / 1000))
-    : 0;
   const sessionValid =
     economy.state.validListenRecorded || controller.validation.validListen;
   const displayedTimePlayed = Math.max(
     controller.telemetry.timeLiveSeconds,
     controller.telemetry.currentProgressSeconds,
-    elapsedSeconds,
   );
   const rewardProgressPercent = canClaimRewards
     ? economy.state.availableRewardCredits > 0
@@ -755,9 +744,6 @@ function WorkspaceV2ShellClient({
     const key = `${controller.playback.state}:${activeSongId}:${controller.playback.error ?? ""}`;
     if (playbackRef.current === key) return;
     playbackRef.current = key;
-    if (controller.playback.state === "playing" && !sessionStartedAtRef.current) {
-      sessionStartedAtRef.current = Date.now();
-    }
     if (controller.playback.state === "playing") {
       recordTransition(
         "PLAY_STARTED",
