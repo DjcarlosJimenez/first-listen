@@ -322,6 +322,7 @@ function WorkspaceV2ShellClient({
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastTransition, setLastTransition] = useState("BOOT");
   const [metadataOverlayVisible, setMetadataOverlayVisible] = useState(true);
+  const [mobileQueueExpanded, setMobileQueueExpanded] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [pipelineDebug, setPipelineDebug] =
@@ -384,6 +385,10 @@ function WorkspaceV2ShellClient({
     document.documentElement.classList.toggle("theme-dark", darkMode);
     window.localStorage.setItem("first-listen-theme", darkMode ? "dark" : "light");
   }, [darkMode]);
+
+  useEffect(() => {
+    setMobileQueueExpanded(false);
+  }, [activePanel]);
 
   useEffect(() => {
     if (!economy.state.lastUpdatedAt) return;
@@ -1376,6 +1381,7 @@ function WorkspaceV2ShellClient({
 
           <aside
             className="workspace-v2-queue-panel"
+            data-mobile-expanded={mobileQueueExpanded ? "true" : "false"}
             data-workspace-mode={workspaceMode}
             aria-label="Queue"
           >
@@ -1405,6 +1411,21 @@ function WorkspaceV2ShellClient({
                 <small>{nextSong?.artist ?? "-"}</small>
               </article>
             </div>
+            <button
+              aria-expanded={mobileQueueExpanded}
+              className="workspace-v2-mobile-queue-toggle"
+              onClick={() => setMobileQueueExpanded((current) => !current)}
+              type="button"
+            >
+              <ListMusic size={14} />
+              {mobileQueueExpanded
+                ? spanish
+                  ? "Ocultar cola completa"
+                  : "Hide full queue"
+                : spanish
+                  ? "Ver cola completa"
+                  : "Show full queue"}
+            </button>
             <p>
               {spanish
                 ? "La cola acompaña al reproductor sin competir con la música."
