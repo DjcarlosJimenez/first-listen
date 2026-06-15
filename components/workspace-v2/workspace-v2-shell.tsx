@@ -1071,6 +1071,16 @@ function WorkspaceV2ShellClient({
     }
   }, []);
 
+  const handleThemeToggle = useCallback(() => {
+    setDarkMode((current) => !current);
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 620px) and (orientation: portrait)").matches
+    ) {
+      setSidebarExpanded(false);
+    }
+  }, []);
+
   const handleFullscreen = useCallback(async () => {
     const target = heroRef.current;
     if (!target || typeof document === "undefined") return;
@@ -1108,13 +1118,13 @@ function WorkspaceV2ShellClient({
   const navItems = useMemo(
     () =>
       [
-        { icon: Compass, id: "discover" as const },
-        { icon: Send, id: "submit" as const },
-        { icon: User, id: "profile" as const },
+        { icon: Compass, id: "discover" as const, mobileIcon: "🎵" },
+        { icon: Send, id: "submit" as const, mobileIcon: "➕" },
+        { icon: User, id: "profile" as const, mobileIcon: "👤" },
         ...(canAccessAdmin
           ? [
-              { icon: ShieldCheck, id: "owner" as const },
-              { icon: Wrench, id: "admin" as const },
+              { icon: ShieldCheck, id: "owner" as const, mobileIcon: "🛡" },
+              { icon: Wrench, id: "admin" as const, mobileIcon: "⚙" },
             ]
           : []),
       ],
@@ -1216,7 +1226,7 @@ function WorkspaceV2ShellClient({
                 : "Use dark theme"
           }
           className="workspace-v2-nav-action"
-          onClick={() => setDarkMode((current) => !current)}
+          onClick={handleThemeToggle}
           type="button"
         >
           {darkMode ? <Sun size={17} /> : <Moon size={17} />}
@@ -1240,6 +1250,46 @@ function WorkspaceV2ShellClient({
             </span>
           </button>
         )}
+        <div
+          aria-label={spanish ? "Acciones rápidas móviles" : "Mobile quick actions"}
+          className="workspace-v2-mobile-action-row"
+        >
+          {navItems.map((item) => (
+            <button
+              aria-current={activePanel === item.id ? "page" : undefined}
+              aria-label={panelLabel(item.id, spanish)}
+              className={activePanel === item.id ? "active" : ""}
+              key={`mobile-${item.id}`}
+              onClick={() => handlePanelChange(item.id)}
+              type="button"
+            >
+              <span aria-hidden="true">{item.mobileIcon}</span>
+            </button>
+          ))}
+          <button
+            aria-label={
+              darkMode
+                ? spanish
+                  ? "Usar modo claro"
+                  : "Use light theme"
+                : spanish
+                  ? "Usar modo oscuro"
+                  : "Use dark theme"
+            }
+            onClick={handleThemeToggle}
+            type="button"
+          >
+            <span aria-hidden="true">{darkMode ? "☀" : "🌙"}</span>
+          </button>
+          <button
+            aria-label={spanish ? "Cerrar sesión" : "Sign out"}
+            disabled={signingOut}
+            onClick={handleSignOut}
+            type="button"
+          >
+            <span aria-hidden="true">🚪</span>
+          </button>
+        </div>
         <button
           className="workspace-v2-signout-button"
           disabled={signingOut}
