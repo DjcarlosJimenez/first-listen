@@ -15852,17 +15852,14 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
   .workspace-v2-product-nav,
   .workspace-v2-product-shell[data-workspace-mode="productivity"] .workspace-v2-product-nav {
-    background: transparent;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
+    border-radius: 0 0 16px 16px;
     display: grid;
-    gap: 4px;
+    gap: 6px;
     grid-template-columns: max-content minmax(96px, 1fr) 36px;
     margin: 0 -8px;
     min-height: 0;
     overflow: visible;
-    padding: 4px 8px 2px;
+    padding: 6px 8px;
     top: 0;
   }
 
@@ -15891,58 +15888,5 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .workspace-v2-product-shell[data-sidebar="compact"] .workspace-v2-product-nav .workspace-v2-debug-toggle,
   .workspace-v2-product-shell[data-sidebar="compact"] .workspace-v2-product-nav .workspace-v2-signout-button {
     display: none;
-  }
-
-  .workspace-v2-product-shell[data-sidebar="expanded"] .workspace-v2-product-nav nav,
-  .workspace-v2-product-shell[data-sidebar="expanded"] .workspace-v2-product-nav .workspace-v2-install-action,
-  .workspace-v2-product-shell[data-sidebar="expanded"] .workspace-v2-product-nav > .workspace-v2-nav-action,
-  .workspace-v2-product-shell[data-sidebar="expanded"] .workspace-v2-product-nav .workspace-v2-debug-toggle,
-  .workspace-v2-product-shell[data-sidebar="expanded"] .workspace-v2-product-nav .workspace-v2-signout-button {
-    display: none;
-  }
-
-  .workspace-v2-product-shell[data-sidebar="expanded"] .workspace-v2-mobile-action-row {
-    align-items: center;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    grid-column: auto;
-    margin: 0;
-    order: 4;
-    overflow: visible;
-    padding: 0;
-    position: absolute;
-    right: 8px;
-    top: calc(100% + 4px);
-    width: 34px;
-    z-index: 45;
-  }
-
-  .workspace-v2-mobile-action-row button {
-    align-items: center;
-    aspect-ratio: 1;
-    background: var(--workspace-v2-control-bg);
-    border: 1px solid var(--workspace-v2-control-border);
-    border-radius: 999px;
-    color: var(--text);
-    cursor: pointer;
-    display: inline-flex;
-    flex: 0 0 34px;
-    font-size: 17px;
-    justify-content: center;
-    min-height: 34px;
-    min-width: 34px;
-    padding: 0;
-  }
-
-  .workspace-v2-mobile-action-row button.active,
-  .workspace-v2-mobile-action-row button:hover {
-    background: var(--workspace-v2-accent-bg);
-    border-color: var(--accent);
-  }
-
-  .workspace-v2-mobile-action-row button:disabled {
-    cursor: wait;
-    opacity: 0.65;
   }
 }
