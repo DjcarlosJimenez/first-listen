@@ -13845,7 +13845,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   align-self: start;
   display: grid;
   gap: 12px;
-  min-height: calc(100dvh - 118px);
+  min-height: 0;
   padding: 14px;
   position: sticky;
   top: 90px;
