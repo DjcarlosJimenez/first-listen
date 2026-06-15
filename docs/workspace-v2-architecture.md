@@ -2,6 +2,8 @@
 
 Workspace V2 is being built beside the current Workspace so production behavior can remain stable until the new pipeline passes authenticated browser verification.
 
+Architecture lock: use `docs/workspace-v2-architecture-contract.md` as the source of truth before adding any Workspace V2 feature work.
+
 ## Ownership Rules
 
 - Playback Machine owns only playback state: `loading`, `ready`, `playing`, `paused`, `completed`, `error`.
