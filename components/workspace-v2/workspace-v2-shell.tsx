@@ -26,6 +26,7 @@ import {
   User,
   Wrench,
 } from "lucide-react";
+import { ProfilePanel, type ProfilePanelProps } from "@/components/profile-panel";
 import { SongActionBar } from "@/components/song-action-bar";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/client";
@@ -206,6 +207,7 @@ export function WorkspaceV2Shell({
   guestToken,
   initialQueue,
   locale,
+  profilePanel,
   viewerIdentity,
   viewerMode = "member",
 }: {
@@ -214,6 +216,7 @@ export function WorkspaceV2Shell({
   guestToken?: string | null;
   initialQueue: WorkspaceV2Queue;
   locale: InterfaceLocale;
+  profilePanel?: ProfilePanelProps | null;
   viewerIdentity?: string | null;
   viewerMode?: WorkspaceV2ViewerMode;
 }) {
@@ -241,6 +244,7 @@ export function WorkspaceV2Shell({
       guestToken={guestToken}
       initialQueue={initialQueue}
       locale={locale}
+      profilePanel={profilePanel}
       viewerIdentity={viewerIdentity}
       viewerMode={viewerMode}
     />
@@ -253,6 +257,7 @@ function WorkspaceV2ShellClient({
   guestToken,
   initialQueue,
   locale,
+  profilePanel,
   viewerIdentity,
   viewerMode,
 }: {
@@ -261,6 +266,7 @@ function WorkspaceV2ShellClient({
   guestToken?: string | null;
   initialQueue: WorkspaceV2Queue;
   locale: InterfaceLocale;
+  profilePanel?: ProfilePanelProps | null;
   viewerIdentity?: string | null;
   viewerMode: WorkspaceV2ViewerMode;
 }) {
@@ -1152,6 +1158,7 @@ function WorkspaceV2ShellClient({
             locale={locale}
             onPanelChange={setActivePanel}
             onPlaySong={handlePlayQueueSong}
+            profilePanel={profilePanel}
             viewerMode={viewerMode}
           />
 
@@ -1225,6 +1232,7 @@ function WorkspaceV2ContentPanel({
   locale,
   onPanelChange,
   onPlaySong,
+  profilePanel,
   viewerMode,
 }: {
   activePanel: WorkspaceV2Panel;
@@ -1234,6 +1242,7 @@ function WorkspaceV2ContentPanel({
   locale: InterfaceLocale;
   onPanelChange: (panel: WorkspaceV2Panel) => void;
   onPlaySong: (song: WorkspaceV2Song) => void;
+  profilePanel?: ProfilePanelProps | null;
   viewerMode: WorkspaceV2ViewerMode;
 }) {
   const spanish = locale === "es";
@@ -1273,6 +1282,31 @@ function WorkspaceV2ContentPanel({
   }
 
   if (activePanel === "profile") {
+    if (viewerMode !== "guest" && profilePanel) {
+      return (
+        <section
+          aria-label={spanish ? "Mi perfil" : "My profile"}
+          className="workspace-v2-content-panel workspace-v2-profile-panel"
+        >
+          <ProfilePanel
+            {...profilePanel}
+            embedded
+            onNavigate={(target) => {
+              if (target === "submit") {
+                onPanelChange("submit");
+                return;
+              }
+              if (target === "profile") {
+                onPanelChange("profile");
+                return;
+              }
+              onPanelChange("discover");
+            }}
+          />
+        </section>
+      );
+    }
+
     return (
       <section className="workspace-v2-content-panel">
         <span className="eyebrow">

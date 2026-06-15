@@ -13946,6 +13946,22 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   opacity: 0.65;
 }
 
+.workspace-v2-profile-panel {
+  overflow: hidden;
+  padding: 0;
+}
+
+.workspace-v2-profile-panel .account-page-embedded {
+  background: transparent;
+  min-height: auto;
+  padding: 18px;
+}
+
+.workspace-v2-profile-panel .account-grid {
+  margin: 0;
+  max-width: none;
+}
+
 .workspace-v2-product-main {
   display: grid;
   gap: 14px;
