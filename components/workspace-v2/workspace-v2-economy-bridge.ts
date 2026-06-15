@@ -9,7 +9,7 @@ import type {
   WorkspaceV2ValidationState,
 } from "@/lib/workspace-v2";
 
-export type WorkspaceV2EconomyMode = "sandbox" | "live";
+export type WorkspaceV2EconomyMode = "sandbox" | "live" | "guest";
 
 export type WorkspaceV2EconomyBridgeState = {
   availableRewardCredits: number;
@@ -111,15 +111,17 @@ function firstRow<T>(value: T | T[] | null): T | null {
 }
 
 export function useWorkspaceV2EconomyBridge({
+  guestToken,
   mode,
   validation,
 }: {
+  guestToken?: string | null;
   mode: WorkspaceV2EconomyMode;
   validation: WorkspaceV2ValidationState;
 }) {
   const [state, setState] = useState<WorkspaceV2EconomyBridgeState>(() => ({
     ...initialEconomyBridgeState,
-    bridgeStatus: mode === "live" ? "idle" : "disabled",
+    bridgeStatus: mode === "live" || mode === "guest" ? "idle" : "disabled",
   }));
   const currentSongIdRef = useRef<string | null>(null);
   const heartbeatInFlightRef = useRef(false);
@@ -130,10 +132,11 @@ export function useWorkspaceV2EconomyBridge({
   const sessionIdRef = useRef<string | null>(null);
   const startingSessionRef = useRef(false);
 
-  const enabled = mode === "live";
+  const enabled = mode === "live" || mode === "guest";
+  const canClaimRewards = mode === "live";
 
   const refreshEconomyStatus = useCallback(async () => {
-    if (!enabled) return;
+    if (!canClaimRewards) return;
     const supabase = createClient();
     if (!supabase) {
       setState((current) => ({
@@ -148,7 +151,9 @@ export function useWorkspaceV2EconomyBridge({
       supabase.rpc("get_listening_bank_status_v2"),
       supabase.auth.getUser(),
     ]);
-      const status = firstRow(statusRows as ListeningStatusRow[] | ListeningStatusRow | null);
+    const status = firstRow(
+      statusRows as ListeningStatusRow[] | ListeningStatusRow | null,
+    );
     let profile: ProfileCreditRow | null = null;
     const userId = userResult.user?.id;
     if (userId) {
@@ -200,7 +205,7 @@ export function useWorkspaceV2EconomyBridge({
         ),
       };
     });
-  }, [enabled]);
+  }, [canClaimRewards]);
 
   useEffect(() => {
     void refreshEconomyStatus();
@@ -235,6 +240,7 @@ export function useWorkspaceV2EconomyBridge({
   const ensureSession = useCallback(
     async (song: WorkspaceV2Song) => {
       if (!enabled || song.playbackKind !== "internal") return null;
+      if (mode === "guest" && !guestToken) return null;
       if (sessionIdRef.current) return sessionIdRef.current;
       if (startingSessionRef.current) return null;
 
@@ -254,12 +260,20 @@ export function useWorkspaceV2EconomyBridge({
         bridgeStatus: "starting",
         warning: "",
       }));
-      const { data, error } = await supabase.rpc("start_listening_session", {
-        target_song_id: song.id,
-      });
+      const { data, error } =
+        mode === "guest"
+          ? await supabase.rpc("start_guest_listening_session", {
+              guest_access_token: guestToken,
+              target_song_id: song.id,
+            })
+          : await supabase.rpc("start_listening_session", {
+              target_song_id: song.id,
+            });
       startingSessionRef.current = false;
       const row = firstRow(data as Record<string, unknown>[] | Record<string, unknown> | null);
-      if (error || !row?.session_id) {
+      const returnedSessionId =
+        row?.session_id ?? row?.listening_session_id ?? null;
+      if (error || !row || !returnedSessionId) {
         setState((current) => ({
           ...current,
           bridgeStatus: "error",
@@ -268,7 +282,7 @@ export function useWorkspaceV2EconomyBridge({
         return null;
       }
 
-      const sessionId = String(row.session_id);
+      const sessionId = String(returnedSessionId);
       sessionIdRef.current = sessionId;
       heartbeatIntervalSecondsRef.current = Number(
         row.heartbeat_interval_seconds ?? 15,
@@ -281,13 +295,14 @@ export function useWorkspaceV2EconomyBridge({
         bridgeStatus: "active",
         dailySecondsRemaining: Number(row.daily_cap_seconds ?? 0),
         sessionId,
-        warning: row.earning_eligible
-          ? ""
-          : "This provider cannot verify reward-eligible playback.",
+        warning:
+          mode === "guest" || row.earning_eligible
+            ? ""
+            : "This provider cannot verify reward-eligible playback.",
       }));
       return sessionId;
     },
-    [enabled],
+    [enabled, guestToken, mode],
   );
 
   const recordHeartbeat = useCallback(
@@ -318,7 +333,7 @@ export function useWorkspaceV2EconomyBridge({
         return;
       }
 
-      const { data, error } = await supabase.rpc("record_listening_heartbeat", {
+      const heartbeatPayload = {
         target_session_id: sessionId,
         playback_position_seconds: snapshot.currentTime,
         playback_duration_seconds: snapshot.duration,
@@ -330,7 +345,14 @@ export function useWorkspaceV2EconomyBridge({
         interaction_recent:
           now - lastInteractionAtRef.current <=
           interactionGraceSecondsRef.current * 1000,
-      });
+      };
+      const { data, error } =
+        mode === "guest"
+          ? await supabase.rpc("record_guest_listening_heartbeat", {
+              ...heartbeatPayload,
+              guest_access_token: guestToken,
+            })
+          : await supabase.rpc("record_listening_heartbeat", heartbeatPayload);
       heartbeatInFlightRef.current = false;
 
       const row = firstRow(data as Record<string, unknown>[] | Record<string, unknown> | null);
@@ -378,14 +400,15 @@ export function useWorkspaceV2EconomyBridge({
       });
 
       if (
-        secondsCounted > 0 ||
-        row.valid_listen_recorded ||
-        row.complete_listen_recorded
+        mode === "live" &&
+        (secondsCounted > 0 ||
+          Boolean(row.valid_listen_recorded) ||
+          Boolean(row.complete_listen_recorded))
       ) {
         void refreshEconomyStatus();
       }
     },
-    [enabled, ensureSession, refreshEconomyStatus],
+    [enabled, ensureSession, guestToken, mode, refreshEconomyStatus],
   );
 
   const handleProviderEvent = useCallback(
@@ -405,7 +428,7 @@ export function useWorkspaceV2EconomyBridge({
   );
 
   const claimReward = useCallback(async () => {
-    if (!enabled) return;
+    if (!canClaimRewards) return;
     const supabase = createClient();
     if (!supabase) return;
     setState((current) => ({ ...current, bridgeStatus: "claiming" }));
@@ -440,11 +463,12 @@ export function useWorkspaceV2EconomyBridge({
       };
     });
     void refreshEconomyStatus();
-  }, [enabled, refreshEconomyStatus, state.credits]);
+  }, [canClaimRewards, refreshEconomyStatus, state.credits]);
 
   return useMemo(
     () => ({
       claimReward,
+      canClaimRewards,
       enabled,
       handleProviderEvent,
       markInteraction,
@@ -458,6 +482,7 @@ export function useWorkspaceV2EconomyBridge({
     }),
     [
       claimReward,
+      canClaimRewards,
       enabled,
       handleProviderEvent,
       markInteraction,

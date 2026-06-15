@@ -27,3 +27,5 @@ next-env.d.ts
 # logs
 *.log
 *.err
+
+.vercel

@@ -14091,6 +14091,58 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   padding: 10px 14px;
 }
 
+.workspace-v2-active-actions {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  padding-top: 12px;
+}
+
+.workspace-v2-active-actions .song-action-shell {
+  margin: 0;
+}
+
+.workspace-v2-active-actions .song-action-bar {
+  justify-content: flex-start;
+}
+
+.workspace-v2-report-action {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.workspace-v2-report-action select,
+.workspace-v2-report-action button {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 9px 12px;
+}
+
+.workspace-v2-report-action button {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.workspace-v2-report-action button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.workspace-v2-report-action small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .workspace-v2-trust-layer {
   display: grid;
   gap: 10px;

@@ -12,6 +12,7 @@ import {
 import {
   Coins,
   Compass,
+  Flag,
   Gauge,
   ListMusic,
   LockKeyhole,
@@ -24,7 +25,10 @@ import {
   User,
   Wrench,
 } from "lucide-react";
+import { SongActionBar } from "@/components/song-action-bar";
 import type { InterfaceLocale } from "@/lib/catalog";
+import { createClient } from "@/lib/supabase/client";
+import type { Platform } from "@/lib/types";
 import type { WorkspaceV2Queue, WorkspaceV2Song } from "@/lib/workspace-v2";
 import {
   WorkspaceV2ProviderPlayerAdapter,
@@ -191,15 +195,21 @@ function nowPlayingLabel(song: WorkspaceV2Song | null, spanish: boolean) {
   return spanish ? "Elige una canción" : "Choose a song";
 }
 
+function workspaceSongPlatform(song: WorkspaceV2Song): Platform {
+  return song.platform as Platform;
+}
+
 export function WorkspaceV2Shell({
   debugMode = false,
   economyMode = "sandbox",
+  guestToken,
   initialQueue,
   locale,
   viewerMode = "member",
 }: {
   debugMode?: boolean;
   economyMode?: WorkspaceV2EconomyMode;
+  guestToken?: string | null;
   initialQueue: WorkspaceV2Queue;
   locale: InterfaceLocale;
   viewerMode?: WorkspaceV2ViewerMode;
@@ -225,6 +235,7 @@ export function WorkspaceV2Shell({
     <WorkspaceV2ShellClient
       debugMode={debugMode}
       economyMode={economyMode}
+      guestToken={guestToken}
       initialQueue={initialQueue}
       locale={locale}
       viewerMode={viewerMode}
@@ -235,18 +246,21 @@ export function WorkspaceV2Shell({
 function WorkspaceV2ShellClient({
   debugMode,
   economyMode,
+  guestToken,
   initialQueue,
   locale,
   viewerMode,
 }: {
   debugMode: boolean;
   economyMode: WorkspaceV2EconomyMode;
+  guestToken?: string | null;
   initialQueue: WorkspaceV2Queue;
   locale: InterfaceLocale;
   viewerMode: WorkspaceV2ViewerMode;
 }) {
   const controller = useWorkspaceV2Controller();
   const economy = useWorkspaceV2EconomyBridge({
+    guestToken,
     mode: economyMode,
     validation: controller.validation,
   });
@@ -969,6 +983,15 @@ function WorkspaceV2ShellClient({
               /{positionTotal}
             </span>
           </div>
+
+          {controller.activeSong && (
+            <WorkspaceV2ActiveSongActions
+              locale={locale}
+              song={controller.activeSong}
+              guestToken={guestToken}
+              viewerMode={viewerMode}
+            />
+          )}
         </section>
 
         <section className="workspace-v2-trust-layer" aria-label="Listening status">
@@ -1305,6 +1328,97 @@ function WorkspaceV2ContentPanel({
       >
         {spanish ? "Enviar mi música" : "Submit my music"}
       </button>
+    </section>
+  );
+}
+
+function WorkspaceV2ActiveSongActions({
+  guestToken,
+  locale,
+  song,
+  viewerMode,
+}: {
+  guestToken?: string | null;
+  locale: InterfaceLocale;
+  song: WorkspaceV2Song;
+  viewerMode: WorkspaceV2ViewerMode;
+}) {
+  const spanish = locale === "es";
+  const [reportReason, setReportReason] = useState("spam");
+  const [reportMessage, setReportMessage] = useState("");
+  const [reporting, setReporting] = useState(false);
+
+  const submitReport = async () => {
+    if (viewerMode === "guest") {
+      setReportMessage(
+        spanish
+          ? "Crea una cuenta gratis para reportar contenido."
+          : "Create a free account to report content.",
+      );
+      return;
+    }
+    const supabase = createClient();
+    if (!supabase || reporting) return;
+    setReporting(true);
+    const { error } = await supabase.rpc("report_song", {
+      reported_song_id: song.id,
+      report_reason: reportReason,
+      report_details: null,
+    });
+    setReporting(false);
+    setReportMessage(
+      error
+        ? error.message
+        : spanish
+          ? "Reporte enviado para moderacion."
+          : "Report sent to moderation.",
+    );
+  };
+
+  return (
+    <section
+      className="workspace-v2-active-actions"
+      aria-label={spanish ? "Acciones de la cancion actual" : "Current song actions"}
+    >
+      <SongActionBar
+        artist={song.artist}
+        artistId={song.artistId}
+        compact
+        link={song.link}
+        locale={locale}
+        guestToken={guestToken ?? undefined}
+        platform={workspaceSongPlatform(song)}
+        songId={song.id}
+        title={song.title}
+      />
+      <div className="workspace-v2-report-action">
+        <select
+          aria-label={spanish ? "Motivo del reporte" : "Report reason"}
+          onChange={(event) => setReportReason(event.target.value)}
+          value={reportReason}
+        >
+          <option value="spam">Spam</option>
+          <option value="broken_link">{spanish ? "Enlace roto" : "Broken Link"}</option>
+          <option value="not_music">{spanish ? "No es musica" : "Not Music"}</option>
+          <option value="illegal_content">
+            {spanish ? "Contenido ilegal" : "Illegal Content"}
+          </option>
+          <option value="offensive_content">
+            {spanish ? "Contenido ofensivo" : "Offensive Content"}
+          </option>
+        </select>
+        <button disabled={reporting} onClick={submitReport} type="button">
+          <Flag size={14} />
+          {reporting
+            ? spanish
+              ? "Enviando..."
+              : "Sending..."
+            : spanish
+              ? "Reportar"
+              : "Report"}
+        </button>
+        {reportMessage && <small role="status">{reportMessage}</small>}
+      </div>
     </section>
   );
 }
