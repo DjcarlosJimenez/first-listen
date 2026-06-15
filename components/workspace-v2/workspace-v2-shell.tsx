@@ -19,6 +19,7 @@ import {
   LogOut,
   Maximize2,
   Moon,
+  MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
   Pause,
@@ -300,11 +301,13 @@ function WorkspaceV2ShellClient({
     validation: controller.validation,
   });
   const { loadQueue } = controller;
-  const spanish = locale === "es";
+  const [workspaceLocale, setWorkspaceLocale] =
+    useState<InterfaceLocale>(locale);
+  const spanish = workspaceLocale === "es";
   const canAccessAdmin = viewerMode === "founder" || viewerMode === "admin";
   const canClaimRewards = viewerMode !== "guest" && economy.enabled;
   const canSubmit = viewerMode !== "guest";
-  const copy = useMemo(() => getCopy(locale), [locale]);
+  const copy = useMemo(() => getCopy(workspaceLocale), [workspaceLocale]);
   const debugAllowed = canAccessAdmin;
   const displayIdentity =
     viewerIdentity?.trim() || viewerLabel(viewerMode, spanish);
@@ -383,6 +386,16 @@ function WorkspaceV2ShellClient({
   useEffect(() => {
     setDarkMode(window.localStorage.getItem("first-listen-theme") === "dark");
   }, []);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("first-listen-locale");
+    setWorkspaceLocale(stored === "en" || stored === "es" ? stored : locale);
+  }, [locale]);
+
+  useEffect(() => {
+    document.documentElement.lang = workspaceLocale;
+    window.localStorage.setItem("first-listen-locale", workspaceLocale);
+  }, [workspaceLocale]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("theme-dark", darkMode);
@@ -642,6 +655,13 @@ function WorkspaceV2ShellClient({
   const nextSongId = nextSong?.id ?? "none";
   const queueTitle = controller.queue.activeQueue?.title ?? initialQueue.title;
   const queueSource = controller.queue.activeQueue?.source ?? initialQueue.source;
+  const localizedQueueTitle =
+    queueTitle === "Continuous Discovery" ||
+    queueTitle === "Descubrimiento continuo"
+      ? spanish
+        ? "Descubrimiento continuo"
+        : "Continuous Discovery"
+      : queueTitle;
   const positionCurrent = controller.position.current;
   const positionTotal = controller.position.total;
   const remainingCount = controller.remainingSongs.length;
@@ -685,7 +705,7 @@ function WorkspaceV2ShellClient({
   const playbackStatusText = sessionValid
     ? spanish
       ? "Reproducción válida"
-      : "Playback counting"
+      : "Counting"
     : controller.playback.state === "playing"
       ? spanish
         ? "Reproduciendo"
@@ -693,9 +713,7 @@ function WorkspaceV2ShellClient({
       : statusLabel(controller.playback.state, spanish);
   const playbackTrustOverlayVisible =
     Boolean(controller.activeSong) && controller.playback.state === "playing";
-  const playbackTrustOverlayLabel = spanish
-    ? "▶ Reproducción válida"
-    : "▶ Playback counting";
+  const playbackTrustOverlayLabel = "▶ Reproducción válida";
   const bankSecondsForDisplay =
     viewerMode === "guest"
       ? controller.validation.eligibleSeconds
@@ -1043,6 +1061,16 @@ function WorkspaceV2ShellClient({
     [economy, initialQueue, loadQueue],
   );
 
+  const handlePanelChange = useCallback((panel: WorkspaceV2Panel) => {
+    setActivePanel(panel);
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 900px)").matches
+    ) {
+      setSidebarExpanded(false);
+    }
+  }, []);
+
   const handleFullscreen = useCallback(async () => {
     const target = heroRef.current;
     if (!target || typeof document === "undefined") return;
@@ -1124,7 +1152,12 @@ function WorkspaceV2ShellClient({
           onClick={() => setSidebarExpanded((current) => !current)}
           type="button"
         >
-          {sidebarExpanded ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
+          {sidebarExpanded ? (
+            <PanelLeftClose className="workspace-v2-desktop-sidebar-icon" size={17} />
+          ) : (
+            <PanelLeftOpen className="workspace-v2-desktop-sidebar-icon" size={17} />
+          )}
+          <MoreHorizontal className="workspace-v2-mobile-more-icon" size={18} />
           <span>{sidebarExpanded ? (spanish ? "Contraer" : "Collapse") : "Menu"}</span>
         </button>
         <nav>
@@ -1135,7 +1168,7 @@ function WorkspaceV2ShellClient({
                 aria-current={activePanel === item.id ? "page" : undefined}
                 className={activePanel === item.id ? "active" : ""}
                 key={item.id}
-                onClick={() => setActivePanel(item.id)}
+                onClick={() => handlePanelChange(item.id)}
                 type="button"
               >
                 <Icon size={17} />
@@ -1147,16 +1180,39 @@ function WorkspaceV2ShellClient({
         <PwaInstallButton
           className="workspace-v2-nav-action workspace-v2-install-action"
           compact
-          locale={locale}
+          locale={workspaceLocale}
         />
+        <div
+          aria-label={spanish ? "Selector de idioma" : "Language selector"}
+          className="workspace-v2-language-switcher"
+          role="group"
+        >
+          <button
+            aria-pressed={workspaceLocale === "es"}
+            className={workspaceLocale === "es" ? "active" : ""}
+            onClick={() => setWorkspaceLocale("es")}
+            type="button"
+          >
+            ES
+          </button>
+          <span aria-hidden="true">|</span>
+          <button
+            aria-pressed={workspaceLocale === "en"}
+            className={workspaceLocale === "en" ? "active" : ""}
+            onClick={() => setWorkspaceLocale("en")}
+            type="button"
+          >
+            EN
+          </button>
+        </div>
         <button
           aria-label={
             darkMode
               ? spanish
-                ? "Usar tema claro"
+                ? "Usar modo claro"
                 : "Use light theme"
               : spanish
-                ? "Usar tema oscuro"
+                ? "Usar modo oscuro"
                 : "Use dark theme"
           }
           className="workspace-v2-nav-action"
@@ -1164,7 +1220,7 @@ function WorkspaceV2ShellClient({
           type="button"
         >
           {darkMode ? <Sun size={17} /> : <Moon size={17} />}
-          <span>{darkMode ? (spanish ? "Tema claro" : "Light mode") : (spanish ? "Tema oscuro" : "Dark mode")}</span>
+          <span>{darkMode ? (spanish ? "Modo claro" : "Light mode") : (spanish ? "Modo oscuro" : "Dark mode")}</span>
         </button>
         {debugAllowed && (
           <button
@@ -1239,7 +1295,7 @@ function WorkspaceV2ShellClient({
           >
             <WorkspaceV2ProviderPlayerAdapter
               command={controller.playback.pendingCommand}
-              locale={locale}
+              locale={workspaceLocale}
               onDebug={handleProviderDebug}
               onEvent={handleProviderEvent}
               song={controller.activeSong}
@@ -1324,7 +1380,7 @@ function WorkspaceV2ShellClient({
 
           {controller.activeSong && (
             <WorkspaceV2ActiveSongActions
-              locale={locale}
+              locale={workspaceLocale}
               song={controller.activeSong}
               guestToken={guestToken}
               viewerMode={viewerMode}
@@ -1444,8 +1500,8 @@ function WorkspaceV2ShellClient({
             copy={copy}
             founderFree={founderSubmissionsRemaining > 0}
             initialQueue={initialQueue}
-            locale={locale}
-            onPanelChange={setActivePanel}
+            locale={workspaceLocale}
+            onPanelChange={handlePanelChange}
             onPlaySong={handlePlayQueueSong}
             onSubmitNotice={notifySubmit}
             onSubmitSong={handleSubmitSong}
@@ -1460,13 +1516,13 @@ function WorkspaceV2ShellClient({
             className="workspace-v2-queue-panel"
             data-mobile-expanded={mobileQueueExpanded ? "true" : "false"}
             data-workspace-mode={workspaceMode}
-            aria-label="Queue"
+            aria-label={spanish ? "Cola" : "Queue"}
           >
             <span className="eyebrow">
               <ListMusic size={13} />
               {spanish ? "Cola" : "Queue"}
             </span>
-            <h2>{queueTitle}</h2>
+            <h2>{localizedQueueTitle}</h2>
             <div className="workspace-v2-queue-context">
               <strong>
                 {positionCurrent}/{positionTotal}
@@ -1500,7 +1556,7 @@ function WorkspaceV2ShellClient({
                   ? "Ocultar cola completa"
                   : "Hide full queue"
                 : spanish
-                  ? "Ver cola completa"
+                  ? "Mostrar cola completa"
                   : "Show full queue"}
             </button>
             <p>

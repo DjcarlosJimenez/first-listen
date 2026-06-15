@@ -80,7 +80,7 @@ function mapContentEconomyRows(
 }
 
 function localeFromProfile(profile: WorkspaceV2Profile | null): InterfaceLocale {
-  return profile?.interface_language === "es" ? "es" : "en";
+  return profile?.interface_language === "en" ? "en" : "es";
 }
 
 function viewerModeFromProfile(profile: WorkspaceV2Profile | null): WorkspaceV2ViewerMode {

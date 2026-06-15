@@ -36,15 +36,10 @@ function firstRow<T>(value: T | T[] | null): T | null {
   return value ?? null;
 }
 
-function browserLocale(): InterfaceLocale {
-  if (typeof navigator === "undefined") return "en";
-  return navigator.language.toLowerCase().startsWith("es") ? "es" : "en";
-}
-
 function storedLocale(): InterfaceLocale {
-  if (typeof window === "undefined") return "en";
+  if (typeof window === "undefined") return "es";
   const stored = window.localStorage.getItem("first-listen-locale");
-  return stored === "es" || stored === "en" ? stored : browserLocale();
+  return stored === "es" || stored === "en" ? stored : "es";
 }
 
 function mapGuestIdentity(
@@ -112,7 +107,7 @@ export function WorkspaceV2GuestEntry() {
   const [fatalError, setFatalError] = useState("");
   const [guest, setGuest] = useState<GuestSession | null>(null);
   const [loading, setLoading] = useState(true);
-  const [locale, setLocale] = useState<InterfaceLocale>("en");
+  const [locale, setLocale] = useState<InterfaceLocale>("es");
   const [queue, setQueue] = useState<WorkspaceV2Queue | null>(null);
 
   const loadQueue = useCallback(
@@ -154,7 +149,10 @@ export function WorkspaceV2GuestEntry() {
         });
         const row = firstRow(data as Record<string, unknown>[] | Record<string, unknown> | null);
         if (!error && row) {
-          identity = mapGuestIdentity(row, token);
+          identity = {
+            ...mapGuestIdentity(row, token),
+            locale: nextLocale,
+          };
         } else {
           window.localStorage.removeItem("first-listen-guest-token");
           token = null;
