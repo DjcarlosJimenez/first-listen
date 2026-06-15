@@ -313,6 +313,7 @@ function WorkspaceV2ShellClient({
   const [logs, setLogs] = useState<InstrumentationLog[]>([]);
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastTransition, setLastTransition] = useState("BOOT");
+  const [metadataOverlayVisible, setMetadataOverlayVisible] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
   const [pipelineDebug, setPipelineDebug] =
     useState<PlaybackPipelineDebug>(initialPipelineDebug);
@@ -714,6 +715,35 @@ function WorkspaceV2ShellClient({
         }
       : undefined;
 
+  const revealMetadataOverlay = useCallback(() => {
+    if (!playerIsVideo) return;
+    setMetadataOverlayVisible(true);
+  }, [playerIsVideo]);
+
+  useEffect(() => {
+    setMetadataOverlayVisible(playerIsVideo);
+  }, [activeSongId, playerIsVideo]);
+
+  useEffect(() => {
+    if (!playerIsVideo) return;
+    if (
+      controller.playback.state === "playing" ||
+      controller.playback.state === "paused" ||
+      controller.playback.state === "ready"
+    ) {
+      setMetadataOverlayVisible(true);
+    }
+  }, [controller.playback.state, playerIsVideo]);
+
+  useEffect(() => {
+    if (!playerIsVideo || !metadataOverlayVisible) return;
+    const timeout = window.setTimeout(
+      () => setMetadataOverlayVisible(false),
+      3200,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [metadataOverlayVisible, playerIsVideo]);
+
   useEffect(() => {
     const pending = controller.playback.pendingCommand;
     const key = `${pending.command}:${activeSongId}:${controller.playback.lastEventAt}`;
@@ -1068,6 +1098,10 @@ function WorkspaceV2ShellClient({
           <div
             className="workspace-v2-player-surface"
             data-player-mode={playerIsVideo ? "video" : "audio"}
+            data-overlay-visible={metadataOverlayVisible ? "true" : "false"}
+            onMouseEnter={revealMetadataOverlay}
+            onMouseMove={revealMetadataOverlay}
+            onPointerDown={revealMetadataOverlay}
             style={playerSurfaceStyle}
           >
             <WorkspaceV2ProviderPlayerAdapter
@@ -1077,6 +1111,20 @@ function WorkspaceV2ShellClient({
               onEvent={handleProviderEvent}
               song={controller.activeSong}
             />
+            {playerIsVideo && (
+              <div
+                aria-hidden="true"
+                className="workspace-v2-video-metadata-overlay"
+                data-visible={metadataOverlayVisible ? "true" : "false"}
+              >
+                <span>{spanish ? "Ahora suena" : "Now Playing"}</span>
+                <strong>{nowPlayingLabel(controller.activeSong, spanish)}</strong>
+                <small>
+                  {controller.activeSong?.artist ??
+                    (spanish ? "First Listen" : "First Listen")}
+                </small>
+              </div>
+            )}
           </div>
 
           <div
