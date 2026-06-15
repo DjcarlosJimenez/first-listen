@@ -14245,6 +14245,64 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   font-weight: 850;
 }
 
+.workspace-v2-playback-trust-overlay {
+  backdrop-filter: blur(10px);
+  background:
+    linear-gradient(135deg, rgba(7, 16, 9, 0.74), rgba(7, 16, 9, 0.42)),
+    rgba(7, 16, 9, 0.48);
+  border: 1px solid rgba(185, 255, 47, 0.28);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26);
+  display: grid;
+  gap: 3px;
+  max-width: min(170px, calc(100% - 24px));
+  padding: 8px 10px;
+  pointer-events: none;
+  position: absolute;
+  bottom: 62px;
+  left: 12px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.58);
+  z-index: 5;
+}
+
+.workspace-v2-playback-trust-overlay span {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.workspace-v2-playback-trust-overlay strong {
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.workspace-v2-playback-trust-overlay[data-playback-state="playing"] {
+  border-color: rgba(185, 255, 47, 0.5);
+}
+
+.workspace-v2-provider-skip-notice {
+  backdrop-filter: blur(12px);
+  background: rgba(7, 16, 9, 0.78);
+  border: 1px solid rgba(185, 255, 47, 0.34);
+  border-radius: 999px;
+  bottom: 16px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+  left: 50%;
+  max-width: min(620px, calc(100% - 28px));
+  padding: 10px 14px;
+  pointer-events: none;
+  position: absolute;
+  text-align: center;
+  transform: translateX(-50%);
+  z-index: 6;
+}
+
 .workspace-v2-player-surface .workspace-v2-provider-player,
 .workspace-v2-player-surface .provider-player {
   min-height: 390px;
@@ -14747,6 +14805,11 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   min-height: calc(100vh - 112px);
 }
 
+.workspace-v2-product-hero:fullscreen .workspace-v2-playback-trust-overlay {
+  bottom: 82px;
+  left: 18px;
+}
+
 @media (max-width: 900px) {
   .workspace-v2-header,
   .workspace-v2-grid,
@@ -14909,6 +14972,30 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
   .workspace-v2-video-metadata-overlay strong {
     font-size: clamp(16px, 6vw, 24px);
+  }
+
+  .workspace-v2-playback-trust-overlay {
+    border-radius: 12px;
+    bottom: 54px;
+    left: 8px;
+    max-width: min(150px, calc(100% - 20px));
+    padding: 7px 9px;
+  }
+
+  .workspace-v2-playback-trust-overlay span {
+    font-size: 8px;
+  }
+
+  .workspace-v2-playback-trust-overlay strong {
+    font-size: 15px;
+  }
+
+  .workspace-v2-provider-skip-notice {
+    border-radius: 16px;
+    bottom: 10px;
+    font-size: 11px;
+    max-width: calc(100% - 20px);
+    padding: 9px 11px;
   }
 
   .workspace-v2-trust-layer {

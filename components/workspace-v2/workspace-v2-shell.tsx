@@ -195,7 +195,7 @@ function queueSourceLabel(source: string | undefined, spanish: boolean) {
     featured: "destacadas",
     genre: "género",
     random: "aleatorio",
-    review: "escucha",
+    review: "reproducción",
   };
   return labels[source] ?? normalized;
 }
@@ -323,6 +323,7 @@ function WorkspaceV2ShellClient({
   const [lastTransition, setLastTransition] = useState("BOOT");
   const [metadataOverlayVisible, setMetadataOverlayVisible] = useState(true);
   const [mobileQueueExpanded, setMobileQueueExpanded] = useState(false);
+  const [providerSkipNotice, setProviderSkipNotice] = useState("");
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [pipelineDebug, setPipelineDebug] =
@@ -335,6 +336,8 @@ function WorkspaceV2ShellClient({
   const heroCollapsedRef = useRef(false);
   const heroRef = useRef<HTMLDivElement | null>(null);
   const playbackRef = useRef("");
+  const providerSkipSongRef = useRef<string | null>(null);
+  const providerSkipTimeoutRef = useRef<number | null>(null);
   const queueRef = useRef("");
   const telemetryRef = useRef("");
   const validationRef = useRef("");
@@ -575,10 +578,34 @@ function WorkspaceV2ShellClient({
           providerReadyHandledCount: current.providerReadyHandledCount + 1,
         }));
       }
+      if (event.type === "error") {
+        const failedSongId = controller.activeSong?.id ?? null;
+        setProviderSkipNotice(
+          spanish
+            ? "Este contenido no puede reproducirse dentro de First Listen. Saltando automáticamente..."
+            : "This content cannot play inside First Listen. Skipping automatically...",
+        );
+        if (
+          controller.canAdvance &&
+          providerSkipSongRef.current !== failedSongId
+        ) {
+          providerSkipSongRef.current = failedSongId;
+          if (providerSkipTimeoutRef.current) {
+            window.clearTimeout(providerSkipTimeoutRef.current);
+          }
+          providerSkipTimeoutRef.current = window.setTimeout(() => {
+            providerSkipTimeoutRef.current = null;
+            if (providerSkipSongRef.current !== failedSongId) return;
+            controller.next("error");
+          }, 2200);
+        }
+      } else if (event.type === "ready" || event.type === "playing") {
+        setProviderSkipNotice("");
+      }
       economy.handleProviderEvent(event, controller.activeSong);
       controller.handleProviderEvent(event);
     },
-    [controller, economy],
+    [controller, economy, spanish],
   );
 
   useEffect(() => {
@@ -655,6 +682,20 @@ function WorkspaceV2ShellClient({
     : spanish
       ? "Listo"
       : "Ready";
+  const playbackStatusText = sessionValid
+    ? spanish
+      ? "Reproducción válida"
+      : "Playback counting"
+    : controller.playback.state === "playing"
+      ? spanish
+        ? "Reproduciendo"
+        : "Playing"
+      : statusLabel(controller.playback.state, spanish);
+  const playbackTrustOverlayVisible =
+    Boolean(controller.activeSong) && controller.playback.state === "playing";
+  const playbackTrustOverlayLabel = spanish
+    ? "▶ Reproducción válida"
+    : "▶ Playback counting";
   const bankSecondsForDisplay =
     viewerMode === "guest"
       ? controller.validation.eligibleSeconds
@@ -712,7 +753,7 @@ function WorkspaceV2ShellClient({
       ? Math.max(consumedSongs.length, sessionValid ? 1 : 0)
       : Math.max(economy.state.todayValidListens, consumedSongs.length);
   const artistsSupportedToday = Math.max(supportedArtistCount, 0);
-  const listeningStreak =
+  const playbackStreak =
     controller.playback.state === "playing"
       ? spanish
         ? "Activa"
@@ -738,6 +779,24 @@ function WorkspaceV2ShellClient({
           backgroundImage: `linear-gradient(135deg, rgba(7, 16, 9, 0.5), rgba(7, 16, 9, 0.92)), url("${controller.activeSong.coverUrl}")`,
         }
       : undefined;
+
+  useEffect(() => {
+    setProviderSkipNotice("");
+    providerSkipSongRef.current = null;
+    if (providerSkipTimeoutRef.current) {
+      window.clearTimeout(providerSkipTimeoutRef.current);
+      providerSkipTimeoutRef.current = null;
+    }
+  }, [activeSongId]);
+
+  useEffect(
+    () => () => {
+      if (providerSkipTimeoutRef.current) {
+        window.clearTimeout(providerSkipTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   const revealMetadataOverlay = useCallback(() => {
     if (!playerIsVideo) return;
@@ -1199,6 +1258,22 @@ function WorkspaceV2ShellClient({
                 </small>
               </div>
             )}
+            {playbackTrustOverlayVisible && (
+              <div
+                aria-hidden="true"
+                className="workspace-v2-playback-trust-overlay"
+                data-playback-state={controller.playback.state}
+                data-valid-playback={sessionValid ? "true" : "false"}
+              >
+                <span>{playbackTrustOverlayLabel}</span>
+                <strong>{clock(displayedTimePlayed)}</strong>
+              </div>
+            )}
+            {providerSkipNotice && (
+              <div className="workspace-v2-provider-skip-notice" role="status">
+                {providerSkipNotice}
+              </div>
+            )}
           </div>
 
           <div
@@ -1257,19 +1332,16 @@ function WorkspaceV2ShellClient({
           )}
         </section>
 
-        <section className="workspace-v2-trust-layer" aria-label="Listening status">
+        <section
+          className="workspace-v2-trust-layer"
+          aria-label={spanish ? "Estado de reproducción" : "Playback status"}
+        >
           <article className="workspace-v2-session-card">
-            <span>{spanish ? "Sesión" : "Session"}</span>
-            <strong>
-              {sessionValid
-                ? spanish
-                  ? "Válida"
-                  : "Valid"
-                : statusLabel(controller.playback.state, spanish)}
-            </strong>
+            <span>{spanish ? "Reproducción" : "Playback"}</span>
+            <strong>{playbackStatusText}</strong>
           </article>
           <article>
-            <span>{spanish ? "Tiempo reproducido" : "Time Played"}</span>
+            <span>{spanish ? "Tiempo reproducido" : "Playback Time"}</span>
             <strong>{clock(displayedTimePlayed)}</strong>
           </article>
           <article className="workspace-v2-time-bank-card">
@@ -1331,7 +1403,9 @@ function WorkspaceV2ShellClient({
 
         <section
           className="workspace-v2-motivation-layer"
-          aria-label={spanish ? "Motivación de escucha" : "Listening motivation"}
+          aria-label={
+            spanish ? "Motivación de reproducción" : "Playback motivation"
+          }
         >
           <article>
             <span>{spanish ? "Canciones hoy" : "Songs today"}</span>
@@ -1342,8 +1416,8 @@ function WorkspaceV2ShellClient({
             <strong>{artistsSupportedToday}</strong>
           </article>
           <article>
-            <span>{spanish ? "Racha de escucha" : "Listening streak"}</span>
-            <strong>{listeningStreak}</strong>
+            <span>{spanish ? "Racha de reproducción" : "Playback streak"}</span>
+            <strong>{playbackStreak}</strong>
           </article>
           <article>
             <span>{spanish ? "Minutos hoy" : "Minutes today"}</span>
@@ -1399,7 +1473,7 @@ function WorkspaceV2ShellClient({
               </strong>
               <span>{queueSourceLabel(queueSource, spanish)}</span>
               <small>
-                {remainingCount} {spanish ? "por escuchar" : "remaining"}
+                {remainingCount} {spanish ? "pendientes" : "remaining"}
               </small>
             </div>
             <div className="workspace-v2-now-next">
@@ -1553,8 +1627,8 @@ function WorkspaceV2ContentPanel({
               ? "El shell conserva la reproducción mientras abres el flujo actual de envío."
               : "The shell keeps playback alive while you open the current submission workflow."
             : spanish
-              ? "Puedes seguir escuchando como invitado. Una cuenta gratis activa recompensas, tokens y envíos."
-              : "You can keep listening as a guest. A free account activates rewards, tokens and submissions."}
+              ? "Puedes seguir reproduciendo como invitado. Una cuenta gratis activa recompensas, tokens y envíos."
+              : "You can keep playing as a guest. A free account activates rewards, tokens and submissions."}
         </p>
         {canSubmit ? (
           <Link href="/submit">{spanish ? "Abrir Enviar Canción" : "Open Submit Song"}</Link>
