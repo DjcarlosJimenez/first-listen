@@ -58,11 +58,27 @@ export function reduceWorkspaceV2Playback(
 
     case "provider_ready":
       if (!state.activeSong) return { ...state, lastEventAt: event.at };
+      if (
+        state.pendingCommand.command === "load" &&
+        state.pendingCommand.autoPlay &&
+        !state.manualPause
+      ) {
+        return {
+          ...state,
+          error: null,
+          lastEventAt: event.at,
+          pendingCommand: { command: "play" },
+          state: "ready",
+        };
+      }
       return {
         ...state,
         error: null,
         lastEventAt: event.at,
-        pendingCommand: { command: "none" },
+        pendingCommand:
+          state.pendingCommand.command === "play"
+            ? state.pendingCommand
+            : { command: "none" },
         state: state.pendingCommand.command === "load" ? "ready" : state.state,
       };
 

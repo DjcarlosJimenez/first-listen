@@ -87,6 +87,7 @@ playback = reduceWorkspaceV2Playback(playback, {
   type: "provider_ready",
 });
 assert.equal(playback.state, "ready");
+assert.equal(playback.pendingCommand.command, "play");
 
 playback = reduceWorkspaceV2Playback(playback, {
   at: now + 200,

@@ -60,6 +60,16 @@ type ProviderDebugState = {
   youtubeCleanupCount: number;
 };
 
+type PlaybackPipelineDebug = {
+  playButtonRequestCount: number;
+  playFailedCount: number;
+  playRequestAdapterCount: number;
+  playRequestEmittedCount: number;
+  playStartedCount: number;
+  providerReadyEventCount: number;
+  providerReadyHandledCount: number;
+};
+
 function clock(seconds: number) {
   const safe = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(safe / 60);
@@ -169,6 +179,15 @@ function WorkspaceV2ShellClient({
   const [nowMs, setNowMs] = useState(Date.now());
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastTransition, setLastTransition] = useState("BOOT");
+  const [pipelineDebug, setPipelineDebug] = useState<PlaybackPipelineDebug>({
+    playButtonRequestCount: 0,
+    playFailedCount: 0,
+    playRequestAdapterCount: 0,
+    playRequestEmittedCount: 0,
+    playStartedCount: 0,
+    providerReadyEventCount: 0,
+    providerReadyHandledCount: 0,
+  });
   const [providerDebug, setProviderDebug] = useState<ProviderDebugState>({
     adapterMountCount: 0,
     adapterRenderCount: 0,
@@ -185,6 +204,7 @@ function WorkspaceV2ShellClient({
     youtubeCleanupCount: 0,
   });
   const playbackRef = useRef("");
+  const commandRef = useRef("");
   const queueRef = useRef("");
   const validationRef = useRef("");
   const telemetryRef = useRef("");
@@ -240,7 +260,7 @@ function WorkspaceV2ShellClient({
 
   useEffect(() => {
     try {
-      loadQueue(initialQueue);
+      loadQueue(initialQueue, { autoPlay: true });
       recordTransition(
         "LOAD_SONG",
         initialQueue.songs[0]
@@ -273,6 +293,24 @@ function WorkspaceV2ShellClient({
     );
     return () => window.clearInterval(interval);
   }, [captureMemorySnapshot]);
+
+  const handleProviderEvent = useCallback(
+    (event: Parameters<typeof controller.handleProviderEvent>[0]) => {
+      if (event.type === "ready") {
+        setPipelineDebug((current) => ({
+          ...current,
+          providerReadyHandledCount: current.providerReadyHandledCount + 1,
+        }));
+        recordLog({
+          channel: "transition",
+          details: "Provider ready event forwarded to playback machine.",
+          message: "PROVIDER_READY handled",
+        });
+      }
+      controller.handleProviderEvent(event);
+    },
+    [controller, recordLog],
+  );
 
   useEffect(() => {
     const onVisibility = () => {
@@ -364,6 +402,30 @@ function WorkspaceV2ShellClient({
         youtubeCleanupCount:
           event.youtubeCleanupCount ?? current.youtubeCleanupCount,
       }));
+      if (event.transition === "PROVIDER_READY") {
+        setPipelineDebug((current) => ({
+          ...current,
+          providerReadyEventCount: current.providerReadyEventCount + 1,
+        }));
+      }
+      if (event.transition === "PLAY_REQUEST") {
+        setPipelineDebug((current) => ({
+          ...current,
+          playRequestAdapterCount: current.playRequestAdapterCount + 1,
+        }));
+      }
+      if (event.transition === "PLAY_STARTED") {
+        setPipelineDebug((current) => ({
+          ...current,
+          playStartedCount: current.playStartedCount + 1,
+        }));
+      }
+      if (event.transition === "PLAY_FAILED") {
+        setPipelineDebug((current) => ({
+          ...current,
+          playFailedCount: current.playFailedCount + 1,
+        }));
+      }
       recordLog({
         channel: event.error ? "error" : "provider",
         details: event.error ?? event.details,
@@ -375,6 +437,10 @@ function WorkspaceV2ShellClient({
 
   const handlePlay = useCallback(() => {
     try {
+      setPipelineDebug((current) => ({
+        ...current,
+        playButtonRequestCount: current.playButtonRequestCount + 1,
+      }));
       recordTransition("PLAY_REQUEST", `${activeSongId} / ${controller.activeSong?.title ?? "No song"}`);
       controller.play();
     } catch (error) {
@@ -384,6 +450,29 @@ function WorkspaceV2ShellClient({
       );
     }
   }, [activeSongId, controller, recordError, recordTransition]);
+
+  useEffect(() => {
+    const pending = controller.playback.pendingCommand;
+    const key = `${pending.command}:${activeSongId}:${controller.playback.lastEventAt}`;
+    if (commandRef.current === key) return;
+    commandRef.current = key;
+    if (pending.command !== "play") return;
+    setPipelineDebug((current) => ({
+      ...current,
+      playRequestEmittedCount: current.playRequestEmittedCount + 1,
+    }));
+    recordLog({
+      channel: "transition",
+      details: `${activeSongId} / ${controller.activeSong?.title ?? "Unknown song"}`,
+      message: "PLAY_REQUEST emitted",
+    });
+  }, [
+    activeSongId,
+    controller.activeSong,
+    controller.playback.lastEventAt,
+    controller.playback.pendingCommand,
+    recordLog,
+  ]);
 
   const handleNext = useCallback(() => {
     try {
@@ -604,7 +693,7 @@ function WorkspaceV2ShellClient({
             command={controller.playback.pendingCommand}
             locale={locale}
             onDebug={handleProviderDebug}
-            onEvent={controller.handleProviderEvent}
+            onEvent={handleProviderEvent}
             song={controller.activeSong}
           />
         </div>
@@ -679,6 +768,10 @@ function WorkspaceV2ShellClient({
           <strong>{controller.playback.state}</strong>
         </div>
         <div>
+          <span>pendingCommand</span>
+          <strong>{controller.playback.pendingCommand.command}</strong>
+        </div>
+        <div>
           <span>queueState</span>
           <strong>
             {controller.queue.activeQueue?.mode ?? "none"} /{" "}
@@ -689,6 +782,34 @@ function WorkspaceV2ShellClient({
         <div>
           <span>providerReady</span>
           <strong>{providerDebug.providerReady ? "true" : "false"}</strong>
+        </div>
+        <div>
+          <span>providerReady events</span>
+          <strong>{pipelineDebug.providerReadyEventCount}</strong>
+        </div>
+        <div>
+          <span>providerReady handled</span>
+          <strong>{pipelineDebug.providerReadyHandledCount}</strong>
+        </div>
+        <div>
+          <span>play button requests</span>
+          <strong>{pipelineDebug.playButtonRequestCount}</strong>
+        </div>
+        <div>
+          <span>play requests emitted</span>
+          <strong>{pipelineDebug.playRequestEmittedCount}</strong>
+        </div>
+        <div>
+          <span>play requests at adapter</span>
+          <strong>{pipelineDebug.playRequestAdapterCount}</strong>
+        </div>
+        <div>
+          <span>play started events</span>
+          <strong>{pipelineDebug.playStartedCount}</strong>
+        </div>
+        <div>
+          <span>play failed events</span>
+          <strong>{pipelineDebug.playFailedCount}</strong>
         </div>
         <div>
           <span>providerLoaded</span>
