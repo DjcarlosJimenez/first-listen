@@ -1045,6 +1045,9 @@ function WorkspaceV2ShellClient({
       <aside className="workspace-v2-product-nav" aria-label="Workspace navigation">
         <div className="workspace-v2-product-brand">
           <span>FIRST LISTEN</span>
+          <em className="workspace-v2-beta-status">
+            {spanish ? "Beta pública" : "Public Beta"}
+          </em>
           <small>{displayIdentity}</small>
         </div>
         <button

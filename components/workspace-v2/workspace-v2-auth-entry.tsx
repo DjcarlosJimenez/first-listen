@@ -124,8 +124,8 @@ function buildPublicBetaQueue(rows: WorkspaceV2SongRow[], locale: InterfaceLocal
     source: "featured",
     title:
       locale === "es"
-        ? "Workspace V2 Public Beta"
-        : "Workspace V2 Public Beta",
+        ? "Descubrimiento continuo"
+        : "Continuous Discovery",
   };
 }
 
@@ -353,16 +353,6 @@ export async function WorkspaceV2AuthEntry({
           )}
         </div>
       </header>
-
-      <section className="workspace-v2-preview-intro">
-        <span className="eyebrow">Public Beta</span>
-        <h1>Workspace V2</h1>
-        <p>
-          {spanish
-            ? "La nueva experiencia de escucha publica. Submit, Perfil y herramientas legacy permanecen disponibles."
-            : "The new public listening experience. Submit, Profile and legacy tools remain available."}
-        </p>
-      </section>
 
       {error && (
         <section className="admin-notice" role="alert">

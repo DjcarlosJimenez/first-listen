@@ -242,18 +242,6 @@ export function WorkspaceV2GuestEntry() {
         </div>
       </header>
 
-      <section className="workspace-v2-preview-intro">
-        <span className="eyebrow">
-          {spanish ? "Invitado" : "Guest Listener"} / {guestIdentity}
-        </span>
-        <h1>Workspace V2</h1>
-        <p>
-          {spanish
-            ? "Escucha, descubre, sigue y guarda musica sin crear cuenta. Las recompensas se activan al registrarte."
-            : "Listen, discover, follow and save music without creating an account. Rewards activate when you join."}
-        </p>
-      </section>
-
       {queue.songs.length === 0 ? (
         <section className="workspace-v2-empty">
           <h2>{spanish ? "No hay canciones disponibles" : "No songs available"}</h2>

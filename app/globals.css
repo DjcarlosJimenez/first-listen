@@ -13884,6 +13884,21 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   white-space: nowrap;
 }
 
+.workspace-v2-beta-status {
+  border: 1px solid rgba(185, 255, 47, 0.34);
+  border-radius: 999px;
+  color: var(--acid);
+  display: inline-flex;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 4px 7px;
+  text-transform: uppercase;
+  width: max-content;
+}
+
 .workspace-v2-product-shell[data-sidebar="compact"] .workspace-v2-product-brand {
   justify-items: center;
 }
@@ -13896,6 +13911,13 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .workspace-v2-product-shell[data-sidebar="compact"] .workspace-v2-product-brand small {
   display: none;
+}
+
+.workspace-v2-product-shell[data-sidebar="compact"] .workspace-v2-beta-status {
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  padding: 4px 5px;
+  writing-mode: vertical-rl;
 }
 
 .workspace-v2-product-brand small,
@@ -14764,6 +14786,14 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
   .workspace-v2-product-brand {
     min-width: 160px;
+  }
+
+  .workspace-v2-product-shell[data-sidebar="compact"] .workspace-v2-beta-status,
+  .workspace-v2-beta-status {
+    font-size: 8px;
+    letter-spacing: 0.05em;
+    padding: 4px 6px;
+    writing-mode: horizontal-tb;
   }
 
   .workspace-v2-product-nav nav {
