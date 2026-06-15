@@ -16,6 +16,7 @@ import {
   Gauge,
   ListMusic,
   LockKeyhole,
+  LogOut,
   Maximize2,
   Pause,
   Play,
@@ -277,6 +278,7 @@ function WorkspaceV2ShellClient({
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastTransition, setLastTransition] = useState("BOOT");
   const [nowMs, setNowMs] = useState(Date.now());
+  const [signingOut, setSigningOut] = useState(false);
   const [pipelineDebug, setPipelineDebug] =
     useState<PlaybackPipelineDebug>(initialPipelineDebug);
   const [providerDebug, setProviderDebug] =
@@ -842,6 +844,23 @@ function WorkspaceV2ShellClient({
     }
   }, [recordError]);
 
+  const handleSignOut = useCallback(async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const supabase = createClient();
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+      window.localStorage.removeItem("first-listen-guest-token");
+      window.sessionStorage.removeItem("first-listen-pending-email");
+      document.cookie =
+        "first-listen-guest-token=; Max-Age=0; Path=/; SameSite=Lax";
+    } finally {
+      window.location.assign("/login?next=/dashboard");
+    }
+  }, [signingOut]);
+
   const navItems = useMemo(
     () =>
       [
@@ -902,6 +921,25 @@ function WorkspaceV2ShellClient({
                 : "Founder debug"}
           </button>
         )}
+        <button
+          className="workspace-v2-signout-button"
+          disabled={signingOut}
+          onClick={handleSignOut}
+          type="button"
+        >
+          <LogOut size={15} />
+          {signingOut
+            ? spanish
+              ? "Saliendo..."
+              : "Signing out..."
+            : viewerMode === "guest"
+              ? spanish
+                ? "Cambiar cuenta"
+                : "Switch account"
+              : spanish
+                ? "Cerrar sesiÃ³n"
+                : "Sign out"}
+        </button>
       </aside>
 
       <main className="workspace-v2-product-main">

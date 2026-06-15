@@ -13890,6 +13890,15 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   align-self: end;
 }
 
+.workspace-v2-signout-button {
+  margin-top: auto;
+}
+
+.workspace-v2-product-nav button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .workspace-v2-product-main {
   display: grid;
   gap: 14px;
