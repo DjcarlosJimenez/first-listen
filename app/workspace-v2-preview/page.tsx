@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { WorkspaceV2PreviewErrorBoundary } from "@/components/workspace-v2/workspace-v2-preview-error-boundary";
 import { WorkspaceV2Shell } from "@/components/workspace-v2/workspace-v2-shell";
 import { isFounderOneIdentity } from "@/lib/admin-access";
 import type { InterfaceLocale } from "@/lib/catalog";
@@ -148,7 +149,9 @@ export default async function WorkspaceV2PreviewPage() {
           </p>
         </section>
       ) : (
-        <WorkspaceV2Shell initialQueue={queue} locale={locale} />
+        <WorkspaceV2PreviewErrorBoundary>
+          <WorkspaceV2Shell initialQueue={queue} locale={locale} />
+        </WorkspaceV2PreviewErrorBoundary>
       )}
     </main>
   );

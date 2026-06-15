@@ -4,12 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, SkipForward } from "lucide-react";
 import type { InterfaceLocale } from "@/lib/catalog";
 import type { WorkspaceV2Queue } from "@/lib/workspace-v2";
-import { WorkspaceV2ProviderPlayerAdapter } from "@/components/workspace-v2/workspace-v2-provider-player-adapter";
+import {
+  WorkspaceV2ProviderPlayerAdapter,
+  type WorkspaceV2ProviderDebugEvent,
+} from "@/components/workspace-v2/workspace-v2-provider-player-adapter";
 import { useWorkspaceV2Controller } from "@/components/workspace-v2/workspace-v2-controller";
 
 type InstrumentationChannel =
+  | "error"
   | "playback"
+  | "provider"
   | "queue"
+  | "transition"
   | "validation"
   | "telemetry"
   | "memory"
@@ -36,6 +42,13 @@ type PerformanceWithMemory = Performance & {
     totalJSHeapSize: number;
     usedJSHeapSize: number;
   };
+};
+
+type ProviderDebugState = {
+  lastEvent: string;
+  providerLoaded: boolean;
+  providerPlaying: boolean;
+  providerReady: boolean;
 };
 
 function clock(seconds: number) {
@@ -118,36 +131,89 @@ export function WorkspaceV2Shell({
   const [logs, setLogs] = useState<InstrumentationLog[]>([]);
   const [memorySnapshots, setMemorySnapshots] = useState<MemorySnapshot[]>([]);
   const [nowMs, setNowMs] = useState(Date.now());
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [lastTransition, setLastTransition] = useState("BOOT");
+  const [providerDebug, setProviderDebug] = useState<ProviderDebugState>({
+    lastEvent: "waiting",
+    providerLoaded: false,
+    providerPlaying: false,
+    providerReady: false,
+  });
   const playbackRef = useRef("");
   const queueRef = useRef("");
   const validationRef = useRef("");
   const telemetryRef = useRef("");
   const sessionStartedAtRef = useRef<number | null>(null);
 
+  const recordLog = useCallback(
+    ({
+      channel,
+      details,
+      message,
+    }: {
+      channel: InstrumentationChannel;
+      details?: string;
+      message: string;
+    }) => {
+      setLogs((current) =>
+        pushLog(current, {
+          at: Date.now(),
+          channel,
+          details,
+          message,
+        }),
+      );
+    },
+    [],
+  );
+
+  const recordTransition = useCallback(
+    (message: string, details?: string) => {
+      setLastTransition(message);
+      recordLog({ channel: "transition", details, message });
+    },
+    [recordLog],
+  );
+
+  const recordError = useCallback(
+    (message: string, details?: string) => {
+      setLastError(details ? `${message}: ${details}` : message);
+      recordLog({ channel: "error", details, message });
+    },
+    [recordLog],
+  );
+
   const captureMemorySnapshot = useCallback((label: string) => {
     const snapshot = readMemorySnapshot(label);
     setMemorySnapshots((current) => [snapshot, ...current].slice(0, 20));
-    setLogs((current) =>
-      pushLog(current, {
-        at: snapshot.at,
-        channel: "memory",
-        details: memoryLabel(snapshot),
-        message: label,
-      }),
-    );
-  }, []);
+    recordLog({
+      channel: "memory",
+      details: memoryLabel(snapshot),
+      message: label,
+    });
+  }, [recordLog]);
 
   useEffect(() => {
-    loadQueue(initialQueue);
-    setLogs((current) =>
-      pushLog(current, {
-        at: Date.now(),
+    try {
+      loadQueue(initialQueue);
+      recordTransition(
+        "LOAD_SONG",
+        initialQueue.songs[0]
+          ? `${initialQueue.songs[0].id} / ${initialQueue.songs[0].title}`
+          : "Queue is empty",
+      );
+      recordLog({
         channel: "sandbox",
         details: `${initialQueue.songs.length} canciones cargadas en modo solo lectura`,
         message: "Workspace V2 Preview inicializado",
-      }),
-    );
-  }, [initialQueue, loadQueue]);
+      });
+    } catch (error) {
+      recordError(
+        "LOAD_SONG failed",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }, [initialQueue, loadQueue, recordError, recordLog, recordTransition]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -165,14 +231,11 @@ export function WorkspaceV2Shell({
 
   useEffect(() => {
     const onVisibility = () => {
-      setLogs((current) =>
-        pushLog(current, {
-          at: Date.now(),
-          channel: "validation",
-          details: `visible=${document.visibilityState === "visible"} focused=${document.hasFocus()}`,
-          message: "Cambio de pestana detectado",
-        }),
-      );
+      recordLog({
+        channel: "validation",
+        details: `visible=${document.visibilityState === "visible"} focused=${document.hasFocus()}`,
+        message: "Cambio de pestana detectado",
+      });
     };
     window.addEventListener("focus", onVisibility);
     window.addEventListener("blur", onVisibility);
@@ -182,9 +245,36 @@ export function WorkspaceV2Shell({
       window.removeEventListener("blur", onVisibility);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [recordLog]);
+
+  useEffect(() => {
+    const onError = (event: ErrorEvent) => {
+      recordError(
+        "Client exception captured",
+        event.error instanceof Error
+          ? `${event.error.message}\n${event.error.stack ?? ""}`
+          : event.message,
+      );
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      recordError(
+        "Unhandled promise rejection captured",
+        event.reason instanceof Error
+          ? `${event.reason.message}\n${event.reason.stack ?? ""}`
+          : String(event.reason),
+      );
+    };
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    };
+  }, [recordError]);
 
   const activeSongId = controller.activeSong?.id ?? "none";
+  const nextSong = controller.remainingSongs[0] ?? null;
+  const nextSongId = nextSong?.id ?? "none";
   const queueTitle = controller.queue.activeQueue?.title ?? initialQueue.title;
   const positionCurrent = controller.position.current;
   const positionTotal = controller.position.total;
@@ -202,12 +292,72 @@ export function WorkspaceV2Shell({
     return `${delta >= 0 ? "+" : ""}${delta} MB`;
   }, [memorySnapshots, spanish]);
 
+  const handleProviderDebug = useCallback(
+    (event: WorkspaceV2ProviderDebugEvent) => {
+      if (event.transition) {
+        setLastTransition(event.transition);
+      }
+      if (event.error) {
+        setLastError(event.error);
+      }
+      setProviderDebug((current) => ({
+        lastEvent: event.transition ?? current.lastEvent,
+        providerLoaded: event.providerLoaded ?? current.providerLoaded,
+        providerPlaying: event.providerPlaying ?? current.providerPlaying,
+        providerReady: event.providerReady ?? current.providerReady,
+      }));
+      recordLog({
+        channel: event.error ? "error" : "provider",
+        details: event.error ?? event.details,
+        message: event.transition ?? "PROVIDER_EVENT",
+      });
+    },
+    [recordLog],
+  );
+
+  const handlePlay = useCallback(() => {
+    try {
+      recordTransition("PLAY_REQUEST", `${activeSongId} / ${controller.activeSong?.title ?? "No song"}`);
+      controller.play();
+    } catch (error) {
+      recordError(
+        "PLAY_FAILED",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }, [activeSongId, controller, recordError, recordTransition]);
+
+  const handleNext = useCallback(() => {
+    try {
+      recordTransition("NEXT_REQUEST", `${activeSongId} -> ${nextSongId}`);
+      if (!controller.canAdvance) {
+        recordError("NEXT_FAILED", "Queue cannot advance from current state.");
+        return;
+      }
+      controller.next();
+    } catch (error) {
+      recordError(
+        "NEXT_FAILED",
+        error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error),
+      );
+    }
+  }, [activeSongId, controller, nextSongId, recordError, recordTransition]);
+
   useEffect(() => {
     const key = `${controller.playback.state}:${activeSongId}:${controller.playback.error ?? ""}`;
     if (playbackRef.current === key) return;
     playbackRef.current = key;
     if (controller.playback.state === "playing" && !sessionStartedAtRef.current) {
       sessionStartedAtRef.current = Date.now();
+    }
+    if (controller.playback.state === "playing") {
+      recordTransition(
+        "PLAY_STARTED",
+        `${activeSongId} / ${controller.activeSong?.title ?? "Unknown song"}`,
+      );
+    }
+    if (controller.playback.state === "error") {
+      recordError("PLAY_FAILED", controller.playback.error ?? "Playback machine entered error state.");
     }
     setLogs((current) =>
       pushLog(current, {
@@ -224,6 +374,8 @@ export function WorkspaceV2Shell({
     controller.activeSong,
     controller.playback.error,
     controller.playback.state,
+    recordError,
+    recordTransition,
     spanish,
   ]);
 
@@ -240,6 +392,12 @@ export function WorkspaceV2Shell({
       }),
     );
     if (activeSongId !== "none") {
+      if (controller.queue.lastAdvanceReason && controller.queue.lastAdvanceReason !== "load_queue") {
+        recordTransition(
+          "NEXT_LOADED",
+          `${activeSongId} / ${controller.activeSong?.title ?? "Unknown song"}`,
+        );
+      }
       captureMemorySnapshot(
         `Cambio de cancion ${positionCurrent}/${positionTotal}`,
       );
@@ -248,8 +406,10 @@ export function WorkspaceV2Shell({
     activeSongId,
     captureMemorySnapshot,
     controller.queue.lastAdvanceReason,
+    controller.activeSong,
     positionCurrent,
     positionTotal,
+    recordTransition,
     remainingCount,
   ]);
 
@@ -385,6 +545,7 @@ export function WorkspaceV2Shell({
           <WorkspaceV2ProviderPlayerAdapter
             command={controller.playback.pendingCommand}
             locale={locale}
+            onDebug={handleProviderDebug}
             onEvent={controller.handleProviderEvent}
             song={controller.activeSong}
           />
@@ -392,13 +553,13 @@ export function WorkspaceV2Shell({
       </header>
 
       <div className="workspace-v2-controls">
-        <button onClick={controller.play}>
+        <button onClick={handlePlay}>
           <Play size={16} /> Play
         </button>
         <button onClick={controller.pause}>
           <Pause size={16} /> Pause
         </button>
-        <button disabled={!controller.canAdvance} onClick={() => controller.next()}>
+        <button disabled={!controller.canAdvance} onClick={handleNext}>
           <SkipForward size={16} /> {spanish ? "Siguiente" : "Next"}
         </button>
       </div>
@@ -445,6 +606,49 @@ export function WorkspaceV2Shell({
           <strong>{memoryTrend}</strong>
         </div>
       </div>
+
+      <section className="workspace-v2-debug-panel" aria-label="Workspace V2 debug panel">
+        <div>
+          <span>currentSongId</span>
+          <strong>{activeSongId}</strong>
+        </div>
+        <div>
+          <span>nextSongId</span>
+          <strong>{nextSongId}</strong>
+        </div>
+        <div>
+          <span>playbackState</span>
+          <strong>{controller.playback.state}</strong>
+        </div>
+        <div>
+          <span>queueState</span>
+          <strong>
+            {controller.queue.activeQueue?.mode ?? "none"} /{" "}
+            {controller.queue.activeQueue?.source ?? "none"} / {positionCurrent}
+            of {positionTotal}
+          </strong>
+        </div>
+        <div>
+          <span>providerReady</span>
+          <strong>{providerDebug.providerReady ? "true" : "false"}</strong>
+        </div>
+        <div>
+          <span>providerLoaded</span>
+          <strong>{providerDebug.providerLoaded ? "true" : "false"}</strong>
+        </div>
+        <div>
+          <span>providerPlaying</span>
+          <strong>{providerDebug.providerPlaying ? "true" : "false"}</strong>
+        </div>
+        <div>
+          <span>lastTransition</span>
+          <strong>{lastTransition}</strong>
+        </div>
+        <div className="workspace-v2-debug-wide">
+          <span>lastError</span>
+          <strong>{lastError ?? "-"}</strong>
+        </div>
+      </section>
 
       <div className="workspace-v2-grid">
         <aside className="workspace-v2-queue">
