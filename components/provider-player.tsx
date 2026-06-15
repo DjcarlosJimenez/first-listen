@@ -44,6 +44,22 @@ export type ProviderTelemetrySnapshot = {
   lastInteractionAt: number;
 };
 
+export type ProviderLifecycleDebugEvent = {
+  currentIframeSrc?: string | null;
+  details?: string;
+  iframeLoadCount?: number;
+  mountCount?: number;
+  renderCount?: number;
+  transition:
+    | "PLAYER_RENDER_SAMPLE"
+    | "PLAYER_MOUNT"
+    | "PLAYER_UNMOUNT"
+    | "IFRAME_LOADED"
+    | "YOUTUBE_CLEANUP";
+  unmountCount?: number;
+  youtubeCleanupCount?: number;
+};
+
 type ProviderProgressSample = {
   currentTime: number;
   duration: number;
@@ -340,6 +356,7 @@ export function ProviderPlayer({
   title,
   onTelemetry,
   onReady,
+  onLifecycleDebug,
   autoPlay = false,
   controlChannel,
   skipExternalRedirectWarning = false,
@@ -354,12 +371,15 @@ export function ProviderPlayer({
   title: string;
   onTelemetry?: (snapshot: ProviderTelemetrySnapshot) => void;
   onReady?: () => void;
+  onLifecycleDebug?: (event: ProviderLifecycleDebugEvent) => void;
   autoPlay?: boolean;
   controlChannel?: string;
   skipExternalRedirectWarning?: boolean;
   onExternalRedirectPreferenceChange?: (disabled: boolean) => void;
 }) {
   const playbackInstanceId = useId();
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const spotifyContainerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YouTubePlayer | null>(null);
@@ -401,6 +421,11 @@ export function ProviderPlayer({
   const lastActivePlaybackLogRef = useRef({ at: 0, target: "" });
   const lastInteractionAtRef = useRef(Date.now());
   const previousPlaybackStateRef = useRef<PlaybackState>("loading");
+  const mountCountRef = useRef(0);
+  const unmountCountRef = useRef(0);
+  const iframeLoadCountRef = useRef(0);
+  const youtubeCleanupCountRef = useRef(0);
+  const initialMountLogRef = useRef({ songLoadedAt, title });
   const previousPlaybackTargetRef = useRef<{
     link: string;
     platform: Platform;
@@ -447,6 +472,22 @@ export function ProviderPlayer({
   useEffect(() => {
     onReadyRef.current = onReady;
   }, [onReady]);
+
+  useEffect(() => {
+    if (!onLifecycleDebug) return;
+    const interval = window.setInterval(() => {
+      onLifecycleDebug({
+        currentIframeSrc: iframeRef.current?.src ?? null,
+        iframeLoadCount: iframeLoadCountRef.current,
+        mountCount: mountCountRef.current,
+        renderCount: renderCountRef.current,
+        transition: "PLAYER_RENDER_SAMPLE",
+        unmountCount: unmountCountRef.current,
+        youtubeCleanupCount: youtubeCleanupCountRef.current,
+      });
+    }, 2000);
+    return () => window.clearInterval(interval);
+  }, [onLifecycleDebug]);
 
   useEffect(() => {
     autoPlayRef.current = autoPlay;
@@ -767,6 +808,16 @@ export function ProviderPlayer({
 
   useEffect(() => {
     const mountedAt = timestamp();
+    mountCountRef.current += 1;
+    onLifecycleDebug?.({
+      currentIframeSrc: iframeRef.current?.src ?? null,
+      iframeLoadCount: iframeLoadCountRef.current,
+      mountCount: mountCountRef.current,
+      renderCount: renderCountRef.current,
+      transition: "PLAYER_MOUNT",
+      unmountCount: unmountCountRef.current,
+      youtubeCleanupCount: youtubeCleanupCountRef.current,
+    });
     const queryDebug =
       new URLSearchParams(window.location.search).get("debug") === "1";
     if (queryDebug) {
@@ -780,10 +831,23 @@ export function ProviderPlayer({
     setPlayerMountedAt(mountedAt);
     console.info("[First Listen player] Player mounted", {
       playerMountedAt: mountedAt,
-      songLoadedAt,
-      title,
+      songLoadedAt: initialMountLogRef.current.songLoadedAt,
+      title: initialMountLogRef.current.title,
     });
-  }, [songLoadedAt, title]);
+    const mountedIframe = iframeRef.current;
+    return () => {
+      unmountCountRef.current += 1;
+      onLifecycleDebug?.({
+        currentIframeSrc: mountedIframe?.src ?? null,
+        iframeLoadCount: iframeLoadCountRef.current,
+        mountCount: mountCountRef.current,
+        renderCount: renderCountRef.current,
+        transition: "PLAYER_UNMOUNT",
+        unmountCount: unmountCountRef.current,
+        youtubeCleanupCount: youtubeCleanupCountRef.current,
+      });
+    };
+  }, [onLifecycleDebug]);
 
   useEffect(() => {
     const previous = previousPlaybackTargetRef.current;
@@ -1276,9 +1340,21 @@ export function ProviderPlayer({
         }
       });
 
+    const cleanupIframe = iframeRef.current;
     return () => {
       disposed = true;
       clearAutoplayRetryTimers();
+      youtubeCleanupCountRef.current += 1;
+      onLifecycleDebug?.({
+        currentIframeSrc: cleanupIframe?.src ?? null,
+        details: iframeSrc,
+        iframeLoadCount: iframeLoadCountRef.current,
+        mountCount: mountCountRef.current,
+        renderCount: renderCountRef.current,
+        transition: "YOUTUBE_CLEANUP",
+        unmountCount: unmountCountRef.current,
+        youtubeCleanupCount: youtubeCleanupCountRef.current,
+      });
       const playerToDestroy = player ?? youtubePlayerRef.current;
       if (youtubePlayerRef.current === playerToDestroy) {
         youtubePlayerRef.current = null;
@@ -1300,6 +1376,7 @@ export function ProviderPlayer({
     initializationAttempt,
     loadedEmbedSrc,
     markProviderError,
+    onLifecycleDebug,
     playerMountedAt,
     readYouTubeTelemetry,
     scheduleYouTubeAutoplayRetries,
@@ -1520,8 +1597,18 @@ export function ProviderPlayer({
   const playerLoaded = () => {
     if (!embed || !iframeSrc) return;
     const loadedAt = timestamp();
+    iframeLoadCountRef.current += 1;
     setLoadedEmbedSrc(iframeSrc);
     setIframeLoadedAt(loadedAt);
+    onLifecycleDebug?.({
+      currentIframeSrc: iframeSrc,
+      iframeLoadCount: iframeLoadCountRef.current,
+      mountCount: mountCountRef.current,
+      renderCount: renderCountRef.current,
+      transition: "IFRAME_LOADED",
+      unmountCount: unmountCountRef.current,
+      youtubeCleanupCount: youtubeCleanupCountRef.current,
+    });
     console.info("[First Listen player] Provider iframe loaded", {
       embedUrl: iframeSrc,
       iframeLoadedAt: loadedAt,

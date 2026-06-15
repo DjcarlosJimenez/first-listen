@@ -45,10 +45,19 @@ type PerformanceWithMemory = Performance & {
 };
 
 type ProviderDebugState = {
+  adapterMountCount: number;
+  adapterRenderCount: number;
+  adapterUnmountCount: number;
+  currentIframeSrc: string | null;
+  iframeLoadCount: number;
   lastEvent: string;
+  playerMountCount: number;
+  playerRenderCount: number;
+  playerUnmountCount: number;
   providerLoaded: boolean;
   providerPlaying: boolean;
   providerReady: boolean;
+  youtubeCleanupCount: number;
 };
 
 function clock(seconds: number) {
@@ -134,10 +143,19 @@ export function WorkspaceV2Shell({
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastTransition, setLastTransition] = useState("BOOT");
   const [providerDebug, setProviderDebug] = useState<ProviderDebugState>({
+    adapterMountCount: 0,
+    adapterRenderCount: 0,
+    adapterUnmountCount: 0,
+    currentIframeSrc: null,
+    iframeLoadCount: 0,
     lastEvent: "waiting",
+    playerMountCount: 0,
+    playerRenderCount: 0,
+    playerUnmountCount: 0,
     providerLoaded: false,
     providerPlaying: false,
     providerReady: false,
+    youtubeCleanupCount: 0,
   });
   const playbackRef = useRef("");
   const queueRef = useRef("");
@@ -301,10 +319,23 @@ export function WorkspaceV2Shell({
         setLastError(event.error);
       }
       setProviderDebug((current) => ({
+        adapterMountCount: event.adapterMountCount ?? current.adapterMountCount,
+        adapterRenderCount:
+          event.adapterRenderCount ?? current.adapterRenderCount,
+        adapterUnmountCount:
+          event.adapterUnmountCount ?? current.adapterUnmountCount,
+        currentIframeSrc: event.currentIframeSrc ?? current.currentIframeSrc,
+        iframeLoadCount: event.iframeLoadCount ?? current.iframeLoadCount,
         lastEvent: event.transition ?? current.lastEvent,
+        playerMountCount: event.playerMountCount ?? current.playerMountCount,
+        playerRenderCount: event.playerRenderCount ?? current.playerRenderCount,
+        playerUnmountCount:
+          event.playerUnmountCount ?? current.playerUnmountCount,
         providerLoaded: event.providerLoaded ?? current.providerLoaded,
         providerPlaying: event.providerPlaying ?? current.providerPlaying,
         providerReady: event.providerReady ?? current.providerReady,
+        youtubeCleanupCount:
+          event.youtubeCleanupCount ?? current.youtubeCleanupCount,
       }));
       recordLog({
         channel: event.error ? "error" : "provider",
@@ -644,9 +675,41 @@ export function WorkspaceV2Shell({
           <span>lastTransition</span>
           <strong>{lastTransition}</strong>
         </div>
+        <div>
+          <span>adapter renders</span>
+          <strong>{providerDebug.adapterRenderCount}</strong>
+        </div>
+        <div>
+          <span>adapter mount/unmount</span>
+          <strong>
+            {providerDebug.adapterMountCount}/{providerDebug.adapterUnmountCount}
+          </strong>
+        </div>
+        <div>
+          <span>player renders</span>
+          <strong>{providerDebug.playerRenderCount}</strong>
+        </div>
+        <div>
+          <span>player mount/unmount</span>
+          <strong>
+            {providerDebug.playerMountCount}/{providerDebug.playerUnmountCount}
+          </strong>
+        </div>
+        <div>
+          <span>iframe loads</span>
+          <strong>{providerDebug.iframeLoadCount}</strong>
+        </div>
+        <div>
+          <span>youtube cleanup</span>
+          <strong>{providerDebug.youtubeCleanupCount}</strong>
+        </div>
         <div className="workspace-v2-debug-wide">
           <span>lastError</span>
           <strong>{lastError ?? "-"}</strong>
+        </div>
+        <div className="workspace-v2-debug-wide">
+          <span>currentIframeSrc</span>
+          <strong>{providerDebug.currentIframeSrc ?? "-"}</strong>
         </div>
       </section>
 
