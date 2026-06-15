@@ -550,7 +550,7 @@ export function AdminPanel({
     <main className="admin-page">
       <header className="account-header">
         <Logo />
-        <Link href="/review"><ArrowLeft size={16} /> Review Songs</Link>
+        <Link href="/dashboard"><ArrowLeft size={16} /> Workspace V2</Link>
       </header>
       <div className="admin-shell">
         <aside className="admin-nav">

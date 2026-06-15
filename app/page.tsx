@@ -24,7 +24,7 @@ export default async function Home() {
     founderRemaining = 0;
   }
 
-  if (authenticated) redirect("/review");
+  if (authenticated) redirect("/dashboard");
   const cookieStore = await cookies();
   if (cookieStore.get("first-listen-guest-token")?.value) redirect("/guest");
 

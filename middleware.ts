@@ -80,7 +80,7 @@ export async function middleware(request: NextRequest) {
 
     if (path.startsWith("/owner")) {
       if (!hasOwnerAccess(profile, user.email)) {
-        return NextResponse.redirect(new URL("/review", request.url));
+        return NextResponse.redirect(new URL("/dashboard", request.url));
       }
     }
 
@@ -91,12 +91,12 @@ export async function middleware(request: NextRequest) {
           allowModerator: isModerationPath,
         })
       ) {
-        return NextResponse.redirect(new URL("/review", request.url));
+        return NextResponse.redirect(new URL("/dashboard", request.url));
       }
     }
 
     if (authPaths.includes(path) && !profile?.force_password_change) {
-      return NextResponse.redirect(new URL("/review", request.url));
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 

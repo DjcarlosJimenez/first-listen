@@ -64,7 +64,7 @@ export async function AdminPageContent({
     !profile ||
     !canAccessAdminRoute(profile, user.email, { allowModerator })
   ) {
-    redirect("/review");
+    redirect("/dashboard");
   }
   const ownerAccess = hasOwnerAccess(profile, user.email);
   const adminAccess = hasAdminAccess(profile, user.email);

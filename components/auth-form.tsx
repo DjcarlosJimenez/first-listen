@@ -43,7 +43,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [accepted, setAccepted] = useState(false);
   const [unconfirmedEmail, setUnconfirmedEmail] = useState("");
   const isSignup = mode === "signup";
-  const nextPath = useMemo(() => searchParams.get("next") || "/review", [searchParams]);
+  const nextPath = useMemo(() => searchParams.get("next") || "/dashboard", [searchParams]);
   const resetMessage =
     searchParams.get("message") === "password-reset"
       ? spanish
@@ -103,7 +103,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               guest_access_token:
                 window.localStorage.getItem("first-listen-guest-token"),
             },
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
           },
         })
       : await supabase.auth.signInWithPassword({ email, password });
@@ -124,7 +124,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       return;
     }
 
-    router.replace(isSignup ? "/review" : nextPath);
+    router.replace(isSignup ? "/dashboard" : nextPath);
     router.refresh();
   };
 

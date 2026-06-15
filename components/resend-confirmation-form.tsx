@@ -55,7 +55,7 @@ export function ResendConfirmationForm() {
       type: "signup",
       email: normalizedEmail,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/review`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
       },
     });
     setLoading(false);

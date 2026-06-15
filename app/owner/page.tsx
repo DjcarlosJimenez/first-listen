@@ -63,7 +63,7 @@ export default async function OwnerControlCenterPage() {
     .select("role, founder_number")
     .eq("id", user.id)
     .single();
-  if (!hasOwnerAccess(profile, user.email)) redirect("/review");
+  if (!hasOwnerAccess(profile, user.email)) redirect("/dashboard");
 
   const [
     { data: controlCenterData, error: controlError },
@@ -131,8 +131,8 @@ export default async function OwnerControlCenterPage() {
           <Link href="/admin">
             <ShieldCheck size={16} /> Admin Panel
           </Link>
-          <Link href="/review">
-            <ArrowLeft size={16} /> Review Songs
+          <Link href="/dashboard">
+            <ArrowLeft size={16} /> Workspace V2
           </Link>
         </div>
       </header>

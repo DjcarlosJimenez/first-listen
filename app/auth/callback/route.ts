@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const nextPath =
     requestedNext?.startsWith("/") && !requestedNext.startsWith("//")
       ? requestedNext
-      : "/review";
+      : "/dashboard";
   const cookieStore = await cookies();
 
   if (code && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {

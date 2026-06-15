@@ -1242,7 +1242,7 @@ export function ProfilePanel({
                       {spanish ? "Apoyar a un creador" : "Support a creator"}
                     </button>
                   ) : (
-                    <Link href="/review">{spanish ? "Apoyar a un creador" : "Support a creator"}</Link>
+                    <Link href="/dashboard">{spanish ? "Apoyar a un creador" : "Support a creator"}</Link>
                   )}
                 </div>
               )}
@@ -1261,7 +1261,7 @@ export function ProfilePanel({
                   {spanish ? "Escuchar y descubrir música" : "Review and discover music"}
                 </button>
               ) : (
-                <Link href="/review">{spanish ? "Escuchar y descubrir música" : "Review and discover music"}</Link>
+                <Link href="/dashboard">{spanish ? "Escuchar y descubrir música" : "Review and discover music"}</Link>
               )}
             </div>
           ) : (

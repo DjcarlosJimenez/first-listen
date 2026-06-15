@@ -2300,7 +2300,7 @@ export function SuperAdminControlCenter({
                       ? "/"
                       : config.ui.preview.target === "section" &&
                           config.ui.preview.section === "review_queue"
-                        ? "/review"
+                        ? "/dashboard"
                         : "/";
                   window.open(target, "_blank", "noopener,noreferrer");
                 }}
