@@ -18,16 +18,21 @@ import {
   LockKeyhole,
   LogOut,
   Maximize2,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pause,
   Play,
   Send,
   ShieldCheck,
   SkipForward,
+  Sun,
   User,
   Wrench,
 } from "lucide-react";
 import { SubmitView, type SongSubmission } from "@/components/first-listen-app";
 import { ProfilePanel, type ProfilePanelProps } from "@/components/profile-panel";
+import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import { SongActionBar } from "@/components/song-action-bar";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { databasePlatform } from "@/lib/content-economy";
@@ -306,6 +311,7 @@ function WorkspaceV2ShellClient({
   const [activePanel, setActivePanel] = useState<WorkspaceV2Panel>("discover");
   const productivityMode = activePanel !== "discover";
   const workspaceMode = productivityMode ? "productivity" : "discover";
+  const [darkMode, setDarkMode] = useState(false);
   const [debugOpen, setDebugOpen] = useState(debugMode && debugAllowed);
   const [
     founderSubmissionsRemaining,
@@ -316,6 +322,7 @@ function WorkspaceV2ShellClient({
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastTransition, setLastTransition] = useState("BOOT");
   const [metadataOverlayVisible, setMetadataOverlayVisible] = useState(true);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [pipelineDebug, setPipelineDebug] =
     useState<PlaybackPipelineDebug>(initialPipelineDebug);
@@ -368,6 +375,15 @@ function WorkspaceV2ShellClient({
     },
     [recordLog],
   );
+
+  useEffect(() => {
+    setDarkMode(window.localStorage.getItem("first-listen-theme") === "dark");
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("theme-dark", darkMode);
+    window.localStorage.setItem("first-listen-theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   useEffect(() => {
     if (!economy.state.lastUpdatedAt) return;
@@ -1015,7 +1031,8 @@ function WorkspaceV2ShellClient({
 
   return (
     <section
-      className="workspace-v2-product-shell"
+      className={`workspace-v2-product-shell${darkMode ? " theme-dark" : ""}`}
+      data-sidebar={sidebarExpanded ? "expanded" : "compact"}
       data-viewer-mode={viewerMode}
       data-workspace-mode={workspaceMode}
       data-workspace-version="2"
@@ -1025,6 +1042,24 @@ function WorkspaceV2ShellClient({
           <span>FIRST LISTEN</span>
           <small>{displayIdentity}</small>
         </div>
+        <button
+          aria-expanded={sidebarExpanded}
+          aria-label={
+            sidebarExpanded
+              ? spanish
+                ? "Contraer navegacion"
+                : "Collapse navigation"
+              : spanish
+                ? "Expandir navegacion"
+                : "Expand navigation"
+          }
+          className="workspace-v2-sidebar-toggle"
+          onClick={() => setSidebarExpanded((current) => !current)}
+          type="button"
+        >
+          {sidebarExpanded ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
+          <span>{sidebarExpanded ? (spanish ? "Contraer" : "Collapse") : "Menu"}</span>
+        </button>
         <nav>
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -1037,11 +1072,33 @@ function WorkspaceV2ShellClient({
                 type="button"
               >
                 <Icon size={17} />
-                {panelLabel(item.id, spanish)}
+                <span>{panelLabel(item.id, spanish)}</span>
               </button>
             );
           })}
         </nav>
+        <PwaInstallButton
+          className="workspace-v2-nav-action workspace-v2-install-action"
+          compact
+          locale={locale}
+        />
+        <button
+          aria-label={
+            darkMode
+              ? spanish
+                ? "Usar tema claro"
+                : "Use light theme"
+              : spanish
+                ? "Usar tema oscuro"
+                : "Use dark theme"
+          }
+          className="workspace-v2-nav-action"
+          onClick={() => setDarkMode((current) => !current)}
+          type="button"
+        >
+          {darkMode ? <Sun size={17} /> : <Moon size={17} />}
+          <span>{darkMode ? (spanish ? "Tema claro" : "Light mode") : (spanish ? "Tema oscuro" : "Dark mode")}</span>
+        </button>
         {debugAllowed && (
           <button
             className="workspace-v2-debug-toggle"
@@ -1049,13 +1106,15 @@ function WorkspaceV2ShellClient({
             type="button"
           >
             <Gauge size={15} />
-            {debugOpen
-              ? spanish
-                ? "Ocultar debug"
-                : "Hide debug"
-              : spanish
-                ? "Debug Founder"
-                : "Founder debug"}
+            <span>
+              {debugOpen
+                ? spanish
+                  ? "Ocultar debug"
+                  : "Hide debug"
+                : spanish
+                  ? "Debug Founder"
+                  : "Founder debug"}
+            </span>
           </button>
         )}
         <button
@@ -1065,17 +1124,19 @@ function WorkspaceV2ShellClient({
           type="button"
         >
           <LogOut size={15} />
-          {signingOut
-            ? spanish
-              ? "Saliendo..."
-              : "Signing out..."
-              : viewerMode === "guest"
-                ? spanish
-                  ? "Cambiar cuenta"
-                  : "Switch account"
-              : spanish
-                ? "Cerrar sesion"
-                : "Sign out"}
+          <span>
+            {signingOut
+              ? spanish
+                ? "Saliendo..."
+                : "Signing out..."
+                : viewerMode === "guest"
+                  ? spanish
+                    ? "Cambiar cuenta"
+                    : "Switch account"
+                : spanish
+                  ? "Cerrar sesion"
+                  : "Sign out"}
+          </span>
         </button>
       </aside>
 
@@ -1292,7 +1353,7 @@ function WorkspaceV2ShellClient({
           )}
         </section>
 
-        <div className="workspace-v2-product-body">
+        <div className="workspace-v2-product-body" data-workspace-mode={workspaceMode}>
           <WorkspaceV2ContentPanel
             activePanel={activePanel}
             canAccessAdmin={canAccessAdmin}
@@ -1313,7 +1374,11 @@ function WorkspaceV2ShellClient({
             viewerMode={viewerMode}
           />
 
-          <aside className="workspace-v2-queue-panel" aria-label="Queue">
+          <aside
+            className="workspace-v2-queue-panel"
+            data-workspace-mode={workspaceMode}
+            aria-label="Queue"
+          >
             <span className="eyebrow">
               <ListMusic size={13} />
               {spanish ? "Cola" : "Queue"}
