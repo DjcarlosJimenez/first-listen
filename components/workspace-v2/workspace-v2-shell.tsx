@@ -134,6 +134,33 @@ export function WorkspaceV2Shell({
   initialQueue: WorkspaceV2Queue;
   locale: InterfaceLocale;
 }) {
+  const [clientMounted, setClientMounted] = useState(false);
+
+  useEffect(() => {
+    setClientMounted(true);
+  }, []);
+
+  if (!clientMounted) {
+    return (
+      <section className="workspace-v2-shell" data-workspace-version="2">
+        <div className="workspace-v2-sandbox-banner" role="status">
+          <strong>Workspace V2 Preview</strong>
+          <span>Preparing client-only playback diagnostics...</span>
+        </div>
+      </section>
+    );
+  }
+
+  return <WorkspaceV2ShellClient initialQueue={initialQueue} locale={locale} />;
+}
+
+function WorkspaceV2ShellClient({
+  initialQueue,
+  locale,
+}: {
+  initialQueue: WorkspaceV2Queue;
+  locale: InterfaceLocale;
+}) {
   const controller = useWorkspaceV2Controller();
   const { loadQueue } = controller;
   const spanish = locale === "es";
