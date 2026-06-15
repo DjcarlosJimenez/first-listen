@@ -206,6 +206,7 @@ export function WorkspaceV2Shell({
   guestToken,
   initialQueue,
   locale,
+  viewerIdentity,
   viewerMode = "member",
 }: {
   debugMode?: boolean;
@@ -213,6 +214,7 @@ export function WorkspaceV2Shell({
   guestToken?: string | null;
   initialQueue: WorkspaceV2Queue;
   locale: InterfaceLocale;
+  viewerIdentity?: string | null;
   viewerMode?: WorkspaceV2ViewerMode;
 }) {
   const [clientMounted, setClientMounted] = useState(false);
@@ -239,6 +241,7 @@ export function WorkspaceV2Shell({
       guestToken={guestToken}
       initialQueue={initialQueue}
       locale={locale}
+      viewerIdentity={viewerIdentity}
       viewerMode={viewerMode}
     />
   );
@@ -250,6 +253,7 @@ function WorkspaceV2ShellClient({
   guestToken,
   initialQueue,
   locale,
+  viewerIdentity,
   viewerMode,
 }: {
   debugMode: boolean;
@@ -257,6 +261,7 @@ function WorkspaceV2ShellClient({
   guestToken?: string | null;
   initialQueue: WorkspaceV2Queue;
   locale: InterfaceLocale;
+  viewerIdentity?: string | null;
   viewerMode: WorkspaceV2ViewerMode;
 }) {
   const controller = useWorkspaceV2Controller();
@@ -271,6 +276,8 @@ function WorkspaceV2ShellClient({
   const canClaimRewards = viewerMode !== "guest" && economy.enabled;
   const canSubmit = viewerMode !== "guest";
   const debugAllowed = canAccessAdmin;
+  const displayIdentity =
+    viewerIdentity?.trim() || viewerLabel(viewerMode, spanish);
   const [activePanel, setActivePanel] = useState<WorkspaceV2Panel>("discover");
   const [debugOpen, setDebugOpen] = useState(debugMode && debugAllowed);
   const [heroCollapsed, setHeroCollapsed] = useState(false);
@@ -886,7 +893,7 @@ function WorkspaceV2ShellClient({
       <aside className="workspace-v2-product-nav" aria-label="Workspace navigation">
         <div className="workspace-v2-product-brand">
           <span>FIRST LISTEN</span>
-          <small>{viewerLabel(viewerMode, spanish)}</small>
+          <small>{displayIdentity}</small>
         </div>
         <nav>
           {navItems.map((item) => {
@@ -932,12 +939,12 @@ function WorkspaceV2ShellClient({
             ? spanish
               ? "Saliendo..."
               : "Signing out..."
-            : viewerMode === "guest"
-              ? spanish
-                ? "Cambiar cuenta"
-                : "Switch account"
+              : viewerMode === "guest"
+                ? spanish
+                  ? "Cambiar cuenta"
+                  : "Switch account"
               : spanish
-                ? "Cerrar sesiÃ³n"
+                ? "Cerrar sesion"
                 : "Sign out"}
         </button>
       </aside>

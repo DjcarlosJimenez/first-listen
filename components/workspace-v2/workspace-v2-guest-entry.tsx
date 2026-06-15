@@ -199,6 +199,9 @@ export function WorkspaceV2GuestEntry() {
   }, [loadQueue]);
 
   const spanish = locale === "es";
+  const guestIdentity = guest
+    ? `${guest.nickname} #${guest.listenerId.slice(0, 8)}`
+    : null;
 
   if (loading) {
     return (
@@ -241,7 +244,7 @@ export function WorkspaceV2GuestEntry() {
 
       <section className="workspace-v2-preview-intro">
         <span className="eyebrow">
-          {spanish ? "Invitado" : "Guest Listener"} / {guest.listenerId}
+          {spanish ? "Invitado" : "Guest Listener"} / {guestIdentity}
         </span>
         <h1>Workspace V2</h1>
         <p>
@@ -263,6 +266,7 @@ export function WorkspaceV2GuestEntry() {
             guestToken={guest.token}
             initialQueue={queue}
             locale={locale}
+            viewerIdentity={guestIdentity}
             viewerMode="guest"
           />
         </WorkspaceV2PreviewErrorBoundary>
