@@ -14,6 +14,7 @@ import type {
   CommunityNetwork,
   ConnectedPlatform,
   ConnectedPlatformAccount,
+  ContentEconomySetting,
 } from "@/lib/types";
 import type { WorkspaceV2Queue, WorkspaceV2Song } from "@/lib/workspace-v2";
 
@@ -42,6 +43,41 @@ type WorkspaceV2SongRow = {
   title: string | null;
   user_id: string | null;
 };
+
+type ContentEconomyRow = {
+  activation_at: string | null;
+  activation_pending: boolean | null;
+  classification: "internal" | "external" | null;
+  compatibility_status:
+    | "Partially Supported"
+    | "Discovery Only"
+    | "Not Recommended"
+    | null;
+  current_token_cost: number | null;
+  effective_token_cost: number | null;
+  platform: string | null;
+  scheduled_token_cost: number | null;
+};
+
+function mapContentEconomyRows(
+  rows: ContentEconomyRow[] | null | undefined,
+): ContentEconomySetting[] {
+  return (rows ?? []).map((setting) => {
+    const platform = displayPlatform[String(setting.platform ?? "")] ?? "YouTube";
+    return {
+      activationAt: setting.activation_at ?? undefined,
+      activationPending: Boolean(setting.activation_pending),
+      classification:
+        setting.classification === "external" ? "external" : "internal",
+      compatibilityStatus:
+        setting.compatibility_status ?? "Partially Supported",
+      currentTokenCost: Number(setting.current_token_cost ?? 1),
+      effectiveTokenCost: Number(setting.effective_token_cost ?? 1),
+      platform,
+      scheduledTokenCost: Number(setting.scheduled_token_cost ?? 1),
+    };
+  });
+}
 
 function localeFromProfile(profile: WorkspaceV2Profile | null): InterfaceLocale {
   return profile?.interface_language === "es" ? "es" : "en";
@@ -244,6 +280,7 @@ export async function WorkspaceV2AuthEntry({
     { data: activityRows },
     { data: connectedPlatformRows },
     { data: removedSongHistoryRows },
+    { data: contentEconomyRows },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -278,6 +315,7 @@ export async function WorkspaceV2AuthEntry({
       )
       .eq("user_id", user.id),
     supabase.rpc("get_my_removed_song_history"),
+    supabase.rpc("get_content_economy_settings"),
   ]);
 
   const typedProfile = profile as WorkspaceV2Profile | null;
@@ -348,8 +386,15 @@ export async function WorkspaceV2AuthEntry({
         <WorkspaceV2PreviewErrorBoundary>
           <WorkspaceV2Shell
             economyMode="live"
+            initialFounderSubmissionsRemaining={Number(
+              typedProfile?.founder_free_submissions_remaining ?? 0,
+            )}
+            initialSubmissionTokens={Number(typedProfile?.credits ?? 0)}
             initialQueue={queue}
             locale={locale}
+            contentEconomy={mapContentEconomyRows(
+              contentEconomyRows as ContentEconomyRow[] | null,
+            )}
             profilePanel={profilePanel}
             viewerMode={viewerMode}
           />

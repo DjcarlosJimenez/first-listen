@@ -26,11 +26,14 @@ import {
   User,
   Wrench,
 } from "lucide-react";
+import { SubmitView, type SongSubmission } from "@/components/first-listen-app";
 import { ProfilePanel, type ProfilePanelProps } from "@/components/profile-panel";
 import { SongActionBar } from "@/components/song-action-bar";
 import type { InterfaceLocale } from "@/lib/catalog";
+import { databasePlatform } from "@/lib/content-economy";
+import { getCopy } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
-import type { Platform } from "@/lib/types";
+import type { ContentEconomySetting, Platform } from "@/lib/types";
 import type { WorkspaceV2Queue, WorkspaceV2Song } from "@/lib/workspace-v2";
 import {
   WorkspaceV2ProviderPlayerAdapter,
@@ -202,19 +205,25 @@ function workspaceSongPlatform(song: WorkspaceV2Song): Platform {
 }
 
 export function WorkspaceV2Shell({
+  contentEconomy = [],
   debugMode = false,
   economyMode = "sandbox",
   guestToken,
+  initialFounderSubmissionsRemaining = 0,
   initialQueue,
+  initialSubmissionTokens = 0,
   locale,
   profilePanel,
   viewerIdentity,
   viewerMode = "member",
 }: {
+  contentEconomy?: ContentEconomySetting[];
   debugMode?: boolean;
   economyMode?: WorkspaceV2EconomyMode;
   guestToken?: string | null;
+  initialFounderSubmissionsRemaining?: number;
   initialQueue: WorkspaceV2Queue;
+  initialSubmissionTokens?: number;
   locale: InterfaceLocale;
   profilePanel?: ProfilePanelProps | null;
   viewerIdentity?: string | null;
@@ -239,10 +248,13 @@ export function WorkspaceV2Shell({
 
   return (
     <WorkspaceV2ShellClient
+      contentEconomy={contentEconomy}
       debugMode={debugMode}
       economyMode={economyMode}
       guestToken={guestToken}
+      initialFounderSubmissionsRemaining={initialFounderSubmissionsRemaining}
       initialQueue={initialQueue}
+      initialSubmissionTokens={initialSubmissionTokens}
       locale={locale}
       profilePanel={profilePanel}
       viewerIdentity={viewerIdentity}
@@ -252,19 +264,25 @@ export function WorkspaceV2Shell({
 }
 
 function WorkspaceV2ShellClient({
+  contentEconomy,
   debugMode,
   economyMode,
   guestToken,
+  initialFounderSubmissionsRemaining,
   initialQueue,
+  initialSubmissionTokens,
   locale,
   profilePanel,
   viewerIdentity,
   viewerMode,
 }: {
+  contentEconomy: ContentEconomySetting[];
   debugMode: boolean;
   economyMode: WorkspaceV2EconomyMode;
   guestToken?: string | null;
+  initialFounderSubmissionsRemaining: number;
   initialQueue: WorkspaceV2Queue;
+  initialSubmissionTokens: number;
   locale: InterfaceLocale;
   profilePanel?: ProfilePanelProps | null;
   viewerIdentity?: string | null;
@@ -281,11 +299,16 @@ function WorkspaceV2ShellClient({
   const canAccessAdmin = viewerMode === "founder" || viewerMode === "admin";
   const canClaimRewards = viewerMode !== "guest" && economy.enabled;
   const canSubmit = viewerMode !== "guest";
+  const copy = useMemo(() => getCopy(locale), [locale]);
   const debugAllowed = canAccessAdmin;
   const displayIdentity =
     viewerIdentity?.trim() || viewerLabel(viewerMode, spanish);
   const [activePanel, setActivePanel] = useState<WorkspaceV2Panel>("discover");
   const [debugOpen, setDebugOpen] = useState(debugMode && debugAllowed);
+  const [
+    founderSubmissionsRemaining,
+    setFounderSubmissionsRemaining,
+  ] = useState(initialFounderSubmissionsRemaining);
   const [heroCollapsed, setHeroCollapsed] = useState(false);
   const [logs, setLogs] = useState<InstrumentationLog[]>([]);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -296,6 +319,8 @@ function WorkspaceV2ShellClient({
     useState<PlaybackPipelineDebug>(initialPipelineDebug);
   const [providerDebug, setProviderDebug] =
     useState<ProviderDebugState>(initialProviderDebug);
+  const [submissionTokens, setSubmissionTokens] = useState(initialSubmissionTokens);
+  const [submitNotice, setSubmitNotice] = useState("");
   const commandRef = useRef("");
   const heroCollapsedRef = useRef(false);
   const heroRef = useRef<HTMLDivElement | null>(null);
@@ -341,6 +366,85 @@ function WorkspaceV2ShellClient({
       recordLog({ channel: "error", details, message });
     },
     [recordLog],
+  );
+
+  useEffect(() => {
+    if (!economy.state.lastUpdatedAt) return;
+    setSubmissionTokens(Number(economy.state.credits ?? 0));
+  }, [economy.state.credits, economy.state.lastUpdatedAt]);
+
+  const notifySubmit = useCallback(
+    (message: string) => {
+      setSubmitNotice(message);
+      recordLog({
+        channel: "transition",
+        details: message,
+        message: "SUBMIT_NOTICE",
+      });
+    },
+    [recordLog],
+  );
+
+  const handleSubmitSong = useCallback(
+    async (usedFounderFree: boolean, submission: SongSubmission) => {
+      const supabase = createClient();
+      if (!supabase) {
+        notifySubmit(
+          spanish
+            ? "El servicio de envio no esta disponible. Actualiza e intenta otra vez."
+            : "Submission service is unavailable. Please refresh and try again.",
+        );
+        return false;
+      }
+
+      const { error } = await supabase.rpc("submit_song", {
+        song_artist_name: submission.artistName,
+        song_content_kind: submission.contentKind,
+        song_country: submission.country,
+        song_cover_image_url: submission.coverImageUrl,
+        song_duration_seconds: submission.durationSeconds,
+        song_explicit_content: submission.explicitContent,
+        song_feedback_focus: submission.feedbackFocus,
+        song_genre: submission.genre,
+        song_language: submission.language,
+        song_music_url: submission.musicUrl,
+        song_platform: databasePlatform[submission.platform],
+        song_title: submission.title,
+      });
+      if (error) {
+        notifySubmit(error.message);
+        recordError("SUBMIT_FAILED", error.message);
+        return false;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: updatedProfile } = await supabase
+          .from("profiles")
+          .select("credits, founder_free_submissions_remaining")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (updatedProfile) {
+          setSubmissionTokens(Number(updatedProfile.credits ?? 0));
+          setFounderSubmissionsRemaining(
+            Number(updatedProfile.founder_free_submissions_remaining ?? 0),
+          );
+        }
+      } else if (usedFounderFree) {
+        setFounderSubmissionsRemaining((current) => Math.max(0, current - 1));
+      }
+
+      void economy.refreshEconomyStatus();
+      recordLog({
+        channel: "transition",
+        details: `${submission.title} / ${submission.platform}`,
+        message: "SUBMIT_SUCCESS",
+      });
+      return true;
+    },
+    [economy, notifySubmit, recordError, recordLog, spanish],
   );
 
   useEffect(() => {
@@ -1154,11 +1258,19 @@ function WorkspaceV2ShellClient({
             activePanel={activePanel}
             canAccessAdmin={canAccessAdmin}
             canSubmit={canSubmit}
+            contentEconomy={contentEconomy}
+            copy={copy}
+            founderFree={founderSubmissionsRemaining > 0}
             initialQueue={initialQueue}
             locale={locale}
             onPanelChange={setActivePanel}
             onPlaySong={handlePlayQueueSong}
+            onSubmitNotice={notifySubmit}
+            onSubmitSong={handleSubmitSong}
             profilePanel={profilePanel}
+            submitNotice={submitNotice}
+            submissionTokens={submissionTokens}
+            unlimitedSubmissionTokens={viewerMode === "founder"}
             viewerMode={viewerMode}
           />
 
@@ -1228,26 +1340,70 @@ function WorkspaceV2ContentPanel({
   activePanel,
   canAccessAdmin,
   canSubmit,
+  contentEconomy,
+  copy,
+  founderFree,
   initialQueue,
   locale,
   onPanelChange,
   onPlaySong,
+  onSubmitNotice,
+  onSubmitSong,
   profilePanel,
+  submitNotice,
+  submissionTokens,
+  unlimitedSubmissionTokens,
   viewerMode,
 }: {
   activePanel: WorkspaceV2Panel;
   canAccessAdmin: boolean;
   canSubmit: boolean;
+  contentEconomy: ContentEconomySetting[];
+  copy: ReturnType<typeof getCopy>;
+  founderFree: boolean;
   initialQueue: WorkspaceV2Queue;
   locale: InterfaceLocale;
   onPanelChange: (panel: WorkspaceV2Panel) => void;
   onPlaySong: (song: WorkspaceV2Song) => void;
+  onSubmitNotice: (message: string) => void;
+  onSubmitSong: (
+    usedFounderFree: boolean,
+    submission: SongSubmission,
+  ) => Promise<boolean>;
   profilePanel?: ProfilePanelProps | null;
+  submitNotice: string;
+  submissionTokens: number;
+  unlimitedSubmissionTokens: boolean;
   viewerMode: WorkspaceV2ViewerMode;
 }) {
   const spanish = locale === "es";
 
   if (activePanel === "submit") {
+    if (canSubmit) {
+      return (
+        <section
+          aria-label={spanish ? "Enviar cancion" : "Submit song"}
+          className="workspace-v2-content-panel workspace-v2-submit-panel"
+        >
+          {submitNotice && (
+            <div className="workspace-v2-submit-notice" role="status">
+              {submitNotice}
+            </div>
+          )}
+          <SubmitView
+            contentEconomy={contentEconomy}
+            copy={copy}
+            founderFree={founderFree}
+            locale={locale}
+            notify={onSubmitNotice}
+            onSubmitted={onSubmitSong}
+            reviewCount={submissionTokens}
+            unlimitedCredits={unlimitedSubmissionTokens}
+          />
+        </section>
+      );
+    }
+
     return (
       <section className="workspace-v2-content-panel">
         <span className="eyebrow">

@@ -769,7 +769,7 @@ type ListeningSessionUi = {
   warning: string;
 };
 
-type SongSubmission = {
+export type SongSubmission = {
   title: string;
   artistName: string;
   coverImageUrl: string;
@@ -8442,7 +8442,7 @@ function toggleFocus(values: FeedbackFocus[], value: FeedbackFocus) {
     : [...values, value];
 }
 
-function SubmitView({
+export function SubmitView({
   reviewCount,
   notify,
   onSubmitted,
