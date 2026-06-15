@@ -13907,6 +13907,21 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   text-decoration: none;
 }
 
+.workspace-v2-product-nav button {
+  font-size: 12px;
+  height: 38px;
+  line-height: 1.15;
+  min-height: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.workspace-v2-product-nav button svg {
+  flex: 0 0 auto;
+}
+
 .workspace-v2-product-nav button.active,
 .workspace-v2-product-nav button:hover,
 .workspace-v2-sticky-controls button:hover,
