@@ -13898,6 +13898,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .workspace-v2-product-hero {
   align-items: stretch;
+  backdrop-filter: blur(14px);
   display: grid;
   gap: 20px;
   grid-template-columns: minmax(260px, 0.65fr) minmax(360px, 1fr);
@@ -13905,7 +13906,20 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   padding: 22px;
   position: sticky;
   top: 76px;
+  transition:
+    border-radius 180ms ease,
+    box-shadow 180ms ease,
+    gap 180ms ease,
+    padding 180ms ease;
   z-index: 16;
+}
+
+.workspace-v2-product-hero[data-collapsed="true"] {
+  border-color: rgba(185, 255, 47, 0.38);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.34);
+  gap: 12px;
+  grid-template-columns: minmax(190px, 0.55fr) minmax(260px, 0.85fr);
+  padding: 12px 14px;
 }
 
 .workspace-v2-hero-copy {
@@ -13918,12 +13932,34 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   font-size: clamp(38px, 6vw, 82px);
   line-height: 0.88;
   margin: 0;
+  transition:
+    font-size 180ms ease,
+    line-height 180ms ease;
 }
 
 .workspace-v2-hero-copy p {
   color: var(--muted);
   font-weight: 800;
   max-width: 520px;
+}
+
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-hero-copy {
+  align-content: center;
+  gap: 5px;
+}
+
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-hero-copy h1 {
+  display: -webkit-box;
+  font-size: clamp(20px, 2.4vw, 34px);
+  line-height: 1;
+  max-height: 68px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-hero-copy p {
+  display: none;
 }
 
 .workspace-v2-player-surface {
@@ -13936,6 +13972,9 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   border-radius: 22px;
   min-height: 390px;
   overflow: hidden;
+  transition:
+    border-radius 180ms ease,
+    min-height 180ms ease;
 }
 
 .workspace-v2-player-surface[data-player-mode="audio"] {
@@ -13956,6 +13995,61 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   min-height: 430px;
 }
 
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface,
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface .workspace-v2-provider-player,
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface .provider-player,
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface[data-player-mode="audio"],
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface[data-player-mode="audio"] .workspace-v2-provider-player,
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface[data-player-mode="audio"] .provider-player {
+  min-height: 118px;
+}
+
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface {
+  border-radius: 16px;
+}
+
+.workspace-v2-compact-listener-status {
+  display: none;
+}
+
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-compact-listener-status {
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.workspace-v2-compact-listener-status article {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.workspace-v2-compact-listener-status span {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-v2-compact-listener-status strong {
+  color: var(--text);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-v2-compact-listener-status article:nth-child(3),
+.workspace-v2-compact-listener-status article:nth-child(4) {
+  border-color: rgba(185, 255, 47, 0.24);
+}
+
 .workspace-v2-sticky-controls {
   align-items: center;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -13964,6 +14058,15 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   gap: 10px;
   grid-column: 1 / -1;
   padding-top: 14px;
+}
+
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-sticky-controls {
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-sticky-controls button {
+  padding: 9px 11px;
 }
 
 .workspace-v2-sticky-controls button:first-child {
@@ -14252,8 +14355,14 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   }
 
   .workspace-v2-product-hero {
-    position: relative;
-    top: auto;
+    position: sticky;
+    top: 76px;
+    z-index: 22;
+  }
+
+  .workspace-v2-product-hero[data-collapsed="true"] {
+    grid-template-columns: 1fr;
+    padding: 10px;
   }
 
   .workspace-v2-player-surface,
@@ -14268,11 +14377,29 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     min-height: 320px;
   }
 
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface,
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface .workspace-v2-provider-player,
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface .provider-player,
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface[data-player-mode="audio"],
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface[data-player-mode="audio"] .workspace-v2-provider-player,
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface[data-player-mode="audio"] .provider-player {
+    min-height: 140px;
+  }
+
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-compact-listener-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .workspace-v2-sticky-controls {
     bottom: 0;
     margin: 0 -6px;
     position: sticky;
     z-index: 20;
+  }
+
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-sticky-controls {
+    margin: 0;
+    position: static;
   }
 
   .workspace-v2-sticky-controls span {
@@ -14309,6 +14436,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
   .workspace-v2-hero-copy h1 {
     font-size: clamp(34px, 13vw, 58px);
+  }
+
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-hero-copy h1 {
+    font-size: clamp(20px, 7vw, 30px);
   }
 
   .workspace-v2-trust-layer {
@@ -14352,8 +14483,13 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .workspace-v2-product-hero {
     grid-template-columns: minmax(220px, 0.55fr) minmax(360px, 1fr);
     padding: 14px;
-    position: relative;
-    top: auto;
+    position: sticky;
+    top: 12px;
+  }
+
+  .workspace-v2-product-hero[data-collapsed="true"] {
+    grid-template-columns: minmax(180px, 0.48fr) minmax(260px, 0.8fr);
+    padding: 10px;
   }
 
   .workspace-v2-player-surface,
@@ -14366,6 +14502,19 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .workspace-v2-player-surface[data-player-mode="audio"] .workspace-v2-provider-player,
   .workspace-v2-player-surface[data-player-mode="audio"] .provider-player {
     min-height: 240px;
+  }
+
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface,
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface .workspace-v2-provider-player,
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface .provider-player,
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface[data-player-mode="audio"],
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface[data-player-mode="audio"] .workspace-v2-provider-player,
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-player-surface[data-player-mode="audio"] .provider-player {
+    min-height: 112px;
+  }
+
+  .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-compact-listener-status {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .workspace-v2-trust-layer {

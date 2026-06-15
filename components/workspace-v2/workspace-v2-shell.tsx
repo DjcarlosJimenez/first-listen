@@ -258,6 +258,7 @@ function WorkspaceV2ShellClient({
   const debugAllowed = canAccessAdmin;
   const [activePanel, setActivePanel] = useState<WorkspaceV2Panel>("discover");
   const [debugOpen, setDebugOpen] = useState(debugMode && debugAllowed);
+  const [heroCollapsed, setHeroCollapsed] = useState(false);
   const [logs, setLogs] = useState<InstrumentationLog[]>([]);
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastTransition, setLastTransition] = useState("BOOT");
@@ -267,6 +268,7 @@ function WorkspaceV2ShellClient({
   const [providerDebug, setProviderDebug] =
     useState<ProviderDebugState>(initialProviderDebug);
   const commandRef = useRef("");
+  const heroCollapsedRef = useRef(false);
   const heroRef = useRef<HTMLDivElement | null>(null);
   const playbackRef = useRef("");
   const queueRef = useRef("");
@@ -332,6 +334,25 @@ function WorkspaceV2ShellClient({
   useEffect(() => {
     const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const updateCollapsedState = () => {
+      const mobile = window.matchMedia("(max-width: 900px)").matches;
+      const threshold = mobile ? 90 : 260;
+      const nextCollapsed = window.scrollY > threshold;
+      if (heroCollapsedRef.current === nextCollapsed) return;
+      heroCollapsedRef.current = nextCollapsed;
+      setHeroCollapsed(nextCollapsed);
+    };
+
+    updateCollapsedState();
+    window.addEventListener("scroll", updateCollapsedState, { passive: true });
+    window.addEventListener("resize", updateCollapsedState);
+    return () => {
+      window.removeEventListener("scroll", updateCollapsedState);
+      window.removeEventListener("resize", updateCollapsedState);
+    };
   }, []);
 
   const handleProviderDebug = useCallback(
@@ -872,6 +893,7 @@ function WorkspaceV2ShellClient({
       <main className="workspace-v2-product-main">
         <section
           className="workspace-v2-product-hero"
+          data-collapsed={heroCollapsed ? "true" : "false"}
           data-player-mode={playerIsVideo ? "video" : "audio"}
           ref={heroRef}
         >
@@ -900,6 +922,28 @@ function WorkspaceV2ShellClient({
               onEvent={handleProviderEvent}
               song={controller.activeSong}
             />
+          </div>
+
+          <div
+            aria-hidden={!heroCollapsed}
+            className="workspace-v2-compact-listener-status"
+          >
+            <article>
+              <span>{spanish ? "Ahora" : "Now"}</span>
+              <strong>{controller.activeSong?.title ?? "-"}</strong>
+            </article>
+            <article>
+              <span>{spanish ? "Siguiente" : "Next"}</span>
+              <strong>{nextSong?.title ?? "-"}</strong>
+            </article>
+            <article>
+              <span>{spanish ? "Banco" : "Time Bank"}</span>
+              <strong>{clock(bankSecondsForDisplay)}</strong>
+            </article>
+            <article>
+              <span>{spanish ? "Recompensa" : "Reward"}</span>
+              <strong>{rewardStatusText}</strong>
+            </article>
           </div>
 
           <div className="workspace-v2-sticky-controls">
