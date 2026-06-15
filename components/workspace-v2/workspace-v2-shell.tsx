@@ -304,6 +304,8 @@ function WorkspaceV2ShellClient({
   const displayIdentity =
     viewerIdentity?.trim() || viewerLabel(viewerMode, spanish);
   const [activePanel, setActivePanel] = useState<WorkspaceV2Panel>("discover");
+  const productivityMode = activePanel !== "discover";
+  const workspaceMode = productivityMode ? "productivity" : "discover";
   const [debugOpen, setDebugOpen] = useState(debugMode && debugAllowed);
   const [
     founderSubmissionsRemaining,
@@ -708,6 +710,7 @@ function WorkspaceV2ShellClient({
           Math.max(economy.state.todayListeningSeconds, displayedTimePlayed) /
             60,
         );
+  const compactHero = heroCollapsed || productivityMode;
   const playerSurfaceStyle: CSSProperties | undefined =
     controller.activeSong && !playerIsVideo && controller.activeSong.coverUrl
       ? {
@@ -1014,6 +1017,7 @@ function WorkspaceV2ShellClient({
     <section
       className="workspace-v2-product-shell"
       data-viewer-mode={viewerMode}
+      data-workspace-mode={workspaceMode}
       data-workspace-version="2"
     >
       <aside className="workspace-v2-product-nav" aria-label="Workspace navigation">
@@ -1078,8 +1082,9 @@ function WorkspaceV2ShellClient({
       <main className="workspace-v2-product-main">
         <section
           className="workspace-v2-product-hero"
-          data-collapsed={heroCollapsed ? "true" : "false"}
+          data-collapsed={compactHero ? "true" : "false"}
           data-player-mode={playerIsVideo ? "video" : "audio"}
+          data-workspace-mode={workspaceMode}
           ref={heroRef}
         >
           <div className="workspace-v2-hero-copy">
@@ -1128,7 +1133,7 @@ function WorkspaceV2ShellClient({
           </div>
 
           <div
-            aria-hidden={!heroCollapsed}
+            aria-hidden={!compactHero}
             className="workspace-v2-compact-listener-status"
           >
             <article>

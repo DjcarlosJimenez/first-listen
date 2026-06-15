@@ -14191,6 +14191,55 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   border-radius: 16px;
 }
 
+.workspace-v2-product-hero[data-workspace-mode="productivity"] {
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.workspace-v2-product-hero[data-workspace-mode="productivity"][data-player-mode="video"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-player-surface,
+.workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-player-surface .workspace-v2-provider-player,
+.workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-player-surface .provider-player {
+  min-height: 150px;
+}
+
+.workspace-v2-product-hero[data-workspace-mode="productivity"][data-player-mode="audio"] .workspace-v2-player-surface,
+.workspace-v2-product-hero[data-workspace-mode="productivity"][data-player-mode="audio"] .workspace-v2-player-surface .workspace-v2-provider-player,
+.workspace-v2-product-hero[data-workspace-mode="productivity"][data-player-mode="audio"] .workspace-v2-player-surface .provider-player {
+  min-height: 170px;
+}
+
+.workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-video-metadata-overlay {
+  left: 10px;
+  padding: 8px 10px;
+  top: 10px;
+}
+
+.workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-video-metadata-overlay strong {
+  font-size: clamp(16px, 2.4vw, 24px);
+}
+
+.workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-compact-listener-status {
+  gap: 6px;
+}
+
+.workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-compact-listener-status article {
+  padding: 7px 9px;
+}
+
+.workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-sticky-controls {
+  gap: 7px;
+  padding-top: 8px;
+}
+
+.workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-active-actions {
+  gap: 6px;
+  padding-top: 8px;
+}
+
 .workspace-v2-compact-listener-status {
   display: none;
 }
@@ -14341,6 +14390,39 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   gap: 6px;
   min-width: 0;
   padding: 12px;
+}
+
+.workspace-v2-product-shell[data-workspace-mode="productivity"] .workspace-v2-trust-layer {
+  gap: 8px;
+  padding: 10px;
+}
+
+.workspace-v2-product-shell[data-workspace-mode="productivity"] .workspace-v2-trust-layer article {
+  border-radius: 14px;
+  gap: 4px;
+  min-height: 0;
+  padding: 9px 10px;
+}
+
+.workspace-v2-product-shell[data-workspace-mode="productivity"] .workspace-v2-trust-layer span {
+  font-size: 8px;
+}
+
+.workspace-v2-product-shell[data-workspace-mode="productivity"] .workspace-v2-trust-layer strong {
+  font-size: 15px;
+}
+
+.workspace-v2-product-shell[data-workspace-mode="productivity"] .workspace-v2-time-bank-card strong {
+  font-size: clamp(20px, 2.6vw, 32px);
+}
+
+.workspace-v2-product-shell[data-workspace-mode="productivity"] .workspace-v2-time-bank-card i,
+.workspace-v2-product-shell[data-workspace-mode="productivity"] .workspace-v2-reward-progress i {
+  height: 6px;
+}
+
+.workspace-v2-product-shell[data-workspace-mode="productivity"] .workspace-v2-motivation-layer {
+  display: none;
 }
 
 .workspace-v2-trust-layer span,
