@@ -30533,3 +30533,976 @@ grant execute on function public.upsert_verified_song_platform_link(uuid, public
   to authenticated;
 grant execute on function public.remove_verified_song_platform_link(uuid, public.music_platform)
   to authenticated;
+
+-- ============================================================
+-- 20260613001000_discovery_dashboard_owner_song_cleanup.sql
+-- ============================================================
+
+-- Discovery-first dashboard polish and Founder-only song cleanup helpers.
+--
+-- This migration is additive. It creates owner-scoped RPCs only; no song data
+-- is removed unless the Founder explicitly calls owner_permanently_delete_song.
+
+create or replace function public.owner_restore_archived_song(target_song_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  target_song public.songs%rowtype;
+begin
+  if public.current_user_role() <> 'super_admin' then
+    raise exception 'Forbidden';
+  end if;
+
+  select *
+  into target_song
+  from public.songs
+  where id = target_song_id
+  for update;
+
+  if not found then
+    raise exception 'Song not found';
+  end if;
+
+  if target_song.archived_at is null then
+    raise exception 'Only archived songs can be restored from this action';
+  end if;
+
+  if target_song.merged_into_song_id is not null then
+    raise exception 'Merged songs cannot be restored';
+  end if;
+
+  update public.songs
+  set
+    is_active = true,
+    featured = false,
+    archived_at = null,
+    archived_by = null,
+    removed_at = null,
+    removed_by = null,
+    updated_at = now()
+  where id = target_song_id;
+
+  insert into public.admin_audit_log (
+    actor_id,
+    action,
+    target_type,
+    target_id,
+    details
+  )
+  values (
+    auth.uid(),
+    'owner_restore_archived_song',
+    'song',
+    target_song_id,
+    jsonb_build_object(
+      'title', target_song.title,
+      'artist_name', target_song.artist_name,
+      'previous_archived_at', target_song.archived_at
+    )
+  );
+
+  return jsonb_build_object(
+    'song_id', target_song_id,
+    'action', 'restored',
+    'title', target_song.title
+  );
+end;
+$$;
+
+create or replace function public.owner_permanently_delete_song(
+  target_song_id uuid,
+  deletion_reason text default 'Owner cleanup'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  target_song public.songs%rowtype;
+  activity jsonb;
+  dependent record;
+  deleted_rows integer := 0;
+  dependent_rows integer := 0;
+begin
+  if public.current_user_role() <> 'super_admin' then
+    raise exception 'Forbidden';
+  end if;
+
+  select *
+  into target_song
+  from public.songs
+  where id = target_song_id
+  for update;
+
+  if not found then
+    raise exception 'Song not found';
+  end if;
+
+  activity := public.song_activity_snapshot(target_song.id);
+
+  insert into public.song_management_history (
+    original_song_id,
+    owner_id,
+    action,
+    title,
+    artist_name,
+    music_url,
+    platform,
+    submission_token_cost,
+    refunded_tokens,
+    merged_into_song_id,
+    activity_snapshot,
+    performed_by,
+    reason
+  )
+  values (
+    target_song.id,
+    target_song.user_id,
+    'deleted',
+    target_song.title,
+    target_song.artist_name,
+    target_song.music_url,
+    target_song.platform,
+    greatest(0, target_song.submission_token_cost),
+    0,
+    target_song.merged_into_song_id,
+    activity,
+    auth.uid(),
+    left(coalesce(nullif(trim(deletion_reason), ''), 'Owner cleanup'), 500)
+  );
+
+  insert into public.admin_audit_log (
+    actor_id,
+    action,
+    target_type,
+    target_id,
+    details
+  )
+  values (
+    auth.uid(),
+    'owner_permanently_delete_song',
+    'song',
+    target_song.id,
+    jsonb_build_object(
+      'title', target_song.title,
+      'artist_name', target_song.artist_name,
+      'platform', target_song.platform,
+      'activity_snapshot', activity,
+      'reason', left(coalesce(nullif(trim(deletion_reason), ''), 'Owner cleanup'), 500)
+    )
+  );
+
+  for dependent in
+    select
+      columns.table_schema,
+      columns.table_name,
+      columns.column_name
+    from information_schema.columns
+    join information_schema.tables
+      on tables.table_schema = columns.table_schema
+     and tables.table_name = columns.table_name
+    where columns.table_schema = 'public'
+      and tables.table_type = 'BASE TABLE'
+      and columns.column_name in (
+        'song_id',
+        'target_song_id',
+        'reviewed_song_id'
+      )
+      and columns.table_name not in (
+        'songs',
+        'song_management_history',
+        'admin_audit_log'
+      )
+  loop
+    execute format(
+      'delete from %I.%I where %I = $1',
+      dependent.table_schema,
+      dependent.table_name,
+      dependent.column_name
+    )
+    using target_song.id;
+    get diagnostics deleted_rows = row_count;
+    dependent_rows := dependent_rows + deleted_rows;
+  end loop;
+
+  update public.songs
+  set merged_into_song_id = null
+  where merged_into_song_id = target_song.id;
+
+  delete from public.songs
+  where id = target_song.id;
+
+  return jsonb_build_object(
+    'song_id', target_song.id,
+    'action', 'permanently_deleted',
+    'title', target_song.title,
+    'dependent_rows_deleted', dependent_rows,
+    'activity_snapshot', activity
+  );
+end;
+$$;
+
+revoke all on function public.owner_restore_archived_song(uuid)
+  from public, anon, authenticated;
+revoke all on function public.owner_permanently_delete_song(uuid, text)
+  from public, anon, authenticated;
+
+grant execute on function public.owner_restore_archived_song(uuid)
+  to authenticated;
+grant execute on function public.owner_permanently_delete_song(uuid, text)
+  to authenticated;
+
+-- ============================================================
+-- 20260613002000_moderator_permission_hardening.sql
+-- ============================================================
+
+-- Harden moderator permissions before public growth.
+--
+-- Moderators are limited to report-scoped content moderation. User
+-- administration, platform configuration, broad user directories, and general
+-- song-state management are reserved for Admin and Super Admin roles.
+
+create or replace function public.admin_list_users(result_limit integer default 1000)
+returns table (
+  id uuid,
+  display_name text,
+  email text,
+  username text,
+  role public.app_role,
+  account_status public.account_status,
+  creator_activity_status public.creator_activity_status,
+  founder_number integer,
+  banned_at timestamptz,
+  warning_count integer,
+  credits integer,
+  completed_reviews integer,
+  created_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public, auth
+as $$
+begin
+  if public.current_user_role() not in ('super_admin', 'admin') then
+    raise exception 'Administrator access required';
+  end if;
+
+  return query
+  select
+    profiles.id,
+    profiles.display_name,
+    coalesce(auth_users.email, '')::text,
+    coalesce(
+      nullif(auth_users.raw_user_meta_data ->> 'username', ''),
+      split_part(coalesce(auth_users.email, ''), '@', 1)
+    )::text,
+    profiles.role,
+    profiles.account_status,
+    profiles.creator_activity_status,
+    profiles.founder_number,
+    profiles.banned_at,
+    profiles.warning_count,
+    profiles.credits,
+    profiles.completed_reviews,
+    profiles.created_at
+  from public.profiles
+  join auth.users as auth_users on auth_users.id = profiles.id
+  order by profiles.created_at desc
+  limit greatest(1, least(result_limit, 1000));
+end;
+$$;
+
+create or replace function public.admin_issue_user_warning(
+  target_user_id uuid,
+  warning_reason text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  warning_id uuid;
+  actor_role public.app_role := public.current_user_role();
+  target_role public.app_role;
+begin
+  if actor_role not in ('super_admin', 'admin') then
+    raise exception 'Administrator access required';
+  end if;
+  if char_length(trim(warning_reason)) < 3 then
+    raise exception 'Warning reason is required';
+  end if;
+
+  select role into target_role
+  from public.profiles
+  where id = target_user_id;
+  if not found then raise exception 'User not found'; end if;
+  if actor_role <> 'super_admin' and target_role <> 'user' then
+    raise exception 'Only Super Admin can warn staff accounts';
+  end if;
+
+  insert into public.account_warnings (user_id, issued_by, reason)
+  values (target_user_id, auth.uid(), trim(warning_reason))
+  returning id into warning_id;
+
+  update public.profiles
+  set warning_count = warning_count + 1, updated_at = now()
+  where id = target_user_id;
+
+  insert into public.admin_audit_log (
+    actor_id, action, target_type, target_id, details
+  )
+  values (
+    auth.uid(),
+    'issue_warning',
+    'profile',
+    target_user_id,
+    jsonb_build_object('reason', trim(warning_reason))
+  );
+
+  return warning_id;
+end;
+$$;
+
+create or replace function public.admin_enforce_account(
+  target_user_id uuid,
+  enforcement text,
+  enforcement_reason text
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  actor_role public.app_role := public.current_user_role();
+  target_role public.app_role;
+begin
+  if actor_role not in ('super_admin', 'admin') then
+    raise exception 'Administrator access required';
+  end if;
+  if enforcement not in ('activate', 'suspend', 'ban') then
+    raise exception 'Invalid enforcement action';
+  end if;
+  if enforcement <> 'activate' and char_length(trim(enforcement_reason)) < 3 then
+    raise exception 'Enforcement reason is required';
+  end if;
+  if target_user_id = auth.uid() then
+    raise exception 'You cannot enforce your own account';
+  end if;
+
+  select role into target_role
+  from public.profiles
+  where id = target_user_id;
+  if not found then raise exception 'User not found'; end if;
+  if actor_role <> 'super_admin' and target_role <> 'user' then
+    raise exception 'Only Super Admin can enforce staff accounts';
+  end if;
+
+  update public.profiles
+  set
+    account_status = case
+      when enforcement = 'activate'
+        then 'active'::public.account_status
+      else 'suspended'::public.account_status
+    end,
+    banned_at = case when enforcement = 'ban' then now() else null end,
+    banned_by = case when enforcement = 'ban' then auth.uid() else null end,
+    ban_reason = case
+      when enforcement = 'ban' then trim(enforcement_reason)
+      else null
+    end,
+    updated_at = now()
+  where id = target_user_id;
+
+  insert into public.admin_audit_log (
+    actor_id, action, target_type, target_id, details
+  )
+  values (
+    auth.uid(),
+    'enforce_account',
+    'profile',
+    target_user_id,
+    jsonb_build_object(
+      'enforcement', enforcement,
+      'reason', trim(coalesce(enforcement_reason, ''))
+    )
+  );
+end;
+$$;
+
+create or replace function public.admin_set_song_state(
+  target_song_id uuid,
+  active boolean,
+  feature boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  target_song public.songs%rowtype;
+begin
+  if public.current_user_role() not in ('super_admin', 'admin') then
+    raise exception 'Administrator access required';
+  end if;
+
+  select * into target_song
+  from public.songs
+  where id = target_song_id
+  for update;
+  if not found then raise exception 'Song not found'; end if;
+  if target_song.merged_into_song_id is not null then
+    raise exception 'Merged songs cannot be restored';
+  end if;
+
+  update public.songs
+  set
+    is_active = active,
+    featured = feature and active,
+    removed_at = case when active then null else now() end,
+    removed_by = case when active then null else auth.uid() end,
+    archived_at = case when active then null else archived_at end,
+    archived_by = case when active then null else archived_by end,
+    updated_at = now()
+  where id = target_song_id;
+
+  insert into public.admin_audit_log (
+    actor_id, action, target_type, target_id, details
+  )
+  values (
+    auth.uid(),
+    case when active then 'restore_song' else 'remove_song' end,
+    'song',
+    target_song_id,
+    jsonb_build_object('feature', feature and active)
+  );
+end;
+$$;
+
+create or replace function public.moderator_hide_reported_song(
+  target_report_id uuid,
+  moderation_reason text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  actor_role public.app_role := public.current_user_role();
+  report_row public.song_reports%rowtype;
+  target_song public.songs%rowtype;
+  reason text := left(
+    coalesce(nullif(trim(moderation_reason), ''), 'Moderator hid reported content'),
+    500
+  );
+begin
+  if actor_role not in ('super_admin', 'admin', 'moderator') then
+    raise exception 'Staff access required';
+  end if;
+
+  select *
+  into report_row
+  from public.song_reports
+  where id = target_report_id
+  for update;
+  if not found then raise exception 'Report not found'; end if;
+  if report_row.status not in ('open', 'reviewing') then
+    raise exception 'Only open or escalated reports can hide content';
+  end if;
+
+  select *
+  into target_song
+  from public.songs
+  where id = report_row.song_id
+  for update;
+  if not found then raise exception 'Reported song not found'; end if;
+
+  update public.songs
+  set
+    is_active = false,
+    featured = false,
+    removed_at = coalesce(removed_at, now()),
+    removed_by = coalesce(removed_by, auth.uid()),
+    updated_at = now()
+  where id = target_song.id;
+
+  update public.song_reports
+  set status = 'reviewing', reviewed_by = auth.uid(), reviewed_at = now()
+  where id = target_report_id;
+
+  insert into public.admin_audit_log (
+    actor_id, action, target_type, target_id, details
+  )
+  values (
+    auth.uid(),
+    'hide_reported_song',
+    'song',
+    target_song.id,
+    jsonb_build_object(
+      'report_id', target_report_id,
+      'reason', reason,
+      'actor_role', actor_role
+    )
+  );
+end;
+$$;
+
+create or replace function public.admin_moderate_review_comment(
+  target_review_id uuid,
+  moderation_action text,
+  moderation_reason text
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  actor_role public.app_role := public.current_user_role();
+begin
+  if actor_role not in ('super_admin', 'admin', 'moderator') then
+    raise exception 'Staff access required';
+  end if;
+  if moderation_action not in ('remove', 'restore') then
+    raise exception 'Invalid moderation action';
+  end if;
+  if char_length(trim(moderation_reason)) < 3 then
+    raise exception 'Moderation reason is required';
+  end if;
+  if actor_role = 'moderator' then
+    if moderation_action <> 'remove' then
+      raise exception 'Moderators cannot restore comments';
+    end if;
+    if not exists (
+      select 1
+      from public.review_comment_reports
+      where review_id = target_review_id
+        and status in ('open', 'reviewing')
+    ) then
+      raise exception 'Moderators can only remove reported comments';
+    end if;
+  end if;
+
+  update public.reviews
+  set
+    comment_removed_at = case
+      when moderation_action = 'remove' then now()
+      else null
+    end,
+    comment_removed_by = case
+      when moderation_action = 'remove' then auth.uid()
+      else null
+    end,
+    comment_removal_reason = case
+      when moderation_action = 'remove' then trim(moderation_reason)
+      else null
+    end
+  where id = target_review_id;
+  if not found then raise exception 'Review not found'; end if;
+
+  insert into public.admin_audit_log (
+    actor_id, action, target_type, target_id, details
+  )
+  values (
+    auth.uid(),
+    'moderate_comment',
+    'review',
+    target_review_id,
+    jsonb_build_object(
+      'moderation_action', moderation_action,
+      'reason', trim(moderation_reason),
+      'actor_role', actor_role
+    )
+  );
+end;
+$$;
+
+create or replace function public.admin_list_feedback(
+  feedback_status text default null,
+  result_limit integer default 100
+)
+returns table (
+  id uuid,
+  user_id uuid,
+  submitter_name text,
+  submitter_email text,
+  category text,
+  status text,
+  subject text,
+  message text,
+  screenshot_url text,
+  page_url text,
+  contact_email text,
+  notify_by_email boolean,
+  founder_reply text,
+  replied_at timestamptz,
+  resolved_at timestamptz,
+  archived_at timestamptz,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, public, auth
+as $$
+begin
+  if public.current_user_role() not in ('super_admin', 'admin') then
+    raise exception 'Administrator access required';
+  end if;
+
+  return query
+  select
+    feedback.id,
+    feedback.user_id,
+    coalesce(profile.display_name::text, 'Guest Listener'::text) as submitter_name,
+    coalesce(auth_user.email::text, feedback.contact_email::text) as submitter_email,
+    feedback.category::text,
+    feedback.status::text,
+    feedback.subject::text,
+    feedback.message::text,
+    feedback.screenshot_url::text,
+    feedback.page_url::text,
+    feedback.contact_email::text,
+    feedback.notify_by_email,
+    feedback.founder_reply::text,
+    feedback.replied_at,
+    feedback.resolved_at,
+    feedback.archived_at,
+    feedback.created_at,
+    feedback.updated_at
+  from public.feedback_submissions feedback
+  left join public.profiles profile on profile.id = feedback.user_id
+  left join auth.users auth_user on auth_user.id = feedback.user_id
+  where (
+      feedback_status is null
+      or feedback_status = 'all'
+      or feedback.status = feedback_status
+    )
+    and feedback.status <> 'spam_deleted'
+  order by
+    case feedback.status
+      when 'open' then 1
+      when 'in_progress' then 2
+      when 'resolved' then 3
+      when 'archived' then 4
+      else 5
+    end,
+    feedback.created_at desc
+  limit greatest(1, least(coalesce(result_limit, 100), 500));
+end;
+$$;
+
+create or replace function public.admin_update_feedback(
+  feedback_id uuid,
+  next_status text default null,
+  reply_message text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  updated_feedback public.feedback_submissions%rowtype;
+begin
+  if public.current_user_role() not in ('super_admin', 'admin') then
+    raise exception 'Administrator access required';
+  end if;
+
+  if next_status is not null
+    and next_status not in ('open', 'in_progress', 'resolved', 'archived')
+  then
+    raise exception 'Unsupported feedback status';
+  end if;
+
+  update public.feedback_submissions
+  set
+    status = coalesce(next_status, status),
+    founder_reply = case
+      when reply_message is null then founder_reply
+      else nullif(trim(reply_message), '')
+    end,
+    replied_by = case
+      when reply_message is null then replied_by
+      else auth.uid()
+    end,
+    replied_at = case
+      when reply_message is null then replied_at
+      else now()
+    end,
+    resolved_at = case
+      when next_status = 'resolved' then coalesce(resolved_at, now())
+      when next_status is not null and next_status <> 'resolved' then null
+      else resolved_at
+    end,
+    archived_at = case
+      when next_status = 'archived' then coalesce(archived_at, now())
+      when next_status is not null and next_status <> 'archived' then null
+      else archived_at
+    end,
+    updated_at = now()
+  where id = feedback_id
+    and status <> 'spam_deleted'
+  returning * into updated_feedback;
+
+  if not found then
+    raise exception 'Feedback item not found';
+  end if;
+
+  return jsonb_build_object(
+    'id', updated_feedback.id,
+    'status', updated_feedback.status,
+    'founder_reply', updated_feedback.founder_reply,
+    'updated_at', updated_feedback.updated_at
+  );
+end;
+$$;
+
+revoke all on function public.admin_list_users(integer) from public, anon, authenticated;
+revoke all on function public.admin_issue_user_warning(uuid, text) from public, anon, authenticated;
+revoke all on function public.admin_enforce_account(uuid, text, text) from public, anon, authenticated;
+revoke all on function public.admin_set_song_state(uuid, boolean, boolean) from public, anon, authenticated;
+revoke all on function public.moderator_hide_reported_song(uuid, text) from public, anon, authenticated;
+revoke all on function public.admin_moderate_review_comment(uuid, text, text) from public, anon, authenticated;
+revoke all on function public.admin_list_feedback(text, integer) from public, anon, authenticated;
+revoke all on function public.admin_update_feedback(uuid, text, text) from public, anon, authenticated;
+
+grant execute on function public.admin_list_users(integer) to authenticated;
+grant execute on function public.admin_issue_user_warning(uuid, text) to authenticated;
+grant execute on function public.admin_enforce_account(uuid, text, text) to authenticated;
+grant execute on function public.admin_set_song_state(uuid, boolean, boolean) to authenticated;
+grant execute on function public.moderator_hide_reported_song(uuid, text) to authenticated;
+grant execute on function public.admin_moderate_review_comment(uuid, text, text) to authenticated;
+grant execute on function public.admin_list_feedback(text, integer) to authenticated;
+grant execute on function public.admin_update_feedback(uuid, text, text) to authenticated;
+
+-- ============================================================
+-- 20260615001000_feedback_engine_optional_artist_message.sql
+-- ============================================================
+
+-- Feedback Engine reframing: keep review infrastructure, but make the
+-- listener-facing artist message optional so support signals can move the
+-- queue forward without forcing a written review.
+
+alter table public.reviews
+  alter column comment set default '';
+
+alter table public.reviews
+  drop constraint if exists reviews_comment_check;
+
+alter table public.reviews
+  drop constraint if exists reviews_comment_optional_or_useful_check;
+
+alter table public.reviews
+  add constraint reviews_comment_optional_or_useful_check
+  check (
+    comment = ''
+    or char_length(comment) between 30 and 1000
+  );
+
+comment on column public.reviews.comment is
+  'Optional artist message. Empty string means the listener sent structured support signals without a written message.';
+
+create or replace function public.submit_review_with_listening(
+  reviewed_song_id uuid,
+  review_listen_full boolean,
+  review_add_to_playlist boolean,
+  review_grabbed_attention boolean,
+  review_share_with_friend boolean,
+  review_rating smallint,
+  review_comment text,
+  review_pasted_comment_detected boolean default false,
+  listening_session_id uuid default null
+)
+returns table (
+  accepted boolean,
+  quality_score smallint,
+  credit_granted boolean,
+  warning text,
+  listening_seconds_banked integer,
+  listening_bank_seconds bigint,
+  community_points_awarded integer
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  raw_comment text := trim(coalesce(review_comment, ''));
+  stored_comment text := '';
+  normalized_comment text := '';
+  repeated_comment boolean := false;
+  computed_score integer := 100;
+  new_quality_score numeric;
+  new_review_id uuid;
+  session_row public.listening_sessions%rowtype;
+  current_bank bigint;
+  message_warning text := '';
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+
+  if review_rating not between 1 and 10 then
+    raise exception 'Rating must be between 1 and 10';
+  end if;
+
+  if not exists (
+    select 1
+    from public.songs
+    where id = reviewed_song_id
+      and user_id <> auth.uid()
+      and removed_at is null
+  ) then
+    raise exception 'Song is unavailable for feedback';
+  end if;
+
+  if raw_comment <> '' and char_length(raw_comment) >= 30 then
+    stored_comment := raw_comment;
+    normalized_comment := public.normalize_feedback(stored_comment);
+
+    select exists (
+      select 1
+      from public.reviews
+      where reviewer_id = auth.uid()
+        and nullif(trim(comment), '') is not null
+        and public.normalize_feedback(comment) = normalized_comment
+    ) into repeated_comment;
+
+    if repeated_comment then
+      stored_comment := '';
+      normalized_comment := '';
+      message_warning := 'Optional artist message was not saved because it repeated earlier feedback.';
+    else
+      if coalesce(review_pasted_comment_detected, false) then
+        computed_score := computed_score - 50;
+      end if;
+      if coalesce(array_length(regexp_split_to_array(normalized_comment, '\s+'), 1), 0) < 7 then
+        computed_score := computed_score - 25;
+      end if;
+      computed_score := greatest(0, least(100, computed_score));
+
+      if computed_score < 60 then
+        stored_comment := '';
+        normalized_comment := '';
+        computed_score := 100;
+        message_warning := 'Optional artist message was not saved because it looked copied or low quality.';
+      end if;
+    end if;
+  elsif raw_comment <> '' then
+    message_warning := 'Optional artist message was not saved because it was too short.';
+  end if;
+
+  if listening_session_id is not null then
+    select *
+    into session_row
+    from public.listening_sessions
+    where id = listening_session_id
+      and user_id = auth.uid()
+      and song_id = reviewed_song_id
+      and status in ('active', 'qualified')
+    for update;
+  end if;
+
+  insert into public.reviews (
+    song_id,
+    reviewer_id,
+    listen_full,
+    add_to_playlist,
+    grabbed_attention,
+    share_with_friend,
+    rating,
+    comment,
+    pasted_comment_detected,
+    quality_score,
+    quality_passed,
+    listening_session_id,
+    listening_seconds,
+    listening_duration_seconds,
+    listening_completion_percent
+  )
+  values (
+    reviewed_song_id,
+    auth.uid(),
+    review_listen_full,
+    review_add_to_playlist,
+    review_grabbed_attention,
+    review_share_with_friend,
+    review_rating,
+    stored_comment,
+    stored_comment <> '' and coalesce(review_pasted_comment_detected, false),
+    computed_score,
+    true,
+    session_row.id,
+    coalesce(session_row.settled_seconds, 0),
+    case
+      when session_row.provider_duration_seconds is null then null
+      else round(session_row.provider_duration_seconds)::integer
+    end,
+    case
+      when coalesce(session_row.provider_duration_seconds, 0) > 0
+      then least(
+        100,
+        round(
+          (session_row.max_position_seconds / session_row.provider_duration_seconds) * 100,
+          2
+        )
+      )
+      else null
+    end
+  )
+  returning id into new_review_id;
+
+  update public.profiles as target_profile
+  set completed_reviews = completed_reviews + 1, updated_at = now()
+  where id = auth.uid()
+  returning target_profile.listening_bank_seconds into current_bank;
+
+  if session_row.id is not null then
+    update public.listening_sessions
+    set review_id = new_review_id, updated_at = now()
+    where id = session_row.id;
+  end if;
+
+  perform public.award_community_points(
+    auth.uid(),
+    5,
+    'Send song support feedback',
+    'review',
+    new_review_id,
+    null
+  );
+
+  select round(avg(reviews.quality_score)::numeric, 2)
+  into new_quality_score
+  from public.reviews as reviews
+  where reviews.reviewer_id = auth.uid();
+
+  update public.profiles
+  set review_quality_score = coalesce(new_quality_score, 100)
+  where id = auth.uid();
+
+  return query select
+    true,
+    computed_score::smallint,
+    false,
+    message_warning,
+    0,
+    current_bank,
+    5;
+end;
+$$;
+
+revoke all on function public.submit_review_with_listening(
+  uuid, boolean, boolean, boolean, boolean, smallint, text, boolean, uuid
+) from public, anon, authenticated;
+
+grant execute on function public.submit_review_with_listening(
+  uuid, boolean, boolean, boolean, boolean, smallint, text, boolean, uuid
+) to authenticated;

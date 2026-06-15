@@ -2898,20 +2898,15 @@ function ReviewView({
     form.grabbedAttention !== null &&
     form.shareWithFriend !== null &&
     form.rating > 0;
-  const reviewQuality = evaluateReviewQuality(
-    form.comment,
-    priorComments,
-    pastedWithoutEditing,
-  );
-  const complete = requiredAnswersComplete && reviewQuality.passed;
+  const artistMessageProvided = form.comment.trim().length > 0;
+  const reviewQuality = artistMessageProvided
+    ? evaluateReviewQuality(form.comment, priorComments, pastedWithoutEditing)
+    : { passed: true, score: 100, warning: "" };
+  const complete = requiredAnswersComplete;
 
   const submitReview = async () => {
     if (!requiredAnswersComplete) {
-      notify(locale === "es" ? "Responde las cinco preguntas requeridas." : "Answer all five required questions first.");
-      return;
-    }
-    if (!reviewQuality.passed) {
-      notify(copy.app.review.warning);
+      notify(locale === "es" ? "Completa las cinco señales de apoyo." : "Complete the five support signals first.");
       return;
     }
     if (!song) return;
@@ -2933,8 +2928,8 @@ function ReviewView({
     setReviewSubmitted(true);
     notify(
       locale === "es"
-        ? `Review enviada. +${result.communityPointsAwarded ?? 5} puntos de comunidad.`
-        : `Review submitted. +${result.communityPointsAwarded ?? 5} Community Points.`,
+        ? `Apoyo enviado. +${result.communityPointsAwarded ?? 5} puntos de comunidad.`
+        : `Support sent. +${result.communityPointsAwarded ?? 5} Community Points.`,
     );
   };
 
@@ -3339,32 +3334,47 @@ function ReviewView({
           unlimitedCredits={unlimitedCredits}
         />
 
-        <div className="review-form">
+        <div className="review-form feedback-engine-form">
           <div className="form-heading">
             <div>
               <span className="eyebrow">
-                {locale === "es" ? "Review opcional" : "Optional Review"} /{" "}
+                {locale === "es" ? "Apoyo rápido" : "Quick Support"} /{" "}
                 {copy.app.review.firstImpression}
               </span>
               <h3>{copy.app.review.direct}</h3>
               <p className="optional-review-note">
                 {externalContent
                   ? locale === "es"
-                    ? "La actividad externa no se verifica. Regresa a First Listen para dejar feedback util."
-                    : "External activity is not verified. Return to First Listen to leave useful feedback."
+                    ? "La actividad externa no se verifica, pero tus respuestas ayudan al artista."
+                    : "External activity is not verified, but your answers still help the artist."
                   : locale === "es"
-                    ? "Puedes apoyar al artista solo escuchando. Completa la review para ganar 5 puntos de comunidad."
-                    : "Listening supports the artist by itself. Complete the review to earn 5 Community Points."}
+                    ? "Cinco toques rápidos preservan Hook Score, rankings y analíticas para el artista."
+                    : "Five quick taps preserve Hook Score, rankings, and artist analytics."}
               </p>
             </div>
             <span className="anonymous-badge">{copy.app.review.anonymous}</span>
           </div>
 
+          <div className="feedback-engine-benefits" aria-label={locale === "es" ? "Beneficios del apoyo" : "Support benefits"}>
+            <span>
+              <Sparkles size={13} />
+              Hook Score
+            </span>
+            <span>
+              <Trophy size={13} />
+              Top 10
+            </span>
+            <span>
+              <BarChart3 size={13} />
+              {locale === "es" ? "Analíticas" : "Analytics"}
+            </span>
+          </div>
+
           <div className="questions">
             {[
-              ["01", copy.app.review.q1, "listenFull"],
-              ["02", copy.app.review.q2, "addPlaylist"],
-              ["03", copy.app.review.q3, "grabbedAttention"],
+              ["01", copy.app.review.q1, "grabbedAttention"],
+              ["02", copy.app.review.q2, "listenFull"],
+              ["03", copy.app.review.q3, "addPlaylist"],
               ["04", copy.app.review.q4, "shareWithFriend"],
             ].map(([number, question, key]) => (
               <div className="question-row" key={key}>
@@ -3404,30 +3414,33 @@ function ReviewView({
             </span>
             <textarea
               maxLength={500}
-              minLength={30}
               onChange={(event) => setForm({ ...form, comment: event.target.value })}
               onKeyDown={() => {
                 if (pastedWithoutEditing) setPastedWithoutEditing(false);
               }}
               onPaste={() => setPastedWithoutEditing(true)}
-              placeholder={locale === "es" ? "El inicio me atrapo porque..." : "The opening pulled me in because..."}
-              required
+              placeholder={locale === "es" ? "Mensaje opcional para el artista..." : "Optional message for the artist..."}
               value={form.comment}
             />
-            <small>{form.comment.length}/500</small>
+            <small>
+              {form.comment.length}/500 ·{" "}
+              {locale === "es"
+                ? "Si no quieres escribir, puedes seguir."
+                : "No message needed to continue."}
+            </small>
           </label>
           {!reviewQuality.passed && form.comment.length > 0 && (
             <div className="quality-warning" role="alert">
               <ShieldCheck size={16} />
               <span>
-                <strong>{copy.app.review.warning}</strong>
+                <strong>{locale === "es" ? "Mensaje opcional no listo." : "Optional message not ready."}</strong>
                 {locale === "es"
-                  ? " Evita comentarios repetidos, pegados o demasiado cortos."
-                  : reviewQuality.warning.replace("Please provide useful feedback. ", "")}
+                  ? " Puedes enviarlo vacío o escribir algo más específico para el artista."
+                  : " You can leave it empty or write something more specific for the artist."}
               </span>
             </div>
           )}
-          {reviewQuality.passed && (
+          {artistMessageProvided && reviewQuality.passed && (
             <div className="quality-pass">
               <CheckCircle2 size={15} />
               {copy.app.review.qualityPassed} {reviewQuality.score}
@@ -3452,8 +3465,8 @@ function ReviewView({
           >
             {reviewSubmitted
               ? locale === "es"
-                ? "Review enviada"
-                : "Review Submitted"
+                ? "Apoyo enviado"
+                : "Support Sent"
               : submitting
                 ? "..."
                 : copy.app.review.submitReview}{" "}
@@ -10060,11 +10073,13 @@ export function FirstListenApp({
     setReviewQualityScores((current) => {
       return [...current, qualityScore];
     });
-    setPriorComments((current) => {
-      const next = [...current, form.comment.trim()].slice(-20);
-      window.localStorage.setItem("first-listen-prior-comments", JSON.stringify(next));
-      return next;
-    });
+    if (form.comment.trim().length >= 30 && !result.warning) {
+      setPriorComments((current) => {
+        const next = [...current, form.comment.trim()].slice(-20);
+        window.localStorage.setItem("first-listen-prior-comments", JSON.stringify(next));
+        return next;
+      });
+    }
     return {
       accepted: true,
       qualityScore,

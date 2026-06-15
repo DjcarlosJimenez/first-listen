@@ -1470,6 +1470,32 @@ button {
   padding: 28px;
 }
 
+.feedback-engine-form {
+  background:
+    radial-gradient(circle at top left, rgba(198, 255, 65, 0.1), transparent 34%),
+    var(--surface);
+}
+
+.feedback-engine-benefits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.feedback-engine-benefits span {
+  align-items: center;
+  background: rgba(198, 255, 65, 0.09);
+  border: 1px solid rgba(198, 255, 65, 0.24);
+  border-radius: 999px;
+  color: var(--text-strong);
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 900;
+  gap: 6px;
+  padding: 8px 11px;
+}
+
 .form-heading,
 .panel-heading,
 .comments-heading {

@@ -50,6 +50,9 @@
     "moderator-hardening:dry-run": "node scripts/apply-moderator-permission-hardening.mjs",
     "moderator-hardening:apply": "node scripts/apply-moderator-permission-hardening.mjs --apply",
     "moderator-hardening:verify": "node scripts/verify-moderator-permission-hardening.mjs",
+    "feedback-engine:dry-run": "node scripts/apply-feedback-engine-migration.mjs",
+    "feedback-engine:apply": "node scripts/apply-feedback-engine-migration.mjs --apply",
+    "feedback-engine:verify": "node scripts/verify-feedback-engine-production.mjs",
     "db:verify": "node scripts/verify-database.mjs"
   },
   "dependencies": {
