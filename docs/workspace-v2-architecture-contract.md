@@ -10,16 +10,19 @@ Workspace V2 must become:
 
 ```mermaid
 flowchart LR
-  Destination["Destination view<br/>music / video / podcast / audiobook / livestream"]
+  InternalDestination["Internal playback destination<br/>YouTube / YouTube Music today"]
+  DiscoveryDestination["Discovery destination<br/>Spotify / Apple / TikTok / Bandcamp / Audiomack / external"]
   Shell["One Workspace Shell"]
-  Queue["One Queue Engine"]
-  Playback["One Playback Engine"]
-  ProviderHost["One Player Host"]
-  Adapter["Provider Adapter"]
+  Queue["One Internal Queue Engine"]
+  Playback["One Internal Playback Engine"]
+  ProviderHost["One Internal Player Host"]
+  Adapter["Internal Provider Adapter"]
   Validation["One Validation Machine"]
   Telemetry["One Telemetry Machine"]
+  Rewards["Reward / Time Bank / Tokens"]
+  Discovery["Discovery Actions<br/>follow / save / platform links"]
 
-  Destination -->|typed intent only| Shell
+  InternalDestination -->|play internally| Shell
   Shell --> Queue
   Queue --> Playback
   Playback --> ProviderHost
@@ -28,20 +31,60 @@ flowchart LR
   Adapter -->|normalized snapshots| Validation
   Validation --> Telemetry
   Telemetry --> Shell
+  Validation --> Rewards
+  DiscoveryDestination -->|open/save/follow only| Discovery
+  Discovery --> Shell
 ```
 
 The product rule is simple:
 
-One Shell. One Player. One Queue Engine. Many Destinations.
+One Shell. One Internal Player. One Queue Engine. Many Destinations.
+
+Internal Playback and Discovery are separate concepts.
+
+Internal Playback includes:
+
+- Queue Engine.
+- Playback Engine.
+- Validation Engine.
+- Telemetry Engine.
+- Reward Engine.
+- Time Bank.
+- Submission Tokens.
+
+Internal Playback applies only to internally playable content. Current internal providers:
+
+- YouTube.
+- YouTube Music.
+
+Future internal providers may be added only if First Listen can still validate playback progress reliably enough for Time Bank and rewards.
+
+Discovery includes:
+
+- Follow Artist.
+- Save Artist.
+- Platform Presence Manager.
+- Open External Destination.
+
+Discovery destinations do not participate in:
+
+- Queue Engine.
+- Validation.
+- Rewards.
+- Time Bank.
+- Submission Tokens.
+
+External platforms such as Spotify, Apple Music, TikTok, Bandcamp, Audiomack, and other off-platform destinations are Discovery only unless they later provide reliable internal playback telemetry and are explicitly promoted to Internal Playback providers.
 
 ## Hard Rules
 
 1. There is one Workspace Shell.
-2. There is one Queue Engine.
-3. There is one Playback Engine.
-4. Provider-specific logic belongs only in provider adapters.
-5. Destination views cannot own playback, validation, provider lifecycle, or queue advancement.
-6. The destination model must support future music, video, podcast, audiobook, and livestream content.
+2. There is one Internal Queue Engine.
+3. There is one Internal Playback Engine.
+4. Internal provider-specific logic belongs only in internal provider adapters.
+5. Discovery destinations cannot enter the Queue Engine.
+6. Destination views cannot own playback, validation, provider lifecycle, or queue advancement.
+7. The destination model must support future music, video, podcast, audiobook, and livestream content.
 
 ## Ownership Boundaries
 
@@ -70,13 +113,13 @@ Authoritative file today:
 
 Owns:
 
-- Active queue.
-- Current item.
-- Next item.
-- Queue position.
-- Consumed item IDs.
-- Queue refill policy.
-- Queue advancement.
+- Active internal queue.
+- Current internal item.
+- Next internal item.
+- Internal queue position.
+- Consumed internal item IDs.
+- Internal queue refill policy.
+- Internal queue advancement.
 
 Forbidden elsewhere:
 
@@ -84,6 +127,13 @@ Forbidden elsewhere:
 - Local `remainingSongs` mutation.
 - Destination-level `next song` logic.
 - Provider-level queue advancement.
+- External discovery links in queue state.
+
+Queue input rule:
+
+- The Queue Engine must accept only internally playable items.
+- The Queue Engine must reject or filter Discovery-only items.
+- Internal replay is preferable to falling back into external-only discovery.
 
 ### Playback Engine
 
@@ -108,7 +158,7 @@ Forbidden elsewhere:
 - Destination views deciding autoplay continuation.
 - Provider adapters advancing the queue.
 
-### Provider Adapters
+### Internal Provider Adapters
 
 Own:
 
@@ -134,6 +184,7 @@ Must not own:
 - Reward decisions.
 - Valid-listen decisions.
 - Destination routing.
+- Discovery destination opening.
 
 ### Validation Machine
 
@@ -167,6 +218,48 @@ Owns:
 
 Must consume validation output and normalized snapshots only.
 
+## Internal Playback vs Discovery Contract
+
+### Internal Playback
+
+Internal Playback is the only path allowed to produce:
+
+- Queue participation.
+- Playback validation.
+- Fair Skip.
+- Time Bank progress.
+- Reward eligibility.
+- Submission token progress.
+
+Internal Playback currently means:
+
+- YouTube.
+- YouTube Music.
+
+SoundCloud is not guaranteed to be an Internal Playback provider unless its telemetry path is explicitly verified and promoted. Spotify, Apple Music, TikTok, Bandcamp, Audiomack, Instagram, Facebook Video, Amazon Music, Deezer, and generic external links are Discovery-only by default.
+
+### Discovery
+
+Discovery is the path for artist growth and off-platform traffic.
+
+Discovery may:
+
+- Display platform presence.
+- Open an external platform link.
+- Follow an artist.
+- Save an artist or song.
+- Share artist/song links.
+
+Discovery must not:
+
+- Enter the internal queue.
+- Drive validation.
+- Earn rewards.
+- Increase Time Bank.
+- Increase Submission Tokens.
+- Trigger Fair Skip.
+- Pretend external playback is internally verified.
+
 ## Destination Model Contract
 
 The current type is still song-centered:
@@ -186,12 +279,12 @@ type WorkspaceDestinationKind =
   | "audiobook"
   | "livestream";
 
-type WorkspacePlaybackKind = "internal" | "external";
+type WorkspaceDestinationRole = "internal_playback" | "discovery";
 
 type WorkspacePlayableItem = {
   id: string;
   destinationKind: WorkspaceDestinationKind;
-  playbackKind: WorkspacePlaybackKind;
+  destinationRole: WorkspaceDestinationRole;
   title: string;
   creatorName: string;
   creatorId?: string;
@@ -212,14 +305,14 @@ type WorkspacePlayableItem = {
 };
 ```
 
-Queue logic must operate on `WorkspacePlayableItem` behavior, not on music-only assumptions.
+Queue logic must operate only on `WorkspacePlayableItem` records where `destinationRole === "internal_playback"`. Discovery records must stay outside the queue.
 
 ## Current Audit Findings
 
 ### Good
 
 - `lib/workspace-v2/playback-machine.ts` is provider-agnostic and owns playback states.
-- `lib/workspace-v2/queue-machine.ts` is separated from the UI and owns current item and advancement.
+- `lib/workspace-v2/queue-machine.ts` is separated from the UI and owns current internal item and advancement.
 - `lib/workspace-v2/validation-machine.ts` consumes normalized snapshots rather than provider SDK objects.
 - `lib/workspace-v2/telemetry-machine.ts` consumes validation output and normalized snapshots.
 - `components/workspace-v2/workspace-v2-controller.tsx` is the current reducer bridge between machines.
@@ -229,7 +322,7 @@ Queue logic must operate on `WorkspacePlayableItem` behavior, not on music-only 
 
 1. `components/provider-player.tsx` is still a monolithic legacy player.
 
-   It contains YouTube, Spotify, and SoundCloud API loading, iframe handling, telemetry, autoplay retries, active-playback events, cleanup, and provider-specific state in one component. This violates the final Provider Adapter rule and is allowed only as a temporary bridge.
+   It contains YouTube, Spotify, and SoundCloud API loading, iframe handling, telemetry, autoplay retries, active-playback events, cleanup, and provider-specific state in one component. This violates the final Internal Provider Adapter rule and is allowed only as a temporary bridge. Spotify behavior must not be treated as Internal Playback just because the legacy component contains Spotify code.
 
 2. `components/workspace-v2/workspace-v2-provider-player-adapter.tsx` still wraps the legacy `ProviderPlayer`.
 
@@ -241,7 +334,7 @@ Queue logic must operate on `WorkspacePlayableItem` behavior, not on music-only 
 
 4. `app/workspace-v2-preview/page.tsx` filters provider platforms directly.
 
-   The preview currently filters `youtube_music`, `youtube`, and `soundcloud`. This is acceptable for a Founder sandbox, but production destinations must request playable items through a provider-agnostic destination resolver.
+   The preview currently filters `youtube_music`, `youtube`, and `soundcloud`, then filters by `playbackKind === "internal"`. This must be tightened so only explicitly verified Internal Playback providers enter V2 queues.
 
 5. `lib/workspace-v2/types.ts` is song-centered.
 
@@ -259,12 +352,12 @@ Provider-specific code currently exists in:
 - `components/workspace-v2/workspace-v2-provider-player-adapter.tsx`
 - `app/workspace-v2-preview/page.tsx`
 
-Provider-specific code should eventually exist only in:
+Internal provider-specific code should eventually exist only in:
 
 - `components/workspace-v2/providers/*`
 - or `lib/workspace-v2/providers/*`
 
-Allowed provider adapter responsibilities:
+Allowed internal provider adapter responsibilities:
 
 - Load provider SDK.
 - Create provider player.
@@ -272,7 +365,7 @@ Allowed provider adapter responsibilities:
 - Translate provider telemetry to Workspace V2 snapshots.
 - Cleanup provider resources.
 
-Forbidden provider adapter responsibilities:
+Forbidden internal provider adapter responsibilities:
 
 - Queue refill.
 - Queue advancement.
@@ -280,6 +373,7 @@ Forbidden provider adapter responsibilities:
 - Valid listen.
 - Time Bank.
 - Destination navigation.
+- External discovery link opening.
 
 ## Queue Duplication Audit
 
@@ -294,6 +388,8 @@ This is acceptable only because the shell is invoking an intent. The permanent r
 Destination and shell components may request `next`, but only the Queue Machine may change the queue.
 
 No destination card, song card, provider component, or review component may mutate queue position.
+
+No external discovery card may request queue entry. External cards may request only discovery actions such as follow, save, share, or open external destination.
 
 ## Playback Duplication Audit
 
@@ -337,10 +433,12 @@ Queue, playback, validation, and telemetry machines must not import:
 Workspace V2 cannot replace production until:
 
 - The final shell uses one persistent player host.
-- Provider-specific code is isolated behind adapter boundaries.
+- Internal provider-specific code is isolated behind adapter boundaries.
 - Queue advancement is only possible through the Queue Machine.
 - Playback state is only owned by the Playback Machine.
 - Validation receives only normalized provider snapshots.
+- Queue input is limited to explicitly internal playable content.
+- External Discovery is independent from Queue, Validation, Rewards, Time Bank, and Submission Tokens.
 - Destination data supports `music`, `video`, `podcast`, `audiobook`, and `livestream`.
 - `npm run workspace-v2:verify` passes.
 - `npm run lint` passes.
@@ -358,6 +456,7 @@ Allowed next work:
 - Move preview diagnostics out of the production shell path.
 - Route provider commands through a typed provider interface instead of global browser events.
 - Add tests that enforce the import boundaries above.
+- Add tests that reject Discovery-only items from Queue Engine input.
 
 Blocked next work:
 

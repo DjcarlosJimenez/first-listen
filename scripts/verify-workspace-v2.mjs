@@ -63,14 +63,18 @@ const queue = buildWorkspaceV2ContinuousQueue({
 });
 
 assert.equal(queue.songs[0].id, "internal-new");
-assert.equal(queue.songs.at(-1)?.id, "external-1");
+assert.equal(queue.songs.some((item) => item.playbackKind === "external"), false);
 
 let queueState = reduceWorkspaceV2Queue(initialWorkspaceV2QueueState, {
   at: now,
-  queue,
+  queue: {
+    ...queue,
+    songs: [song("external-load", "external"), ...queue.songs],
+  },
   type: "load_queue",
 });
 assert.equal(activeWorkspaceV2Song(queueState)?.id, "internal-new");
+assert.equal(queueState.activeQueue?.songs.some((item) => item.playbackKind === "external"), false);
 assert.equal(workspaceV2CanAdvance(queueState), true);
 
 let playback = reduceWorkspaceV2Playback(initialWorkspaceV2PlaybackState, {

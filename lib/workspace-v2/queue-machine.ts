@@ -38,6 +38,10 @@ function uniqueSongs(songs: WorkspaceV2Song[]) {
   });
 }
 
+function internalSongsOnly(songs: WorkspaceV2Song[]) {
+  return uniqueSongs(songs).filter(isWorkspaceV2PlayableInternal);
+}
+
 function clampIndex(index: number, songs: WorkspaceV2Song[]) {
   if (!songs.length) return 0;
   return Math.min(Math.max(0, index), songs.length - 1);
@@ -101,7 +105,7 @@ export function buildWorkspaceV2ContinuousQueue({
   title: string;
 }): WorkspaceV2Queue {
   const consumed = new Set(previousConsumedSongIds ?? []);
-  const ordered = uniqueSongs(songs)
+  const ordered = internalSongsOnly(songs)
     .filter((song) => song.id.trim().length > 0)
     .sort((left, right) => {
       const leftConsumed = consumed.has(left.id) ? 1 : 0;
@@ -127,13 +131,14 @@ export function reduceWorkspaceV2Queue(
 ): WorkspaceV2QueueMachineState {
   switch (event.type) {
     case "load_queue":
+      const loadSongs = internalSongsOnly(event.queue.songs);
       return {
         activeQueue: {
           ...event.queue,
-          songs: uniqueSongs(event.queue.songs),
+          songs: loadSongs,
         },
         consumedSongIds: state.consumedSongIds,
-        currentIndex: clampIndex(event.startIndex ?? 0, event.queue.songs),
+        currentIndex: clampIndex(event.startIndex ?? 0, loadSongs),
         lastAdvanceReason: "load_queue",
         lastUpdatedAt: event.at,
       };
@@ -183,12 +188,13 @@ export function reduceWorkspaceV2Queue(
     }
 
     case "refill": {
+      const refillSongs = internalSongsOnly(event.songs);
       if (!state.activeQueue) {
         return {
           activeQueue: {
             id: `${event.source}:${event.at}`,
             mode: "discovery",
-            songs: uniqueSongs(event.songs),
+            songs: refillSongs,
             source: event.source,
             title: event.source.replaceAll("_", " "),
           },
@@ -200,7 +206,7 @@ export function reduceWorkspaceV2Queue(
       }
       const nextSongs = uniqueSongs([
         ...state.activeQueue.songs,
-        ...event.songs,
+        ...refillSongs,
       ]);
       return {
         ...state,
