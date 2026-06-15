@@ -122,11 +122,11 @@ export default async function WorkspaceV2PreviewPage() {
 
       <section className="workspace-v2-preview-intro">
         <span className="eyebrow">Founder-only Preview</span>
-        <h1>Workspace V2 Preview</h1>
+        <h1>Workspace V2 Product Shell</h1>
         <p>
           {spanish
-            ? "Esta ruta permite validar el nuevo motor de reproduccion sin activar cambios para usuarios."
-            : "This route validates the new playback engine without switching production users."}
+            ? "Vista Founder para validar el shell de producto antes de activarlo para usuarios."
+            : "Founder view for validating the product shell before enabling it for users."}
         </p>
       </section>
 
@@ -150,7 +150,12 @@ export default async function WorkspaceV2PreviewPage() {
         </section>
       ) : (
         <WorkspaceV2PreviewErrorBoundary>
-          <WorkspaceV2Shell initialQueue={queue} locale={locale} />
+          <WorkspaceV2Shell
+            economyMode="live"
+            initialQueue={queue}
+            locale={locale}
+            viewerMode="founder"
+          />
         </WorkspaceV2PreviewErrorBoundary>
       )}
     </main>
