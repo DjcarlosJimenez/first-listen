@@ -1131,6 +1131,11 @@ function WorkspaceV2ShellClient({
     [canAccessAdmin],
   );
 
+  const mobileNavItems = useMemo(
+    () => navItems.filter((item) => viewerMode !== "guest" || item.id !== "submit"),
+    [navItems, viewerMode],
+  );
+
   return (
     <section
       className={`workspace-v2-product-shell${darkMode ? " theme-dark" : ""}`}
@@ -1254,7 +1259,7 @@ function WorkspaceV2ShellClient({
           aria-label={spanish ? "Acciones rápidas móviles" : "Mobile quick actions"}
           className="workspace-v2-mobile-action-row"
         >
-          {navItems.map((item) => (
+          {mobileNavItems.map((item) => (
             <button
               aria-current={activePanel === item.id ? "page" : undefined}
               aria-label={panelLabel(item.id, spanish)}
@@ -1284,7 +1289,10 @@ function WorkspaceV2ShellClient({
           <button
             aria-label={spanish ? "Cerrar sesión" : "Sign out"}
             disabled={signingOut}
-            onClick={handleSignOut}
+            onClick={() => {
+              setSidebarExpanded(false);
+              void handleSignOut();
+            }}
             type="button"
           >
             <span aria-hidden="true">🚪</span>
