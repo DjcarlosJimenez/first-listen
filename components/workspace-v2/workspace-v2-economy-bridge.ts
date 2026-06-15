@@ -31,7 +31,12 @@ export type WorkspaceV2EconomyBridgeState = {
   secondsToNextCredit: number;
   sessionId: string | null;
   sessionVerifiedSeconds: number;
+  todayCompleteListens: number;
+  todayListeningSeconds: number;
+  todayValidListens: number;
+  totalCompleteListens: number;
   totalCreditsEarned: number;
+  totalValidListens: number;
   validListenRecorded: boolean;
   warning: string;
 };
@@ -49,7 +54,12 @@ const initialEconomyBridgeState: WorkspaceV2EconomyBridgeState = {
   secondsToNextCredit: 0,
   sessionId: null,
   sessionVerifiedSeconds: 0,
+  todayCompleteListens: 0,
+  todayListeningSeconds: 0,
+  todayValidListens: 0,
+  totalCompleteListens: 0,
   totalCreditsEarned: 0,
+  totalValidListens: 0,
   validListenRecorded: false,
   warning: "",
 };
@@ -79,10 +89,15 @@ function secondsToNextReward(bankSeconds: number, minutesPerCredit: number) {
 type ListeningStatusRow = {
   available_reward_credits?: number | string | null;
   bank_seconds?: number | string | null;
+  complete_listens?: number | string | null;
   community_points?: number | string | null;
   daily_cap_minutes?: number | string | null;
   minutes_per_credit?: number | string | null;
   seconds_to_next_credit?: number | string | null;
+  today_complete_listens?: number | string | null;
+  today_seconds?: number | string | null;
+  today_valid_listens?: number | string | null;
+  valid_listens?: number | string | null;
 };
 
 type ProfileCreditRow = {
@@ -165,8 +180,23 @@ export function useWorkspaceV2EconomyBridge({
           status?.seconds_to_next_credit ??
             secondsToNextReward(bankSeconds, minutesPerCredit),
         ),
+        todayCompleteListens: Number(
+          status?.today_complete_listens ?? current.todayCompleteListens,
+        ),
+        todayListeningSeconds: Number(
+          status?.today_seconds ?? current.todayListeningSeconds,
+        ),
+        todayValidListens: Number(
+          status?.today_valid_listens ?? current.todayValidListens,
+        ),
+        totalCompleteListens: Number(
+          status?.complete_listens ?? current.totalCompleteListens,
+        ),
         totalCreditsEarned: Number(
           profile?.total_review_credits_earned ?? current.totalCreditsEarned,
+        ),
+        totalValidListens: Number(
+          status?.valid_listens ?? current.totalValidListens,
         ),
       };
     });
@@ -335,6 +365,11 @@ export function useWorkspaceV2EconomyBridge({
           sessionVerifiedSeconds: Number(
             row.session_verified_seconds ?? current.sessionVerifiedSeconds,
           ),
+          todayCompleteListens: current.todayCompleteListens,
+          todayListeningSeconds: current.todayListeningSeconds + bankDelta,
+          todayValidListens: current.todayValidListens,
+          totalCompleteListens: current.totalCompleteListens,
+          totalValidListens: current.totalValidListens,
           validListenRecorded: Boolean(
             row.valid_listen_recorded ?? current.validListenRecorded,
           ),

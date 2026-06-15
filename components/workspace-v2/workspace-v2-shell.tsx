@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Coins,
   Compass,
@@ -451,13 +458,15 @@ function WorkspaceV2ShellClient({
     elapsedSeconds,
   );
   const rewardProgressPercent = canClaimRewards
-    ? Math.min(
-        100,
-        ((economy.state.bankSeconds %
-          Math.max(1, economy.state.minutesPerCredit * 60)) /
-          Math.max(1, economy.state.minutesPerCredit * 60)) *
+    ? economy.state.availableRewardCredits > 0
+      ? 100
+      : Math.min(
           100,
-      )
+          ((economy.state.bankSeconds %
+            Math.max(1, economy.state.minutesPerCredit * 60)) /
+            Math.max(1, economy.state.minutesPerCredit * 60)) *
+            100,
+        )
     : Math.min(
         100,
         (controller.validation.eligibleSeconds /
@@ -465,8 +474,11 @@ function WorkspaceV2ShellClient({
           100,
       );
   const activePlatform = controller.activeSong?.platform ?? "First Listen";
+  const playerIsVideo = Boolean(
+    controller.activeSong?.platform.toLowerCase().includes("youtube"),
+  );
   const playerMode = controller.activeSong
-    ? controller.activeSong.platform.toLowerCase().includes("youtube")
+    ? playerIsVideo
       ? spanish
         ? "Video"
         : "Video"
@@ -476,6 +488,88 @@ function WorkspaceV2ShellClient({
     : spanish
       ? "Listo"
       : "Ready";
+  const bankSecondsForDisplay =
+    viewerMode === "guest"
+      ? controller.validation.eligibleSeconds
+      : economy.state.bankSeconds;
+  const exchangeSeconds = Math.max(1, economy.state.minutesPerCredit * 60);
+  const secondsUntilReward =
+    viewerMode === "guest"
+      ? Math.max(
+          0,
+          controller.validation.minimumListenSeconds -
+            controller.validation.eligibleSeconds,
+        )
+      : Math.max(0, economy.state.secondsToNextCredit);
+  const rewardReady =
+    viewerMode !== "guest" && economy.state.availableRewardCredits > 0;
+  const rewardStatusText =
+    viewerMode === "guest"
+      ? spanish
+        ? "Crea una cuenta gratis para activar recompensas."
+        : "Create a free account to activate rewards."
+      : rewardReady
+        ? spanish
+          ? "Token listo para reclamar"
+          : "Token ready to claim"
+        : `${clock(secondsUntilReward)} ${
+            spanish ? "para el próximo token" : "to next token"
+          }`;
+  const bankProgressPercent =
+    viewerMode === "guest"
+      ? Math.min(
+          100,
+          (controller.validation.eligibleSeconds /
+            Math.max(1, controller.validation.minimumListenSeconds)) *
+            100,
+        )
+      : rewardReady
+        ? 100
+        : Math.min(
+          100,
+          ((bankSecondsForDisplay % exchangeSeconds) / exchangeSeconds) * 100,
+        );
+  const queueSongs = controller.queue.activeQueue?.songs ?? initialQueue.songs;
+  const consumedSongs = queueSongs.filter((song) =>
+    controller.queue.consumedSongIds.includes(song.id),
+  );
+  const activeArtist = controller.activeSong?.artist;
+  const supportedArtistCount = new Set(
+    [
+      ...consumedSongs.map((song) => song.artist).filter(Boolean),
+      sessionValid && activeArtist ? activeArtist : "",
+    ].filter(Boolean),
+  ).size;
+  const songsListenedToday =
+    viewerMode === "guest"
+      ? Math.max(consumedSongs.length, sessionValid ? 1 : 0)
+      : Math.max(economy.state.todayValidListens, consumedSongs.length);
+  const artistsSupportedToday = Math.max(supportedArtistCount, 0);
+  const listeningStreak =
+    controller.playback.state === "playing"
+      ? spanish
+        ? "Activa"
+        : "Active"
+      : sessionValid
+        ? spanish
+          ? "En progreso"
+          : "In progress"
+        : spanish
+          ? "Empieza al reproducir"
+          : "Starts when you play";
+  const minutesListenedToday =
+    viewerMode === "guest"
+      ? Math.floor(controller.validation.eligibleSeconds / 60)
+      : Math.floor(
+          Math.max(economy.state.todayListeningSeconds, displayedTimePlayed) /
+            60,
+        );
+  const playerSurfaceStyle: CSSProperties | undefined =
+    controller.activeSong && !playerIsVideo && controller.activeSong.coverUrl
+      ? {
+          backgroundImage: `linear-gradient(135deg, rgba(7, 16, 9, 0.5), rgba(7, 16, 9, 0.92)), url("${controller.activeSong.coverUrl}")`,
+        }
+      : undefined;
 
   useEffect(() => {
     const pending = controller.playback.pendingCommand;
@@ -776,7 +870,11 @@ function WorkspaceV2ShellClient({
       </aside>
 
       <main className="workspace-v2-product-main">
-        <section className="workspace-v2-product-hero" ref={heroRef}>
+        <section
+          className="workspace-v2-product-hero"
+          data-player-mode={playerIsVideo ? "video" : "audio"}
+          ref={heroRef}
+        >
           <div className="workspace-v2-hero-copy">
             <span className="eyebrow">
               {playerMode} / {activePlatform}
@@ -790,7 +888,11 @@ function WorkspaceV2ShellClient({
             </p>
           </div>
 
-          <div className="workspace-v2-player-surface">
+          <div
+            className="workspace-v2-player-surface"
+            data-player-mode={playerIsVideo ? "video" : "audio"}
+            style={playerSurfaceStyle}
+          >
             <WorkspaceV2ProviderPlayerAdapter
               command={controller.playback.pendingCommand}
               locale={locale}
@@ -802,10 +904,10 @@ function WorkspaceV2ShellClient({
 
           <div className="workspace-v2-sticky-controls">
             <button onClick={handlePlay} type="button">
-              <Play size={16} /> Play
+              <Play size={16} /> {spanish ? "Reproducir" : "Play"}
             </button>
             <button onClick={handlePause} type="button">
-              <Pause size={16} /> Pause
+              <Pause size={16} /> {spanish ? "Pausa" : "Pause"}
             </button>
             <button
               disabled={!controller.canAdvance}
@@ -815,7 +917,8 @@ function WorkspaceV2ShellClient({
               <SkipForward size={16} /> {spanish ? "Siguiente" : "Next"}
             </button>
             <button onClick={handleFullscreen} type="button">
-              <Maximize2 size={16} /> Fullscreen
+              <Maximize2 size={16} />{" "}
+              {spanish ? "Pantalla completa" : "Fullscreen"}
             </button>
             <span>
               {queueSourceLabel(queueSource, spanish)} / {positionCurrent}
@@ -825,7 +928,7 @@ function WorkspaceV2ShellClient({
         </section>
 
         <section className="workspace-v2-trust-layer" aria-label="Listening status">
-          <article>
+          <article className="workspace-v2-session-card">
             <span>{spanish ? "Sesión" : "Session"}</span>
             <strong>
               {sessionValid
@@ -839,15 +942,27 @@ function WorkspaceV2ShellClient({
             <span>{spanish ? "Tiempo reproducido" : "Time Played"}</span>
             <strong>{clock(displayedTimePlayed)}</strong>
           </article>
-          <article>
+          <article className="workspace-v2-time-bank-card">
             <span>{spanish ? "Banco de Tiempo" : "Time Bank"}</span>
-            <strong>
+            <strong>{clock(bankSecondsForDisplay)}</strong>
+            <small>
               {viewerMode === "guest"
-                ? clock(controller.validation.eligibleSeconds)
-                : clock(economy.state.bankSeconds)}
-            </strong>
+                ? spanish
+                  ? "Vista previa de progreso. Crea una cuenta para activar recompensas."
+                  : "Progress preview. Create an account to activate rewards."
+                : rewardReady
+                  ? spanish
+                    ? "Recompensa disponible ahora"
+                    : "Reward available now"
+                  : spanish
+                    ? `${clock(secondsUntilReward)} hasta el próximo token`
+                    : `${clock(secondsUntilReward)} until next token`}
+            </small>
+            <i>
+              <b style={{ width: `${rewardReady ? 100 : bankProgressPercent}%` }} />
+            </i>
           </article>
-          <article>
+          <article className="workspace-v2-token-card">
             <span>{spanish ? "Tokens de envío" : "Submission Tokens"}</span>
             <strong>
               {viewerMode === "guest"
@@ -859,19 +974,7 @@ function WorkspaceV2ShellClient({
           </article>
           <article className="workspace-v2-reward-progress">
             <span>{spanish ? "Progreso de recompensa" : "Reward Progress"}</span>
-            <strong>
-              {viewerMode === "guest"
-                ? spanish
-                  ? "Crea una cuenta gratis para activar recompensas."
-                  : "Create a free account to activate rewards."
-                : economy.state.availableRewardCredits > 0
-                  ? spanish
-                    ? "Token listo para reclamar"
-                    : "Token ready to claim"
-                  : `${clock(economy.state.secondsToNextCredit)} ${
-                      spanish ? "para el próximo token" : "to next token"
-                    }`}
-            </strong>
+            <strong>{rewardStatusText}</strong>
             <i>
               <b style={{ width: `${rewardProgressPercent}%` }} />
             </i>
@@ -896,6 +999,38 @@ function WorkspaceV2ShellClient({
           </article>
         </section>
 
+        <section
+          className="workspace-v2-motivation-layer"
+          aria-label={spanish ? "Motivación de escucha" : "Listening motivation"}
+        >
+          <article>
+            <span>{spanish ? "Canciones hoy" : "Songs today"}</span>
+            <strong>{songsListenedToday}</strong>
+          </article>
+          <article>
+            <span>{spanish ? "Artistas apoyados" : "Artists supported"}</span>
+            <strong>{artistsSupportedToday}</strong>
+          </article>
+          <article>
+            <span>{spanish ? "Racha de escucha" : "Listening streak"}</span>
+            <strong>{listeningStreak}</strong>
+          </article>
+          <article>
+            <span>{spanish ? "Minutos hoy" : "Minutes today"}</span>
+            <strong>{minutesListenedToday}</strong>
+          </article>
+          {viewerMode === "guest" && (
+            <article className="workspace-v2-guest-conversion-card">
+              <span>{spanish ? "Recompensas" : "Rewards"}</span>
+              <strong>
+                {spanish
+                  ? "Crea una cuenta gratis para activar tokens."
+                  : "Create a free account to activate tokens."}
+              </strong>
+            </article>
+          )}
+        </section>
+
         <div className="workspace-v2-product-body">
           <WorkspaceV2ContentPanel
             activePanel={activePanel}
@@ -914,6 +1049,15 @@ function WorkspaceV2ShellClient({
               {spanish ? "Cola" : "Queue"}
             </span>
             <h2>{queueTitle}</h2>
+            <div className="workspace-v2-queue-context">
+              <strong>
+                {positionCurrent}/{positionTotal}
+              </strong>
+              <span>{queueSourceLabel(queueSource, spanish)}</span>
+              <small>
+                {remainingCount} {spanish ? "por escuchar" : "remaining"}
+              </small>
+            </div>
             <div className="workspace-v2-now-next">
               <article>
                 <span>{spanish ? "Ahora" : "Now Playing"}</span>
@@ -927,9 +1071,9 @@ function WorkspaceV2ShellClient({
               </article>
             </div>
             <p>
-              {remainingCount}{" "}
-              {spanish ? "canciones restantes" : "songs remaining"} /{" "}
-              {queueSourceLabel(queueSource, spanish)}
+              {spanish
+                ? "La cola acompaña al reproductor sin competir con la música."
+                : "The queue supports the player without competing with the music."}
             </p>
             <ol>
               {controller.remainingSongs.slice(0, 8).map((song) => (

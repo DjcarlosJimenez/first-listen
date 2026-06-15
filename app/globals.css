@@ -13801,6 +13801,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .workspace-v2-product-nav,
 .workspace-v2-product-hero,
 .workspace-v2-trust-layer,
+.workspace-v2-motivation-layer,
 .workspace-v2-content-panel,
 .workspace-v2-queue-panel {
   background: rgba(23, 31, 24, 0.92);
@@ -13843,7 +13844,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .workspace-v2-product-brand small,
 .workspace-v2-queue-panel p,
 .workspace-v2-now-next small,
-.workspace-v2-content-panel p {
+.workspace-v2-content-panel p,
+.workspace-v2-time-bank-card small {
   color: var(--muted);
 }
 
@@ -13928,15 +13930,30 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   background:
     radial-gradient(circle at center, rgba(185, 255, 47, 0.08), transparent 55%),
     rgba(0, 0, 0, 0.36);
+  background-position: center;
+  background-size: cover;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 22px;
   min-height: 390px;
   overflow: hidden;
 }
 
+.workspace-v2-player-surface[data-player-mode="audio"] {
+  min-height: 430px;
+}
+
+.workspace-v2-player-surface[data-player-mode="video"] {
+  box-shadow: inset 0 0 0 1px rgba(185, 255, 47, 0.08);
+}
+
 .workspace-v2-player-surface .workspace-v2-provider-player,
 .workspace-v2-player-surface .provider-player {
   min-height: 390px;
+}
+
+.workspace-v2-player-surface[data-player-mode="audio"] .workspace-v2-provider-player,
+.workspace-v2-player-surface[data-player-mode="audio"] .provider-player {
+  min-height: 430px;
 }
 
 .workspace-v2-sticky-controls {
@@ -13974,7 +13991,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .workspace-v2-trust-layer {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   padding: 14px;
 }
 
@@ -13989,6 +14006,9 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .workspace-v2-trust-layer span,
+.workspace-v2-motivation-layer span,
+.workspace-v2-queue-context span,
+.workspace-v2-queue-context small,
 .workspace-v2-now-next span,
 .workspace-v2-queue-panel ol small,
 .workspace-v2-discover-list small {
@@ -14000,6 +14020,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .workspace-v2-trust-layer strong,
+.workspace-v2-motivation-layer strong,
+.workspace-v2-queue-context strong,
 .workspace-v2-now-next strong,
 .workspace-v2-queue-panel li span,
 .workspace-v2-discover-list span {
@@ -14007,10 +14029,34 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   overflow-wrap: anywhere;
 }
 
+.workspace-v2-session-card {
+  border-color: rgba(185, 255, 47, 0.22);
+}
+
+.workspace-v2-time-bank-card {
+  background:
+    linear-gradient(135deg, rgba(185, 255, 47, 0.18), rgba(185, 255, 47, 0.05)),
+    rgba(255, 255, 255, 0.055);
+  border-color: rgba(185, 255, 47, 0.52);
+  box-shadow: 0 18px 50px rgba(185, 255, 47, 0.09);
+  grid-column: span 2;
+}
+
+.workspace-v2-time-bank-card strong {
+  color: var(--acid);
+  font-size: clamp(24px, 3.5vw, 42px);
+  line-height: 0.95;
+}
+
+.workspace-v2-token-card strong {
+  color: var(--acid);
+}
+
 .workspace-v2-reward-progress {
   grid-column: span 2;
 }
 
+.workspace-v2-time-bank-card i,
 .workspace-v2-reward-progress i {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
@@ -14019,10 +14065,36 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   overflow: hidden;
 }
 
+.workspace-v2-time-bank-card b,
 .workspace-v2-reward-progress b {
   background: var(--acid);
   display: block;
   height: 100%;
+}
+
+.workspace-v2-motivation-layer {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 12px;
+}
+
+.workspace-v2-motivation-layer article {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+}
+
+.workspace-v2-motivation-layer strong {
+  font-size: 18px;
+}
+
+.workspace-v2-guest-conversion-card {
+  border-color: rgba(185, 255, 47, 0.34) !important;
+  grid-column: span 2;
 }
 
 .workspace-v2-product-body {
@@ -14064,6 +14136,24 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .workspace-v2-now-next {
   display: grid;
   gap: 10px;
+}
+
+.workspace-v2-queue-context {
+  align-items: center;
+  background: rgba(185, 255, 47, 0.08);
+  border: 1px solid rgba(185, 255, 47, 0.22);
+  border-radius: 18px;
+  display: grid;
+  gap: 3px;
+  grid-template-columns: auto 1fr;
+  padding: 12px;
+}
+
+.workspace-v2-queue-context strong {
+  color: var(--acid);
+  font-size: 28px;
+  grid-row: span 2;
+  line-height: 0.9;
 }
 
 .workspace-v2-now-next article,
@@ -14172,6 +14262,12 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     min-height: 280px;
   }
 
+  .workspace-v2-player-surface[data-player-mode="audio"],
+  .workspace-v2-player-surface[data-player-mode="audio"] .workspace-v2-provider-player,
+  .workspace-v2-player-surface[data-player-mode="audio"] .provider-player {
+    min-height: 320px;
+  }
+
   .workspace-v2-sticky-controls {
     bottom: 0;
     margin: 0 -6px;
@@ -14188,8 +14284,16 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .workspace-v2-time-bank-card {
+    grid-column: span 2;
+  }
+
   .workspace-v2-reward-progress {
     grid-column: span 2;
+  }
+
+  .workspace-v2-motivation-layer {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -14211,7 +14315,16 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     grid-template-columns: 1fr;
   }
 
+  .workspace-v2-time-bank-card,
   .workspace-v2-reward-progress {
+    grid-column: auto;
+  }
+
+  .workspace-v2-motivation-layer {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-v2-guest-conversion-card {
     grid-column: auto;
   }
 }
@@ -14249,8 +14362,23 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     min-height: 220px;
   }
 
+  .workspace-v2-player-surface[data-player-mode="audio"],
+  .workspace-v2-player-surface[data-player-mode="audio"] .workspace-v2-provider-player,
+  .workspace-v2-player-surface[data-player-mode="audio"] .provider-player {
+    min-height: 240px;
+  }
+
   .workspace-v2-trust-layer {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .workspace-v2-time-bank-card,
+  .workspace-v2-reward-progress {
+    grid-column: span 2;
+  }
+
+  .workspace-v2-motivation-layer {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .workspace-v2-product-body {
