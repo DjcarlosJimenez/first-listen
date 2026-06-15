@@ -8,6 +8,9 @@ export type WorkspaceV2TelemetryState = {
   currentProgressSeconds: number;
   durationSeconds: number;
   lastUpdatedAt: number;
+  lastProviderAt: number;
+  pageFocused: boolean | null;
+  pageVisible: boolean | null;
   playbackState: WorkspaceV2PlaybackState;
   rewardEligibleSeconds: number;
   timeLiveSeconds: number;
@@ -27,6 +30,9 @@ export const initialWorkspaceV2TelemetryState: WorkspaceV2TelemetryState = {
   currentProgressSeconds: 0,
   durationSeconds: 0,
   lastUpdatedAt: 0,
+  lastProviderAt: 0,
+  pageFocused: null,
+  pageVisible: null,
   playbackState: "ready",
   rewardEligibleSeconds: 0,
   timeLiveSeconds: 0,
@@ -42,7 +48,10 @@ export function reduceWorkspaceV2Telemetry(
       return {
         currentProgressSeconds: event.validation.progressSeconds,
         durationSeconds: event.validation.durationSeconds || event.snapshot.duration,
+        lastProviderAt: event.snapshot.at,
         lastUpdatedAt: event.at,
+        pageFocused: event.snapshot.pageFocused ?? null,
+        pageVisible: event.snapshot.pageVisible ?? null,
         playbackState: event.snapshot.playbackState,
         rewardEligibleSeconds: event.validation.eligibleSeconds,
         timeLiveSeconds:

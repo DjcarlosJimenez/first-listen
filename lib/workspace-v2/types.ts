@@ -53,6 +53,8 @@ export type WorkspaceV2ProviderSnapshot = {
   currentTime: number;
   duration: number;
   muted: boolean | null;
+  pageFocused?: boolean;
+  pageVisible?: boolean;
   playbackState: WorkspaceV2PlaybackState;
   supported: boolean;
   volume: number | null;

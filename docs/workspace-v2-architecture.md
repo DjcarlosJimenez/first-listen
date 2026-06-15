@@ -37,3 +37,17 @@ Workspace V2 can replace the current Workspace only after:
 ## Current Status
 
 Phase 1 has added the V2 machines and controller hook in parallel. The current production Workspace is not wired to V2 yet.
+
+## Founder-Only Preview
+
+- Route: `/workspace-v2-preview`
+- Access: Founder #1 only.
+- Mode: sandbox.
+- Sandbox behavior: no token consumption, no Time Bank writes, and no production statistics updates.
+- Instrumentation: playback state transitions, queue transitions, validation transitions, telemetry transitions, browser visibility changes, and memory snapshots.
+- Required manual validation before production switch:
+  - 20-song autoplay test.
+  - 60-minute continuous playback test.
+  - Chrome vs Edge parity test.
+  - Validation tab-switch test.
+  - 50-song long-session memory test.
