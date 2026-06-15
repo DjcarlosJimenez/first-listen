@@ -14203,13 +14203,19 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-player-surface,
 .workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-player-surface .workspace-v2-provider-player,
 .workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-player-surface .provider-player {
-  min-height: 150px;
+  height: clamp(150px, 22vh, 220px);
+  min-height: 0;
 }
 
 .workspace-v2-product-hero[data-workspace-mode="productivity"][data-player-mode="audio"] .workspace-v2-player-surface,
 .workspace-v2-product-hero[data-workspace-mode="productivity"][data-player-mode="audio"] .workspace-v2-player-surface .workspace-v2-provider-player,
 .workspace-v2-product-hero[data-workspace-mode="productivity"][data-player-mode="audio"] .workspace-v2-player-surface .provider-player {
-  min-height: 170px;
+  height: clamp(160px, 24vh, 240px);
+  min-height: 0;
+}
+
+.workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-player-surface .provider-player {
+  aspect-ratio: auto;
 }
 
 .workspace-v2-product-hero[data-workspace-mode="productivity"] .workspace-v2-video-metadata-overlay {
