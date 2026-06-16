@@ -15036,6 +15036,14 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     padding: 0 12px 18px;
   }
 
+  .workspace-v2-product-shell[data-sidebar="expanded"] {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-v2-product-shell[data-sidebar="expanded"] .workspace-v2-product-nav {
+    z-index: 70;
+  }
+
   .workspace-v2-product-nav {
     align-items: center;
     display: grid;
@@ -15689,18 +15697,27 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .workspace-v2-product-shell[data-sidebar="expanded"] .workspace-v2-mobile-action-row {
     align-items: center;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 6px;
     grid-column: auto;
     margin: 0;
     order: 4;
-    overflow: visible;
+    max-width: calc(100vw - 16px);
+    overflow-x: auto;
+    overflow-y: hidden;
     padding: 0;
     position: absolute;
     right: 8px;
     top: calc(100% + 4px);
-    width: 34px;
+    width: max-content;
     z-index: 45;
+    scrollbar-width: none;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .workspace-v2-product-shell[data-sidebar="expanded"] .workspace-v2-mobile-action-row::-webkit-scrollbar {
+    display: none;
   }
 
   .workspace-v2-mobile-action-row button {
