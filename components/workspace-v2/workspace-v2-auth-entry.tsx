@@ -7,6 +7,7 @@ import { WorkspaceV2PreviewErrorBoundary } from "@/components/workspace-v2/works
 import { WorkspaceV2Shell, type WorkspaceV2ViewerMode } from "@/components/workspace-v2/workspace-v2-shell";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { displayPlatform, getContentClassification } from "@/lib/content-economy";
+import { loadFounderOperationsSnapshot } from "@/lib/founder-operations";
 import { safeCoverUrl } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -324,6 +325,8 @@ export async function WorkspaceV2AuthEntry({
   const queue = buildPublicBetaQueue((rows ?? []) as WorkspaceV2SongRow[], locale);
   const viewerMode = viewerModeFromProfile(typedProfile);
   const canAccessAdmin = viewerMode === "founder" || viewerMode === "admin";
+  const founderOperations =
+    viewerMode === "founder" ? await loadFounderOperationsSnapshot() : null;
   const profilePanel = buildProfilePanelPayload({
     activityRows,
     connectedPlatformRows,
@@ -376,6 +379,7 @@ export async function WorkspaceV2AuthEntry({
         <WorkspaceV2PreviewErrorBoundary>
           <WorkspaceV2Shell
             economyMode="live"
+            founderOperations={founderOperations}
             initialFounderSubmissionsRemaining={Number(
               typedProfile?.founder_free_submissions_remaining ?? 0,
             )}

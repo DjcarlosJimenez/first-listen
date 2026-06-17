@@ -43,6 +43,7 @@ import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import { SongActionBar } from "@/components/song-action-bar";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { databasePlatform } from "@/lib/content-economy";
+import type { FounderOperationsSnapshot } from "@/lib/founder-operations-types";
 import { getCopy } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import type { ContentEconomySetting, Platform } from "@/lib/types";
@@ -71,37 +72,6 @@ type WorkspaceV2Panel =
   | "founder-operations"
   | "owner"
   | "admin";
-
-export type FounderOperationsSnapshot = {
-  errors?: string[];
-  feedback: {
-    inProgress: number;
-    open: number;
-    resolved: number;
-  };
-  reports: Array<{
-    createdAt: string;
-    id: string;
-    reportType: string;
-    status: string;
-    targetContent: string;
-  }>;
-  summary: {
-    activeUsers: number;
-    openFeedbackItems: number;
-    openReports: number;
-    songsPendingReview: number;
-    totalSongs: number;
-    totalUsers: number;
-  };
-  users: Array<{
-    email: string;
-    id: string;
-    role: string;
-    tokenBalance: number;
-    username: string;
-  }>;
-};
 
 type InstrumentationLog = {
   at: number;
@@ -217,7 +187,7 @@ function panelLabel(panel: WorkspaceV2Panel, spanish: boolean) {
     ? {
         admin: "Admin",
         discover: "Descubrir",
-        "founder-operations": "Operaciones Founder",
+        "founder-operations": "Centro de Operaciones",
         owner: "Owner",
         profile: "Mi perfil",
         submit: "Enviar canción",
@@ -225,7 +195,7 @@ function panelLabel(panel: WorkspaceV2Panel, spanish: boolean) {
     : {
         admin: "Admin",
         discover: "Discover",
-        "founder-operations": "Founder Operations",
+        "founder-operations": "Centro de Operaciones",
         owner: "Owner",
         profile: "My profile",
         submit: "Submit song",
