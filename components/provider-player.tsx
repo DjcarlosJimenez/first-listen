@@ -1789,6 +1789,7 @@ export function ProviderPlayer({
       {embed && iframeSrc && embed.telemetry !== "spotify_iframe_api" && (
         <iframe
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          allowFullScreen
           className={status === "ready" ? "ready" : ""}
           key={`${iframeSrc}:${initializationAttempt}`}
           onError={playerFailed}

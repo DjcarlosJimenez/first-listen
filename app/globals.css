@@ -14323,7 +14323,11 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .workspace-v2-player-surface[data-player-mode="video"] {
+  aspect-ratio: 16 / 9;
   box-shadow: inset 0 0 0 1px rgba(185, 255, 47, 0.08);
+  height: auto;
+  min-height: 0;
+  width: 100%;
 }
 
 .workspace-v2-video-metadata-overlay {
@@ -14439,6 +14443,14 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .workspace-v2-player-surface .workspace-v2-provider-player,
 .workspace-v2-player-surface .provider-player {
   min-height: 390px;
+}
+
+.workspace-v2-player-surface[data-player-mode="video"] .workspace-v2-provider-player,
+.workspace-v2-player-surface[data-player-mode="video"] .provider-player {
+  aspect-ratio: 16 / 9;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
 }
 
 .workspace-v2-player-surface[data-player-mode="audio"] .workspace-v2-provider-player,
@@ -15156,6 +15168,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .workspace-v2-product-hero:fullscreen .workspace-v2-player-surface {
+  aspect-ratio: auto;
   min-height: 72vh;
 }
 
@@ -15172,6 +15185,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .workspace-v2-product-hero[data-player-mode="video"]:fullscreen .workspace-v2-player-surface,
 .workspace-v2-product-hero[data-player-mode="video"]:fullscreen .workspace-v2-player-surface .workspace-v2-provider-player,
 .workspace-v2-product-hero[data-player-mode="video"]:fullscreen .workspace-v2-player-surface .provider-player {
+  aspect-ratio: auto;
+  height: auto;
   min-height: calc(100vh - 112px);
 }
 
@@ -15180,6 +15195,19 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   left: 50%;
   top: 18px;
   transform: translateX(-50%);
+}
+
+@media (orientation: landscape) {
+  .workspace-v2-product-hero[data-player-mode="video"]:not([data-workspace-mode="productivity"]) .workspace-v2-player-surface {
+    justify-self: center;
+    max-height: min(68dvh, 720px);
+    max-width: min(100%, 121dvh, 1280px);
+  }
+
+  .workspace-v2-product-hero[data-player-mode="video"]:not([data-workspace-mode="productivity"]) .workspace-v2-player-surface .workspace-v2-provider-player,
+  .workspace-v2-product-hero[data-player-mode="video"]:not([data-workspace-mode="productivity"]) .workspace-v2-player-surface .provider-player {
+    max-height: min(68dvh, 720px);
+  }
 }
 
 @media (max-width: 900px) {
@@ -15959,6 +15987,13 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 @media (orientation: landscape) and (max-height: 560px) {
+  .workspace-v2-product-hero[data-player-mode="video"]:not([data-workspace-mode="productivity"]) .workspace-v2-player-surface,
+  .workspace-v2-product-hero[data-player-mode="video"]:not([data-workspace-mode="productivity"]) .workspace-v2-player-surface .workspace-v2-provider-player,
+  .workspace-v2-product-hero[data-player-mode="video"]:not([data-workspace-mode="productivity"]) .workspace-v2-player-surface .provider-player {
+    max-height: min(56dvh, 420px);
+    max-width: min(100%, 99.6dvh, 746px);
+  }
+
   .workspace-v2-product-shell[data-workspace-mode="productivity"] {
     gap: 6px;
     grid-template-columns: 1fr;
@@ -16070,6 +16105,13 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 @media (orientation: landscape) and (max-height: 560px) and (max-width: 900px) {
+  .workspace-v2-product-hero[data-player-mode="video"]:not([data-workspace-mode="productivity"]) .workspace-v2-player-surface,
+  .workspace-v2-product-hero[data-player-mode="video"]:not([data-workspace-mode="productivity"]) .workspace-v2-player-surface .workspace-v2-provider-player,
+  .workspace-v2-product-hero[data-player-mode="video"]:not([data-workspace-mode="productivity"]) .workspace-v2-player-surface .provider-player {
+    max-height: min(52dvh, 320px);
+    max-width: min(100%, 92.5dvh, 568px);
+  }
+
   .workspace-v2-product-shell,
   .workspace-v2-product-shell[data-workspace-mode="productivity"] {
     grid-template-columns: 1fr;
