@@ -10,25 +10,31 @@ import {
   useState,
 } from "react";
 import {
+  Activity,
+  BarChart3,
   Coins,
   Compass,
   Flag,
   Gauge,
+  Inbox,
   ListMusic,
   LockKeyhole,
   LogOut,
   Maximize2,
   Moon,
   MoreHorizontal,
+  Music2,
   PanelLeftClose,
   PanelLeftOpen,
   Pause,
   Play,
+  Search,
   Send,
   ShieldCheck,
   SkipForward,
   Sun,
   User,
+  Users,
   Wrench,
 } from "lucide-react";
 import { SubmitView, type SongSubmission } from "@/components/first-listen-app";
@@ -58,7 +64,44 @@ export type WorkspaceV2ViewerMode =
   | "founder"
   | "admin";
 
-type WorkspaceV2Panel = "discover" | "submit" | "profile" | "owner" | "admin";
+type WorkspaceV2Panel =
+  | "discover"
+  | "submit"
+  | "profile"
+  | "founder-operations"
+  | "owner"
+  | "admin";
+
+export type FounderOperationsSnapshot = {
+  errors?: string[];
+  feedback: {
+    inProgress: number;
+    open: number;
+    resolved: number;
+  };
+  reports: Array<{
+    createdAt: string;
+    id: string;
+    reportType: string;
+    status: string;
+    targetContent: string;
+  }>;
+  summary: {
+    activeUsers: number;
+    openFeedbackItems: number;
+    openReports: number;
+    songsPendingReview: number;
+    totalSongs: number;
+    totalUsers: number;
+  };
+  users: Array<{
+    email: string;
+    id: string;
+    role: string;
+    tokenBalance: number;
+    username: string;
+  }>;
+};
 
 type InstrumentationLog = {
   at: number;
@@ -174,6 +217,7 @@ function panelLabel(panel: WorkspaceV2Panel, spanish: boolean) {
     ? {
         admin: "Admin",
         discover: "Descubrir",
+        "founder-operations": "Operaciones Founder",
         owner: "Owner",
         profile: "Mi perfil",
         submit: "Enviar canción",
@@ -181,6 +225,7 @@ function panelLabel(panel: WorkspaceV2Panel, spanish: boolean) {
     : {
         admin: "Admin",
         discover: "Discover",
+        "founder-operations": "Founder Operations",
         owner: "Owner",
         profile: "My profile",
         submit: "Submit song",
@@ -214,6 +259,7 @@ export function WorkspaceV2Shell({
   contentEconomy = [],
   debugMode = false,
   economyMode = "sandbox",
+  founderOperations = null,
   guestToken,
   initialFounderSubmissionsRemaining = 0,
   initialQueue,
@@ -226,6 +272,7 @@ export function WorkspaceV2Shell({
   contentEconomy?: ContentEconomySetting[];
   debugMode?: boolean;
   economyMode?: WorkspaceV2EconomyMode;
+  founderOperations?: FounderOperationsSnapshot | null;
   guestToken?: string | null;
   initialFounderSubmissionsRemaining?: number;
   initialQueue: WorkspaceV2Queue;
@@ -257,6 +304,7 @@ export function WorkspaceV2Shell({
       contentEconomy={contentEconomy}
       debugMode={debugMode}
       economyMode={economyMode}
+      founderOperations={founderOperations}
       guestToken={guestToken}
       initialFounderSubmissionsRemaining={initialFounderSubmissionsRemaining}
       initialQueue={initialQueue}
@@ -273,6 +321,7 @@ function WorkspaceV2ShellClient({
   contentEconomy,
   debugMode,
   economyMode,
+  founderOperations,
   guestToken,
   initialFounderSubmissionsRemaining,
   initialQueue,
@@ -285,6 +334,7 @@ function WorkspaceV2ShellClient({
   contentEconomy: ContentEconomySetting[];
   debugMode: boolean;
   economyMode: WorkspaceV2EconomyMode;
+  founderOperations: FounderOperationsSnapshot | null;
   guestToken?: string | null;
   initialFounderSubmissionsRemaining: number;
   initialQueue: WorkspaceV2Queue;
@@ -305,6 +355,7 @@ function WorkspaceV2ShellClient({
     useState<InterfaceLocale>(locale);
   const spanish = workspaceLocale === "es";
   const canAccessAdmin = viewerMode === "founder" || viewerMode === "admin";
+  const canAccessFounderOperations = viewerMode === "founder";
   const canClaimRewards = viewerMode !== "guest" && economy.enabled;
   const canSubmit = viewerMode !== "guest";
   const copy = useMemo(() => getCopy(workspaceLocale), [workspaceLocale]);
@@ -1121,6 +1172,15 @@ function WorkspaceV2ShellClient({
         { icon: Compass, id: "discover" as const, mobileIcon: "🎵" },
         { icon: Send, id: "submit" as const, mobileIcon: "➕" },
         { icon: User, id: "profile" as const, mobileIcon: "👤" },
+        ...(canAccessFounderOperations
+          ? [
+              {
+                icon: Gauge,
+                id: "founder-operations" as const,
+                mobileIcon: "FO",
+              },
+            ]
+          : []),
         ...(canAccessAdmin
           ? [
               { icon: ShieldCheck, id: "owner" as const, mobileIcon: "🛡" },
@@ -1128,7 +1188,7 @@ function WorkspaceV2ShellClient({
             ]
           : []),
       ],
-    [canAccessAdmin],
+    [canAccessAdmin, canAccessFounderOperations],
   );
 
   const mobileNavItems = useMemo(
@@ -1557,6 +1617,7 @@ function WorkspaceV2ShellClient({
             contentEconomy={contentEconomy}
             copy={copy}
             founderFree={founderSubmissionsRemaining > 0}
+            founderOperations={founderOperations}
             initialQueue={initialQueue}
             locale={workspaceLocale}
             onPanelChange={handlePanelChange}
@@ -1659,6 +1720,7 @@ function WorkspaceV2ContentPanel({
   contentEconomy,
   copy,
   founderFree,
+  founderOperations,
   initialQueue,
   locale,
   onPanelChange,
@@ -1677,6 +1739,7 @@ function WorkspaceV2ContentPanel({
   contentEconomy: ContentEconomySetting[];
   copy: ReturnType<typeof getCopy>;
   founderFree: boolean;
+  founderOperations: FounderOperationsSnapshot | null;
   initialQueue: WorkspaceV2Queue;
   locale: InterfaceLocale;
   onPanelChange: (panel: WorkspaceV2Panel) => void;
@@ -1816,6 +1879,36 @@ function WorkspaceV2ContentPanel({
     );
   }
 
+  if (activePanel === "founder-operations") {
+    if (viewerMode === "founder") {
+      return (
+        <FounderOperationsPanel
+          locale={locale}
+          snapshot={founderOperations}
+        />
+      );
+    }
+
+    return (
+      <section className="workspace-v2-content-panel">
+        <span className="eyebrow">
+          <Gauge size={13} />
+          Founder Operations
+        </span>
+        <h2>
+          {spanish
+            ? "Esta seccion requiere acceso Founder."
+            : "This section requires Founder access."}
+        </h2>
+        <p>
+          {spanish
+            ? "Los permisos de Admin, Moderator, Member y Guest se mantienen sin cambios."
+            : "Admin, Moderator, Member, and Guest permissions remain unchanged."}
+        </p>
+      </section>
+    );
+  }
+
   if (activePanel === "owner" || activePanel === "admin") {
     return (
       <section className="workspace-v2-content-panel">
@@ -1879,6 +1972,244 @@ function WorkspaceV2ContentPanel({
       >
         {spanish ? "Enviar mi música" : "Submit my music"}
       </button>
+    </section>
+  );
+}
+
+function humanizeOperationsLabel(value: string) {
+  return value.replaceAll("_", " ");
+}
+
+function formatOperationsDate(value: string, locale: InterfaceLocale) {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return value;
+  return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(timestamp);
+}
+
+function FounderOperationsPanel({
+  locale,
+  snapshot,
+}: {
+  locale: InterfaceLocale;
+  snapshot: FounderOperationsSnapshot | null;
+}) {
+  const spanish = locale === "es";
+  const [userSearch, setUserSearch] = useState("");
+
+  const filteredUsers = useMemo(() => {
+    if (!snapshot) return [];
+    const query = userSearch.trim().toLowerCase();
+    if (!query) return snapshot.users;
+    return snapshot.users.filter((user) =>
+      [
+        user.username,
+        user.email,
+        user.role,
+        user.id,
+        String(user.tokenBalance),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [snapshot, userSearch]);
+
+  if (!snapshot) {
+    return (
+      <section className="workspace-v2-content-panel workspace-v2-founder-ops">
+        <span className="eyebrow">
+          <Gauge size={13} />
+          Founder Operations
+        </span>
+        <h2>
+          {spanish
+            ? "El panel Founder Operations no esta disponible."
+            : "Founder Operations is unavailable."}
+        </h2>
+        <p>
+          {spanish
+            ? "La preview conserva el Workspace V2, pero no recibio el snapshot administrativo."
+            : "The Workspace V2 preview remains available, but the administrative snapshot did not load."}
+        </p>
+      </section>
+    );
+  }
+
+  const summaryCards = [
+    [spanish ? "Usuarios totales" : "Total users", snapshot.summary.totalUsers, Users],
+    [spanish ? "Usuarios activos" : "Active users", snapshot.summary.activeUsers, Activity],
+    [spanish ? "Canciones totales" : "Total songs", snapshot.summary.totalSongs, Music2],
+    [
+      spanish ? "Canciones pendientes" : "Songs pending review",
+      snapshot.summary.songsPendingReview,
+      ListMusic,
+    ],
+    [spanish ? "Reportes abiertos" : "Open reports", snapshot.summary.openReports, Flag],
+    [
+      spanish ? "Feedback abierto" : "Open feedback items",
+      snapshot.summary.openFeedbackItems,
+      Inbox,
+    ],
+  ] as const;
+
+  return (
+    <section
+      aria-label="Founder Operations"
+      className="workspace-v2-content-panel workspace-v2-founder-ops"
+    >
+      <div className="workspace-v2-founder-ops-heading">
+        <div>
+          <span className="eyebrow">
+            <Gauge size={13} />
+            Founder Operations
+          </span>
+          <h2>Centro de Operaciones</h2>
+          <p>
+            Vista general de usuarios, actividad, reportes y soporte.
+          </p>
+        </div>
+        <span className="workspace-v2-readonly-badge">
+          Solo lectura
+        </span>
+      </div>
+
+      {snapshot.errors?.length ? (
+        <div className="workspace-v2-founder-ops-warning" role="status">
+          <strong>{spanish ? "Lecturas incompletas" : "Incomplete reads"}</strong>
+          <span>{snapshot.errors.join(" / ")}</span>
+        </div>
+      ) : null}
+
+      <div className="workspace-v2-founder-summary-grid">
+        {summaryCards.map(([label, value, Icon]) => (
+          <article key={label}>
+            <span>
+              <Icon size={14} />
+              {label}
+            </span>
+            <strong>{Number(value).toLocaleString()}</strong>
+          </article>
+        ))}
+      </div>
+
+      <section className="workspace-v2-founder-section">
+        <div className="workspace-v2-founder-section-heading">
+          <div>
+            <span className="eyebrow">
+              <Users size={13} />
+              {spanish ? "Directorio" : "User Directory"}
+            </span>
+            <h3>{spanish ? "Usuarios" : "Users"}</h3>
+          </div>
+          <label className="workspace-v2-founder-search">
+            <Search size={14} />
+            <input
+              aria-label={spanish ? "Buscar usuarios" : "Search users"}
+              onChange={(event) => setUserSearch(event.target.value)}
+              placeholder={
+                spanish
+                  ? "Buscar usuario, email o rol"
+                  : "Search username, email, or role"
+              }
+              value={userSearch}
+            />
+          </label>
+        </div>
+        <div className="workspace-v2-founder-table" role="table">
+          <div role="row">
+            <span role="columnheader">{spanish ? "Usuario" : "Username"}</span>
+            <span role="columnheader">Email</span>
+            <span role="columnheader">Role</span>
+            <span role="columnheader">Tokens</span>
+          </div>
+          {filteredUsers.slice(0, 80).map((user) => (
+            <div key={user.id} role="row">
+              <span role="cell">{user.username || user.id}</span>
+              <span role="cell">{user.email || "-"}</span>
+              <span role="cell">{humanizeOperationsLabel(user.role)}</span>
+              <span role="cell">{user.tokenBalance.toLocaleString()}</span>
+            </div>
+          ))}
+          {!filteredUsers.length && (
+            <p className="workspace-v2-founder-empty">
+              {spanish ? "No hay usuarios para esta busqueda." : "No users match this search."}
+            </p>
+          )}
+        </div>
+      </section>
+
+      <div className="workspace-v2-founder-two-column">
+        <section className="workspace-v2-founder-section">
+          <div className="workspace-v2-founder-section-heading">
+            <div>
+              <span className="eyebrow">
+                <Flag size={13} />
+                {spanish ? "Reportes" : "Reports Overview"}
+              </span>
+              <h3>{spanish ? "Reportes abiertos" : "Open reports"}</h3>
+            </div>
+          </div>
+          <div className="workspace-v2-founder-table" role="table">
+            <div role="row">
+              <span role="columnheader">{spanish ? "Tipo" : "Report type"}</span>
+              <span role="columnheader">{spanish ? "Contenido" : "Target content"}</span>
+              <span role="columnheader">Status</span>
+            </div>
+            {snapshot.reports.slice(0, 20).map((report) => (
+              <div
+                key={report.id}
+                role="row"
+                title={formatOperationsDate(report.createdAt, locale)}
+              >
+                <span role="cell">{humanizeOperationsLabel(report.reportType)}</span>
+                <span role="cell">{report.targetContent}</span>
+                <span role="cell">{humanizeOperationsLabel(report.status)}</span>
+              </div>
+            ))}
+            {!snapshot.reports.length && (
+              <p className="workspace-v2-founder-empty">
+                {spanish ? "No hay reportes abiertos." : "No open reports."}
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="workspace-v2-founder-section">
+          <div className="workspace-v2-founder-section-heading">
+            <div>
+              <span className="eyebrow">
+                <Inbox size={13} />
+                {spanish ? "Feedback" : "Feedback Inbox"}
+              </span>
+              <h3>{spanish ? "Estado del inbox" : "Inbox status"}</h3>
+            </div>
+          </div>
+          <div className="workspace-v2-feedback-counts">
+            <article>
+              <span>{spanish ? "Abierto" : "Open feedback"}</span>
+              <strong>{snapshot.feedback.open.toLocaleString()}</strong>
+            </article>
+            <article>
+              <span>{spanish ? "En progreso" : "In progress"}</span>
+              <strong>{snapshot.feedback.inProgress.toLocaleString()}</strong>
+            </article>
+            <article>
+              <span>{spanish ? "Resuelto" : "Resolved"}</span>
+              <strong>{snapshot.feedback.resolved.toLocaleString()}</strong>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <small className="workspace-v2-founder-footnote">
+        <BarChart3 size={13} />
+        {spanish
+          ? `Snapshot generado con lecturas existentes. Reportes limitados a los ultimos ${snapshot.reports.length}.`
+          : `Snapshot generated from existing reads. Reports shown: ${snapshot.reports.length}.`}
+      </small>
     </section>
   );
 }
