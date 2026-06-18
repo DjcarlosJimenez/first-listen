@@ -1301,6 +1301,13 @@ function WorkspaceV2ShellClient({
               <span aria-hidden="true">{item.mobileIcon}</span>
             </button>
           ))}
+          <PwaInstallButton
+            className="workspace-v2-mobile-install-action"
+            compact
+            iconOnly
+            locale={workspaceLocale}
+            onAfterRequest={() => setSidebarExpanded(false)}
+          />
           <button
             aria-label={
               darkMode

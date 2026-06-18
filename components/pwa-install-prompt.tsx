@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { Download, Share2, Smartphone, X } from "lucide-react";
@@ -22,8 +23,12 @@ type PwaInstallContextValue = {
   installing: boolean;
   iosSafari: boolean;
   nativePromptAvailable: boolean;
+  refreshing: boolean;
+  updateAvailable: boolean;
   requestInstall: () => Promise<void>;
   dismissInstructions: () => void;
+  dismissUpdate: () => void;
+  refreshApp: () => void;
 };
 
 const PwaInstallContext = createContext<PwaInstallContextValue | null>(null);
@@ -82,23 +87,64 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const [iosSafari, setIosSafari] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const updateDismissedRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const standalone = isStandaloneMode();
+    const serviceWorkerSupported = "serviceWorker" in navigator;
+    const hadControllerOnLoad =
+      serviceWorkerSupported && Boolean(navigator.serviceWorker.controller);
+    let removeUpdateListener: (() => void) | undefined;
+    let cancelled = false;
+
+    const notifyUpdateAvailable = () => {
+      if (!hadControllerOnLoad || updateDismissedRef.current || cancelled) return;
+      setUpdateAvailable(true);
+    };
+
+    const watchRegistration = (registration: ServiceWorkerRegistration) => {
+      const onUpdateFound = () => {
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener("statechange", () => {
+          if (
+            (worker.state === "installed" || worker.state === "activated") &&
+            navigator.serviceWorker.controller
+          ) {
+            notifyUpdateAvailable();
+          }
+        });
+      };
+
+      registration.addEventListener("updatefound", onUpdateFound);
+      if (registration.waiting && navigator.serviceWorker.controller) {
+        notifyUpdateAvailable();
+      }
+      return () => registration.removeEventListener("updatefound", onUpdateFound);
+    };
+
     setInstalled(standalone);
     document.documentElement.dataset.pwaStandalone = String(standalone);
     setIosSafari(isIosSafari());
 
     if (
-      "serviceWorker" in navigator &&
+      serviceWorkerSupported &&
       (window.location.protocol === "https:" ||
         window.location.hostname === "localhost")
     ) {
       const register = () => {
         navigator.serviceWorker
           .register("/service-worker.js", { scope: "/" })
+          .then((registration) => {
+            if (cancelled) return;
+            removeUpdateListener?.();
+            removeUpdateListener = watchRegistration(registration);
+            registration.update().catch(() => undefined);
+          })
           .catch(() => undefined);
       };
       if (document.readyState === "complete") register();
@@ -121,9 +167,15 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       document.documentElement.dataset.pwaStandalone = String(event.matches);
       if (event.matches) setVisible(false);
     };
+    const onControllerChange = () => {
+      if (navigator.serviceWorker.controller) notifyUpdateAvailable();
+    };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onInstalled);
+    if (serviceWorkerSupported) {
+      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    }
     const media = window.matchMedia("(display-mode: standalone)");
     media.addEventListener("change", onDisplayModeChange);
 
@@ -134,16 +186,31 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     }, 1600);
 
     return () => {
+      cancelled = true;
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
+      if (serviceWorkerSupported) {
+        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      }
       media.removeEventListener("change", onDisplayModeChange);
       window.clearTimeout(instructionTimer);
+      removeUpdateListener?.();
     };
   }, []);
 
   const dismissInstructions = useCallback(() => {
     markDismissed();
     setVisible(false);
+  }, []);
+
+  const dismissUpdate = useCallback(() => {
+    updateDismissedRef.current = true;
+    setUpdateAvailable(false);
+  }, []);
+
+  const refreshApp = useCallback(() => {
+    setRefreshing(true);
+    window.location.reload();
   }, []);
 
   const requestInstall = useCallback(async () => {
@@ -172,16 +239,32 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       installing,
       iosSafari,
       nativePromptAvailable: Boolean(promptEvent),
+      refreshing,
+      updateAvailable,
       requestInstall,
       dismissInstructions,
+      dismissUpdate,
+      refreshApp,
     }),
-    [dismissInstructions, installed, installing, iosSafari, promptEvent, requestInstall],
+    [
+      dismissInstructions,
+      dismissUpdate,
+      installed,
+      installing,
+      iosSafari,
+      promptEvent,
+      refreshApp,
+      refreshing,
+      requestInstall,
+      updateAvailable,
+    ],
   );
 
   return (
     <PwaInstallContext.Provider value={value}>
       {children}
       <PwaInstallPrompt visible={visible} />
+      <PwaUpdatePrompt visible={installed && updateAvailable} />
     </PwaInstallContext.Provider>
   );
 }
@@ -197,11 +280,15 @@ function usePwaInstall() {
 export function PwaInstallButton({
   className = "pwa-header-install-button",
   compact = false,
+  iconOnly = false,
   locale = "en",
+  onAfterRequest,
 }: {
   className?: string;
   compact?: boolean;
+  iconOnly?: boolean;
   locale?: InterfaceLocale;
+  onAfterRequest?: () => void;
 }) {
   const { installed, installing, nativePromptAvailable, requestInstall } =
     usePwaInstall();
@@ -222,12 +309,17 @@ export function PwaInstallButton({
       aria-label={label}
       className={className}
       disabled={installing}
-      onClick={() => void requestInstall()}
+      onClick={() => {
+        void requestInstall();
+        onAfterRequest?.();
+      }}
       title={hint}
       type="button"
     >
       <Smartphone size={compact ? 15 : 16} />
-      <span>{installing ? (spanish ? "Instalando..." : "Installing...") : label}</span>
+      {!iconOnly && (
+        <span>{installing ? (spanish ? "Instalando..." : "Installing...") : label}</span>
+      )}
     </button>
   );
 }
@@ -285,6 +377,32 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
           type="button"
         >
           <X size={14} />
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function PwaUpdatePrompt({ visible }: { visible: boolean }) {
+  const { dismissUpdate, refreshApp, refreshing } = usePwaInstall();
+
+  if (!visible) return null;
+
+  return (
+    <aside className="pwa-update-card" aria-live="polite">
+      <div className="pwa-install-icon" aria-hidden="true">
+        <Download size={20} />
+      </div>
+      <div>
+        <strong>Nueva versión disponible</strong>
+        <span>Actualiza First Listen para obtener mejoras recientes.</span>
+      </div>
+      <div className="pwa-update-actions">
+        <button disabled={refreshing} onClick={refreshApp} type="button">
+          {refreshing ? "Actualizando..." : "Actualizar"}
+        </button>
+        <button onClick={dismissUpdate} type="button">
+          Más tarde
         </button>
       </div>
     </aside>

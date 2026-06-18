@@ -249,7 +249,8 @@
   text-decoration: none;
 }
 
-.pwa-install-card {
+.pwa-install-card,
+.pwa-update-card {
   position: fixed;
   right: max(18px, env(safe-area-inset-right));
   bottom: max(18px, env(safe-area-inset-bottom));
@@ -266,6 +267,13 @@
   padding: 14px;
 }
 
+.pwa-update-card {
+  z-index: 82;
+  width: min(540px, calc(100vw - 36px));
+  background: color-mix(in srgb, var(--card) 91%, var(--accent) 9%);
+  box-shadow: 0 28px 80px rgba(22, 27, 21, 0.24);
+}
+
 .pwa-install-icon,
 .install-icon {
   display: inline-flex;
@@ -279,31 +287,38 @@
 }
 
 .pwa-install-card strong,
-.pwa-install-card span {
+.pwa-install-card span,
+.pwa-update-card strong,
+.pwa-update-card span {
   display: block;
 }
 
-.pwa-install-card strong {
+.pwa-install-card strong,
+.pwa-update-card strong {
   margin-bottom: 3px;
 }
 
-.pwa-install-card span {
+.pwa-install-card span,
+.pwa-update-card span {
   color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.45;
 }
 
-.pwa-install-card svg {
+.pwa-install-card svg,
+.pwa-update-card svg {
   flex: 0 0 auto;
 }
 
-.pwa-install-actions {
+.pwa-install-actions,
+.pwa-update-actions {
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
 .pwa-install-actions button,
+.pwa-update-actions button,
 .offline-shell-actions a,
 .offline-shell-actions button {
   display: inline-flex;
@@ -318,6 +333,17 @@
   font-size: 0.85rem;
   font-weight: 900;
   text-decoration: none;
+}
+
+.pwa-update-actions button:first-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--dark);
+}
+
+.pwa-update-actions button:last-child {
+  background: color-mix(in srgb, var(--dark) 8%, transparent);
+  color: var(--ink);
 }
 
 .pwa-install-actions button:last-child {
@@ -391,18 +417,21 @@ html[data-pwa-standalone="true"] body {
     grid-template-columns: 1fr;
   }
 
-  .pwa-install-card {
+  .pwa-install-card,
+  .pwa-update-card {
     right: max(12px, env(safe-area-inset-right));
     bottom: max(12px, env(safe-area-inset-bottom));
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .pwa-install-actions {
+  .pwa-install-actions,
+  .pwa-update-actions {
     grid-column: 1 / -1;
     justify-content: stretch;
   }
 
-  .pwa-install-actions button:first-child {
+  .pwa-install-actions button:first-child,
+  .pwa-update-actions button:first-child {
     flex: 1;
   }
 }
