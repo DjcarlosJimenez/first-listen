@@ -1,4 +1,4 @@
-const CACHE_VERSION = "first-listen-pwa-v2-owner-admin-access";
+const CACHE_VERSION = "first-listen-pwa-v3-landscape-orientation";
 const OFFLINE_URL = "/offline";
 const APP_SHELL = [
   OFFLINE_URL,
