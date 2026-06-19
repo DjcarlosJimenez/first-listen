@@ -35,6 +35,21 @@ const PwaInstallContext = createContext<PwaInstallContextValue | null>(null);
 
 const DISMISS_KEY = "first-listen-install-dismissed-at";
 const DISMISS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const UPDATE_REMINDER_MS = 10 * 60 * 1000;
+
+async function readServiceWorkerVersion() {
+  try {
+    const response = await fetch(`/service-worker.js?version-check=${Date.now()}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const source = await response.text();
+    const match = source.match(/CACHE_VERSION\s*=\s*["']([^"']+)["']/);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 function isStandaloneMode() {
   if (typeof window === "undefined") return false;
@@ -89,7 +104,25 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const [installing, setInstalling] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
-  const updateDismissedRef = useRef(false);
+  const updateVersionRef = useRef<string | null>(null);
+  const updateReminderTimerRef = useRef<number | null>(null);
+
+  const clearUpdateReminder = useCallback(() => {
+    if (updateReminderTimerRef.current === null) return;
+    window.clearTimeout(updateReminderTimerRef.current);
+    updateReminderTimerRef.current = null;
+  }, []);
+
+  const showUpdateAvailable = useCallback(
+    (version: string | null = null) => {
+      if (version && version !== updateVersionRef.current) {
+        updateVersionRef.current = version;
+      }
+      clearUpdateReminder();
+      setUpdateAvailable(true);
+    },
+    [clearUpdateReminder],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -102,8 +135,11 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const notifyUpdateAvailable = () => {
-      if (!hadControllerOnLoad || updateDismissedRef.current || cancelled) return;
-      setUpdateAvailable(true);
+      if (!hadControllerOnLoad || cancelled) return;
+      void readServiceWorkerVersion().then((version) => {
+        if (cancelled) return;
+        showUpdateAvailable(version);
+      });
     };
 
     const watchRegistration = (registration: ServiceWorkerRegistration) => {
@@ -170,9 +206,16 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     const onControllerChange = () => {
       if (navigator.serviceWorker.controller) notifyUpdateAvailable();
     };
+    const onFocus = () => {
+      if (updateVersionRef.current && !document.hidden) {
+        showUpdateAvailable(updateVersionRef.current);
+      }
+    };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onInstalled);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
     if (serviceWorkerSupported) {
       navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
     }
@@ -187,8 +230,11 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+      clearUpdateReminder();
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
       if (serviceWorkerSupported) {
         navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
       }
@@ -196,7 +242,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(instructionTimer);
       removeUpdateListener?.();
     };
-  }, []);
+  }, [clearUpdateReminder, showUpdateAvailable]);
 
   const dismissInstructions = useCallback(() => {
     markDismissed();
@@ -204,14 +250,19 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const dismissUpdate = useCallback(() => {
-    updateDismissedRef.current = true;
     setUpdateAvailable(false);
-  }, []);
+    clearUpdateReminder();
+    updateReminderTimerRef.current = window.setTimeout(() => {
+      setUpdateAvailable(true);
+      updateReminderTimerRef.current = null;
+    }, UPDATE_REMINDER_MS);
+  }, [clearUpdateReminder]);
 
   const refreshApp = useCallback(() => {
+    clearUpdateReminder();
     setRefreshing(true);
     window.location.reload();
-  }, []);
+  }, [clearUpdateReminder]);
 
   const requestInstall = useCallback(async () => {
     if (installed) return;
@@ -394,12 +445,12 @@ function PwaUpdatePrompt({ visible }: { visible: boolean }) {
         <Download size={20} />
       </div>
       <div>
-        <strong>Nueva versión disponible</strong>
+        <strong>🚀 Nueva versión disponible</strong>
         <span>Actualiza First Listen para obtener mejoras recientes.</span>
       </div>
       <div className="pwa-update-actions">
         <button disabled={refreshing} onClick={refreshApp} type="button">
-          {refreshing ? "Actualizando..." : "Actualizar"}
+          {refreshing ? "Actualizando..." : "Actualizar ahora"}
         </button>
         <button onClick={dismissUpdate} type="button">
           Más tarde
