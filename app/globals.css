@@ -15036,6 +15036,140 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   padding: 14px;
 }
 
+.workspace-v2-discovery-analytics {
+  gap: 14px;
+}
+
+.workspace-v2-discovery-analytics .workspace-v2-founder-section-heading p {
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.workspace-v2-discovery-health-grid,
+.workspace-v2-discovery-impact-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.workspace-v2-discovery-health-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workspace-v2-discovery-impact-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workspace-v2-discovery-health-grid article,
+.workspace-v2-discovery-impact-grid article,
+.workspace-v2-discovery-analytics-card {
+  background: var(--workspace-v2-card-bg);
+  border: 1px solid var(--workspace-v2-card-border);
+  border-radius: 18px;
+}
+
+.workspace-v2-discovery-health-grid article,
+.workspace-v2-discovery-impact-grid article {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.workspace-v2-discovery-health-grid span,
+.workspace-v2-discovery-impact-grid span {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 7px;
+}
+
+.workspace-v2-discovery-health-grid strong,
+.workspace-v2-discovery-impact-grid strong {
+  color: var(--text);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.workspace-v2-discovery-analytics-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+.workspace-v2-discovery-analytics-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.workspace-v2-discovery-analytics-card h4 {
+  color: var(--text);
+  font-size: 18px;
+  margin: 0;
+}
+
+.workspace-v2-discovery-analytics-card small {
+  color: var(--muted);
+}
+
+.workspace-v2-discovery-bars {
+  align-items: end;
+  background: var(--workspace-v2-control-bg);
+  border: 1px solid var(--workspace-v2-control-border);
+  border-radius: 16px;
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  height: 132px;
+  padding: 12px;
+}
+
+.workspace-v2-discovery-bars span {
+  background: linear-gradient(180deg, var(--acid), rgba(185, 255, 47, 0.36));
+  border-radius: 999px 999px 4px 4px;
+  display: block;
+  height: var(--bar-height, 6%);
+  min-height: 6px;
+}
+
+.workspace-v2-discovery-song-list {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.workspace-v2-discovery-song-list article {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.workspace-v2-discovery-song-list strong,
+.workspace-v2-discovery-song-list span,
+.workspace-v2-discovery-song-list small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-v2-discovery-song-list strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.workspace-v2-discovery-song-list span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .workspace-v2-founder-search {
   align-items: center;
   background: var(--workspace-v2-control-bg);
@@ -15824,8 +15958,30 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   }
 
   .workspace-v2-founder-summary-grid,
-  .workspace-v2-feedback-counts {
+  .workspace-v2-feedback-counts,
+  .workspace-v2-discovery-health-grid,
+  .workspace-v2-discovery-impact-grid,
+  .workspace-v2-discovery-analytics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace-v2-discovery-analytics-grid,
+  .workspace-v2-founder-two-column .workspace-v2-discovery-analytics-card {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-v2-discovery-health-grid strong,
+  .workspace-v2-discovery-impact-grid strong {
+    font-size: 23px;
+  }
+
+  .workspace-v2-discovery-bars {
+    height: 104px;
+    padding: 10px;
+  }
+
+  .workspace-v2-discovery-song-list {
+    max-height: 320px;
   }
 
   .workspace-v2-founder-search {

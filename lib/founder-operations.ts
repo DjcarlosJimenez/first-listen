@@ -1,4 +1,7 @@
-import type { FounderOperationsSnapshot } from "@/lib/founder-operations-types";
+import type {
+  FounderDiscoveryAnalyticsReport,
+  FounderOperationsSnapshot,
+} from "@/lib/founder-operations-types";
 import { createClient } from "@/lib/supabase/server";
 
 type FounderOperationsUserRow = {
@@ -65,6 +68,7 @@ export async function loadFounderOperationsSnapshot(): Promise<FounderOperations
     commentReportsResult,
     statisticsResult,
     feedbackResult,
+    discoveryAnalyticsResult,
   ] = await Promise.all([
     supabase.rpc("admin_list_users", { result_limit: 1000 }),
     supabase
@@ -87,6 +91,7 @@ export async function loadFounderOperationsSnapshot(): Promise<FounderOperations
       feedback_status: "all",
       result_limit: 1000,
     }),
+    supabase.rpc("get_founder_discovery_analytics_report"),
   ]);
 
   const founderOperationsErrors = [
@@ -98,6 +103,9 @@ export async function loadFounderOperationsSnapshot(): Promise<FounderOperations
       : null,
     statisticsResult.error ? `statistics: ${statisticsResult.error.message}` : null,
     feedbackResult.error ? `feedback: ${feedbackResult.error.message}` : null,
+    discoveryAnalyticsResult.error
+      ? `discovery analytics: ${discoveryAnalyticsResult.error.message}`
+      : null,
   ].filter((message): message is string => Boolean(message));
   const operationsUsers = (usersResult.data ?? []) as FounderOperationsUserRow[];
   const operationsSongs =
@@ -111,6 +119,8 @@ export async function loadFounderOperationsSnapshot(): Promise<FounderOperations
     (feedbackResult.data ?? []) as FounderOperationsFeedbackRow[];
   const statistics =
     (statisticsResult.data ?? null) as FounderOperationsStatistics | null;
+  const discoveryAnalytics =
+    (discoveryAnalyticsResult.data ?? null) as FounderDiscoveryAnalyticsReport | null;
   const openSongReports = songReports.filter((report) => report.status === "open");
   const openCommentReports = commentReports.filter(
     (report) => report.status === "open",
@@ -124,6 +134,7 @@ export async function loadFounderOperationsSnapshot(): Promise<FounderOperations
   ).length;
 
   return {
+    discoveryAnalytics,
     errors: founderOperationsErrors.length ? founderOperationsErrors : undefined,
     feedback: {
       inProgress: inProgressFeedback,

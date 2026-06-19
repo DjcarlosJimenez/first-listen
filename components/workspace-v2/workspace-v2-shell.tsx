@@ -11,7 +11,9 @@ import {
 } from "react";
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
+  Clock3,
   Coins,
   Compass,
   Flag,
@@ -33,6 +35,8 @@ import {
   ShieldCheck,
   SkipForward,
   Sun,
+  TrendingUp,
+  Trophy,
   User,
   Users,
   Wrench,
@@ -43,7 +47,10 @@ import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import { SongActionBar } from "@/components/song-action-bar";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { databasePlatform } from "@/lib/content-economy";
-import type { FounderOperationsSnapshot } from "@/lib/founder-operations-types";
+import type {
+  FounderDiscoveryAnalyticsReport,
+  FounderOperationsSnapshot,
+} from "@/lib/founder-operations-types";
 import { getCopy } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import type { ContentEconomySetting, Platform } from "@/lib/types";
@@ -2349,6 +2356,366 @@ function formatOperationsDate(value: string, locale: InterfaceLocale) {
   }).format(timestamp);
 }
 
+function formatAnalyticsNumber(value: number | null | undefined, locale: InterfaceLocale) {
+  return Number(value ?? 0).toLocaleString(locale === "es" ? "es-US" : "en-US");
+}
+
+function formatAnalyticsPercent(value: number | null | undefined, locale: InterfaceLocale) {
+  return `${Number(value ?? 0).toLocaleString(locale === "es" ? "es-US" : "en-US", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  })}%`;
+}
+
+function formatAnalyticsHours(value: number | null | undefined, locale: InterfaceLocale) {
+  const hours = Number(value ?? 0);
+  if (!Number.isFinite(hours) || hours <= 0) return "0 h";
+  if (hours < 24) {
+    return `${hours.toLocaleString(locale === "es" ? "es-US" : "en-US", {
+      maximumFractionDigits: 1,
+    })} h`;
+  }
+  return `${(hours / 24).toLocaleString(locale === "es" ? "es-US" : "en-US", {
+    maximumFractionDigits: 1,
+  })} d`;
+}
+
+function FounderDiscoveryAnalyticsDashboard({
+  locale,
+  report,
+}: {
+  locale: InterfaceLocale;
+  report: FounderDiscoveryAnalyticsReport | null | undefined;
+}) {
+  const spanish = locale === "es";
+  const topDailyListens = Math.max(
+    1,
+    ...(report?.discoverySpread.dailyTrend ?? []).map((day) => day.validListens),
+  );
+
+  if (!report) {
+    return (
+      <section className="workspace-v2-founder-section workspace-v2-discovery-analytics">
+        <div className="workspace-v2-founder-section-heading">
+          <div>
+            <span className="eyebrow">
+              <BarChart3 size={13} />
+              {spanish ? "Analitica de descubrimiento" : "Discovery Analytics"}
+            </span>
+            <h3>
+              {spanish
+                ? "No hay datos disponibles todavía."
+                : "No discovery data is available yet."}
+            </h3>
+          </div>
+        </div>
+        <p className="workspace-v2-founder-empty">
+          {spanish
+            ? "Cuando haya reproducciones válidas suficientes, este panel mostrará la salud de descubrimiento."
+            : "Once enough valid playback exists, this panel will show discovery health."}
+        </p>
+      </section>
+    );
+  }
+
+  const overviewCards = [
+    {
+      icon: Music2,
+      label: spanish ? "Canciones activas" : "Active songs",
+      value: formatAnalyticsNumber(report.overview.activeSongs, locale),
+    },
+    {
+      icon: Play,
+      label: spanish ? "Reproducen aqui" : "Internal playable",
+      value: formatAnalyticsNumber(report.overview.internalPlayableSongs, locale),
+    },
+    {
+      icon: AlertTriangle,
+      label: spanish ? "Sin reproducciones" : "Zero listens",
+      value: formatAnalyticsNumber(report.overview.zeroListenSongs, locale),
+    },
+    {
+      icon: Gauge,
+      label: spanish ? "<=2 reproducciones" : "<=2 listens",
+      value: formatAnalyticsNumber(report.overview.lowExposureSongs, locale),
+    },
+    {
+      icon: Trophy,
+      label: spanish ? "Top 10 concentra" : "Top 10 concentration",
+      value: formatAnalyticsPercent(
+        report.topConcentration.top10ConcentrationPercent,
+        locale,
+      ),
+    },
+    {
+      icon: Clock3,
+      label: spanish ? "Promedio hasta 1ra reproduccion" : "Avg. time to first listen",
+      value: formatAnalyticsHours(
+        report.timeToFirstListen.averageHoursToDiscovery,
+        locale,
+      ),
+    },
+  ] as const;
+
+  const impactCards = [
+    {
+      label: spanish ? "Reproducciones despues de Smart Queue" : "Post Smart Queue listens",
+      value: report.smartQueueImpact.postValidListens,
+    },
+    {
+      label: spanish ? "Canciones alcanzadas" : "Songs reached",
+      value: report.smartQueueImpact.postSongsReached,
+    },
+    {
+      label: spanish ? "Pasaron de 0 a 1" : "Moved from 0 to 1",
+      value: report.smartQueueImpact.zeroToOneSongs,
+    },
+    {
+      label: spanish ? "Baja exposicion ayudada" : "Low exposure hits",
+      value: report.smartQueueImpact.lowExposureHits,
+    },
+  ];
+
+  return (
+    <section className="workspace-v2-founder-section workspace-v2-discovery-analytics">
+      <div className="workspace-v2-founder-section-heading">
+        <div>
+          <span className="eyebrow">
+            <BarChart3 size={13} />
+            {spanish ? "Analitica de descubrimiento" : "Discovery Analytics"}
+          </span>
+          <h3>{spanish ? "Salud de descubrimiento" : "Discovery Health"}</h3>
+          <p>
+            {spanish
+              ? "Lectura founder-only del impacto de Smart Queue y la distribucion de exposicion."
+              : "Founder-only readout for Smart Queue impact and exposure distribution."}
+          </p>
+        </div>
+        <span className="workspace-v2-readonly-badge">
+          {spanish ? "Solo lectura" : "Read only"}
+        </span>
+      </div>
+
+      <div className="workspace-v2-discovery-health-grid">
+        {overviewCards.map(({ icon: Icon, label, value }) => (
+          <article key={label}>
+            <span>
+              <Icon size={14} />
+              {label}
+            </span>
+            <strong>{value}</strong>
+          </article>
+        ))}
+      </div>
+
+      <div className="workspace-v2-discovery-analytics-grid">
+        <section className="workspace-v2-discovery-analytics-card">
+          <div className="workspace-v2-founder-section-heading">
+            <div>
+              <span className="eyebrow">
+                <TrendingUp size={13} />
+                {spanish ? "Impacto Smart Queue" : "Smart Queue Impact"}
+              </span>
+              <h4>{spanish ? "Primeras senales" : "Early signals"}</h4>
+            </div>
+          </div>
+          <div className="workspace-v2-discovery-impact-grid">
+            {impactCards.map((card) => (
+              <article key={card.label}>
+                <strong>{formatAnalyticsNumber(card.value, locale)}</strong>
+                <span>{card.label}</span>
+              </article>
+            ))}
+          </div>
+          <small>
+            {spanish
+              ? `Corte Smart Queue: ${formatOperationsDate(
+                  report.smartQueueStartedAt,
+                  locale,
+                )}`
+              : `Smart Queue cutoff: ${formatOperationsDate(
+                  report.smartQueueStartedAt,
+                  locale,
+                )}`}
+          </small>
+        </section>
+
+        <section className="workspace-v2-discovery-analytics-card">
+          <div className="workspace-v2-founder-section-heading">
+            <div>
+              <span className="eyebrow">
+                <Activity size={13} />
+                {spanish ? "Discovery spread" : "Discovery Spread"}
+              </span>
+              <h4>{spanish ? "Ultimos 14 dias" : "Last 14 days"}</h4>
+            </div>
+          </div>
+          <div className="workspace-v2-discovery-bars" aria-label="Discovery daily trend">
+            {report.discoverySpread.dailyTrend.map((day) => (
+              <span
+                key={day.date}
+                title={`${day.date}: ${day.validListens} / ${day.songsReached}`}
+                style={
+                  {
+                    "--bar-height": `${Math.max(
+                      6,
+                      Math.round((day.validListens / topDailyListens) * 100),
+                    )}%`,
+                  } as CSSProperties
+                }
+              />
+            ))}
+          </div>
+          <small>
+            {spanish
+              ? "Barras = reproducciones validas diarias. Tooltip muestra canciones alcanzadas."
+              : "Bars = daily valid listens. Tooltip shows songs reached."}
+          </small>
+        </section>
+      </div>
+
+      <div className="workspace-v2-founder-two-column">
+        <section className="workspace-v2-discovery-analytics-card">
+          <div className="workspace-v2-founder-section-heading">
+            <div>
+              <span className="eyebrow">
+                <TrendingUp size={13} />
+                {spanish ? "Canciones ganando exposicion" : "Songs Gaining Exposure"}
+              </span>
+              <h4>{spanish ? "Movimiento reciente" : "Recent movement"}</h4>
+            </div>
+          </div>
+          <div className="workspace-v2-discovery-song-list">
+            {report.songsGainingExposure.slice(0, 8).map((song) => (
+              <article key={song.songId}>
+                <strong>{song.title}</strong>
+                <span>{song.artist}</span>
+                <small>
+                  {formatAnalyticsNumber(song.validListens7d, locale)}{" "}
+                  {spanish ? "en 7 dias" : "in 7 days"} /{" "}
+                  {formatAnalyticsNumber(song.totalValidListens, locale)} total
+                </small>
+              </article>
+            ))}
+            {!report.songsGainingExposure.length && (
+              <p className="workspace-v2-founder-empty">
+                {spanish
+                  ? "Aun no hay movimiento reciente."
+                  : "No recent movement yet."}
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="workspace-v2-discovery-analytics-card">
+          <div className="workspace-v2-founder-section-heading">
+            <div>
+              <span className="eyebrow">
+                <AlertTriangle size={13} />
+                {spanish ? "Canciones en riesgo" : "Songs At Risk"}
+              </span>
+              <h4>{spanish ? "Baja exposicion" : "Low exposure"}</h4>
+            </div>
+          </div>
+          <div className="workspace-v2-discovery-song-list">
+            {report.songsAtRisk.slice(0, 8).map((song) => (
+              <article key={song.songId}>
+                <strong>{song.title}</strong>
+                <span>{song.artist}</span>
+                <small>
+                  {formatAnalyticsNumber(song.validListens, locale)}{" "}
+                  {spanish ? "reproducciones" : "listens"} /{" "}
+                  {formatAnalyticsNumber(song.daysSinceUpload, locale)}{" "}
+                  {spanish ? "dias publicada" : "days live"}
+                </small>
+              </article>
+            ))}
+            {!report.songsAtRisk.length && (
+              <p className="workspace-v2-founder-empty">
+                {spanish
+                  ? "No hay canciones en riesgo."
+                  : "No songs are currently at risk."}
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div className="workspace-v2-founder-two-column">
+        <section className="workspace-v2-discovery-analytics-card">
+          <div className="workspace-v2-founder-section-heading">
+            <div>
+              <span className="eyebrow">
+                <Trophy size={13} />
+                {spanish ? "Discovery winners" : "Discovery Winners"}
+              </span>
+              <h4>{spanish ? "Beneficiadas despues de Smart Queue" : "Post Smart Queue winners"}</h4>
+            </div>
+          </div>
+          <div className="workspace-v2-discovery-song-list">
+            {report.discoveryWinners.slice(0, 8).map((song) => (
+              <article key={song.songId}>
+                <strong>{song.title}</strong>
+                <span>{song.artist}</span>
+                <small>
+                  +{formatAnalyticsNumber(song.validAfterSmartQueue, locale)}{" "}
+                  {spanish ? "desde Smart Queue" : "since Smart Queue"}
+                </small>
+              </article>
+            ))}
+            {!report.discoveryWinners.length && (
+              <p className="workspace-v2-founder-empty">
+                {spanish
+                  ? "Todavia no hay ganadoras posteriores al cambio."
+                  : "No post-change winners yet."}
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="workspace-v2-discovery-analytics-card">
+          <div className="workspace-v2-founder-section-heading">
+            <div>
+              <span className="eyebrow">
+                <Clock3 size={13} />
+                {spanish ? "Tiempo hasta primera reproduccion" : "Time To First Listen"}
+              </span>
+              <h4>
+                {spanish
+                  ? `${formatAnalyticsNumber(
+                      report.timeToFirstListen.pendingFirstListenSongs,
+                      locale,
+                    )} pendientes`
+                  : `${formatAnalyticsNumber(
+                      report.timeToFirstListen.pendingFirstListenSongs,
+                      locale,
+                    )} pending`}
+              </h4>
+            </div>
+          </div>
+          <div className="workspace-v2-discovery-song-list">
+            {report.timeToFirstListen.songs.slice(0, 8).map((song) => (
+              <article key={song.songId}>
+                <strong>{song.title}</strong>
+                <span>{song.artist}</span>
+                <small>
+                  {song.firstValidListenAt
+                    ? `${formatAnalyticsHours(song.hoursToFirstListen, locale)} ${
+                        spanish ? "hasta 1ra reproduccion" : "to first listen"
+                      }`
+                    : spanish
+                      ? "Sin primera reproduccion valida"
+                      : "No first valid listen yet"}
+                </small>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
 function FounderOperationsPanel({
   locale,
   snapshot,
@@ -2454,6 +2821,11 @@ function FounderOperationsPanel({
           </article>
         ))}
       </div>
+
+      <FounderDiscoveryAnalyticsDashboard
+        locale={locale}
+        report={snapshot.discoveryAnalytics}
+      />
 
       <section className="workspace-v2-founder-section">
         <div className="workspace-v2-founder-section-heading">
