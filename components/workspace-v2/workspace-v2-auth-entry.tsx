@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/logo";
 import type { ProfilePanelProps } from "@/components/profile-panel";
 import { WorkspaceV2PreviewErrorBoundary } from "@/components/workspace-v2/workspace-v2-preview-error-boundary";
@@ -345,14 +345,16 @@ export async function WorkspaceV2AuthEntry({
       <header className="account-header workspace-v2-preview-topbar">
         <Logo />
         <div className="owner-header-actions">
-          <Link href="/review">
-            <ArrowLeft size={16} />
-            {spanish ? "Fallback V1" : "V1 fallback"}
-          </Link>
           {canAccessAdmin && (
-            <Link href="/owner">
-              <ShieldCheck size={16} /> Owner Control Center
-            </Link>
+            <>
+              <Link href="/review">
+                <ShieldCheck size={16} />
+                {spanish ? "Fallback V1" : "V1 fallback"}
+              </Link>
+              <Link href="/owner">
+                <ShieldCheck size={16} /> Owner Control Center
+              </Link>
+            </>
           )}
         </div>
       </header>

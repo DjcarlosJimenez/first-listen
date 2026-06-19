@@ -247,7 +247,23 @@ function queueSourceLabel(source: string | undefined, spanish: boolean) {
 
 function nowPlayingLabel(song: WorkspaceV2Song | null, spanish: boolean) {
   if (song) return song.title;
-  return spanish ? "Elige una canción" : "Choose a song";
+  return spanish ? "Descubriendo nueva música" : "Discovering new music";
+}
+
+function workspaceSessionHeadline({
+  activeSong,
+  resumeTitle,
+  spanish,
+}: {
+  activeSong: WorkspaceV2Song | null;
+  resumeTitle: string | null;
+  spanish: boolean;
+}) {
+  if (activeSong) return activeSong.title;
+  if (resumeTitle) {
+    return spanish ? "Continuando tu sesión" : "Continuing your session";
+  }
+  return spanish ? "Descubriendo nueva música" : "Discovering new music";
 }
 
 function workspaceSongPlatform(song: WorkspaceV2Song): Platform {
@@ -461,7 +477,7 @@ function WorkspaceV2ShellClient({
     useState<PlaybackPipelineDebug>(initialPipelineDebug);
   const [providerDebug, setProviderDebug] =
     useState<ProviderDebugState>(initialProviderDebug);
-  const [pendingResume, setPendingResume] =
+  const [resumedSession, setResumedSession] =
     useState<PendingWorkspaceResume | null>(null);
   const [resumeChecked, setResumeChecked] = useState(false);
   const [queueBootstrapped, setQueueBootstrapped] = useState(false);
@@ -623,7 +639,7 @@ function WorkspaceV2ShellClient({
     (reason: string) => {
       try {
         loadQueue(initialQueue, { autoPlay: true });
-        setPendingResume(null);
+        setResumedSession(null);
         setQueueBootstrapped(true);
         recordTransition(
           "LOAD_SONG",
@@ -701,10 +717,15 @@ function WorkspaceV2ShellClient({
           : null;
 
         if (resume) {
-          setPendingResume(resume);
+          loadQueue(resume.queue, {
+            autoPlay: true,
+            startIndex: resume.startIndex,
+          });
+          setResumedSession(resume);
           setResumeChecked(true);
+          setQueueBootstrapped(true);
           recordTransition(
-            "RESUME_AVAILABLE",
+            "RESUME_AUTO_CONTINUED",
             `${resume.currentSongTitle} / ${clock(resume.playbackPositionSeconds)}`,
           );
           return;
@@ -736,26 +757,14 @@ function WorkspaceV2ShellClient({
     guestToken,
     initialQueue,
     loadInitialQueue,
+    loadQueue,
     recordError,
     recordTransition,
   ]);
 
-  const handleContinueResume = useCallback(() => {
-    if (!pendingResume) return;
-    loadQueue(pendingResume.queue, {
-      autoPlay: true,
-      startIndex: pendingResume.startIndex,
-    });
-    setPendingResume(null);
-    setQueueBootstrapped(true);
-    recordTransition(
-      "RESUME_CONTINUED",
-      `${pendingResume.currentSongTitle} / ${clock(pendingResume.playbackPositionSeconds)}`,
-    );
-  }, [loadQueue, pendingResume, recordTransition]);
-
   const handleStartNewSession = useCallback(() => {
     void clearQueueSnapshot();
+    setResumedSession(null);
     loadInitialQueue("new session");
   }, [clearQueueSnapshot, loadInitialQueue]);
 
@@ -772,7 +781,6 @@ function WorkspaceV2ShellClient({
   useEffect(() => {
     if (
       !queueBootstrapped ||
-      pendingResume ||
       economyMode === "sandbox" ||
       !snapshotActiveSong ||
       !snapshotActiveQueue?.songs.length
@@ -835,7 +843,6 @@ function WorkspaceV2ShellClient({
   }, [
     economyMode,
     guestToken,
-    pendingResume,
     queueBootstrapped,
     recordError,
     snapshotActiveQueue,
@@ -1067,6 +1074,11 @@ function WorkspaceV2ShellClient({
   const playbackTrustOverlayVisible =
     Boolean(controller.activeSong) && controller.playback.state === "playing";
   const playbackTrustOverlayLabel = "▶ Reproducción válida";
+  const heroHeadline = workspaceSessionHeadline({
+    activeSong: controller.activeSong,
+    resumeTitle: resumedSession?.currentSongTitle ?? null,
+    spanish,
+  });
   const bankSecondsForDisplay =
     viewerMode === "guest"
       ? controller.validation.eligibleSeconds
@@ -1702,7 +1714,7 @@ function WorkspaceV2ShellClient({
             <span className="eyebrow">
               {playerMode} / {activePlatform}
             </span>
-            <h1>{nowPlayingLabel(controller.activeSong, spanish)}</h1>
+            <h1>{heroHeadline}</h1>
             <p>
               {controller.activeSong?.artist ??
                 (spanish
@@ -1765,7 +1777,7 @@ function WorkspaceV2ShellClient({
           >
             <article>
               <span>{spanish ? "Ahora" : "Now"}</span>
-              <strong>{controller.activeSong?.title ?? "-"}</strong>
+              <strong>{heroHeadline}</strong>
             </article>
             <article>
               <span>{spanish ? "Siguiente" : "Next"}</span>
@@ -1815,29 +1827,25 @@ function WorkspaceV2ShellClient({
           )}
         </section>
 
-        {pendingResume && (
+        {resumedSession && (
           <section className="workspace-v2-resume-card" role="status">
             <div>
               <span className="eyebrow">
-                {spanish ? "Sesion guardada" : "Saved session"}
+                {spanish ? "Sesión restaurada" : "Session restored"}
               </span>
               <h2>
                 {spanish
-                  ? "Continuar donde quedaste"
-                  : "Continue where you left off"}
+                  ? "Continuando tu sesión"
+                  : "Continuing your session"}
               </h2>
               <p>
-                {pendingResume.currentSongTitle} /{" "}
-                {clock(pendingResume.playbackPositionSeconds)}
+                {resumedSession.currentSongTitle} /{" "}
+                {clock(resumedSession.playbackPositionSeconds)}
               </p>
             </div>
             <div className="workspace-v2-resume-actions">
-              <button onClick={handleContinueResume} type="button">
-                <Play size={15} />
-                {spanish ? "Continuar donde quedaste" : "Continue"}
-              </button>
               <button onClick={handleStartNewSession} type="button">
-                {spanish ? "Comenzar nueva sesion" : "Start new session"}
+                {spanish ? "Nueva sesión" : "New session"}
               </button>
             </div>
           </section>

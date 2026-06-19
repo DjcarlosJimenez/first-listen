@@ -11876,6 +11876,12 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   z-index: 250;
 }
 
+@media (max-width: 700px) {
+  .platform-preview-banner {
+    display: none;
+  }
+}
+
 [data-platform-module="away_summary"] {
   display: var(--community-visibility-whileYouWereAway, var(--module-display-away_summary, block));
   order: var(--module-order-away_summary, 1);
@@ -14056,12 +14062,6 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
-}
-
-.workspace-v2-resume-actions button:first-child {
-  background: var(--acid);
-  border-color: var(--acid);
-  color: #10170f;
 }
 
 .workspace-v2-product-nav nav {

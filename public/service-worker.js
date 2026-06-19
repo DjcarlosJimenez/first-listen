@@ -1,4 +1,4 @@
-const CACHE_VERSION = "first-listen-pwa-v4-update-notice";
+const CACHE_VERSION = "first-listen-pwa-v5-auto-resume";
 const OFFLINE_URL = "/offline";
 const APP_SHELL = [
   OFFLINE_URL,

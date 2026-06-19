@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Headphones, LockKeyhole } from "lucide-react";
+import { LockKeyhole } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { WorkspaceV2PreviewErrorBoundary } from "@/components/workspace-v2/workspace-v2-preview-error-boundary";
 import { WorkspaceV2Shell } from "@/components/workspace-v2/workspace-v2-shell";
@@ -218,7 +218,9 @@ export function WorkspaceV2GuestEntry() {
         <section className="workspace-v2-empty">
           <h2>{spanish ? "No pudimos abrir el Workspace" : "We could not open the Workspace"}</h2>
           <p>{fatalError || "Guest access is unavailable."}</p>
-          <Link href="/legacy/guest">{spanish ? "Abrir modo invitado clasico" : "Open classic guest mode"}</Link>
+          <Link href="/workspace-v2/guest">
+            {spanish ? "Intentar de nuevo" : "Try again"}
+          </Link>
         </section>
       </main>
     );
@@ -232,10 +234,6 @@ export function WorkspaceV2GuestEntry() {
           <Link href="/signup">
             <LockKeyhole size={16} />
             {spanish ? "Crear cuenta gratis" : "Create free account"}
-          </Link>
-          <Link href="/legacy/guest">
-            <Headphones size={16} />
-            {spanish ? "Modo invitado clasico" : "Classic guest mode"}
           </Link>
         </div>
       </header>
