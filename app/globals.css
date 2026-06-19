@@ -13926,6 +13926,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .workspace-v2-product-loading,
 .workspace-v2-product-nav,
 .workspace-v2-product-hero,
+.workspace-v2-resume-card,
 .workspace-v2-trust-layer,
 .workspace-v2-motivation-layer,
 .workspace-v2-content-panel,
@@ -14027,6 +14028,42 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: var(--muted);
 }
 
+.workspace-v2-resume-card {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 16px 18px;
+}
+
+.workspace-v2-resume-card h2 {
+  color: var(--text-strong);
+  font-size: clamp(1.15rem, 2.4vw, 1.8rem);
+  line-height: 1;
+  margin: 4px 0;
+}
+
+.workspace-v2-resume-card p {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.workspace-v2-resume-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.workspace-v2-resume-actions button:first-child {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: #10170f;
+}
+
 .workspace-v2-product-nav nav {
   display: grid;
   gap: 6px;
@@ -14034,6 +14071,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .workspace-v2-product-nav button,
 .workspace-v2-sticky-controls button,
+.workspace-v2-resume-actions button,
 .workspace-v2-trust-layer button,
 .workspace-v2-trust-layer a,
 .workspace-v2-content-panel a,

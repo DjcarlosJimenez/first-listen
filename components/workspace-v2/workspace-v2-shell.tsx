@@ -47,7 +47,12 @@ import type { FounderOperationsSnapshot } from "@/lib/founder-operations-types";
 import { getCopy } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import type { ContentEconomySetting, Platform } from "@/lib/types";
-import type { WorkspaceV2Queue, WorkspaceV2Song } from "@/lib/workspace-v2";
+import type {
+  WorkspaceV2Queue,
+  WorkspaceV2QueueMode,
+  WorkspaceV2QueueSource,
+  WorkspaceV2Song,
+} from "@/lib/workspace-v2";
 import {
   WorkspaceV2ProviderPlayerAdapter,
   type WorkspaceV2ProviderDebugEvent,
@@ -112,6 +117,30 @@ type PlaybackPipelineDebug = {
   playStartedCount: number;
   providerReadyEventCount: number;
   providerReadyHandledCount: number;
+};
+
+type WorkspaceQueueSnapshotRow = {
+  current_index: number | null;
+  current_song_id: string | null;
+  duration_seconds: number | string | null;
+  expires_at: string | null;
+  playback_position_seconds: number | string | null;
+  queue_id: string | null;
+  queue_mode: string | null;
+  queue_source: string | null;
+  queue_title: string | null;
+  snapshot_id: string;
+  song_ids: string[] | null;
+  updated_at: string | null;
+};
+
+type PendingWorkspaceResume = {
+  currentSongTitle: string;
+  playbackPositionSeconds: number;
+  queue: WorkspaceV2Queue;
+  snapshotId: string;
+  startIndex: number;
+  updatedAt: string | null;
 };
 
 const initialProviderDebug: ProviderDebugState = {
@@ -223,6 +252,84 @@ function nowPlayingLabel(song: WorkspaceV2Song | null, spanish: boolean) {
 
 function workspaceSongPlatform(song: WorkspaceV2Song): Platform {
   return song.platform as Platform;
+}
+
+function firstRow<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function normalizeQueueMode(value: string | null | undefined): WorkspaceV2QueueMode {
+  const validModes: WorkspaceV2QueueMode[] = [
+    "discovery",
+    "genre",
+    "random",
+    "review",
+    "top10",
+  ];
+  return validModes.includes(value as WorkspaceV2QueueMode)
+    ? (value as WorkspaceV2QueueMode)
+    : "discovery";
+}
+
+function normalizeQueueSource(
+  value: string | null | undefined,
+): WorkspaceV2QueueSource {
+  const validSources: WorkspaceV2QueueSource[] = [
+    "discovery_pool",
+    "featured",
+    "manual",
+    "most_played",
+    "new_releases",
+    "random",
+    "review",
+    "top10",
+    "trending",
+  ];
+  return validSources.includes(value as WorkspaceV2QueueSource)
+    ? (value as WorkspaceV2QueueSource)
+    : "manual";
+}
+
+function restoreQueueFromSnapshot(
+  initialQueue: WorkspaceV2Queue,
+  snapshot: WorkspaceQueueSnapshotRow,
+): PendingWorkspaceResume | null {
+  const songIds = snapshot.song_ids ?? [];
+  const currentSongId = snapshot.current_song_id;
+  if (!songIds.length || !currentSongId) return null;
+
+  const songsById = new Map(initialQueue.songs.map((song) => [song.id, song]));
+  const restoredSongs = songIds
+    .map((songId) => songsById.get(songId))
+    .filter((song): song is WorkspaceV2Song => Boolean(song));
+  const currentIndex = restoredSongs.findIndex((song) => song.id === currentSongId);
+  if (currentIndex < 0) return null;
+
+  const missingCurrentSong = !songsById.has(currentSongId);
+  if (missingCurrentSong) return null;
+
+  const restoredIds = new Set(restoredSongs.map((song) => song.id));
+  const appendedSongs = initialQueue.songs.filter((song) => !restoredIds.has(song.id));
+  const queue: WorkspaceV2Queue = {
+    id: snapshot.queue_id?.trim() || initialQueue.id,
+    mode: normalizeQueueMode(snapshot.queue_mode),
+    songs: [...restoredSongs, ...appendedSongs],
+    source: normalizeQueueSource(snapshot.queue_source),
+    title: snapshot.queue_title?.trim() || initialQueue.title,
+  };
+
+  const playbackPositionSeconds = Number(snapshot.playback_position_seconds ?? 0);
+  return {
+    currentSongTitle: restoredSongs[currentIndex]?.title ?? initialQueue.title,
+    playbackPositionSeconds: Number.isFinite(playbackPositionSeconds)
+      ? Math.max(0, playbackPositionSeconds)
+      : 0,
+    queue,
+    snapshotId: snapshot.snapshot_id,
+    startIndex: currentIndex,
+    updatedAt: snapshot.updated_at,
+  };
 }
 
 export function WorkspaceV2Shell({
@@ -354,10 +461,16 @@ function WorkspaceV2ShellClient({
     useState<PlaybackPipelineDebug>(initialPipelineDebug);
   const [providerDebug, setProviderDebug] =
     useState<ProviderDebugState>(initialProviderDebug);
+  const [pendingResume, setPendingResume] =
+    useState<PendingWorkspaceResume | null>(null);
+  const [resumeChecked, setResumeChecked] = useState(false);
+  const [queueBootstrapped, setQueueBootstrapped] = useState(false);
   const [submissionTokens, setSubmissionTokens] = useState(initialSubmissionTokens);
   const [submitNotice, setSubmitNotice] = useState("");
   const commandRef = useRef("");
   const heroCollapsedRef = useRef(false);
+  const lastSnapshotSignatureRef = useRef("");
+  const snapshotSaveTimeoutRef = useRef<number | null>(null);
   const heroRef = useRef<HTMLDivElement | null>(null);
   const playbackRef = useRef("");
   const providerSkipSongRef = useRef<string | null>(null);
@@ -506,22 +619,241 @@ function WorkspaceV2ShellClient({
     [economy, notifySubmit, recordError, recordLog, spanish],
   );
 
-  useEffect(() => {
-    try {
-      loadQueue(initialQueue, { autoPlay: true });
-      recordTransition(
-        "LOAD_SONG",
-        initialQueue.songs[0]
-          ? `${initialQueue.songs[0].id} / ${initialQueue.songs[0].title}`
-          : "Queue is empty",
-      );
-    } catch (error) {
-      recordError(
-        "LOAD_SONG failed",
-        error instanceof Error ? error.message : String(error),
-      );
+  const loadInitialQueue = useCallback(
+    (reason: string) => {
+      try {
+        loadQueue(initialQueue, { autoPlay: true });
+        setPendingResume(null);
+        setQueueBootstrapped(true);
+        recordTransition(
+          "LOAD_SONG",
+          initialQueue.songs[0]
+            ? `${reason}: ${initialQueue.songs[0].id} / ${initialQueue.songs[0].title}`
+            : `${reason}: Queue is empty`,
+        );
+      } catch (error) {
+        recordError(
+          "LOAD_SONG failed",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    },
+    [initialQueue, loadQueue, recordError, recordTransition],
+  );
+
+  const clearQueueSnapshot = useCallback(async () => {
+    if (economyMode === "sandbox") return;
+    const supabase = createClient();
+    if (!supabase) return;
+    if (economyMode === "guest") {
+      if (!guestToken) return;
+      await supabase.rpc("clear_guest_workspace_queue_snapshot", {
+        guest_access_token: guestToken,
+      });
+      return;
     }
-  }, [initialQueue, loadQueue, recordError, recordTransition]);
+    await supabase.rpc("clear_workspace_queue_snapshot");
+  }, [economyMode, guestToken]);
+
+  useEffect(() => {
+    let active = true;
+
+    const bootstrapQueue = async () => {
+      if (economyMode === "sandbox") {
+        setResumeChecked(true);
+        loadInitialQueue("sandbox");
+        return;
+      }
+
+      const supabase = createClient();
+      if (!supabase) {
+        setResumeChecked(true);
+        loadInitialQueue("supabase unavailable");
+        return;
+      }
+
+      try {
+        const result =
+          economyMode === "guest"
+            ? guestToken
+              ? await supabase.rpc("get_guest_workspace_queue_snapshot", {
+                  guest_access_token: guestToken,
+                })
+              : { data: null, error: null }
+            : await supabase.rpc("get_workspace_queue_snapshot");
+
+        if (!active) return;
+        if (result.error) {
+          recordError("RESUME_SNAPSHOT_FAILED", result.error.message);
+          setResumeChecked(true);
+          loadInitialQueue("resume snapshot failed");
+          return;
+        }
+
+        const snapshot = firstRow(
+          result.data as
+            | WorkspaceQueueSnapshotRow
+            | WorkspaceQueueSnapshotRow[]
+            | null,
+        );
+        const resume = snapshot
+          ? restoreQueueFromSnapshot(initialQueue, snapshot)
+          : null;
+
+        if (resume) {
+          setPendingResume(resume);
+          setResumeChecked(true);
+          recordTransition(
+            "RESUME_AVAILABLE",
+            `${resume.currentSongTitle} / ${clock(resume.playbackPositionSeconds)}`,
+          );
+          return;
+        }
+
+        if (snapshot) {
+          void clearQueueSnapshot();
+        }
+        setResumeChecked(true);
+        loadInitialQueue(snapshot ? "invalid resume snapshot" : "fresh session");
+      } catch (error) {
+        if (!active) return;
+        recordError(
+          "RESUME_SNAPSHOT_FAILED",
+          error instanceof Error ? error.message : String(error),
+        );
+        setResumeChecked(true);
+        loadInitialQueue("resume snapshot exception");
+      }
+    };
+
+    void bootstrapQueue();
+    return () => {
+      active = false;
+    };
+  }, [
+    clearQueueSnapshot,
+    economyMode,
+    guestToken,
+    initialQueue,
+    loadInitialQueue,
+    recordError,
+    recordTransition,
+  ]);
+
+  const handleContinueResume = useCallback(() => {
+    if (!pendingResume) return;
+    loadQueue(pendingResume.queue, {
+      autoPlay: true,
+      startIndex: pendingResume.startIndex,
+    });
+    setPendingResume(null);
+    setQueueBootstrapped(true);
+    recordTransition(
+      "RESUME_CONTINUED",
+      `${pendingResume.currentSongTitle} / ${clock(pendingResume.playbackPositionSeconds)}`,
+    );
+  }, [loadQueue, pendingResume, recordTransition]);
+
+  const handleStartNewSession = useCallback(() => {
+    void clearQueueSnapshot();
+    loadInitialQueue("new session");
+  }, [clearQueueSnapshot, loadInitialQueue]);
+
+  const snapshotProgressBucket = Math.floor(
+    controller.telemetry.currentProgressSeconds / 15,
+  );
+  const snapshotActiveQueue = controller.queue.activeQueue;
+  const snapshotActiveSong = controller.activeSong;
+  const snapshotCurrentPosition = controller.position.current;
+  const snapshotCurrentProgressSeconds =
+    controller.telemetry.currentProgressSeconds;
+  const snapshotDurationSeconds = controller.telemetry.durationSeconds;
+
+  useEffect(() => {
+    if (
+      !queueBootstrapped ||
+      pendingResume ||
+      economyMode === "sandbox" ||
+      !snapshotActiveSong ||
+      !snapshotActiveQueue?.songs.length
+    ) {
+      return;
+    }
+
+    const activeQueue = snapshotActiveQueue;
+    const activeSong = snapshotActiveSong;
+    const currentIndex = Math.max(0, snapshotCurrentPosition - 1);
+    const songIds = activeQueue.songs.map((song) => song.id);
+    const signature = [
+      activeQueue.id,
+      activeSong.id,
+      currentIndex,
+      snapshotProgressBucket,
+      songIds.join(","),
+    ].join("|");
+    if (lastSnapshotSignatureRef.current === signature) return;
+    lastSnapshotSignatureRef.current = signature;
+
+    if (snapshotSaveTimeoutRef.current) {
+      window.clearTimeout(snapshotSaveTimeoutRef.current);
+    }
+    snapshotSaveTimeoutRef.current = window.setTimeout(() => {
+      snapshotSaveTimeoutRef.current = null;
+      const supabase = createClient();
+      if (!supabase) return;
+
+      const payload = {
+        snapshot_current_index: currentIndex,
+        snapshot_current_song_id: activeSong.id,
+        snapshot_duration_seconds: snapshotDurationSeconds || null,
+        snapshot_playback_position_seconds:
+          snapshotCurrentProgressSeconds,
+        snapshot_queue_id: activeQueue.id,
+        snapshot_queue_mode: activeQueue.mode,
+        snapshot_queue_source: activeQueue.source,
+        snapshot_queue_title: activeQueue.title,
+        snapshot_song_ids: songIds,
+      };
+
+      const request =
+        economyMode === "guest"
+          ? guestToken
+            ? supabase.rpc("save_guest_workspace_queue_snapshot", {
+                ...payload,
+                guest_access_token: guestToken,
+              })
+            : null
+          : supabase.rpc("save_workspace_queue_snapshot", payload);
+
+      if (!request) return;
+      void request.then(({ error }) => {
+        if (error) {
+          recordError("RESUME_SNAPSHOT_SAVE_FAILED", error.message);
+        }
+      });
+    }, 600);
+  }, [
+    economyMode,
+    guestToken,
+    pendingResume,
+    queueBootstrapped,
+    recordError,
+    snapshotActiveQueue,
+    snapshotActiveSong,
+    snapshotCurrentPosition,
+    snapshotCurrentProgressSeconds,
+    snapshotDurationSeconds,
+    snapshotProgressBucket,
+  ]);
+
+  useEffect(
+    () => () => {
+      if (snapshotSaveTimeoutRef.current) {
+        window.clearTimeout(snapshotSaveTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const updateCollapsedState = () => {
@@ -1482,6 +1814,49 @@ function WorkspaceV2ShellClient({
             />
           )}
         </section>
+
+        {pendingResume && (
+          <section className="workspace-v2-resume-card" role="status">
+            <div>
+              <span className="eyebrow">
+                {spanish ? "Sesion guardada" : "Saved session"}
+              </span>
+              <h2>
+                {spanish
+                  ? "Continuar donde quedaste"
+                  : "Continue where you left off"}
+              </h2>
+              <p>
+                {pendingResume.currentSongTitle} /{" "}
+                {clock(pendingResume.playbackPositionSeconds)}
+              </p>
+            </div>
+            <div className="workspace-v2-resume-actions">
+              <button onClick={handleContinueResume} type="button">
+                <Play size={15} />
+                {spanish ? "Continuar donde quedaste" : "Continue"}
+              </button>
+              <button onClick={handleStartNewSession} type="button">
+                {spanish ? "Comenzar nueva sesion" : "Start new session"}
+              </button>
+            </div>
+          </section>
+        )}
+
+        {!resumeChecked && (
+          <section className="workspace-v2-resume-card" role="status">
+            <div>
+              <span className="eyebrow">
+                {spanish ? "Preparando cola" : "Preparing queue"}
+              </span>
+              <h2>
+                {spanish
+                  ? "Buscando tu ultima sesion"
+                  : "Checking for saved session"}
+              </h2>
+            </div>
+          </section>
+        )}
 
         <section
           className="workspace-v2-trust-layer"
