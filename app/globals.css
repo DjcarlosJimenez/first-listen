@@ -15475,7 +15475,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     box-sizing: border-box;
     display: grid;
     gap: 6px;
-    grid-template-columns: max-content max-content minmax(86px, 1fr) 34px;
+    grid-template-columns: max-content max-content max-content 34px;
+    justify-content: space-between;
     justify-self: center;
     max-width: calc(100vw - 20px);
     min-height: 0;
@@ -16395,7 +16396,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     box-sizing: border-box;
     display: grid;
     gap: 6px;
-    grid-template-columns: max-content max-content minmax(96px, 1fr) 36px;
+    grid-template-columns: max-content max-content max-content 36px;
+    justify-content: space-between;
     justify-self: center;
     margin: 0 -8px;
     max-width: 100vw;
