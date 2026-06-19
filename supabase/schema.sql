@@ -31506,3 +31506,886 @@ revoke all on function public.submit_review_with_listening(
 grant execute on function public.submit_review_with_listening(
   uuid, boolean, boolean, boolean, boolean, smallint, text, boolean, uuid
 ) to authenticated;
+
+-- ============================================================
+-- 20260617001000_content_classification_phase_one.sql
+-- ============================================================
+
+-- Content Classification Architecture Phase 1.
+-- Passive metadata only: no playback, queue, discovery, reward, submission,
+-- review, or metric behavior is changed by this migration.
+
+create table if not exists public.content_categories (
+  id uuid primary key default uuid_generate_v4(),
+  slug text not null unique,
+  label_en text not null,
+  label_es text not null,
+  content_type text not null,
+  is_active boolean not null default true,
+  sort_order integer not null default 100,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.content_subcategories (
+  id uuid primary key default uuid_generate_v4(),
+  category_id uuid not null references public.content_categories(id) on delete cascade,
+  slug text not null,
+  label_en text not null,
+  label_es text not null,
+  is_active boolean not null default true,
+  sort_order integer not null default 100,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (category_id, slug)
+);
+
+alter table public.content_categories
+  drop constraint if exists content_categories_slug_check;
+alter table public.content_categories
+  add constraint content_categories_slug_check
+  check (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$');
+
+alter table public.content_categories
+  drop constraint if exists content_categories_content_type_check;
+alter table public.content_categories
+  add constraint content_categories_content_type_check
+  check (
+    content_type in (
+      'music',
+      'music_video',
+      'video',
+      'podcast',
+      'gaming',
+      'tutorial',
+      'comedy',
+      'reaction',
+      'vlog',
+      'other'
+    )
+  );
+
+alter table public.content_categories
+  drop constraint if exists content_categories_label_en_check;
+alter table public.content_categories
+  add constraint content_categories_label_en_check
+  check (char_length(trim(label_en)) between 1 and 80);
+
+alter table public.content_categories
+  drop constraint if exists content_categories_label_es_check;
+alter table public.content_categories
+  add constraint content_categories_label_es_check
+  check (char_length(trim(label_es)) between 1 and 80);
+
+alter table public.content_subcategories
+  drop constraint if exists content_subcategories_slug_check;
+alter table public.content_subcategories
+  add constraint content_subcategories_slug_check
+  check (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$');
+
+alter table public.content_subcategories
+  drop constraint if exists content_subcategories_label_en_check;
+alter table public.content_subcategories
+  add constraint content_subcategories_label_en_check
+  check (char_length(trim(label_en)) between 1 and 80);
+
+alter table public.content_subcategories
+  drop constraint if exists content_subcategories_label_es_check;
+alter table public.content_subcategories
+  add constraint content_subcategories_label_es_check
+  check (char_length(trim(label_es)) between 1 and 80);
+
+create index if not exists content_categories_active_order_idx
+  on public.content_categories (is_active, sort_order, label_en);
+
+create index if not exists content_subcategories_category_order_idx
+  on public.content_subcategories (category_id, is_active, sort_order, label_en);
+
+insert into public.content_categories (
+  slug,
+  label_en,
+  label_es,
+  content_type,
+  sort_order
+)
+values
+  ('music', 'Music', 'Musica', 'music', 10),
+  ('music-video', 'Music Videos', 'Videos musicales', 'music_video', 20),
+  ('video', 'General Videos', 'Videos generales', 'video', 30),
+  ('podcast', 'Podcasts', 'Podcasts', 'podcast', 40),
+  ('gaming', 'Gaming', 'Gaming', 'gaming', 50),
+  ('tutorial', 'Tutorials', 'Tutoriales', 'tutorial', 60),
+  ('comedy', 'Comedy', 'Comedia', 'comedy', 70),
+  ('reaction', 'Reactions', 'Reacciones', 'reaction', 80),
+  ('vlog', 'Vlogs', 'Vlogs', 'vlog', 90),
+  ('other', 'Other', 'Otro', 'other', 100)
+on conflict (slug) do update
+set
+  label_en = excluded.label_en,
+  label_es = excluded.label_es,
+  content_type = excluded.content_type,
+  sort_order = excluded.sort_order,
+  updated_at = now();
+
+insert into public.content_subcategories (
+  category_id,
+  slug,
+  label_en,
+  label_es,
+  sort_order
+)
+select
+  categories.id,
+  subcategories.slug,
+  subcategories.label_en,
+  subcategories.label_es,
+  subcategories.sort_order
+from (
+  values
+    ('music', 'cumbia', 'Cumbia', 'Cumbia', 10),
+    ('music', 'regional-mexicano', 'Regional Mexican', 'Regional Mexicano', 20),
+    ('music', 'hip-hop', 'Hip-Hop', 'Hip-Hop', 30),
+    ('music', 'bachata', 'Bachata', 'Bachata', 40),
+    ('music', 'chilena', 'Chilena', 'Chilena', 50),
+    ('music', 'reggaeton', 'Reggaeton', 'Reggaeton', 60),
+    ('music', 'salsa', 'Salsa', 'Salsa', 70),
+    ('music', 'pop', 'Pop', 'Pop', 80),
+    ('music', 'rock', 'Rock', 'Rock', 90),
+    ('music', 'edm', 'EDM', 'EDM', 100),
+    ('music', 'country', 'Country', 'Country', 110),
+    ('music', 'indie', 'Indie', 'Indie', 120),
+    ('music', 'alternative', 'Alternative', 'Alternativo', 130),
+    ('music', 'jazz', 'Jazz', 'Jazz', 140),
+    ('music', 'classical', 'Classical', 'Clasica', 150),
+    ('music', 'instrumental', 'Instrumental', 'Instrumental', 160),
+    ('music', 'other', 'Other', 'Otro', 999),
+    ('video', 'general', 'General', 'General', 10),
+    ('podcast', 'general', 'General', 'General', 10),
+    ('gaming', 'gameplay', 'Gameplay', 'Gameplay', 10),
+    ('tutorial', 'general', 'General', 'General', 10),
+    ('comedy', 'general', 'General', 'General', 10),
+    ('reaction', 'general', 'General', 'General', 10),
+    ('vlog', 'general', 'General', 'General', 10),
+    ('other', 'other', 'Other', 'Otro', 999)
+) as subcategories(category_slug, slug, label_en, label_es, sort_order)
+join public.content_categories as categories
+  on categories.slug = subcategories.category_slug
+on conflict (category_id, slug) do update
+set
+  label_en = excluded.label_en,
+  label_es = excluded.label_es,
+  sort_order = excluded.sort_order,
+  updated_at = now();
+
+alter table public.songs
+  add column if not exists content_type text,
+  add column if not exists category text,
+  add column if not exists subcategory text,
+  add column if not exists playback_source text;
+
+update public.songs
+set
+  content_type = coalesce(
+    content_type,
+    case
+      when content_kind = 'music_video' then 'music_video'
+      when media_vertical = 'video' then 'video'
+      else 'music'
+    end
+  ),
+  category = coalesce(
+    category,
+    case
+      when media_vertical = 'video' and content_kind <> 'music_video'
+        then 'video'
+      else 'music'
+    end
+  ),
+  subcategory = coalesce(
+    subcategory,
+    case
+      when genre is null or trim(genre) = '' then null
+      when lower(trim(genre)) = 'regional mexican' then 'regional-mexicano'
+      when lower(trim(genre)) = 'hip hop' then 'hip-hop'
+      when lower(trim(genre)) = 'instrumental only' then 'instrumental'
+      else regexp_replace(
+        regexp_replace(lower(trim(genre)), '[^a-z0-9]+', '-', 'g'),
+        '(^-|-$)',
+        '',
+        'g'
+      )
+    end
+  ),
+  playback_source = coalesce(
+    playback_source,
+    case
+      when content_classification = 'external' then 'external_only'
+      when platform in ('youtube', 'youtube_music') then 'internal_playable'
+      when platform = 'soundcloud' then 'embedded_unverified'
+      else 'external_only'
+    end
+  );
+
+alter table public.songs
+  alter column content_type set default 'music',
+  alter column content_type set not null,
+  alter column category set default 'music',
+  alter column category set not null,
+  alter column playback_source set default 'internal_playable',
+  alter column playback_source set not null;
+
+alter table public.songs
+  drop constraint if exists songs_content_type_check;
+alter table public.songs
+  add constraint songs_content_type_check
+  check (
+    content_type in (
+      'music',
+      'music_video',
+      'video',
+      'podcast',
+      'gaming',
+      'tutorial',
+      'comedy',
+      'reaction',
+      'vlog',
+      'other'
+    )
+  );
+
+alter table public.songs
+  drop constraint if exists songs_category_check;
+alter table public.songs
+  add constraint songs_category_check
+  check (category ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$');
+
+alter table public.songs
+  drop constraint if exists songs_subcategory_check;
+alter table public.songs
+  add constraint songs_subcategory_check
+  check (
+    subcategory is null
+    or subcategory ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+  );
+
+alter table public.songs
+  drop constraint if exists songs_playback_source_check;
+alter table public.songs
+  add constraint songs_playback_source_check
+  check (
+    playback_source in (
+      'internal_playable',
+      'external_only',
+      'embedded_unverified',
+      'unsupported'
+    )
+  );
+
+create index if not exists songs_content_type_idx
+  on public.songs (content_type);
+
+create index if not exists songs_category_idx
+  on public.songs (category);
+
+create index if not exists songs_subcategory_idx
+  on public.songs (subcategory);
+
+create index if not exists songs_playback_source_idx
+  on public.songs (playback_source);
+
+create index if not exists songs_classification_discovery_idx
+  on public.songs (
+    content_type,
+    category,
+    subcategory,
+    playback_source,
+    is_active,
+    created_at desc
+  );
+
+-- ============================================================
+-- 20260618001000_workspace_queue_snapshots.sql
+-- ============================================================
+
+-- Phase 1 listening continuity: passive Workspace V2 queue resume snapshots.
+-- This stores only queue/playback position metadata. It does not affect
+-- playback validation, Time Bank, rewards, reviews, or discovery ranking.
+
+create table if not exists public.workspace_queue_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  guest_session_id uuid references public.guest_sessions(id) on delete cascade,
+  queue_id text not null,
+  queue_mode text not null,
+  queue_source text not null,
+  queue_title text not null,
+  song_ids uuid[] not null default '{}',
+  current_song_id uuid not null references public.songs(id) on delete cascade,
+  current_index integer not null default 0 check (current_index >= 0),
+  playback_position_seconds numeric not null default 0 check (playback_position_seconds >= 0),
+  duration_seconds numeric check (duration_seconds is null or duration_seconds >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '7 days',
+  constraint workspace_queue_snapshot_single_owner check (
+    (user_id is not null and guest_session_id is null)
+    or (user_id is null and guest_session_id is not null)
+  ),
+  constraint workspace_queue_snapshot_current_in_queue check (
+    current_song_id = any(song_ids)
+  )
+);
+
+create unique index if not exists workspace_queue_snapshots_user_idx
+  on public.workspace_queue_snapshots(user_id)
+  where user_id is not null;
+
+create unique index if not exists workspace_queue_snapshots_guest_idx
+  on public.workspace_queue_snapshots(guest_session_id)
+  where guest_session_id is not null;
+
+create index if not exists workspace_queue_snapshots_expires_idx
+  on public.workspace_queue_snapshots(expires_at);
+
+alter table public.workspace_queue_snapshots enable row level security;
+
+drop policy if exists "workspace queue snapshots are user readable"
+  on public.workspace_queue_snapshots;
+create policy "workspace queue snapshots are user readable"
+  on public.workspace_queue_snapshots for select
+  using (auth.uid() = user_id);
+
+revoke all on table public.workspace_queue_snapshots from public, anon, authenticated;
+grant select on table public.workspace_queue_snapshots to authenticated;
+
+create or replace function public.save_workspace_queue_snapshot(
+  snapshot_queue_id text,
+  snapshot_queue_mode text,
+  snapshot_queue_source text,
+  snapshot_queue_title text,
+  snapshot_song_ids uuid[],
+  snapshot_current_song_id uuid,
+  snapshot_current_index integer,
+  snapshot_playback_position_seconds numeric default 0,
+  snapshot_duration_seconds numeric default null
+)
+returns table(saved boolean, snapshot_id uuid, updated_at timestamptz)
+language plpgsql
+security definer
+set search_path to 'pg_catalog', 'public'
+as $function$
+declare
+  saved_snapshot_id uuid;
+  saved_updated_at timestamptz;
+  normalized_song_ids uuid[] := coalesce(snapshot_song_ids, '{}');
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+
+  if not public.is_active_user() then
+    raise exception 'Active account required';
+  end if;
+
+  if coalesce(array_length(normalized_song_ids, 1), 0) = 0 then
+    raise exception 'Queue snapshot requires at least one song';
+  end if;
+
+  if snapshot_current_song_id is null
+    or not snapshot_current_song_id = any(normalized_song_ids)
+  then
+    raise exception 'Current song must be included in queue snapshot';
+  end if;
+
+  insert into public.workspace_queue_snapshots (
+    user_id,
+    queue_id,
+    queue_mode,
+    queue_source,
+    queue_title,
+    song_ids,
+    current_song_id,
+    current_index,
+    playback_position_seconds,
+    duration_seconds,
+    expires_at
+  )
+  values (
+    auth.uid(),
+    left(coalesce(nullif(trim(snapshot_queue_id), ''), 'workspace-v2'), 120),
+    left(coalesce(nullif(trim(snapshot_queue_mode), ''), 'discovery'), 40),
+    left(coalesce(nullif(trim(snapshot_queue_source), ''), 'manual'), 60),
+    left(coalesce(nullif(trim(snapshot_queue_title), ''), 'First Listen'), 160),
+    normalized_song_ids,
+    snapshot_current_song_id,
+    greatest(0, snapshot_current_index),
+    greatest(0, coalesce(snapshot_playback_position_seconds, 0)),
+    case
+      when snapshot_duration_seconds is null then null
+      else greatest(0, snapshot_duration_seconds)
+    end,
+    now() + interval '7 days'
+  )
+  on conflict (user_id) where user_id is not null
+  do update set
+    queue_id = excluded.queue_id,
+    queue_mode = excluded.queue_mode,
+    queue_source = excluded.queue_source,
+    queue_title = excluded.queue_title,
+    song_ids = excluded.song_ids,
+    current_song_id = excluded.current_song_id,
+    current_index = excluded.current_index,
+    playback_position_seconds = excluded.playback_position_seconds,
+    duration_seconds = excluded.duration_seconds,
+    updated_at = now(),
+    expires_at = excluded.expires_at
+  returning id, workspace_queue_snapshots.updated_at
+  into saved_snapshot_id, saved_updated_at;
+
+  return query select true, saved_snapshot_id, saved_updated_at;
+end;
+$function$;
+
+create or replace function public.get_workspace_queue_snapshot()
+returns table(
+  snapshot_id uuid,
+  queue_id text,
+  queue_mode text,
+  queue_source text,
+  queue_title text,
+  song_ids uuid[],
+  current_song_id uuid,
+  current_index integer,
+  playback_position_seconds numeric,
+  duration_seconds numeric,
+  updated_at timestamptz,
+  expires_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path to 'pg_catalog', 'public'
+as $function$
+  select
+    snapshots.id,
+    snapshots.queue_id,
+    snapshots.queue_mode,
+    snapshots.queue_source,
+    snapshots.queue_title,
+    snapshots.song_ids,
+    snapshots.current_song_id,
+    snapshots.current_index,
+    snapshots.playback_position_seconds,
+    snapshots.duration_seconds,
+    snapshots.updated_at,
+    snapshots.expires_at
+  from public.workspace_queue_snapshots as snapshots
+  where snapshots.user_id = auth.uid()
+    and snapshots.expires_at > now()
+  limit 1;
+$function$;
+
+create or replace function public.clear_workspace_queue_snapshot()
+returns table(cleared boolean)
+language plpgsql
+security definer
+set search_path to 'pg_catalog', 'public'
+as $function$
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+
+  delete from public.workspace_queue_snapshots
+  where user_id = auth.uid();
+
+  return query select true;
+end;
+$function$;
+
+create or replace function public.save_guest_workspace_queue_snapshot(
+  guest_access_token uuid,
+  snapshot_queue_id text,
+  snapshot_queue_mode text,
+  snapshot_queue_source text,
+  snapshot_queue_title text,
+  snapshot_song_ids uuid[],
+  snapshot_current_song_id uuid,
+  snapshot_current_index integer,
+  snapshot_playback_position_seconds numeric default 0,
+  snapshot_duration_seconds numeric default null
+)
+returns table(saved boolean, snapshot_id uuid, updated_at timestamptz)
+language plpgsql
+security definer
+set search_path to 'pg_catalog', 'public'
+as $function$
+declare
+  resolved_guest_id uuid;
+  saved_snapshot_id uuid;
+  saved_updated_at timestamptz;
+  normalized_song_ids uuid[] := coalesce(snapshot_song_ids, '{}');
+begin
+  resolved_guest_id := public.resolve_guest_session(guest_access_token);
+  if resolved_guest_id is null then
+    raise exception 'Guest session not found';
+  end if;
+
+  if coalesce(array_length(normalized_song_ids, 1), 0) = 0 then
+    raise exception 'Queue snapshot requires at least one song';
+  end if;
+
+  if snapshot_current_song_id is null
+    or not snapshot_current_song_id = any(normalized_song_ids)
+  then
+    raise exception 'Current song must be included in queue snapshot';
+  end if;
+
+  insert into public.workspace_queue_snapshots (
+    guest_session_id,
+    queue_id,
+    queue_mode,
+    queue_source,
+    queue_title,
+    song_ids,
+    current_song_id,
+    current_index,
+    playback_position_seconds,
+    duration_seconds,
+    expires_at
+  )
+  values (
+    resolved_guest_id,
+    left(coalesce(nullif(trim(snapshot_queue_id), ''), 'workspace-v2-guest'), 120),
+    left(coalesce(nullif(trim(snapshot_queue_mode), ''), 'discovery'), 40),
+    left(coalesce(nullif(trim(snapshot_queue_source), ''), 'random'), 60),
+    left(coalesce(nullif(trim(snapshot_queue_title), ''), 'Guest Discovery'), 160),
+    normalized_song_ids,
+    snapshot_current_song_id,
+    greatest(0, snapshot_current_index),
+    greatest(0, coalesce(snapshot_playback_position_seconds, 0)),
+    case
+      when snapshot_duration_seconds is null then null
+      else greatest(0, snapshot_duration_seconds)
+    end,
+    now() + interval '7 days'
+  )
+  on conflict (guest_session_id) where guest_session_id is not null
+  do update set
+    queue_id = excluded.queue_id,
+    queue_mode = excluded.queue_mode,
+    queue_source = excluded.queue_source,
+    queue_title = excluded.queue_title,
+    song_ids = excluded.song_ids,
+    current_song_id = excluded.current_song_id,
+    current_index = excluded.current_index,
+    playback_position_seconds = excluded.playback_position_seconds,
+    duration_seconds = excluded.duration_seconds,
+    updated_at = now(),
+    expires_at = excluded.expires_at
+  returning id, workspace_queue_snapshots.updated_at
+  into saved_snapshot_id, saved_updated_at;
+
+  return query select true, saved_snapshot_id, saved_updated_at;
+end;
+$function$;
+
+create or replace function public.get_guest_workspace_queue_snapshot(
+  guest_access_token uuid
+)
+returns table(
+  snapshot_id uuid,
+  queue_id text,
+  queue_mode text,
+  queue_source text,
+  queue_title text,
+  song_ids uuid[],
+  current_song_id uuid,
+  current_index integer,
+  playback_position_seconds numeric,
+  duration_seconds numeric,
+  updated_at timestamptz,
+  expires_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path to 'pg_catalog', 'public'
+as $function$
+  with active_guest as (
+    select public.resolve_guest_session(guest_access_token) as id
+  )
+  select
+    snapshots.id,
+    snapshots.queue_id,
+    snapshots.queue_mode,
+    snapshots.queue_source,
+    snapshots.queue_title,
+    snapshots.song_ids,
+    snapshots.current_song_id,
+    snapshots.current_index,
+    snapshots.playback_position_seconds,
+    snapshots.duration_seconds,
+    snapshots.updated_at,
+    snapshots.expires_at
+  from public.workspace_queue_snapshots as snapshots
+  cross join active_guest
+  where snapshots.guest_session_id = active_guest.id
+    and snapshots.expires_at > now()
+  limit 1;
+$function$;
+
+create or replace function public.clear_guest_workspace_queue_snapshot(
+  guest_access_token uuid
+)
+returns table(cleared boolean)
+language plpgsql
+security definer
+set search_path to 'pg_catalog', 'public'
+as $function$
+declare
+  resolved_guest_id uuid;
+begin
+  resolved_guest_id := public.resolve_guest_session(guest_access_token);
+  if resolved_guest_id is null then
+    raise exception 'Guest session not found';
+  end if;
+
+  delete from public.workspace_queue_snapshots
+  where guest_session_id = resolved_guest_id;
+
+  return query select true;
+end;
+$function$;
+
+revoke all on function public.save_workspace_queue_snapshot(
+  text, text, text, text, uuid[], uuid, integer, numeric, numeric
+) from public, anon, authenticated;
+revoke all on function public.get_workspace_queue_snapshot()
+  from public, anon, authenticated;
+revoke all on function public.clear_workspace_queue_snapshot()
+  from public, anon, authenticated;
+revoke all on function public.save_guest_workspace_queue_snapshot(
+  uuid, text, text, text, text, uuid[], uuid, integer, numeric, numeric
+) from public, anon, authenticated;
+revoke all on function public.get_guest_workspace_queue_snapshot(uuid)
+  from public, anon, authenticated;
+revoke all on function public.clear_guest_workspace_queue_snapshot(uuid)
+  from public, anon, authenticated;
+
+grant execute on function public.save_workspace_queue_snapshot(
+  text, text, text, text, uuid[], uuid, integer, numeric, numeric
+) to authenticated;
+grant execute on function public.get_workspace_queue_snapshot()
+  to authenticated;
+grant execute on function public.clear_workspace_queue_snapshot()
+  to authenticated;
+
+grant execute on function public.save_guest_workspace_queue_snapshot(
+  uuid, text, text, text, text, uuid[], uuid, integer, numeric, numeric
+) to anon, authenticated;
+grant execute on function public.get_guest_workspace_queue_snapshot(uuid)
+  to anon, authenticated;
+grant execute on function public.clear_guest_workspace_queue_snapshot(uuid)
+  to anon, authenticated;
+
+-- ============================================================
+-- 20260619001000_workspace_v2_smart_queue.sql
+-- ============================================================
+
+-- Workspace V2 Smart Queue Phase 1.
+-- Selection-only change: no playback validation, Time Bank, rewards, reviews,
+-- or economy behavior is changed by this migration.
+
+drop function if exists public.get_workspace_v2_smart_queue(integer);
+
+create or replace function public.get_workspace_v2_smart_queue(
+  queue_limit integer default 100
+)
+returns table (
+  id uuid,
+  user_id uuid,
+  title text,
+  artist_name text,
+  cover_image_url text,
+  music_url text,
+  platform public.music_platform,
+  content_duration_seconds integer,
+  featured boolean,
+  created_at timestamptz,
+  exposure_score numeric,
+  last_heard_at timestamptz,
+  global_valid_listens bigint,
+  user_valid_listens bigint,
+  smart_score numeric
+)
+language sql
+security definer
+set search_path = pg_catalog, public
+as $function$
+  with viewer as (
+    select
+      profiles.id,
+      coalesce(profiles.show_explicit_content, false) as show_explicit_content
+    from public.profiles
+    where profiles.id = auth.uid()
+      and profiles.account_status = 'active'
+      and profiles.banned_at is null
+  ),
+  active_boosts as (
+    select distinct song_boosts.song_id
+    from public.song_boosts
+    where song_boosts.status = 'approved'
+      and song_boosts.starts_at <= now()
+      and song_boosts.ends_at > now()
+  ),
+  member_exposure as (
+    select
+      listening_sessions.song_id,
+      count(*) filter (
+        where listening_sessions.valid_listen_at is not null
+      ) as member_valid_listens,
+      count(distinct listening_sessions.user_id) filter (
+        where listening_sessions.user_id is not null
+          and listening_sessions.valid_listen_at is not null
+      ) as member_unique_valid_listeners,
+      coalesce(sum(listening_sessions.verified_seconds), 0) as member_verified_seconds
+    from public.listening_sessions
+    group by listening_sessions.song_id
+  ),
+  guest_exposure as (
+    select
+      guest_listening_sessions.song_id,
+      count(*) filter (
+        where guest_listening_sessions.valid_listen_at is not null
+      ) as guest_valid_listens,
+      count(distinct guest_listening_sessions.guest_session_id) filter (
+        where guest_listening_sessions.guest_session_id is not null
+          and guest_listening_sessions.valid_listen_at is not null
+      ) as guest_unique_valid_listeners,
+      coalesce(sum(guest_listening_sessions.verified_seconds), 0) as guest_verified_seconds
+    from public.guest_listening_sessions
+    group by guest_listening_sessions.song_id
+  ),
+  user_history as (
+    select
+      listening_sessions.song_id,
+      count(*) filter (
+        where listening_sessions.valid_listen_at is not null
+      ) as user_valid_listens,
+      max(listening_sessions.valid_listen_at) filter (
+        where listening_sessions.valid_listen_at is not null
+      ) as last_heard_at
+    from public.listening_sessions
+    where listening_sessions.user_id = auth.uid()
+    group by listening_sessions.song_id
+  ),
+  candidates as (
+    select
+      songs.id,
+      songs.user_id,
+      songs.title,
+      songs.artist_name,
+      songs.cover_image_url,
+      songs.music_url,
+      songs.platform,
+      songs.content_duration_seconds,
+      coalesce(songs.featured, false) as featured,
+      songs.created_at,
+      coalesce(member_exposure.member_valid_listens, 0)
+        + coalesce(guest_exposure.guest_valid_listens, 0) as global_valid_listens,
+      coalesce(member_exposure.member_unique_valid_listeners, 0)
+        + coalesce(guest_exposure.guest_unique_valid_listeners, 0) as global_unique_valid_listeners,
+      coalesce(member_exposure.member_verified_seconds, 0)
+        + coalesce(guest_exposure.guest_verified_seconds, 0) as global_verified_seconds,
+      coalesce(user_history.user_valid_listens, 0) as user_valid_listens,
+      user_history.last_heard_at,
+      active_boosts.song_id is not null as actively_boosted
+    from public.songs
+    join public.profiles as creators on creators.id = songs.user_id
+    cross join viewer
+    left join active_boosts on active_boosts.song_id = songs.id
+    left join member_exposure on member_exposure.song_id = songs.id
+    left join guest_exposure on guest_exposure.song_id = songs.id
+    left join user_history on user_history.song_id = songs.id
+    where songs.is_active
+      and songs.removed_at is null
+      and songs.archived_at is null
+      and songs.merged_into_song_id is null
+      and songs.approval_status in ('auto_approved', 'approved')
+      and songs.queue_tier in ('public', 'sponsored')
+      and songs.platform in ('youtube', 'youtube_music', 'soundcloud')
+      and nullif(btrim(coalesce(songs.music_url, '')), '') is not null
+      and creators.account_status = 'active'
+      and creators.banned_at is null
+      and (not coalesce(songs.explicit_content, false) or viewer.show_explicit_content)
+  ),
+  scored as (
+    select
+      candidates.*,
+      (
+        case when candidates.user_valid_listens = 0 then 12000 else 0 end
+        + case
+            when candidates.last_heard_at is null then 2500
+            when candidates.last_heard_at < now() - interval '24 hours'
+              then least(
+                4000,
+                floor(extract(epoch from (now() - candidates.last_heard_at)) / 3600) * 25
+              )
+            else -25000
+          end
+        + case when candidates.global_valid_listens = 0 then 3500 else 0 end
+        + greatest(0, 6000 - (candidates.global_valid_listens * 500))
+        + greatest(0, 2000 - (candidates.global_unique_valid_listeners * 250))
+        + greatest(
+            0,
+            1500 - floor(coalesce(candidates.global_verified_seconds, 0) / 60) * 20
+          )
+        + case when candidates.featured then 1200 else 0 end
+        + case when candidates.actively_boosted then 800 else 0 end
+        + greatest(
+            0,
+            420 - floor(extract(epoch from (now() - candidates.created_at)) / 86400) * 30
+          )
+        - (candidates.user_valid_listens * 1500)
+        - (candidates.global_valid_listens * 80)
+        - (candidates.global_unique_valid_listeners * 60)
+        + (random() * 250)::numeric
+      )::numeric as smart_score
+    from candidates
+  )
+  select
+    scored.id,
+    scored.user_id,
+    scored.title,
+    scored.artist_name,
+    scored.cover_image_url,
+    scored.music_url,
+    scored.platform,
+    scored.content_duration_seconds,
+    scored.featured,
+    scored.created_at,
+    scored.global_valid_listens::numeric as exposure_score,
+    scored.last_heard_at,
+    scored.global_valid_listens,
+    scored.user_valid_listens,
+    scored.smart_score
+  from scored
+  order by
+    case
+      when scored.last_heard_at >= now() - interval '24 hours' then 1
+      else 0
+    end asc,
+    case when scored.user_valid_listens = 0 then 0 else 1 end asc,
+    scored.smart_score desc,
+    scored.created_at desc
+  limit greatest(1, least(coalesce(queue_limit, 100), 100));
+$function$;
+
+comment on function public.get_workspace_v2_smart_queue(integer)
+  is 'Returns authenticated Workspace V2 internal playback candidates ordered by per-user freshness, low global exposure, and editorial boosts.';
+
+revoke all on function public.get_workspace_v2_smart_queue(integer)
+  from public, anon, authenticated;
+grant execute on function public.get_workspace_v2_smart_queue(integer)
+  to authenticated, service_role;

@@ -37,8 +37,10 @@ type WorkspaceV2SongRow = {
   content_duration_seconds: number | null;
   cover_image_url: string | null;
   created_at: string | null;
+  exposure_score?: number | string | null;
   featured: boolean | null;
   id: string;
+  last_heard_at?: string | null;
   music_url: string | null;
   platform: string | null;
   title: string | null;
@@ -90,10 +92,25 @@ function viewerModeFromProfile(profile: WorkspaceV2Profile | null): WorkspaceV2V
   return "member";
 }
 
+function numericValue(value: number | string | null | undefined) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function timestampMs(value: string | null | undefined) {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 function toWorkspaceSong(row: WorkspaceV2SongRow): WorkspaceV2Song | null {
   const platform = displayPlatform[String(row.platform ?? "")] ?? "YouTube Music";
   const link = String(row.music_url ?? "").trim();
   if (!link) return null;
+  const exposureScore = numericValue(row.exposure_score);
+  const lastHeardAt = timestampMs(row.last_heard_at);
   return {
     artist: String(row.artist_name ?? "Unknown Artist"),
     artistId: row.user_id ?? undefined,
@@ -102,8 +119,9 @@ function toWorkspaceSong(row: WorkspaceV2SongRow): WorkspaceV2Song | null {
       typeof row.content_duration_seconds === "number"
         ? row.content_duration_seconds
         : null,
-    exposureScore: row.featured ? 0 : 50,
+    exposureScore: exposureScore ?? (row.featured ? 0 : 50),
     id: row.id,
+    lastHeardAt,
     link,
     playbackKind:
       getContentClassification(platform) === "internal" ? "internal" : "external",
@@ -122,7 +140,7 @@ function buildPublicBetaQueue(rows: WorkspaceV2SongRow[], locale: InterfaceLocal
     id: "workspace-v2-public-beta",
     mode: "discovery",
     songs,
-    source: "featured",
+    source: "discovery_pool",
     title:
       locale === "es"
         ? "Descubrimiento continuo"
@@ -271,6 +289,35 @@ export async function WorkspaceV2AuthEntry({
 
   if (!user) redirect(`/login?next=${encodeURIComponent(loginRedirectPath)}`);
 
+  const queueRowsPromise = supabase
+    .rpc("get_workspace_v2_smart_queue", { queue_limit: 100 })
+    .then(async ({ data, error: smartQueueError }) => {
+      if (!smartQueueError && data) {
+        return {
+          data: data as WorkspaceV2SongRow[],
+          error: null,
+        };
+      }
+
+      const fallback = await supabase
+        .from("songs")
+        .select(
+          "id, user_id, title, artist_name, cover_image_url, music_url, platform, content_duration_seconds, featured, created_at",
+        )
+        .eq("is_active", true)
+        .is("archived_at", null)
+        .is("removed_at", null)
+        .in("platform", ["youtube_music", "youtube", "soundcloud"])
+        .order("featured", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      return {
+        data: (fallback.data ?? []) as WorkspaceV2SongRow[],
+        error: fallback.error,
+      };
+    });
+
   const [
     { data: profile },
     { data: rows, error },
@@ -290,18 +337,7 @@ export async function WorkspaceV2AuthEntry({
       )
       .eq("id", user.id)
       .maybeSingle(),
-    supabase
-      .from("songs")
-      .select(
-        "id, user_id, title, artist_name, cover_image_url, music_url, platform, content_duration_seconds, featured, created_at",
-      )
-      .eq("is_active", true)
-      .is("archived_at", null)
-      .is("removed_at", null)
-      .in("platform", ["youtube_music", "youtube", "soundcloud"])
-      .order("featured", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(100),
+    queueRowsPromise,
     supabase.rpc("get_my_song_management"),
     supabase.rpc("get_saved_songs"),
     supabase.rpc("get_listener_impact_profile"),
