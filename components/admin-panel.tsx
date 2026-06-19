@@ -466,13 +466,35 @@ export function AdminPanel({
   };
 
   const resetPassword = async (userId: string) => {
-    const response = await fetch(`/api/admin/users/${userId}/reset-password`, { method: "POST" });
-    const data = await response.json();
-    setNotice(
-      response.ok
-        ? "Password recovery email requested."
-        : data.error,
-    );
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/reset-password`, {
+        method: "POST",
+      });
+      const contentType = response.headers.get("content-type") ?? "";
+      const data = contentType.includes("application/json")
+        ? await response.json()
+        : { error: await response.text() };
+      if (response.ok) {
+        setNotice(
+          data.requestId
+            ? `Password recovery email requested. Request ID: ${data.requestId}`
+            : "Password recovery email requested.",
+        );
+        return;
+      }
+      const diagnostic = [
+        data.error ?? "Password recovery request failed.",
+        data.stage ? `Stage: ${data.stage}` : null,
+        data.requestId ? `Request ID: ${data.requestId}` : null,
+      ].filter(Boolean);
+      setNotice(diagnostic.join(" / "));
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? `Password recovery request failed: ${error.message}`
+          : "Password recovery request failed.",
+      );
+    }
   };
 
   const updateThemeColor = (
