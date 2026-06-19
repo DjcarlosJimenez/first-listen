@@ -1445,6 +1445,15 @@ function WorkspaceV2ShellClient({
     }
   }, []);
 
+  const handleMobileSubmitCta = useCallback(() => {
+    if (viewerMode === "guest") {
+      window.location.assign("/signup?next=/dashboard");
+      return;
+    }
+
+    handlePanelChange("submit");
+  }, [handlePanelChange, viewerMode]);
+
   const handleThemeToggle = useCallback(() => {
     setDarkMode((current) => !current);
     if (
@@ -1535,6 +1544,15 @@ function WorkspaceV2ShellClient({
           </em>
           <small>{displayIdentity}</small>
         </div>
+        <button
+          aria-label={spanish ? "Subir canción" : "Upload song"}
+          className="workspace-v2-mobile-submit-cta"
+          onClick={handleMobileSubmitCta}
+          type="button"
+        >
+          <span aria-hidden="true">🎵</span>
+          <strong>{spanish ? "Subir" : "Upload"}</strong>
+        </button>
         <button
           aria-expanded={sidebarExpanded}
           aria-label={
