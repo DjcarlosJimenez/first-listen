@@ -1078,9 +1078,11 @@ function WorkspaceV2ShellClient({
         ? "Reproduciendo"
         : "Playing"
       : statusLabel(controller.playback.state, spanish);
-  const playbackTrustOverlayVisible =
+  const playbackTrustIndicatorVisible =
     Boolean(controller.activeSong) && controller.playback.state === "playing";
-  const playbackTrustOverlayLabel = "▶ Reproducción válida";
+  const playbackTrustIndicatorLabel = spanish
+    ? "✔ Reproducción válida"
+    : "✔ Valid playback";
   const heroHeadline = workspaceSessionHeadline({
     activeSong: controller.activeSong,
     resumeTitle: resumedSession?.currentSongTitle ?? null,
@@ -1760,17 +1762,6 @@ function WorkspaceV2ShellClient({
                 </small>
               </div>
             )}
-            {playbackTrustOverlayVisible && (
-              <div
-                aria-hidden="true"
-                className="workspace-v2-playback-trust-overlay"
-                data-playback-state={controller.playback.state}
-                data-valid-playback={sessionValid ? "true" : "false"}
-              >
-                <span>{playbackTrustOverlayLabel}</span>
-                <strong>{clock(displayedTimePlayed)}</strong>
-              </div>
-            )}
             {providerSkipNotice && (
               <div className="workspace-v2-provider-skip-notice" role="status">
                 {providerSkipNotice}
@@ -1818,7 +1809,19 @@ function WorkspaceV2ShellClient({
               <Maximize2 size={16} />{" "}
               {spanish ? "Pantalla completa" : "Fullscreen"}
             </button>
-            <span>
+            {playbackTrustIndicatorVisible && (
+              <div
+                aria-hidden="true"
+                className="workspace-v2-playback-trust-pill"
+                data-playback-state={controller.playback.state}
+                data-valid-playback={sessionValid ? "true" : "false"}
+              >
+                <strong>{playbackTrustIndicatorLabel}</strong>
+                <i aria-hidden="true">•</i>
+                <em>{clock(displayedTimePlayed)}</em>
+              </div>
+            )}
+            <span className="workspace-v2-queue-position-pill">
               {queueSourceLabel(queueSource, spanish)} / {positionCurrent}
               /{positionTotal}
             </span>
