@@ -346,15 +346,9 @@ export async function WorkspaceV2AuthEntry({
         <Logo />
         <div className="owner-header-actions">
           {canAccessAdmin && (
-            <>
-              <Link href="/review">
-                <ShieldCheck size={16} />
-                {spanish ? "Fallback V1" : "V1 fallback"}
-              </Link>
-              <Link href="/owner">
-                <ShieldCheck size={16} /> Owner Control Center
-              </Link>
-            </>
+            <Link href="/owner">
+              <ShieldCheck size={16} /> Owner Control Center
+            </Link>
           )}
         </div>
       </header>
