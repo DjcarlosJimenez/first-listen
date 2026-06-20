@@ -22,6 +22,10 @@ import { isExternalPlatform } from "@/lib/content-economy";
 import { safeCoverUrl } from "@/lib/media";
 import { getProviderEmbed } from "@/lib/player";
 import type { Platform } from "@/lib/types";
+import {
+  WORKSPACE_V2_PLAYBACK_COMMAND_EVENT,
+  type WorkspaceV2PlaybackCommandDetail,
+} from "@/lib/workspace-v2";
 
 type PlayerStatus = "loading" | "ready" | "error";
 type PlaybackState =
@@ -168,7 +172,7 @@ const SOUNDCLOUD_API_SRC = "https://w.soundcloud.com/player/api.js";
 const SPOTIFY_API_SRC = "https://open.spotify.com/embed/iframe-api/v1";
 const MAX_INITIALIZATION_ATTEMPTS = 3;
 const ACTIVE_PLAYBACK_EVENT = "first-listen:active-playback";
-const PLAYBACK_COMMAND_EVENT = "first-listen:playback-command";
+const USER_CLICK_PLAY_DEDUPE_MS = 850;
 let youtubeApiPromise: Promise<YouTubeApi> | null = null;
 let soundCloudApiPromise: Promise<SoundCloudApi> | null = null;
 let spotifyApiPromise: Promise<SpotifyIframeApi> | null = null;
@@ -420,6 +424,7 @@ export function ProviderPlayer({
   const autoplayRetryTokenRef = useRef(0);
   const lastActivePlaybackLogRef = useRef({ at: 0, target: "" });
   const lastInteractionAtRef = useRef(Date.now());
+  const lastTrustedPlayCommandAtRef = useRef(0);
   const previousPlaybackStateRef = useRef<PlaybackState>("loading");
   const mountCountRef = useRef(0);
   const unmountCountRef = useRef(0);
@@ -945,8 +950,11 @@ export function ProviderPlayer({
     setShowAutoplayFallback(false);
     lastInteractionAtRef.current = Date.now();
     try {
-      youtubePlayerRef.current?.playVideo();
       if (youtubePlayerRef.current) {
+        const state = mapYouTubeState(youtubePlayerRef.current.getPlayerState());
+        if (state !== "playing" && state !== "completed") {
+          youtubePlayerRef.current.playVideo();
+        }
         scheduleYouTubeAutoplayRetries(
           youtubePlayerRef.current,
           latestYouTubeTargetRef.current,
@@ -993,19 +1001,33 @@ export function ProviderPlayer({
     if (!controlChannel) return;
     const handleCommand = (event: Event) => {
       const detail = (
-        event as CustomEvent<{
-          channel?: string;
-          command?: "pause" | "play";
-        }>
+        event as CustomEvent<WorkspaceV2PlaybackCommandDetail>
       ).detail;
       if (detail?.channel !== controlChannel) return;
-      if (detail.command === "play") requestPlayback();
+      if (detail.command === "play") {
+        if (detail.source === "user-click") {
+          lastTrustedPlayCommandAtRef.current = detail.issuedAt ?? Date.now();
+          requestPlayback();
+          return;
+        }
+        const recentlyHandledTrustedPlay =
+          lastTrustedPlayCommandAtRef.current > 0 &&
+          Date.now() - lastTrustedPlayCommandAtRef.current <
+            USER_CLICK_PLAY_DEDUPE_MS;
+        if (detail.source === "state-machine" && recentlyHandledTrustedPlay) {
+          return;
+        }
+        requestPlayback();
+      }
       if (detail.command === "pause") pausePlayback();
     };
 
-    window.addEventListener(PLAYBACK_COMMAND_EVENT, handleCommand);
+    window.addEventListener(WORKSPACE_V2_PLAYBACK_COMMAND_EVENT, handleCommand);
     return () =>
-      window.removeEventListener(PLAYBACK_COMMAND_EVENT, handleCommand);
+      window.removeEventListener(
+        WORKSPACE_V2_PLAYBACK_COMMAND_EVENT,
+        handleCommand,
+      );
   }, [controlChannel, pausePlayback, requestPlayback]);
 
   useEffect(() => {

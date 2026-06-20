@@ -54,11 +54,13 @@ import type {
 import { getCopy } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import type { ContentEconomySetting, Platform } from "@/lib/types";
-import type {
-  WorkspaceV2Queue,
-  WorkspaceV2QueueMode,
-  WorkspaceV2QueueSource,
-  WorkspaceV2Song,
+import {
+  dispatchWorkspaceV2PlaybackCommand,
+  WORKSPACE_V2_PLAYBACK_COMMAND_CHANNEL,
+  type WorkspaceV2Queue,
+  type WorkspaceV2QueueMode,
+  type WorkspaceV2QueueSource,
+  type WorkspaceV2Song,
 } from "@/lib/workspace-v2";
 import {
   WorkspaceV2ProviderPlayerAdapter,
@@ -1382,6 +1384,12 @@ function WorkspaceV2ShellClient({
 
   const handlePlay = useCallback(() => {
     try {
+      if (controller.activeSong) {
+        dispatchWorkspaceV2PlaybackCommand("play", {
+          channel: WORKSPACE_V2_PLAYBACK_COMMAND_CHANNEL,
+          source: "user-click",
+        });
+      }
       economy.markInteraction();
       setPipelineDebug((current) => ({
         ...current,

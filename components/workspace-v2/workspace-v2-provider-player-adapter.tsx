@@ -13,9 +13,13 @@ import type {
   WorkspaceV2ProviderEvent,
   WorkspaceV2Song,
 } from "@/lib/workspace-v2";
+import {
+  dispatchWorkspaceV2PlaybackCommand,
+  WORKSPACE_V2_PLAYBACK_COMMAND_CHANNEL,
+} from "@/lib/workspace-v2";
 import type { Platform } from "@/lib/types";
 
-const DEFAULT_CHANNEL = "workspace-v2";
+const DEFAULT_CHANNEL = WORKSPACE_V2_PLAYBACK_COMMAND_CHANNEL;
 
 export type WorkspaceV2ProviderDebugEvent = {
   at?: number;
@@ -156,14 +160,10 @@ export function WorkspaceV2ProviderPlayerAdapter({
       });
     }
     try {
-      window.dispatchEvent(
-        new CustomEvent("first-listen:playback-command", {
-          detail: {
-            channel: commandChannel,
-            command: command.command,
-          },
-        }),
-      );
+      dispatchWorkspaceV2PlaybackCommand(command.command, {
+        channel: commandChannel,
+        source: "state-machine",
+      });
     } catch (error) {
       onDebug?.({
         at: Date.now(),
