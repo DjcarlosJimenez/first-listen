@@ -1769,9 +1769,14 @@ function WorkspaceV2ShellClient({
             <p>
               {controller.activeSong?.artist ??
                 (spanish
-                  ? "Una cola interna. Un reproductor persistente. Tu progreso siempre visible."
-                  : "One internal queue. One persistent player. Your progress stays visible.")}
+                  ? "Descubre música nueva y apoya creadores reales."
+                  : "Discover new music and support real creators.")}
             </p>
+            <small className="workspace-v2-mission-line">
+              {spanish
+                ? "Escucha. Apoya. Gana tiempo. Sube tu música."
+                : "Listen. Support. Earn time. Submit your music."}
+            </small>
           </div>
 
           <div
@@ -1945,8 +1950,8 @@ function WorkspaceV2ShellClient({
             <small>
               {viewerMode === "guest"
                 ? spanish
-                  ? "Vista previa de progreso. Crea una cuenta para activar recompensas."
-                  : "Progress preview. Create an account to activate rewards."
+                  ? "Tu progreso se guarda. Crea una cuenta gratis para activar recompensas."
+                  : "Your progress is saved. Create a free account to activate rewards."
                 : rewardReady
                   ? spanish
                     ? "Recompensa disponible ahora"
@@ -1954,6 +1959,11 @@ function WorkspaceV2ShellClient({
                   : spanish
                     ? `${clock(secondsUntilReward)} hasta el próximo token`
                     : `${clock(secondsUntilReward)} until next token`}
+            </small>
+            <small className="workspace-v2-time-bank-explainer">
+              {spanish
+                ? "Tu tiempo de reproducción se convierte en tokens para enviar música."
+                : "Your playback time turns into tokens to submit music."}
             </small>
             <i>
               <b style={{ width: `${rewardReady ? 100 : bankProgressPercent}%` }} />
@@ -2033,8 +2043,8 @@ function WorkspaceV2ShellClient({
               <span>{spanish ? "Recompensas" : "Rewards"}</span>
               <strong>
                 {spanish
-                  ? "Crea una cuenta gratis para activar tokens."
-                  : "Create a free account to activate tokens."}
+                  ? "Tu progreso se guarda. Crea una cuenta gratis para activar recompensas."
+                  : "Your progress is saved. Create a free account to activate rewards."}
               </strong>
             </article>
           )}
@@ -2232,11 +2242,11 @@ function WorkspaceV2ContentPanel({
         <p>
           {canSubmit
             ? spanish
-              ? "El shell conserva la reproducción mientras abres el flujo actual de envío."
-              : "The shell keeps playback alive while you open the current submission workflow."
+              ? "Envía tu canción sin detener la reproducción. Tu Banco de Tiempo y tokens siguen visibles."
+              : "Submit your song without stopping playback. Your Time Bank and tokens stay visible."
             : spanish
-              ? "Puedes seguir reproduciendo como invitado. Una cuenta gratis activa recompensas, tokens y envíos."
-              : "You can keep playing as a guest. A free account activates rewards, tokens and submissions."}
+              ? "Sigue descubriendo como invitado. Crea una cuenta gratis para activar recompensas, tokens y envíos."
+              : "Keep discovering as a guest. Create a free account to activate rewards, tokens, and submissions."}
         </p>
         {canSubmit ? (
           <Link href="/submit">{spanish ? "Abrir Enviar Canción" : "Open Submit Song"}</Link>
@@ -2294,8 +2304,8 @@ function WorkspaceV2ContentPanel({
               ? "Sigue descubriendo. Cuando te registres, puedes activar recompensas y herramientas de creador."
               : "Keep discovering. When you join, you can activate rewards and creator tools."
             : spanish
-              ? "La migración completa del perfil vendrá después; por ahora el acceso se mantiene sin duplicar reproductores."
-              : "The full profile migration comes later; access stays available without duplicating players."}
+              ? "Revisa tu actividad, canciones y herramientas personales mientras la reproducción continúa."
+              : "Review your activity, songs, and personal tools while playback continues."}
         </p>
         <Link href={viewerMode === "guest" ? "/signup" : "/profile"}>
           {viewerMode === "guest"
@@ -2358,8 +2368,8 @@ function WorkspaceV2ContentPanel({
         </h2>
         <p>
           {spanish
-            ? "Los controles administrativos no se migran en esta fase. El shell solo conserva acceso y reproducción."
-            : "Administrative controls are not migrated in this phase. The shell only preserves access and playback."}
+            ? "Los controles avanzados permanecen en su panel seguro para proteger la administración."
+            : "Advanced controls stay in their secure panel to protect administration."}
         </p>
         {canAccessAdmin && (
           <Link href={activePanel === "owner" ? "/owner" : "/admin"}>
@@ -2378,13 +2388,13 @@ function WorkspaceV2ContentPanel({
       </span>
       <h2>
         {spanish
-          ? "Elige música sin salir del Workspace."
-          : "Choose music without leaving the Workspace."}
+          ? "Descubre música nueva en First Listen."
+          : "Discover new music in First Listen."}
       </h2>
       <p>
         {spanish
-          ? "Esta fase usa la cola interna actual. Los destinos avanzados se migrarán después de estabilizar el shell."
-          : "This phase uses the current internal queue. Advanced destinations move later after the shell is stable."}
+          ? "Escucha música nueva, apoya artistas y gana tiempo para subir la tuya."
+          : "Listen to new music, support artists, and earn time to submit yours."}
       </p>
       <div className="workspace-v2-discover-list">
         {initialQueue.songs.slice(0, 12).map((song) => (

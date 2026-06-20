@@ -14504,6 +14504,16 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   max-width: 520px;
 }
 
+.workspace-v2-mission-line {
+  color: var(--acid);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  max-width: 520px;
+  text-transform: uppercase;
+}
+
 .workspace-v2-product-hero[data-player-mode="audio"] .workspace-v2-hero-copy h1 {
   font-size: clamp(32px, 4.8vw, 64px);
 }
@@ -14537,6 +14547,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-hero-copy p {
+  display: none;
+}
+
+.workspace-v2-product-hero[data-collapsed="true"] .workspace-v2-mission-line {
   display: none;
 }
 
@@ -15006,6 +15020,11 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: var(--acid);
   font-size: clamp(24px, 3.5vw, 42px);
   line-height: 0.95;
+}
+
+.workspace-v2-time-bank-explainer {
+  display: block;
+  font-weight: 850;
 }
 
 .workspace-v2-token-card strong {

@@ -149,8 +149,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 ? "Usa tu correo real y una contraseña segura. Las áreas privadas requieren cuenta."
                 : "Use your real email and a secure password. Private areas are account-only."
               : spanish
-                ? "Descubrir música, canciones por escuchar, envíos, perfil y herramientas privadas requieren iniciar sesión."
-                : "Music discovery, reviews, submissions, profile, and admin tools require authentication."}
+                ? "Inicia sesión para reclamar recompensas, enviar música, ver tu perfil y acceder a herramientas privadas."
+                : "Log in to claim rewards, submit music, view your profile, and access private tools."}
           </p>
         </div>
 
