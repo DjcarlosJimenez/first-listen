@@ -7244,6 +7244,97 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   font-weight: 900;
 }
 
+.my-songs .song-table {
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.my-songs .song-table article.submitted-song-card {
+  align-items: center;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1fr) auto auto minmax(210px, auto);
+  min-height: 72px;
+  padding: 10px 12px;
+}
+
+.submitted-song-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.submitted-song-title {
+  color: var(--text-strong);
+  font-size: 13px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.song-table span.submitted-song-meta {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.25;
+  margin-top: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.song-table small.submitted-song-metrics {
+  color: var(--muted) !important;
+  font-size: 9px;
+  font-weight: 850 !important;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  margin-top: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.submitted-song-status {
+  justify-self: end;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.submitted-song-card > small {
+  background: var(--warning-bg);
+  border-radius: 999px;
+  color: var(--warning-fg);
+  justify-self: end;
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+.submitted-song-card .song-management-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.submitted-song-card .song-management-actions button,
+.submitted-song-card .song-management-actions a {
+  min-height: 34px;
+  padding: 7px 9px;
+}
+
+.submitted-song-card .song-management-actions .song-platform-presence-cta {
+  padding: 7px 10px;
+}
+
+.submitted-song-card .song-platform-presence-cta small {
+  max-width: 142px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .empty-state {
   background: var(--surface-muted);
   border: 1px solid var(--line);
@@ -8177,6 +8268,40 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   .admin-table article {
     align-items: flex-start;
     grid-template-columns: 1fr;
+  }
+
+  .my-songs .song-table article.submitted-song-card {
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 0;
+    padding: 10px;
+  }
+
+  .submitted-song-copy,
+  .submitted-song-card .song-management-actions,
+  .submitted-song-card .profile-platform-editor {
+    grid-column: 1 / -1;
+  }
+
+  .submitted-song-status,
+  .submitted-song-card > small {
+    justify-self: start;
+    max-width: 100%;
+  }
+
+  .submitted-song-card .song-management-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .submitted-song-card .song-management-actions button,
+  .submitted-song-card .song-management-actions a {
+    min-height: 32px;
+    padding: 7px 8px;
+  }
+
+  .submitted-song-card .song-platform-presence-cta small {
+    max-width: 170px;
   }
 
   .admin-actions {

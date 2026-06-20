@@ -888,10 +888,19 @@ export function ProfilePanel({
                   (platform) => platform !== songPlatform,
                 );
                 return (
-                <article id={`song-${song.song_id}`} key={song.song_id}>
-                  <div>
-                    <strong>{song.title}</strong>
-                    <span>
+                <article
+                  className="submitted-song-card"
+                  id={`song-${song.song_id}`}
+                  key={song.song_id}
+                >
+                  <div className="submitted-song-copy">
+                    <strong className="submitted-song-title" title={song.title}>
+                      {song.title}
+                    </strong>
+                    <span
+                      className="submitted-song-meta"
+                      title={`${song.artist_name} / ${displayPlatform[song.platform] ?? song.platform}`}
+                    >
                       {song.artist_name} /{" "}
                       {displayPlatform[song.platform] ?? song.platform} /{" "}
                       {displayPlatform[song.platform]
@@ -901,7 +910,7 @@ export function ProfilePanel({
                           )
                         : ""}
                     </span>
-                    <small className="song-activity-summary">
+                    <small className="song-activity-summary submitted-song-metrics">
                       {song.reviews} {spanish ? "reseñas" : "reviews"} /{" "}
                       {song.valid_listens + song.guest_valid_listens}{" "}
                       {spanish ? "reproducciones que suman" : "plays that count"} /{" "}
@@ -911,8 +920,8 @@ export function ProfilePanel({
                   <span
                     className={
                       song.catalog_status === "active"
-                        ? "status-active"
-                        : "status-removed"
+                        ? "status-active submitted-song-status"
+                        : "status-removed submitted-song-status"
                     }
                   >
                     {song.catalog_status === "active"
