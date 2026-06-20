@@ -652,10 +652,20 @@ export function ProfilePanel({
           <div className="profile-badges">
             <span><ShieldCheck size={14} /> {roleLabel(profile.role, spanish)}</span>
             {profile.founder && <span><BadgeCheck size={14} /> {spanish ? "Artista fundador" : "Founding Artist"}</span>}
-            <span>{profile.role === "super_admin" ? (spanish ? "Tokens ilimitados" : "Unlimited tokens") : `${tokenBalance} tokens`}</span>
+            <span>
+              {profile.role === "super_admin"
+                ? spanish
+                  ? "Balance de tokens: ilimitado"
+                  : "Token balance: unlimited"
+                : spanish
+                  ? `Balance de tokens: ${tokenBalance}`
+                  : `Token balance: ${tokenBalance}`}
+            </span>
             {profile.founder && (
               <span>
-                {profile.founderSubmissionsRemaining} {spanish ? "envíos Founder disponibles" : "Founder submissions remaining"}
+                {spanish
+                  ? `Envios Founder gratis: ${profile.founderSubmissionsRemaining}`
+                  : `Founder free submissions: ${profile.founderSubmissionsRemaining}`}
               </span>
             )}
           </div>

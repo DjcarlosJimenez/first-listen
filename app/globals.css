@@ -14918,6 +14918,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   padding: 14px;
 }
 
+.workspace-v2-trust-layer[data-founder-benefits="true"] {
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+}
+
 .workspace-v2-trust-layer article {
   background: var(--workspace-v2-card-bg);
   border: 1px solid var(--workspace-v2-card-border);
@@ -15005,6 +15009,14 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .workspace-v2-token-card strong {
+  color: var(--acid);
+}
+
+.workspace-v2-founder-submissions-card {
+  border-color: rgba(185, 255, 47, 0.34);
+}
+
+.workspace-v2-founder-submissions-card strong {
   color: var(--acid);
 }
 
@@ -15863,6 +15875,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .workspace-v2-trust-layer[data-founder-benefits="true"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .workspace-v2-time-bank-card {
     grid-column: span 2;
   }
@@ -16335,6 +16351,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   }
 
   .workspace-v2-trust-layer {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .workspace-v2-trust-layer[data-founder-benefits="true"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 

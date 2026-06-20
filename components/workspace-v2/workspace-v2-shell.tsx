@@ -1896,6 +1896,11 @@ function WorkspaceV2ShellClient({
 
         <section
           className="workspace-v2-trust-layer"
+          data-founder-benefits={
+            founderSubmissionsRemaining > 0 && viewerMode !== "guest"
+              ? "true"
+              : "false"
+          }
           aria-label={spanish ? "Estado de reproducción" : "Playback status"}
         >
           <article className="workspace-v2-session-card">
@@ -1927,7 +1932,7 @@ function WorkspaceV2ShellClient({
             </i>
           </article>
           <article className="workspace-v2-token-card">
-            <span>{spanish ? "Tokens de envío" : "Submission Tokens"}</span>
+            <span>{spanish ? "Balance de tokens" : "Token Balance"}</span>
             <strong>
               {viewerMode === "guest"
                 ? spanish
@@ -1936,6 +1941,16 @@ function WorkspaceV2ShellClient({
                 : economy.state.credits}
             </strong>
           </article>
+          {founderSubmissionsRemaining > 0 && viewerMode !== "guest" && (
+            <article className="workspace-v2-founder-submissions-card">
+              <span>
+                {spanish
+                  ? "Envios Founder gratis"
+                  : "Founder Free Submissions"}
+              </span>
+              <strong>{founderSubmissionsRemaining}</strong>
+            </article>
+          )}
           <article className="workspace-v2-reward-progress">
             <span>{spanish ? "Progreso de recompensa" : "Reward Progress"}</span>
             <strong>{rewardStatusText}</strong>
