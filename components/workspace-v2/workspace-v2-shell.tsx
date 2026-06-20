@@ -502,6 +502,7 @@ function WorkspaceV2ShellClient({
   const providerSkipTimeoutRef = useRef<number | null>(null);
   const queueRef = useRef("");
   const telemetryRef = useRef("");
+  const trustedPlaybackRequestRef = useRef<(() => void) | null>(null);
   const validationRef = useRef("");
 
   const recordLog = useCallback(
@@ -540,6 +541,13 @@ function WorkspaceV2ShellClient({
       recordLog({ channel: "error", details, message });
     },
     [recordLog],
+  );
+
+  const registerTrustedPlaybackRequest = useCallback(
+    (requestPlayback: (() => void) | null) => {
+      trustedPlaybackRequestRef.current = requestPlayback;
+    },
+    [],
   );
 
   useEffect(() => {
@@ -1385,10 +1393,14 @@ function WorkspaceV2ShellClient({
   const handlePlay = useCallback(() => {
     try {
       if (controller.activeSong) {
-        dispatchWorkspaceV2PlaybackCommand("play", {
-          channel: WORKSPACE_V2_PLAYBACK_COMMAND_CHANNEL,
-          source: "user-click",
-        });
+        if (trustedPlaybackRequestRef.current) {
+          trustedPlaybackRequestRef.current();
+        } else {
+          dispatchWorkspaceV2PlaybackCommand("play", {
+            channel: WORKSPACE_V2_PLAYBACK_COMMAND_CHANNEL,
+            source: "user-click",
+          });
+        }
       }
       economy.markInteraction();
       setPipelineDebug((current) => ({
@@ -1772,6 +1784,7 @@ function WorkspaceV2ShellClient({
               locale={workspaceLocale}
               onDebug={handleProviderDebug}
               onEvent={handleProviderEvent}
+              onTrustedPlaybackRequestReady={registerTrustedPlaybackRequest}
               song={controller.activeSong}
             />
             {playerIsVideo && (

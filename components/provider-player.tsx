@@ -361,6 +361,7 @@ export function ProviderPlayer({
   onTelemetry,
   onReady,
   onLifecycleDebug,
+  onTrustedPlaybackRequestReady,
   autoPlay = false,
   controlChannel,
   skipExternalRedirectWarning = false,
@@ -376,6 +377,7 @@ export function ProviderPlayer({
   onTelemetry?: (snapshot: ProviderTelemetrySnapshot) => void;
   onReady?: () => void;
   onLifecycleDebug?: (event: ProviderLifecycleDebugEvent) => void;
+  onTrustedPlaybackRequestReady?: (requestPlayback: (() => void) | null) => void;
   autoPlay?: boolean;
   controlChannel?: string;
   skipExternalRedirectWarning?: boolean;
@@ -967,6 +969,16 @@ export function ProviderPlayer({
     }
   }, [scheduleYouTubeAutoplayRetries]);
 
+  const requestTrustedPlayback = useCallback(() => {
+    lastTrustedPlayCommandAtRef.current = Date.now();
+    requestPlayback();
+  }, [requestPlayback]);
+
+  useEffect(() => {
+    onTrustedPlaybackRequestReady?.(requestTrustedPlayback);
+    return () => onTrustedPlaybackRequestReady?.(null);
+  }, [onTrustedPlaybackRequestReady, requestTrustedPlayback]);
+
   const pausePlayback = useCallback(() => {
     manualPauseRef.current = true;
     clearAutoplayRetryTimers();
@@ -1006,8 +1018,7 @@ export function ProviderPlayer({
       if (detail?.channel !== controlChannel) return;
       if (detail.command === "play") {
         if (detail.source === "user-click") {
-          lastTrustedPlayCommandAtRef.current = detail.issuedAt ?? Date.now();
-          requestPlayback();
+          requestTrustedPlayback();
           return;
         }
         const recentlyHandledTrustedPlay =
@@ -1028,7 +1039,7 @@ export function ProviderPlayer({
         WORKSPACE_V2_PLAYBACK_COMMAND_EVENT,
         handleCommand,
       );
-  }, [controlChannel, pausePlayback, requestPlayback]);
+  }, [controlChannel, pausePlayback, requestPlayback, requestTrustedPlayback]);
 
   useEffect(() => {
     const pauseForAnotherPlayer = (event: Event) => {

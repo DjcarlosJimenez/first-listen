@@ -78,12 +78,14 @@ export function WorkspaceV2ProviderPlayerAdapter({
   locale,
   onDebug,
   onEvent,
+  onTrustedPlaybackRequestReady,
   song,
 }: {
   command: WorkspaceV2ProviderCommand;
   locale: InterfaceLocale;
   onDebug?: (event: WorkspaceV2ProviderDebugEvent) => void;
   onEvent: (event: WorkspaceV2ProviderEvent) => void;
+  onTrustedPlaybackRequestReady?: (requestPlayback: (() => void) | null) => void;
   song: WorkspaceV2Song | null;
 }) {
   const activeSong = command.command === "load" ? command.song : song;
@@ -258,6 +260,7 @@ export function WorkspaceV2ProviderPlayerAdapter({
       onLifecycleDebug={handleLifecycleDebug}
       onReady={handleReady}
       onTelemetry={handleTelemetry}
+      onTrustedPlaybackRequestReady={onTrustedPlaybackRequestReady}
       platform={providerPlatform}
       songLoadedAt={songLoadedAt}
       title={activeSong.title}
