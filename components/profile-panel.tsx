@@ -664,7 +664,7 @@ export function ProfilePanel({
             {profile.founder && (
               <span>
                 {spanish
-                  ? `Envios Founder gratis: ${profile.founderSubmissionsRemaining}`
+                  ? `Envíos Founder gratis: ${profile.founderSubmissionsRemaining}`
                   : `Founder free submissions: ${profile.founderSubmissionsRemaining}`}
               </span>
             )}

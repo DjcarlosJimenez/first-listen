@@ -1945,7 +1945,7 @@ function WorkspaceV2ShellClient({
             <article className="workspace-v2-founder-submissions-card">
               <span>
                 {spanish
-                  ? "Envios Founder gratis"
+                  ? "Envíos Founder gratis"
                   : "Founder Free Submissions"}
               </span>
               <strong>{founderSubmissionsRemaining}</strong>
