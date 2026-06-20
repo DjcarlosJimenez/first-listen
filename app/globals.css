@@ -7252,7 +7252,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 .my-songs .song-table article.submitted-song-card {
   align-items: center;
   gap: 10px;
-  grid-template-columns: minmax(220px, 1fr) auto auto minmax(210px, auto);
+  grid-template-columns: minmax(220px, 1fr) minmax(82px, auto) auto minmax(340px, max-content);
   min-height: 72px;
   padding: 10px 12px;
 }
@@ -7296,8 +7296,9 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 }
 
 .submitted-song-status {
+  grid-column: 2;
   justify-self: end;
-  max-width: 190px;
+  max-width: clamp(82px, 15vw, 190px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7307,6 +7308,7 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   background: var(--warning-bg);
   border-radius: 999px;
   color: var(--warning-fg);
+  grid-column: 3;
   justify-self: end;
   padding: 6px 8px;
   white-space: nowrap;
@@ -7314,14 +7316,17 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
 
 .submitted-song-card .song-management-actions {
   flex-wrap: nowrap;
+  grid-column: 4;
   justify-content: flex-end;
   min-width: 0;
 }
 
 .submitted-song-card .song-management-actions button,
 .submitted-song-card .song-management-actions a {
+  flex: 0 0 auto;
   min-height: 34px;
   padding: 7px 9px;
+  white-space: nowrap;
 }
 
 .submitted-song-card .song-management-actions .song-platform-presence-cta {
@@ -7333,6 +7338,33 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  .my-songs .song-table article.submitted-song-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 0;
+  }
+
+  .submitted-song-copy {
+    grid-column: 1;
+  }
+
+  .submitted-song-status,
+  .submitted-song-card > small {
+    grid-column: 2;
+    max-width: min(210px, 32vw);
+  }
+
+  .submitted-song-card .song-management-actions,
+  .submitted-song-card .profile-platform-editor {
+    grid-column: 1 / -1;
+  }
+
+  .submitted-song-card .song-management-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
 }
 
 .empty-state {
