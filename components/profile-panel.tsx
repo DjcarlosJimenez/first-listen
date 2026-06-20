@@ -926,8 +926,8 @@ export function ProfilePanel({
                   >
                     {song.catalog_status === "active"
                       ? spanish
-                        ? "Disponible para oyentes"
-                        : "Available to listeners"
+                        ? "🟢 Activa"
+                        : "🟢 Active"
                       : song.catalog_status.replaceAll("_", " ")}
                   </span>
                   {song.explicit_content && <small>{spanish ? "Explícita" : "Explicit"}</small>}
