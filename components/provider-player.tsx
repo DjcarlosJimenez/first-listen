@@ -952,7 +952,7 @@ export function ProviderPlayer({
     try {
       if (youtubePlayerRef.current) {
         const state = mapYouTubeState(youtubePlayerRef.current.getPlayerState());
-        if (state !== "playing" && state !== "completed") {
+        if (state !== "playing") {
           youtubePlayerRef.current.playVideo();
         }
         scheduleYouTubeAutoplayRetries(
