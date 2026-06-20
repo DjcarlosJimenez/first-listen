@@ -88,6 +88,7 @@ type YouTubePlayer = {
   loadVideoById: (videoId: string) => void;
   pauseVideo: () => void;
   playVideo: () => void;
+  seekTo: (seconds: number, allowSeekAhead?: boolean) => void;
 };
 
 type YouTubePlayerEvent = {
@@ -955,6 +956,9 @@ export function ProviderPlayer({
       if (youtubePlayerRef.current) {
         const state = mapYouTubeState(youtubePlayerRef.current.getPlayerState());
         if (state !== "playing") {
+          if (state === "completed") {
+            youtubePlayerRef.current.seekTo(0, true);
+          }
           youtubePlayerRef.current.playVideo();
         }
         scheduleYouTubeAutoplayRetries(
