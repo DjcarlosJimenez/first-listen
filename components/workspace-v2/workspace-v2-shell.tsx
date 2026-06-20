@@ -3,7 +3,6 @@
 import Link from "next/link";
 import {
   type CSSProperties,
-  type PointerEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -504,7 +503,6 @@ function WorkspaceV2ShellClient({
   const queueRef = useRef("");
   const telemetryRef = useRef("");
   const trustedPlaybackRequestRef = useRef<(() => void) | null>(null);
-  const trustedPlaybackPointerAtRef = useRef(0);
   const validationRef = useRef("");
 
   const recordLog = useCallback(
@@ -1422,23 +1420,7 @@ function WorkspaceV2ShellClient({
     }
   }, [activeSongId, controller, economy, recordError, recordTransition]);
 
-  const handlePlayPointerDown = useCallback(
-    (event: PointerEvent<HTMLButtonElement>) => {
-      if (event.pointerType === "mouse" || event.pointerType === "pen" || event.pointerType === "touch") {
-        trustedPlaybackPointerAtRef.current = Date.now();
-        handlePlay();
-      }
-    },
-    [handlePlay],
-  );
-
   const handlePlayClick = useCallback(() => {
-    if (
-      trustedPlaybackPointerAtRef.current > 0 &&
-      Date.now() - trustedPlaybackPointerAtRef.current < 750
-    ) {
-      return;
-    }
     handlePlay();
   }, [handlePlay]);
 
@@ -1855,7 +1837,6 @@ function WorkspaceV2ShellClient({
           <div className="workspace-v2-sticky-controls">
             <button
               onClick={handlePlayClick}
-              onPointerDown={handlePlayPointerDown}
               type="button"
             >
               <Play size={16} /> {spanish ? "Reproducir" : "Play"}
