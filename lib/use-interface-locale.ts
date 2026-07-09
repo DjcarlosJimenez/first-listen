@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { InterfaceLocale } from "@/lib/catalog";
 
-export function useInterfaceLocale(defaultLocale: InterfaceLocale = "en") {
+export function useInterfaceLocale(defaultLocale: InterfaceLocale = "es") {
   const [locale, setLocale] = useState<InterfaceLocale>(defaultLocale);
 
   useEffect(() => {

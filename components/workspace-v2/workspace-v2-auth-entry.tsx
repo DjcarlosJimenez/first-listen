@@ -6,7 +6,11 @@ import type { ProfilePanelProps } from "@/components/profile-panel";
 import { WorkspaceV2PreviewErrorBoundary } from "@/components/workspace-v2/workspace-v2-preview-error-boundary";
 import { WorkspaceV2Shell, type WorkspaceV2ViewerMode } from "@/components/workspace-v2/workspace-v2-shell";
 import type { InterfaceLocale } from "@/lib/catalog";
-import { displayPlatform, getContentClassification } from "@/lib/content-economy";
+import {
+  displayPlatform,
+  getContentClassification,
+  isExternalPlatform,
+} from "@/lib/content-economy";
 import { loadFounderOperationsSnapshot } from "@/lib/founder-operations";
 import { safeCoverUrl } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
@@ -16,8 +20,13 @@ import type {
   ConnectedPlatform,
   ConnectedPlatformAccount,
   ContentEconomySetting,
+  Platform,
 } from "@/lib/types";
-import type { WorkspaceV2Queue, WorkspaceV2Song } from "@/lib/workspace-v2";
+import type {
+  WorkspaceV2ExternalDiscoveryItem,
+  WorkspaceV2Queue,
+  WorkspaceV2Song,
+} from "@/lib/workspace-v2";
 
 type WorkspaceV2Profile = {
   autoplay_next_song: boolean | null;
@@ -34,15 +43,19 @@ type WorkspaceV2Profile = {
 
 type WorkspaceV2SongRow = {
   artist_name: string | null;
+  category?: string | null;
   content_duration_seconds: number | null;
+  content_type?: string | null;
   cover_image_url: string | null;
   created_at: string | null;
   exposure_score?: number | string | null;
   featured: boolean | null;
+  genre?: string | null;
   id: string;
   last_heard_at?: string | null;
   music_url: string | null;
   platform: string | null;
+  subcategory?: string | null;
   title: string | null;
   user_id: string | null;
 };
@@ -60,6 +73,15 @@ type ContentEconomyRow = {
   effective_token_cost: number | null;
   platform: string | null;
   scheduled_token_cost: number | null;
+};
+
+type WorkspaceV2ExternalDiscoveryRow = WorkspaceV2SongRow & {
+  artist_id?: string | null;
+  badge?: string | null;
+  feed_kind?: string | null;
+  platform_links?: unknown;
+  recommended_platform?: string | null;
+  song_id?: string | null;
 };
 
 function mapContentEconomyRows(
@@ -114,18 +136,72 @@ function toWorkspaceSong(row: WorkspaceV2SongRow): WorkspaceV2Song | null {
   return {
     artist: String(row.artist_name ?? "Unknown Artist"),
     artistId: row.user_id ?? undefined,
+    category: row.category ?? row.content_type ?? null,
     coverUrl: safeCoverUrl(row.cover_image_url),
     durationSeconds:
       typeof row.content_duration_seconds === "number"
         ? row.content_duration_seconds
         : null,
     exposureScore: exposureScore ?? (row.featured ? 0 : 50),
+    genre: row.genre ?? row.subcategory ?? null,
     id: row.id,
     lastHeardAt,
     link,
     playbackKind:
       getContentClassification(platform) === "internal" ? "internal" : "external",
     platform,
+    subcategory: row.subcategory ?? row.genre ?? null,
+    title: String(row.title ?? "Untitled Song"),
+  };
+}
+
+function normalizePlatformLink(row: unknown) {
+  if (!row || typeof row !== "object") return null;
+  const record = row as Record<string, unknown>;
+  const platform =
+    displayPlatform[String(record.platform ?? "")] ??
+    displayPlatform[String(record.platform_key ?? "")] ??
+    null;
+  const url = String(record.music_url ?? record.url ?? "").trim();
+  if (!platform || !url) return null;
+  return { platform, url };
+}
+
+function pickExternalDiscoveryDestination(row: WorkspaceV2ExternalDiscoveryRow) {
+  const links = Array.isArray(row.platform_links)
+    ? row.platform_links.map(normalizePlatformLink).filter(Boolean)
+    : [];
+  const external = links.find((link) =>
+    isExternalPlatform(link!.platform as Platform),
+  );
+  if (external) return external;
+
+  const fallbackPlatform =
+    displayPlatform[String(row.recommended_platform ?? row.platform ?? "")] ??
+    "Spotify";
+  return {
+    platform: fallbackPlatform,
+    url: String(row.music_url ?? "").trim(),
+  };
+}
+
+function toExternalDiscoveryItem(
+  row: WorkspaceV2ExternalDiscoveryRow,
+): WorkspaceV2ExternalDiscoveryItem | null {
+  const destination = pickExternalDiscoveryDestination(row);
+  if (!destination.url) return null;
+  return {
+    artist: String(row.artist_name ?? "Unknown Artist"),
+    artistId: row.artist_id ?? row.user_id ?? undefined,
+    badge: row.badge ?? undefined,
+    category: row.category ?? row.content_type ?? null,
+    coverUrl: safeCoverUrl(row.cover_image_url),
+    feedKind: row.feed_kind ?? undefined,
+    genre: row.genre ?? row.subcategory ?? null,
+    id: row.id ?? row.song_id ?? "",
+    link: destination.url,
+    platform: destination.platform,
+    subcategory: row.subcategory ?? row.genre ?? null,
     title: String(row.title ?? "Untitled Song"),
   };
 }
@@ -146,6 +222,39 @@ function buildPublicBetaQueue(rows: WorkspaceV2SongRow[], locale: InterfaceLocal
         ? "Descubrimiento continuo"
         : "Continuous Discovery",
   };
+}
+
+async function enrichWorkspaceV2SongRows(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  rows: WorkspaceV2SongRow[],
+) {
+  const missingMetadata = rows.some(
+    (row) => !row.genre && !row.category && !row.subcategory,
+  );
+  if (!rows.length || !missingMetadata) return rows;
+
+  const ids = rows.map((row) => row.id).filter(Boolean);
+  if (!ids.length) return rows;
+
+  const { data } = await supabase
+    .from("songs")
+    .select("id, genre, category, subcategory, content_type")
+    .in("id", ids);
+  const metadataById = new Map(
+    ((data ?? []) as WorkspaceV2SongRow[]).map((row) => [row.id, row]),
+  );
+
+  return rows.map((row) => {
+    const metadata = metadataById.get(row.id);
+    if (!metadata) return row;
+    return {
+      ...row,
+      category: row.category ?? metadata.category ?? metadata.content_type ?? null,
+      content_type: row.content_type ?? metadata.content_type ?? null,
+      genre: row.genre ?? metadata.genre ?? metadata.subcategory ?? null,
+      subcategory: row.subcategory ?? metadata.subcategory ?? metadata.genre ?? null,
+    };
+  });
 }
 
 function profileDisplayName(
@@ -302,7 +411,7 @@ export async function WorkspaceV2AuthEntry({
       const fallback = await supabase
         .from("songs")
         .select(
-          "id, user_id, title, artist_name, cover_image_url, music_url, platform, content_duration_seconds, featured, created_at",
+          "id, user_id, title, artist_name, genre, category, subcategory, content_type, cover_image_url, music_url, platform, content_duration_seconds, featured, created_at",
         )
         .eq("is_active", true)
         .is("archived_at", null)
@@ -329,6 +438,7 @@ export async function WorkspaceV2AuthEntry({
     { data: connectedPlatformRows },
     { data: removedSongHistoryRows },
     { data: contentEconomyRows },
+    { data: externalDiscoveryRows },
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -353,12 +463,22 @@ export async function WorkspaceV2AuthEntry({
       .eq("user_id", user.id),
     supabase.rpc("get_my_removed_song_history"),
     supabase.rpc("get_content_economy_settings"),
+    supabase.rpc("get_external_discovery_feed", { feed_limit: 36 }),
   ]);
 
   const typedProfile = profile as WorkspaceV2Profile | null;
   const locale = localeFromProfile(typedProfile);
   const spanish = locale === "es";
-  const queue = buildPublicBetaQueue((rows ?? []) as WorkspaceV2SongRow[], locale);
+  const enrichedRows = await enrichWorkspaceV2SongRows(
+    supabase,
+    (rows ?? []) as WorkspaceV2SongRow[],
+  );
+  const queue = buildPublicBetaQueue(enrichedRows, locale);
+  const externalDiscoveryItems = (
+    (externalDiscoveryRows ?? []) as WorkspaceV2ExternalDiscoveryRow[]
+  )
+    .map(toExternalDiscoveryItem)
+    .filter((item): item is WorkspaceV2ExternalDiscoveryItem => Boolean(item));
   const viewerMode = viewerModeFromProfile(typedProfile);
   const canAccessAdmin = viewerMode === "founder" || viewerMode === "admin";
   const founderOperations =
@@ -417,6 +537,7 @@ export async function WorkspaceV2AuthEntry({
             )}
             initialSubmissionTokens={Number(typedProfile?.credits ?? 0)}
             initialQueue={queue}
+            externalDiscoveryItems={externalDiscoveryItems}
             locale={locale}
             contentEconomy={mapContentEconomyRows(
               contentEconomyRows as ContentEconomyRow[] | null,

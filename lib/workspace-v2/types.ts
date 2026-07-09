@@ -18,14 +18,32 @@ export type WorkspaceV2PlaybackKind = "internal" | "external";
 export type WorkspaceV2Song = {
   artist: string;
   artistId?: string;
+  category?: string | null;
   coverUrl: string;
   durationSeconds?: number | null;
   exposureScore?: number | null;
+  genre?: string | null;
   id: string;
   lastHeardAt?: number | null;
   link: string;
   playbackKind: WorkspaceV2PlaybackKind;
   platform: string;
+  subcategory?: string | null;
+  title: string;
+};
+
+export type WorkspaceV2ExternalDiscoveryItem = {
+  artist: string;
+  artistId?: string;
+  badge?: string;
+  category?: string | null;
+  coverUrl: string;
+  feedKind?: string;
+  genre?: string | null;
+  id: string;
+  link: string;
+  platform: string;
+  subcategory?: string | null;
   title: string;
 };
 

@@ -146,11 +146,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           <p>
             {isSignup
               ? spanish
-                ? "Usa tu correo real y una contraseña segura. Las áreas privadas requieren cuenta."
-                : "Use your real email and a secure password. Private areas are account-only."
+                ? "Guarda tu progreso, reclama tokens y sube tu música cuando estés listo."
+                : "Save your progress, claim tokens, and submit music when you are ready."
               : spanish
-                ? "Inicia sesión para reclamar recompensas, enviar música, ver tu perfil y acceder a herramientas privadas."
-                : "Log in to claim rewards, submit music, view your profile, and access private tools."}
+                ? "Vuelve a tu música, tu Banco de Tiempo, tus tokens y tus herramientas."
+                : "Return to your music, Time Bank, tokens, and tools."}
           </p>
         </div>
 

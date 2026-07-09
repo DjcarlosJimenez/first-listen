@@ -12,6 +12,7 @@ import {
 } from "react";
 import { Download, Share2, Smartphone, X } from "lucide-react";
 import type { InterfaceLocale } from "@/lib/catalog";
+import { useInterfaceLocale } from "@/lib/use-interface-locale";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -349,7 +350,7 @@ export function PwaInstallButton({
   const label = spanish ? "Instalar First Listen" : "Install First Listen";
   const hint = nativePromptAvailable
     ? spanish
-      ? "Abrir instalacion de la app"
+      ? "Abrir instalación de la app"
       : "Open app install prompt"
     : spanish
       ? "Mostrar instrucciones para instalar"
@@ -384,6 +385,8 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
     nativePromptAvailable,
     requestInstall,
   } = usePwaInstall();
+  const locale = useInterfaceLocale();
+  const spanish = locale === "es";
 
   if (installed || !visible) return null;
 
@@ -393,37 +396,46 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
         <Smartphone size={20} />
       </div>
       <div>
-        <strong>Install First Listen</strong>
+        <strong>{spanish ? "Instalar First Listen" : "Install First Listen"}</strong>
         {nativePromptAvailable ? (
           <span>
-            Add the First Listen icon to your home screen and reopen the app
-            without searching for the website.
+            {spanish
+              ? "Agrega First Listen a tu pantalla de inicio para volver más rápido."
+              : "Add First Listen to your home screen and return faster."}
           </span>
         ) : iosSafari ? (
           <span>
-            On iPhone or iPad, tap Share <Share2 size={13} /> then Add to Home
-            Screen.
+            {spanish ? "En iPhone o iPad, toca Compartir" : "On iPhone or iPad, tap Share"}{" "}
+            <Share2 size={13} />{" "}
+            {spanish ? "y luego Agregar a inicio." : "then Add to Home Screen."}
           </span>
         ) : (
           <span>
-            Use your browser menu to install First Listen or add it to your
-            home screen. Chrome and Samsung Internet may also show an Install
-            button here.
+            {spanish
+              ? "Usa el menú del navegador para instalar o agregar First Listen."
+              : "Use your browser menu to install or add First Listen."}
           </span>
         )}
       </div>
       <div className="pwa-install-actions">
         {nativePromptAvailable ? (
           <button disabled={installing} onClick={() => void requestInstall()} type="button">
-            <Download size={14} /> {installing ? "Installing..." : "Install"}
+            <Download size={14} />{" "}
+            {installing
+              ? spanish
+                ? "Instalando..."
+                : "Installing..."
+              : spanish
+                ? "Instalar"
+                : "Install"}
           </button>
         ) : (
           <button onClick={dismissInstructions} type="button">
-            Got it
+            {spanish ? "Entendido" : "Got it"}
           </button>
         )}
         <button
-          aria-label="Dismiss install prompt"
+          aria-label={spanish ? "Cerrar aviso de instalación" : "Dismiss install prompt"}
           onClick={dismissInstructions}
           type="button"
         >

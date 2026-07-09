@@ -12,10 +12,12 @@ import {
 import {
   Activity,
   AlertTriangle,
+  ArrowLeft,
   BarChart3,
   Clock3,
   Coins,
   Compass,
+  ExternalLink,
   Flag,
   Gauge,
   Inbox,
@@ -57,6 +59,7 @@ import type { ContentEconomySetting, Platform } from "@/lib/types";
 import {
   dispatchWorkspaceV2PlaybackCommand,
   WORKSPACE_V2_PLAYBACK_COMMAND_CHANNEL,
+  type WorkspaceV2ExternalDiscoveryItem,
   type WorkspaceV2Queue,
   type WorkspaceV2QueueMode,
   type WorkspaceV2QueueSource,
@@ -86,6 +89,25 @@ type WorkspaceV2Panel =
   | "founder-operations"
   | "owner"
   | "admin";
+
+type WorkspaceV2DiscoveryView = "home" | "internal" | "external";
+type WorkspaceV2DiscoveryStyleId =
+  | "all"
+  | "cumbia"
+  | "bachata"
+  | "reggaeton"
+  | "regional-mexican"
+  | "salsa"
+  | "fiesta"
+  | "pop"
+  | "hip-hop"
+  | "rock"
+  | "edm"
+  | "country"
+  | "indie"
+  | "alternative"
+  | "instrumental"
+  | "other";
 
 type InstrumentationLog = {
   at: number;
@@ -242,16 +264,182 @@ function panelLabel(panel: WorkspaceV2Panel, spanish: boolean) {
 }
 
 function queueSourceLabel(source: string | undefined, spanish: boolean) {
-  if (!source) return spanish ? "Cola" : "Queue";
+  if (!source) return spanish ? "Cola de descubrimiento" : "Discovery queue";
   const normalized = source.replaceAll("_", " ");
-  if (!spanish) return normalized;
-  const labels: Record<string, string> = {
-    featured: "destacadas",
-    genre: "género",
-    random: "aleatorio",
-    review: "reproducción",
+  const labels: Record<string, { en: string; es: string }> = {
+    discovery_pool: {
+      en: "Discovery queue",
+      es: "Cola de descubrimiento",
+    },
+    featured: {
+      en: "Featured discovery",
+      es: "Descubrimiento destacado",
+    },
+    genre: {
+      en: "Genre discovery",
+      es: "Descubrimiento por género",
+    },
+    manual: {
+      en: "Selected queue",
+      es: "Cola seleccionada",
+    },
+    most_played: {
+      en: "Most played",
+      es: "Más escuchadas",
+    },
+    new_releases: {
+      en: "New releases",
+      es: "Nuevos lanzamientos",
+    },
+    random: {
+      en: "Discovery queue",
+      es: "Cola de descubrimiento",
+    },
+    review: {
+      en: "Support queue",
+      es: "Cola para apoyar artistas",
+    },
+    top10: {
+      en: "Top songs",
+      es: "Canciones destacadas",
+    },
+    trending: {
+      en: "Trending",
+      es: "Tendencias",
+    },
   };
-  return labels[source] ?? normalized;
+  return labels[source]?.[spanish ? "es" : "en"] ?? normalized;
+}
+
+type WorkspaceV2DiscoveryStyle = {
+  aliases: string[];
+  emoji: string;
+  id: WorkspaceV2DiscoveryStyleId;
+  labelEn: string;
+  labelEs: string;
+};
+
+type WorkspaceV2DiscoveryStyleSection = {
+  id: "latin" | "general" | "other";
+  labelEn: string;
+  labelEs: string;
+  styles: WorkspaceV2DiscoveryStyle[];
+};
+
+const workspaceV2DiscoveryStyleSections: WorkspaceV2DiscoveryStyleSection[] = [
+  {
+    id: "latin",
+    labelEn: "Latin music",
+    labelEs: "Musica latina",
+    styles: [
+      { aliases: ["cumbia"], emoji: "💃", id: "cumbia", labelEn: "Cumbia", labelEs: "Cumbia" },
+      { aliases: ["bachata"], emoji: "🎶", id: "bachata", labelEn: "Bachata", labelEs: "Bachata" },
+      { aliases: ["reggaeton"], emoji: "🔥", id: "reggaeton", labelEn: "Reggaeton", labelEs: "Reggaeton" },
+      {
+        aliases: ["regional mexican", "regional mexicano", "regional-mexicano"],
+        emoji: "🤠",
+        id: "regional-mexican",
+        labelEn: "Regional Mexican",
+        labelEs: "Regional Mexicano",
+      },
+      { aliases: ["salsa"], emoji: "🎺", id: "salsa", labelEn: "Salsa", labelEs: "Salsa" },
+      { aliases: ["chilena", "fiesta"], emoji: "🎉", id: "fiesta", labelEn: "Party", labelEs: "Fiesta" },
+    ],
+  },
+  {
+    id: "general",
+    labelEn: "General music",
+    labelEs: "Musica general",
+    styles: [
+      { aliases: ["pop"], emoji: "🎵", id: "pop", labelEn: "Pop", labelEs: "Pop" },
+      { aliases: ["hip hop", "hip-hop", "rap"], emoji: "🎤", id: "hip-hop", labelEn: "Hip-Hop", labelEs: "Hip-Hop" },
+      { aliases: ["rock"], emoji: "🎸", id: "rock", labelEn: "Rock", labelEs: "Rock" },
+      { aliases: ["edm", "electronic", "electronica"], emoji: "⚡", id: "edm", labelEn: "EDM", labelEs: "EDM" },
+      { aliases: ["country"], emoji: "🌾", id: "country", labelEn: "Country", labelEs: "Country" },
+      { aliases: ["indie"], emoji: "✨", id: "indie", labelEn: "Indie", labelEs: "Indie" },
+      { aliases: ["alternative", "alternativo"], emoji: "🌀", id: "alternative", labelEn: "Alternative", labelEs: "Alternativo" },
+      { aliases: ["instrumental", "instrumental only"], emoji: "🎼", id: "instrumental", labelEn: "Instrumental", labelEs: "Instrumental" },
+    ],
+  },
+  {
+    id: "other",
+    labelEn: "Other styles",
+    labelEs: "Otros estilos",
+    styles: [
+      { aliases: ["other", "otro", ""], emoji: "🎧", id: "other", labelEn: "Other", labelEs: "Otro estilo" },
+    ],
+  },
+];
+
+const workspaceV2DiscoveryStyles = workspaceV2DiscoveryStyleSections.flatMap(
+  (section) => section.styles,
+);
+
+function normalizeDiscoveryStyleValue(value: string | null | undefined) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_/]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function itemDiscoveryStyleValue(
+  item: Pick<WorkspaceV2Song, "category" | "genre" | "subcategory">,
+) {
+  return normalizeDiscoveryStyleValue(
+    item.genre || item.subcategory || item.category || "",
+  );
+}
+
+function styleForDiscoveryItem(
+  item: Pick<WorkspaceV2Song, "category" | "genre" | "subcategory">,
+) {
+  const value = itemDiscoveryStyleValue(item);
+  if (!value) {
+    return workspaceV2DiscoveryStyles.find((style) => style.id === "other")!;
+  }
+  return (
+    workspaceV2DiscoveryStyles.find((style) =>
+      style.aliases.some(
+        (alias) => normalizeDiscoveryStyleValue(alias) === value,
+      ),
+    ) ?? workspaceV2DiscoveryStyles.find((style) => style.id === "other")!
+  );
+}
+
+function discoveryStyleLabel(
+  style: WorkspaceV2DiscoveryStyle,
+  spanish: boolean,
+) {
+  return spanish ? style.labelEs : style.labelEn;
+}
+
+function filterItemsByDiscoveryStyle<
+  T extends Pick<WorkspaceV2Song, "category" | "genre" | "subcategory">,
+>(items: T[], styleId: WorkspaceV2DiscoveryStyleId) {
+  if (styleId === "all") return items;
+  return items.filter((item) => styleForDiscoveryItem(item).id === styleId);
+}
+
+function normalizeWorkspaceV2DiscoveryView(
+  value: string | null | undefined,
+): WorkspaceV2DiscoveryView {
+  return value === "internal" || value === "external" ? value : "home";
+}
+
+function normalizeWorkspaceV2DiscoveryStyle(
+  value: string | null | undefined,
+): WorkspaceV2DiscoveryStyleId {
+  if (
+    value &&
+    (value === "all" ||
+      workspaceV2DiscoveryStyles.some((style) => style.id === value))
+  ) {
+    return value as WorkspaceV2DiscoveryStyleId;
+  }
+  return "all";
 }
 
 function nowPlayingLabel(song: WorkspaceV2Song | null, spanish: boolean) {
@@ -361,6 +549,7 @@ export function WorkspaceV2Shell({
   contentEconomy = [],
   debugMode = false,
   economyMode = "sandbox",
+  externalDiscoveryItems = [],
   founderOperations = null,
   guestToken,
   initialFounderSubmissionsRemaining = 0,
@@ -374,6 +563,7 @@ export function WorkspaceV2Shell({
   contentEconomy?: ContentEconomySetting[];
   debugMode?: boolean;
   economyMode?: WorkspaceV2EconomyMode;
+  externalDiscoveryItems?: WorkspaceV2ExternalDiscoveryItem[];
   founderOperations?: FounderOperationsSnapshot | null;
   guestToken?: string | null;
   initialFounderSubmissionsRemaining?: number;
@@ -406,6 +596,7 @@ export function WorkspaceV2Shell({
       contentEconomy={contentEconomy}
       debugMode={debugMode}
       economyMode={economyMode}
+      externalDiscoveryItems={externalDiscoveryItems}
       founderOperations={founderOperations}
       guestToken={guestToken}
       initialFounderSubmissionsRemaining={initialFounderSubmissionsRemaining}
@@ -423,6 +614,7 @@ function WorkspaceV2ShellClient({
   contentEconomy,
   debugMode,
   economyMode,
+  externalDiscoveryItems,
   founderOperations,
   guestToken,
   initialFounderSubmissionsRemaining,
@@ -436,6 +628,7 @@ function WorkspaceV2ShellClient({
   contentEconomy: ContentEconomySetting[];
   debugMode: boolean;
   economyMode: WorkspaceV2EconomyMode;
+  externalDiscoveryItems: WorkspaceV2ExternalDiscoveryItem[];
   founderOperations: FounderOperationsSnapshot | null;
   guestToken?: string | null;
   initialFounderSubmissionsRemaining: number;
@@ -465,6 +658,10 @@ function WorkspaceV2ShellClient({
   const displayIdentity =
     viewerIdentity?.trim() || viewerLabel(viewerMode, spanish);
   const [activePanel, setActivePanel] = useState<WorkspaceV2Panel>("discover");
+  const [discoveryView, setDiscoveryView] =
+    useState<WorkspaceV2DiscoveryView>("home");
+  const [selectedDiscoveryStyle, setSelectedDiscoveryStyle] =
+    useState<WorkspaceV2DiscoveryStyleId>("all");
   const productivityMode = activePanel !== "discover";
   const workspaceMode = productivityMode ? "productivity" : "discover";
   const [darkMode, setDarkMode] = useState(false);
@@ -493,6 +690,7 @@ function WorkspaceV2ShellClient({
   const [submissionTokens, setSubmissionTokens] = useState(initialSubmissionTokens);
   const [submitNotice, setSubmitNotice] = useState("");
   const commandRef = useRef("");
+  const heroCollapseFrameRef = useRef<number | null>(null);
   const heroCollapsedRef = useRef(false);
   const lastSnapshotSignatureRef = useRef("");
   const snapshotSaveTimeoutRef = useRef<number | null>(null);
@@ -502,6 +700,7 @@ function WorkspaceV2ShellClient({
   const providerSkipTimeoutRef = useRef<number | null>(null);
   const queueRef = useRef("");
   const telemetryRef = useRef("");
+  const touchStartYRef = useRef<number | null>(null);
   const trustedPlaybackRequestRef = useRef<(() => void) | null>(null);
   const validationRef = useRef("");
 
@@ -880,21 +1079,108 @@ function WorkspaceV2ShellClient({
   );
 
   useEffect(() => {
-    const updateCollapsedState = () => {
-      const mobile = window.matchMedia("(max-width: 900px)").matches;
-      const threshold = mobile ? 90 : 260;
-      const nextCollapsed = window.scrollY > threshold;
+    const setCollapsedState = (nextCollapsed: boolean) => {
       if (heroCollapsedRef.current === nextCollapsed) return;
       heroCollapsedRef.current = nextCollapsed;
       setHeroCollapsed(nextCollapsed);
     };
 
+    const readWorkspaceScroll = () => {
+      const offsets = [
+        window.scrollY,
+        document.documentElement?.scrollTop ?? 0,
+        document.body?.scrollTop ?? 0,
+      ];
+
+      let current = heroRef.current?.parentElement;
+      while (current) {
+        offsets.push(current.scrollTop);
+        current = current.parentElement;
+      }
+
+      return Math.max(...offsets);
+    };
+
+    const updateCollapsedState = () => {
+      if (heroCollapseFrameRef.current !== null) return;
+      heroCollapseFrameRef.current = window.requestAnimationFrame(() => {
+        heroCollapseFrameRef.current = null;
+        const mobile = window.matchMedia("(max-width: 900px)").matches;
+        const collapseAt = mobile ? 12 : 32;
+        const expandAt = mobile ? 2 : 10;
+        const scrollOffset = readWorkspaceScroll();
+        const nextCollapsed = heroCollapsedRef.current
+          ? scrollOffset > expandAt
+          : scrollOffset > collapseAt;
+        setCollapsedState(nextCollapsed);
+      });
+    };
+
+    const handleWheelIntent = (event: WheelEvent) => {
+      if (event.deltaY > 4) {
+        setCollapsedState(true);
+        return;
+      }
+      if (event.deltaY < -4 && readWorkspaceScroll() <= 10) {
+        setCollapsedState(false);
+      }
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      touchStartYRef.current = event.touches[0]?.clientY ?? null;
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const startY = touchStartYRef.current;
+      const currentY = event.touches[0]?.clientY ?? null;
+      if (startY === null || currentY === null) return;
+      const delta = startY - currentY;
+      if (delta > 8) {
+        setCollapsedState(true);
+        return;
+      }
+      if (delta < -8 && readWorkspaceScroll() <= 10) {
+        setCollapsedState(false);
+      }
+    };
+
     updateCollapsedState();
+    document.addEventListener("wheel", handleWheelIntent, {
+      capture: true,
+      passive: true,
+    });
+    document.addEventListener("scroll", updateCollapsedState, {
+      capture: true,
+      passive: true,
+    });
+    document.addEventListener("touchstart", handleTouchStart, {
+      capture: true,
+      passive: true,
+    });
+    document.addEventListener("touchmove", handleTouchMove, {
+      capture: true,
+      passive: true,
+    });
     window.addEventListener("scroll", updateCollapsedState, { passive: true });
     window.addEventListener("resize", updateCollapsedState);
     return () => {
+      document.removeEventListener("wheel", handleWheelIntent, {
+        capture: true,
+      });
+      document.removeEventListener("scroll", updateCollapsedState, {
+        capture: true,
+      });
+      document.removeEventListener("touchstart", handleTouchStart, {
+        capture: true,
+      });
+      document.removeEventListener("touchmove", handleTouchMove, {
+        capture: true,
+      });
       window.removeEventListener("scroll", updateCollapsedState);
       window.removeEventListener("resize", updateCollapsedState);
+      if (heroCollapseFrameRef.current !== null) {
+        window.cancelAnimationFrame(heroCollapseFrameRef.current);
+      }
     };
   }, []);
 
@@ -1036,8 +1322,8 @@ function WorkspaceV2ShellClient({
     queueTitle === "Continuous Discovery" ||
     queueTitle === "Descubrimiento continuo"
       ? spanish
-        ? "Descubrimiento continuo"
-        : "Continuous Discovery"
+        ? "Cola de reproducción"
+        : "Playback queue"
       : queueTitle;
   const positionCurrent = controller.position.current;
   const positionTotal = controller.position.total;
@@ -1448,19 +1734,79 @@ function WorkspaceV2ShellClient({
     }
   }, [activeSongId, controller, economy, nextSongId, recordError, recordTransition]);
 
-  const handlePlayQueueSong = useCallback(
-    (song: WorkspaceV2Song) => {
-      const index = initialQueue.songs.findIndex((item) => item.id === song.id);
-      if (index < 0) return;
-      economy.markInteraction();
-      loadQueue(initialQueue, { autoPlay: true, startIndex: index });
-      setActivePanel("discover");
+  const handleDiscoveryStyleChange = useCallback(
+    (styleId: WorkspaceV2DiscoveryStyleId) => {
+      setSelectedDiscoveryStyle(styleId);
+      if (typeof window === "undefined") return;
+      const nextUrl = new URL(window.location.href);
+      if (styleId === "all") {
+        nextUrl.searchParams.delete("style");
+      } else {
+        nextUrl.searchParams.set("style", styleId);
+      }
+      window.history.replaceState(
+        {
+          firstListenWorkspace: true,
+          discoveryStyle: styleId,
+          discoveryView,
+        },
+        "",
+        nextUrl,
+      );
     },
-    [economy, initialQueue, loadQueue],
+    [discoveryView],
+  );
+
+  const handleDiscoveryViewChange = useCallback(
+    (view: WorkspaceV2DiscoveryView) => {
+      const nextStyle: WorkspaceV2DiscoveryStyleId = "all";
+      setDiscoveryView(view);
+      setSelectedDiscoveryStyle(nextStyle);
+      if (typeof window === "undefined") return;
+
+      const nextUrl = new URL(window.location.href);
+      if (view === "home") {
+        nextUrl.searchParams.delete("discover");
+        nextUrl.searchParams.delete("style");
+      } else {
+        nextUrl.searchParams.set("discover", view);
+        nextUrl.searchParams.delete("style");
+      }
+
+      const historyMethod = view === "home" ? "replaceState" : "pushState";
+      window.history[historyMethod](
+        {
+          firstListenWorkspace: true,
+          discoveryStyle: nextStyle,
+          discoveryView: view,
+        },
+        "",
+        nextUrl,
+      );
+    },
+    [],
   );
 
   const handlePanelChange = useCallback((panel: WorkspaceV2Panel) => {
     setActivePanel(panel);
+    if (panel === "discover") {
+      setDiscoveryView("home");
+      setSelectedDiscoveryStyle("all");
+      if (typeof window !== "undefined") {
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.delete("discover");
+        nextUrl.searchParams.delete("style");
+        window.history.replaceState(
+          {
+            firstListenWorkspace: true,
+            discoveryStyle: "all",
+            discoveryView: "home",
+          },
+          "",
+          nextUrl,
+        );
+      }
+    }
     if (
       typeof window !== "undefined" &&
       window.matchMedia("(max-width: 900px)").matches
@@ -1488,6 +1834,29 @@ function WorkspaceV2ShellClient({
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncDiscoveryFromUrl = () => {
+      const currentUrl = new URL(window.location.href);
+      const view = normalizeWorkspaceV2DiscoveryView(
+        currentUrl.searchParams.get("discover"),
+      );
+      const style = normalizeWorkspaceV2DiscoveryStyle(
+        currentUrl.searchParams.get("style"),
+      );
+      setDiscoveryView(view);
+      setSelectedDiscoveryStyle(view === "home" ? "all" : style);
+      if (view !== "home") {
+        setActivePanel("discover");
+      }
+    };
+
+    syncDiscoveryFromUrl();
+    window.addEventListener("popstate", syncDiscoveryFromUrl);
+    return () => window.removeEventListener("popstate", syncDiscoveryFromUrl);
+  }, []);
+
   const handleFullscreen = useCallback(async () => {
     const target = heroRef.current;
     if (!target || typeof document === "undefined") return;
@@ -1504,6 +1873,13 @@ function WorkspaceV2ShellClient({
       );
     }
   }, [recordError]);
+
+  const handleFocusPlayer = useCallback(() => {
+    heroRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, []);
 
   const handleSignOut = useCallback(async () => {
     if (signingOut) return;
@@ -1873,8 +2249,8 @@ function WorkspaceV2ShellClient({
               </div>
             )}
             <span className="workspace-v2-queue-position-pill">
-              {queueSourceLabel(queueSource, spanish)} / {positionCurrent}
-              /{positionTotal}
+              {queueSourceLabel(queueSource, spanish)} • {positionCurrent}{" "}
+              {spanish ? "de" : "of"} {positionTotal}
             </span>
           </div>
 
@@ -2057,17 +2433,23 @@ function WorkspaceV2ShellClient({
             canSubmit={canSubmit}
             contentEconomy={contentEconomy}
             copy={copy}
+            discoveryView={discoveryView}
+            externalDiscoveryItems={externalDiscoveryItems}
             founderFree={founderSubmissionsRemaining > 0}
             founderOperations={founderOperations}
             initialQueue={initialQueue}
+            internalQueueSongs={queueSongs}
             locale={workspaceLocale}
+            onDiscoveryStyleChange={handleDiscoveryStyleChange}
+            onDiscoveryViewChange={handleDiscoveryViewChange}
+            onFocusPlayer={handleFocusPlayer}
             onPanelChange={handlePanelChange}
-            onPlaySong={handlePlayQueueSong}
             onSubmitNotice={notifySubmit}
             onSubmitSong={handleSubmitSong}
             profilePanel={profilePanel}
             submitNotice={submitNotice}
             submissionTokens={submissionTokens}
+            selectedDiscoveryStyle={selectedDiscoveryStyle}
             unlimitedSubmissionTokens={viewerMode === "founder"}
             viewerMode={viewerMode}
           />
@@ -2085,11 +2467,11 @@ function WorkspaceV2ShellClient({
             <h2>{localizedQueueTitle}</h2>
             <div className="workspace-v2-queue-context">
               <strong>
-                {positionCurrent}/{positionTotal}
+                {positionCurrent} {spanish ? "de" : "of"} {positionTotal}
               </strong>
               <span>{queueSourceLabel(queueSource, spanish)}</span>
               <small>
-                {remainingCount} {spanish ? "pendientes" : "remaining"}
+                {remainingCount} {spanish ? "canciones por descubrir" : "songs left to discover"}
               </small>
             </div>
             <div className="workspace-v2-now-next">
@@ -2154,23 +2536,79 @@ function WorkspaceV2ShellClient({
   );
 }
 
+function WorkspaceV2StyleFolders({
+  items,
+  locale,
+  onSelect,
+  selectedStyle,
+}: {
+  items: Array<Pick<WorkspaceV2Song, "category" | "genre" | "subcategory">>;
+  locale: InterfaceLocale;
+  onSelect: (styleId: WorkspaceV2DiscoveryStyleId) => void;
+  selectedStyle: WorkspaceV2DiscoveryStyleId;
+}) {
+  const spanish = locale === "es";
+
+  return (
+    <div className="workspace-v2-style-folders">
+      <button
+        className={selectedStyle === "all" ? "is-active" : ""}
+        onClick={() => onSelect("all")}
+        type="button"
+      >
+        <span>🎵</span>
+        <strong>{spanish ? "Todos" : "All"}</strong>
+        <small>{items.length}</small>
+      </button>
+      {workspaceV2DiscoveryStyleSections.map((section) => (
+        <section key={section.id}>
+          <h3>{spanish ? section.labelEs : section.labelEn}</h3>
+          <div>
+            {section.styles.map((style) => {
+              const count = filterItemsByDiscoveryStyle(items, style.id).length;
+              return (
+                <button
+                  className={selectedStyle === style.id ? "is-active" : ""}
+                  key={style.id}
+                  onClick={() => onSelect(style.id)}
+                  type="button"
+                >
+                  <span>{style.emoji}</span>
+                  <strong>{discoveryStyleLabel(style, spanish)}</strong>
+                  <small>{count}</small>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 function WorkspaceV2ContentPanel({
   activePanel,
   canAccessAdmin,
   canSubmit,
   contentEconomy,
   copy,
+  discoveryView,
+  externalDiscoveryItems,
   founderFree,
   founderOperations,
   initialQueue,
+  internalQueueSongs,
   locale,
+  onDiscoveryStyleChange,
+  onDiscoveryViewChange,
+  onFocusPlayer,
   onPanelChange,
-  onPlaySong,
   onSubmitNotice,
   onSubmitSong,
   profilePanel,
   submitNotice,
   submissionTokens,
+  selectedDiscoveryStyle,
   unlimitedSubmissionTokens,
   viewerMode,
 }: {
@@ -2179,12 +2617,17 @@ function WorkspaceV2ContentPanel({
   canSubmit: boolean;
   contentEconomy: ContentEconomySetting[];
   copy: ReturnType<typeof getCopy>;
+  discoveryView: WorkspaceV2DiscoveryView;
+  externalDiscoveryItems: WorkspaceV2ExternalDiscoveryItem[];
   founderFree: boolean;
   founderOperations: FounderOperationsSnapshot | null;
   initialQueue: WorkspaceV2Queue;
+  internalQueueSongs: WorkspaceV2Song[];
   locale: InterfaceLocale;
+  onDiscoveryStyleChange: (styleId: WorkspaceV2DiscoveryStyleId) => void;
+  onDiscoveryViewChange: (view: WorkspaceV2DiscoveryView) => void;
+  onFocusPlayer: () => void;
   onPanelChange: (panel: WorkspaceV2Panel) => void;
-  onPlaySong: (song: WorkspaceV2Song) => void;
   onSubmitNotice: (message: string) => void;
   onSubmitSong: (
     usedFounderFree: boolean,
@@ -2193,6 +2636,7 @@ function WorkspaceV2ContentPanel({
   profilePanel?: ProfilePanelProps | null;
   submitNotice: string;
   submissionTokens: number;
+  selectedDiscoveryStyle: WorkspaceV2DiscoveryStyleId;
   unlimitedSubmissionTokens: boolean;
   viewerMode: WorkspaceV2ViewerMode;
 }) {
@@ -2380,38 +2824,415 @@ function WorkspaceV2ContentPanel({
     );
   }
 
+  const previewSongs = initialQueue.songs.slice(0, 4);
+  const initialQueueTitle =
+    initialQueue.title === "Continuous Discovery" ||
+    initialQueue.title === "Descubrimiento continuo"
+      ? spanish
+        ? "Cola de reproducción"
+        : "Playback queue"
+      : initialQueue.title;
+  const visibleInternalSongs = filterItemsByDiscoveryStyle(
+    internalQueueSongs,
+    selectedDiscoveryStyle,
+  );
+  const visibleExternalItems = filterItemsByDiscoveryStyle(
+    externalDiscoveryItems,
+    selectedDiscoveryStyle,
+  );
+  const selectedStyle =
+    selectedDiscoveryStyle === "all"
+      ? null
+      : workspaceV2DiscoveryStyles.find(
+          (style) => style.id === selectedDiscoveryStyle,
+        ) ?? null;
+  const selectedStyleName = selectedStyle
+    ? discoveryStyleLabel(selectedStyle, spanish)
+    : spanish
+      ? "Todos los estilos"
+      : "All styles";
+
+  if (discoveryView === "internal") {
+    return (
+      <section className="workspace-v2-content-panel workspace-v2-discovery-detail">
+        <nav className="workspace-v2-discovery-breadcrumb" aria-label="Discovery breadcrumb">
+          <button
+            className="workspace-v2-back-action"
+            onClick={() => onDiscoveryViewChange("home")}
+            type="button"
+          >
+            <ArrowLeft size={15} />
+            {spanish ? "Centro First Listen" : "First Listen Center"}
+          </button>
+          <span>
+            {spanish
+              ? "Centro First Listen / Descubrimiento interno"
+              : "First Listen Center / Internal discovery"}
+          </span>
+        </nav>
+        <span className="eyebrow">
+          <ListMusic size={13} />
+          {spanish ? "Descubrimiento interno" : "Internal discovery"}
+        </span>
+        <h2>
+          {spanish ? "Canciones que reproducen aquí." : "Songs that play here."}
+        </h2>
+        <p>
+          {spanish
+            ? "Esta cola usa contenido que puede reproducirse dentro de First Listen y puede sumar Banco de Tiempo cuando la reproducción es válida."
+            : "This queue uses content that can play inside First Listen and can add Time Bank progress when playback is valid."}
+        </p>
+        <div className="workspace-v2-platform-chip-row" aria-label="Internal platforms">
+          <span>▶ YouTube</span>
+          <span>▶ YouTube Music</span>
+        </div>
+        <WorkspaceV2StyleFolders
+          items={internalQueueSongs}
+          locale={locale}
+          onSelect={onDiscoveryStyleChange}
+          selectedStyle={selectedDiscoveryStyle}
+        />
+        <div className="workspace-v2-discovery-detail-actions">
+          <button
+            className="workspace-v2-secondary-action"
+            onClick={onFocusPlayer}
+            type="button"
+          >
+            {spanish ? "Ir al reproductor" : "Go to player"}
+          </button>
+          <span>
+            {visibleInternalSongs.length} / {internalQueueSongs.length}{" "}
+            {spanish ? `en ${selectedStyleName}` : `in ${selectedStyleName}`}
+          </span>
+        </div>
+        {!visibleInternalSongs.length && (
+          <div className="workspace-v2-discovery-empty-state">
+            <strong>
+              {spanish
+                ? "Todavia no hay canciones en este estilo."
+                : "No songs in this style yet."}
+            </strong>
+            <small>
+              {spanish
+                ? "Prueba Todos o vuelve al Centro First Listen."
+                : "Try All or return to the First Listen Center."}
+            </small>
+          </div>
+        )}
+        <ol className="workspace-v2-internal-song-list">
+          {visibleInternalSongs.slice(0, 18).map((song, index) => (
+            <li key={song.id}>
+              <span className="workspace-v2-song-index">{index + 1}</span>
+              <span
+                aria-hidden="true"
+                className="workspace-v2-song-thumb"
+                style={{ backgroundImage: `url("${song.coverUrl}")` }}
+              />
+              <div>
+                <strong>{song.title}</strong>
+                <small>
+                  {song.artist} / {song.platform} /{" "}
+                  {discoveryStyleLabel(styleForDiscoveryItem(song), spanish)}
+                </small>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <button
+          className="workspace-v2-back-action workspace-v2-back-action-bottom"
+          onClick={() => onDiscoveryViewChange("home")}
+          type="button"
+        >
+          <ArrowLeft size={15} />
+          {spanish ? "Volver al Centro First Listen" : "Back to First Listen Center"}
+        </button>
+      </section>
+    );
+  }
+
+  if (discoveryView === "external") {
+    return (
+      <section className="workspace-v2-content-panel workspace-v2-discovery-detail">
+        <nav className="workspace-v2-discovery-breadcrumb" aria-label="Discovery breadcrumb">
+          <button
+            className="workspace-v2-back-action"
+            onClick={() => onDiscoveryViewChange("home")}
+            type="button"
+          >
+            <ArrowLeft size={15} />
+            {spanish ? "Centro First Listen" : "First Listen Center"}
+          </button>
+          <span>
+            {spanish
+              ? "Centro First Listen / Plataformas externas"
+              : "First Listen Center / External platforms"}
+          </span>
+        </nav>
+        <span className="eyebrow">
+          <ExternalLink size={13} />
+          {spanish ? "Plataformas externas" : "External platforms"}
+        </span>
+        <h2>
+          {spanish ? "Explora música fuera de First Listen." : "Explore music outside First Listen."}
+        </h2>
+        <p>
+          {spanish
+            ? "Spotify, Apple Music y otros destinos abren fuera de First Listen. Sirven para descubrimiento, no para Banco de Tiempo."
+            : "Spotify, Apple Music, and other destinations open outside First Listen. They are for discovery, not Time Bank progress."}
+        </p>
+        <div className="workspace-v2-platform-chip-row" aria-label="External platforms">
+          <span>↗ Spotify</span>
+          <span>↗ Apple Music</span>
+          <span>↗ TikTok</span>
+          <span>↗ Instagram</span>
+        </div>
+        <WorkspaceV2StyleFolders
+          items={externalDiscoveryItems}
+          locale={locale}
+          onSelect={onDiscoveryStyleChange}
+          selectedStyle={selectedDiscoveryStyle}
+        />
+        <div className="workspace-v2-discovery-detail-actions">
+          <span>
+            {visibleExternalItems.length} / {externalDiscoveryItems.length}{" "}
+            {spanish ? `en ${selectedStyleName}` : `in ${selectedStyleName}`}
+          </span>
+        </div>
+        {externalDiscoveryItems.length && !visibleExternalItems.length && (
+          <div className="workspace-v2-discovery-empty-state">
+            <strong>
+              {spanish
+                ? "Todavia no hay destinos externos en este estilo."
+                : "No external destinations in this style yet."}
+            </strong>
+            <small>
+              {spanish
+                ? "Prueba Todos o vuelve al Centro First Listen."
+                : "Try All or return to the First Listen Center."}
+            </small>
+          </div>
+        )}
+        {visibleExternalItems.length ? (
+          <div className="workspace-v2-external-discovery-grid">
+            {visibleExternalItems.slice(0, 18).map((item) => (
+              <article key={`${item.feedKind ?? "external"}-${item.id}-${item.link}`}>
+                <span
+                  aria-hidden="true"
+                  className="workspace-v2-song-thumb"
+                  style={{ backgroundImage: `url("${item.coverUrl}")` }}
+                />
+                <div>
+                  <span>{item.badge ?? item.platform}</span>
+                  <strong>{item.title}</strong>
+                  <small>
+                    {item.artist} /{" "}
+                    {discoveryStyleLabel(styleForDiscoveryItem(item), spanish)}
+                  </small>
+                </div>
+                <div className="workspace-v2-external-actions">
+                  <a href={item.link} rel="noreferrer" target="_blank">
+                    <ExternalLink size={14} />
+                    {spanish ? `Abrir ${item.platform}` : `Open ${item.platform}`}
+                  </a>
+                  {item.artistId && (
+                    <Link href={`/artists/${item.artistId}`}>
+                      <User size={14} />
+                      {spanish ? "Perfil" : "Profile"}
+                    </Link>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : !externalDiscoveryItems.length ? (
+          <div className="workspace-v2-discovery-empty-state">
+            <strong>
+              {spanish
+                ? "Aún no hay destinos externos activos."
+                : "No external destinations are active yet."}
+            </strong>
+            <small>
+              {spanish
+                ? "Cuando los artistas agreguen Spotify, Apple Music u otros enlaces, aparecerán aquí."
+                : "When artists add Spotify, Apple Music, or other links, they will appear here."}
+            </small>
+          </div>
+        ) : null}
+        <button
+          className="workspace-v2-back-action workspace-v2-back-action-bottom"
+          onClick={() => onDiscoveryViewChange("home")}
+          type="button"
+        >
+          <ArrowLeft size={15} />
+          {spanish ? "Volver al Centro First Listen" : "Back to First Listen Center"}
+        </button>
+      </section>
+    );
+  }
+
   return (
-    <section className="workspace-v2-content-panel">
+    <section className="workspace-v2-content-panel workspace-v2-discovery-home">
       <span className="eyebrow">
         <Compass size={13} />
-        {spanish ? "Descubrir" : "Discover"}
+        {spanish ? "Centro First Listen" : "First Listen Center"}
       </span>
       <h2>
-        {spanish
-          ? "Descubre música nueva en First Listen."
-          : "Discover new music in First Listen."}
+        {spanish ? "Escucha para ser escuchado." : "Listen to be heard."}
       </h2>
       <p>
         {spanish
-          ? "Escucha música nueva, apoya artistas y gana tiempo para subir la tuya."
-          : "Listen to new music, support artists, and earn time to submit yours."}
+          ? "Presiona Play, deja que la cola avance y convierte tu reproducción válida en tiempo para subir tu música."
+          : "Press Play, let the queue move, and turn valid playback into time to submit your music."}
       </p>
-      <div className="workspace-v2-discover-list">
-        {initialQueue.songs.slice(0, 12).map((song) => (
-          <button key={song.id} onClick={() => onPlaySong(song)} type="button">
-            <span>{song.title}</span>
-            <small>
-              {song.artist} / {song.platform}
-            </small>
-          </button>
-        ))}
+
+      <div
+        aria-label={spanish ? "Estado de First Listen" : "First Listen status"}
+        className="workspace-v2-heart-grid"
+      >
+        <article>
+          <span>
+            <Clock3 size={14} />
+            {spanish ? "Banco de Tiempo" : "Time Bank"}
+          </span>
+          <strong>{spanish ? "Siempre visible" : "Always visible"}</strong>
+          <small>
+            {spanish
+              ? "Tu tiempo aparece arriba mientras escuchas."
+              : "Your time stays visible while you listen."}
+          </small>
+        </article>
+        <article>
+          <span>
+            <ListMusic size={14} />
+            {spanish ? "Canciones disponibles" : "Available songs"}
+          </span>
+          <strong>{initialQueue.songs.length}</strong>
+          <small>{spanish ? "en la cola actual" : "in the current queue"}</small>
+        </article>
+        <article>
+          <span>
+            <Music2 size={14} />
+            {spanish ? "Reproducción" : "Playback"}
+          </span>
+          <strong>{spanish ? "Cola activa" : "Active queue"}</strong>
+          <small>{initialQueueTitle}</small>
+        </article>
+        <article>
+          <span>
+            <Coins size={14} />
+            {spanish ? "Siguiente paso" : "Next step"}
+          </span>
+          <strong>
+            {viewerMode === "guest"
+              ? spanish
+                ? "Activa recompensas"
+                : "Activate rewards"
+              : spanish
+                ? "Reclama y sube"
+                : "Claim and submit"}
+          </strong>
+          <small>
+            {viewerMode === "guest"
+              ? spanish
+                ? "Crea una cuenta gratis cuando estés listo."
+                : "Create a free account when you are ready."
+              : spanish
+                ? "Usa tus tokens para compartir música."
+                : "Use your tokens to share music."}
+          </small>
+        </article>
       </div>
+
+      <div
+        aria-label={spanish ? "Cómo funciona" : "How it works"}
+        className="workspace-v2-flow-strip"
+      >
+        <span>{spanish ? "▶ Reproducir" : "▶ Play"}</span>
+        <span>{spanish ? "⏱ Sumar tiempo" : "⏱ Earn time"}</span>
+        <span>{spanish ? "🎟 Reclamar token" : "🎟 Claim token"}</span>
+        <span>{spanish ? "🎵 Subir música" : "🎵 Submit music"}</span>
+      </div>
+
+      <section
+        aria-label={spanish ? "Próximas canciones" : "Upcoming songs"}
+        className="workspace-v2-up-next-preview"
+      >
+        <div>
+          <span className="eyebrow">
+            <ListMusic size={13} />
+            {spanish ? "Próximas en la cola" : "Up next"}
+          </span>
+          <p>
+            {spanish
+              ? "La cola avanza automáticamente. Usa Siguiente solo cuando esté disponible."
+              : "The queue advances automatically. Use Next only when it is available."}
+          </p>
+        </div>
+        <ol>
+          {previewSongs.map((song, index) => (
+            <li key={song.id}>
+              <span>{index + 1}</span>
+              <strong>{song.title}</strong>
+              <small>{song.artist}</small>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <div
+        aria-label={spanish ? "Opciones de descubrimiento" : "Discovery options"}
+        className="workspace-v2-discovery-options"
+      >
+        <button onClick={() => onDiscoveryViewChange("internal")} type="button">
+          <strong>{spanish ? "Descubrimiento interno" : "Internal discovery"}</strong>
+          <small>
+            {spanish
+              ? "Reproduce dentro de First Listen y puede sumar Banco de Tiempo."
+              : "Plays inside First Listen and can add Time Bank progress."}
+          </small>
+          <span className="workspace-v2-platform-chip-row">
+            <span>▶ YouTube</span>
+            <span>▶ YouTube Music</span>
+          </span>
+        </button>
+        <button onClick={() => onDiscoveryViewChange("external")} type="button">
+          <strong>{spanish ? "Plataformas externas" : "External platforms"}</strong>
+          <small>
+            {spanish
+              ? "Abre destinos externos cuando quieras explorar fuera de First Listen."
+              : "Open external destinations when you want to explore outside First Listen."}
+          </small>
+          <span className="workspace-v2-platform-chip-row">
+            <span>↗ Spotify</span>
+            <span>↗ Apple Music</span>
+            <span>↗ TikTok</span>
+          </span>
+        </button>
+      </div>
+
+      <details className="workspace-v2-help-card">
+        <summary>{spanish ? "¿Necesitas ayuda? Te explico rápido" : "Need help? Quick guide"}</summary>
+        <div>
+          <span>{spanish ? "1. Presiona Play y descubre una canción." : "1. Press Play and discover a song."}</span>
+          <span>{spanish ? "2. La reproducción válida suma Banco de Tiempo." : "2. Valid playback adds Time Bank progress."}</span>
+          <span>{spanish ? "3. Reclama tokens cuando estén listos." : "3. Claim tokens when they are ready."}</span>
+          <span>{spanish ? "4. Usa “Quiero subir mi música” para compartir la tuya." : "4. Use “I want to submit my music” to share yours."}</span>
+          {viewerMode === "guest" && (
+            <strong>
+              {spanish
+                ? "Crea una cuenta gratis para activar recompensas y envíos."
+                : "Create a free account to activate rewards and submissions."}
+            </strong>
+          )}
+        </div>
+      </details>
+
       <button
         className="workspace-v2-secondary-action"
         onClick={() => onPanelChange("submit")}
         type="button"
       >
-        {spanish ? "Enviar mi música" : "Submit my music"}
+        {spanish ? "Quiero subir mi música" : "I want to submit my music"}
       </button>
     </section>
   );
@@ -3079,34 +3900,40 @@ function WorkspaceV2ActiveSongActions({
         songId={song.id}
         title={song.title}
       />
-      <div className="workspace-v2-report-action">
-        <select
-          aria-label={spanish ? "Motivo del reporte" : "Report reason"}
-          onChange={(event) => setReportReason(event.target.value)}
-          value={reportReason}
-        >
-          <option value="spam">Spam</option>
-          <option value="broken_link">{spanish ? "Enlace roto" : "Broken Link"}</option>
-          <option value="not_music">{spanish ? "No es musica" : "Not Music"}</option>
-          <option value="illegal_content">
-            {spanish ? "Contenido ilegal" : "Illegal Content"}
-          </option>
-          <option value="offensive_content">
-            {spanish ? "Contenido ofensivo" : "Offensive Content"}
-          </option>
-        </select>
-        <button disabled={reporting} onClick={submitReport} type="button">
+      <details className="workspace-v2-report-action">
+        <summary>
           <Flag size={14} />
-          {reporting
-            ? spanish
-              ? "Enviando..."
-              : "Sending..."
-            : spanish
-              ? "Reportar"
-              : "Report"}
-        </button>
+          {spanish ? "Reportar problema" : "Report a problem"}
+        </summary>
+        <div>
+          <select
+            aria-label={spanish ? "Motivo del reporte" : "Report reason"}
+            onChange={(event) => setReportReason(event.target.value)}
+            value={reportReason}
+          >
+            <option value="spam">Spam</option>
+            <option value="broken_link">{spanish ? "Enlace roto" : "Broken Link"}</option>
+            <option value="not_music">{spanish ? "No es música" : "Not Music"}</option>
+            <option value="illegal_content">
+              {spanish ? "Contenido ilegal" : "Illegal Content"}
+            </option>
+            <option value="offensive_content">
+              {spanish ? "Contenido ofensivo" : "Offensive Content"}
+            </option>
+          </select>
+          <button disabled={reporting} onClick={submitReport} type="button">
+            <Flag size={14} />
+            {reporting
+              ? spanish
+                ? "Enviando..."
+                : "Sending..."
+              : spanish
+                ? "Enviar reporte"
+                : "Send report"}
+          </button>
+        </div>
         {reportMessage && <small role="status">{reportMessage}</small>}
-      </div>
+      </details>
     </section>
   );
 }

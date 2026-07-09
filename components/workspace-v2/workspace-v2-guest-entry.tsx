@@ -7,10 +7,19 @@ import { Logo } from "@/components/logo";
 import { WorkspaceV2PreviewErrorBoundary } from "@/components/workspace-v2/workspace-v2-preview-error-boundary";
 import { WorkspaceV2Shell } from "@/components/workspace-v2/workspace-v2-shell";
 import type { InterfaceLocale } from "@/lib/catalog";
-import { displayPlatform, getContentClassification } from "@/lib/content-economy";
+import {
+  displayPlatform,
+  getContentClassification,
+  isExternalPlatform,
+} from "@/lib/content-economy";
 import { safeCoverUrl } from "@/lib/media";
 import { createClient } from "@/lib/supabase/client";
-import type { WorkspaceV2Queue, WorkspaceV2Song } from "@/lib/workspace-v2";
+import type { Platform } from "@/lib/types";
+import type {
+  WorkspaceV2ExternalDiscoveryItem,
+  WorkspaceV2Queue,
+  WorkspaceV2Song,
+} from "@/lib/workspace-v2";
 
 type GuestSession = {
   listenerId: string;
@@ -23,12 +32,24 @@ type GuestSession = {
 type GuestQueueRow = {
   artist_id?: string | null;
   artist_name?: string | null;
+  category?: string | null;
   content_duration_seconds?: number | null;
+  content_type?: string | null;
   cover_image_url?: string | null;
+  genre?: string | null;
   music_url?: string | null;
   platform?: string | null;
   song_id?: string | null;
+  subcategory?: string | null;
   title?: string | null;
+};
+
+type GuestExternalDiscoveryRow = GuestQueueRow & {
+  artist_id?: string | null;
+  badge?: string | null;
+  feed_kind?: string | null;
+  platform_links?: unknown;
+  recommended_platform?: string | null;
 };
 
 function firstRow<T>(value: T | T[] | null): T | null {
@@ -73,17 +94,72 @@ function mapQueueSong(row: GuestQueueRow): WorkspaceV2Song | null {
   return {
     artist: String(row.artist_name ?? "Unknown Artist"),
     artistId: row.artist_id ? String(row.artist_id) : undefined,
+    category: row.category ?? row.content_type ?? null,
     coverUrl: safeCoverUrl(row.cover_image_url),
     durationSeconds:
       typeof row.content_duration_seconds === "number"
         ? row.content_duration_seconds
         : null,
     exposureScore: 25,
+    genre: row.genre ?? row.subcategory ?? null,
     id,
     link,
     playbackKind:
       getContentClassification(platform) === "internal" ? "internal" : "external",
     platform,
+    subcategory: row.subcategory ?? row.genre ?? null,
+    title: String(row.title ?? "Untitled Song"),
+  };
+}
+
+function normalizePlatformLink(row: unknown) {
+  if (!row || typeof row !== "object") return null;
+  const record = row as Record<string, unknown>;
+  const platform =
+    displayPlatform[String(record.platform ?? "")] ??
+    displayPlatform[String(record.platform_key ?? "")] ??
+    null;
+  const url = String(record.music_url ?? record.url ?? "").trim();
+  if (!platform || !url) return null;
+  return { platform, url };
+}
+
+function pickExternalDiscoveryDestination(row: GuestExternalDiscoveryRow) {
+  const links = Array.isArray(row.platform_links)
+    ? row.platform_links.map(normalizePlatformLink).filter(Boolean)
+    : [];
+  const external = links.find((link) =>
+    isExternalPlatform(link!.platform as Platform),
+  );
+  if (external) return external;
+
+  const fallbackPlatform =
+    displayPlatform[String(row.recommended_platform ?? row.platform ?? "")] ??
+    "Spotify";
+  return {
+    platform: fallbackPlatform,
+    url: String(row.music_url ?? "").trim(),
+  };
+}
+
+function mapExternalDiscoveryItem(
+  row: GuestExternalDiscoveryRow,
+): WorkspaceV2ExternalDiscoveryItem | null {
+  const id = String(row.song_id ?? "").trim();
+  const destination = pickExternalDiscoveryDestination(row);
+  if (!id || !destination.url) return null;
+  return {
+    artist: String(row.artist_name ?? "Unknown Artist"),
+    artistId: row.artist_id ? String(row.artist_id) : undefined,
+    badge: row.badge ?? undefined,
+    category: row.category ?? row.content_type ?? null,
+    coverUrl: safeCoverUrl(row.cover_image_url),
+    feedKind: row.feed_kind ?? undefined,
+    genre: row.genre ?? row.subcategory ?? null,
+    id,
+    link: destination.url,
+    platform: destination.platform,
+    subcategory: row.subcategory ?? row.genre ?? null,
     title: String(row.title ?? "Untitled Song"),
   };
 }
@@ -109,6 +185,9 @@ export function WorkspaceV2GuestEntry() {
   const [loading, setLoading] = useState(true);
   const [locale, setLocale] = useState<InterfaceLocale>("es");
   const [queue, setQueue] = useState<WorkspaceV2Queue | null>(null);
+  const [externalDiscoveryItems, setExternalDiscoveryItems] = useState<
+    WorkspaceV2ExternalDiscoveryItem[]
+  >([]);
 
   const loadQueue = useCallback(
     async (token: string, nextLocale: InterfaceLocale) => {
@@ -125,6 +204,21 @@ export function WorkspaceV2GuestEntry() {
     },
     [],
   );
+
+  const loadExternalDiscovery = useCallback(async () => {
+    const supabase = createClient();
+    if (!supabase) return;
+    const { data } = await supabase.rpc("get_external_discovery_feed", {
+      feed_limit: 36,
+    });
+    setExternalDiscoveryItems(
+      ((data ?? []) as GuestExternalDiscoveryRow[])
+        .map(mapExternalDiscoveryItem)
+        .filter((item): item is WorkspaceV2ExternalDiscoveryItem =>
+          Boolean(item),
+        ),
+    );
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -180,7 +274,10 @@ export function WorkspaceV2GuestEntry() {
       setLocale(identity.locale);
       document.documentElement.lang = identity.locale;
       try {
-        await loadQueue(identity.token, identity.locale);
+        await Promise.all([
+          loadQueue(identity.token, identity.locale),
+          loadExternalDiscovery(),
+        ]);
       } catch (error) {
         setFatalError(
           error instanceof Error ? error.message : "Music could not be loaded.",
@@ -194,7 +291,7 @@ export function WorkspaceV2GuestEntry() {
     return () => {
       active = false;
     };
-  }, [loadQueue]);
+  }, [loadExternalDiscovery, loadQueue]);
 
   const spanish = locale === "es";
   const guestIdentity = guest
@@ -248,6 +345,7 @@ export function WorkspaceV2GuestEntry() {
           <WorkspaceV2Shell
             economyMode="guest"
             guestToken={guest.token}
+            externalDiscoveryItems={externalDiscoveryItems}
             initialQueue={queue}
             locale={locale}
             viewerIdentity={guestIdentity}
