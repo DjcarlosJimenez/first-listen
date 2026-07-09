@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LockKeyhole } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -18,10 +19,150 @@ export function ResetPasswordForm() {
   const spanish = locale === "es";
   const router = useRouter();
   const [error, setError] = useState("");
+  const [checkingRecovery, setCheckingRecovery] = useState(true);
+  const [recoveryReady, setRecoveryReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const passwordRequirements = spanish
-    ? "Mínimo 8 caracteres, una mayúscula, una minúscula y un número."
+    ? "Minimo 8 caracteres, una mayuscula, una minuscula y un numero."
     : PASSWORD_REQUIREMENTS;
+
+  useEffect(() => {
+    let active = true;
+    const supabase = createClient();
+
+    const finishChecking = (ready: boolean, nextError = "") => {
+      if (!active) return;
+      setRecoveryReady(ready);
+      setError(nextError);
+      setCheckingRecovery(false);
+    };
+
+    const cleanRecoveryUrl = () => {
+      window.history.replaceState(null, "", "/reset-password");
+    };
+
+    const prepareRecoverySession = async () => {
+      if (!supabase) {
+        finishChecking(
+          false,
+          spanish
+            ? "La recuperacion no esta disponible. Solicita un nuevo enlace."
+            : "Password recovery is unavailable. Request a new recovery link.",
+        );
+        return;
+      }
+
+      const currentSession = await supabase.auth.getSession();
+      if (currentSession.data.session) {
+        finishChecking(true);
+        return;
+      }
+
+      const url = new URL(window.location.href);
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const urlError =
+        url.searchParams.get("error_description") ??
+        hashParams.get("error_description") ??
+        url.searchParams.get("error") ??
+        hashParams.get("error");
+      if (urlError) {
+        cleanRecoveryUrl();
+        finishChecking(
+          false,
+          spanish
+            ? "El enlace de recuperacion expiro o ya fue usado. Solicita uno nuevo."
+            : "This recovery link expired or was already used. Request a new one.",
+        );
+        return;
+      }
+
+      const tokenHash = url.searchParams.get("token_hash");
+      const recoveryType = url.searchParams.get("type");
+      if (tokenHash && recoveryType === "recovery") {
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: "recovery",
+        });
+        if (verifyError) {
+          cleanRecoveryUrl();
+          finishChecking(
+            false,
+            spanish
+              ? "No pudimos verificar este enlace de recuperacion. Solicita uno nuevo."
+              : "We could not verify this recovery link. Request a new one.",
+          );
+          return;
+        }
+        cleanRecoveryUrl();
+        finishChecking(true);
+        return;
+      }
+
+      const code = url.searchParams.get("code");
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) {
+          cleanRecoveryUrl();
+          finishChecking(
+            false,
+            spanish
+              ? "No pudimos abrir este enlace de recuperacion. Solicita uno nuevo."
+              : "We could not open this recovery link. Request a new one.",
+          );
+          return;
+        }
+        cleanRecoveryUrl();
+        finishChecking(true);
+        return;
+      }
+
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      if (accessToken && refreshToken) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (sessionError) {
+          cleanRecoveryUrl();
+          finishChecking(
+            false,
+            spanish
+              ? "No pudimos activar este enlace de recuperacion. Solicita uno nuevo."
+              : "We could not activate this recovery link. Request a new one.",
+          );
+          return;
+        }
+        cleanRecoveryUrl();
+        finishChecking(true);
+        return;
+      }
+
+      finishChecking(
+        false,
+        spanish
+          ? "Abre el enlace mas reciente que enviamos a tu correo."
+          : "Open the latest recovery link we sent to your email.",
+      );
+    };
+
+    const {
+      data: { subscription },
+    } =
+      supabase?.auth.onAuthStateChange((event, session) => {
+        if ((event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") && session) {
+          cleanRecoveryUrl();
+          finishChecking(true);
+        }
+      }) ?? { data: { subscription: null } };
+
+    void prepareRecoverySession();
+
+    return () => {
+      active = false;
+      subscription?.unsubscribe();
+    };
+  }, [spanish]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -35,7 +176,7 @@ export function ResetPasswordForm() {
       return;
     }
     if (password !== confirm) {
-      setError(spanish ? "Las contraseñas deben coincidir." : "Passwords must match.");
+      setError(spanish ? "Las contrasenas deben coincidir." : "Passwords must match.");
       return;
     }
 
@@ -43,16 +184,30 @@ export function ResetPasswordForm() {
     if (!supabase) {
       setError(
         spanish
-          ? "La recuperación no está disponible. Solicita un nuevo enlace."
+          ? "La recuperacion no esta disponible. Solicita un nuevo enlace."
           : "Password recovery is unavailable. Request a new recovery link.",
       );
       return;
     }
 
     setLoading(true);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      setError(
+        spanish
+          ? "Tu enlace de recuperacion expiro. Solicita uno nuevo."
+          : "Your recovery link expired. Request a new one.",
+      );
+      setLoading(false);
+      setRecoveryReady(false);
+      return;
+    }
+
     const { error: passwordError } = await supabase.auth.updateUser({ password });
     if (passwordError) {
-      setError(spanish ? "No pudimos guardar la contraseña. Inténtalo de nuevo." : passwordError.message);
+      setError(spanish ? "No pudimos guardar la contrasena. Intentalo de nuevo." : passwordError.message);
       setLoading(false);
       return;
     }
@@ -62,18 +217,60 @@ export function ResetPasswordForm() {
     router.refresh();
   };
 
+  if (checkingRecovery) {
+    return (
+      <main className="auth-page">
+        <section className="auth-card">
+          <Logo />
+          <div className="auth-heading">
+            <span className="auth-icon"><LockKeyhole size={22} /></span>
+            <h1>{spanish ? "Verificando enlace" : "Verifying link"}</h1>
+            <p>
+              {spanish
+                ? "Estamos preparando la pagina para que elijas una nueva contrasena."
+                : "We are preparing the page so you can choose a new password."}
+            </p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!recoveryReady) {
+    return (
+      <main className="auth-page">
+        <section className="auth-card">
+          <Logo />
+          <div className="auth-heading">
+            <span className="auth-icon"><LockKeyhole size={22} /></span>
+            <h1>{spanish ? "Solicita un nuevo enlace" : "Request a new link"}</h1>
+            <p>
+              {spanish
+                ? "Por seguridad, los enlaces de recuperacion solo funcionan una vez y expiran rapido."
+                : "For security, recovery links only work once and expire quickly."}
+            </p>
+          </div>
+          {error && <div className="auth-error" role="alert">{error}</div>}
+          <Link className="auth-submit" href="/forgot-password">
+            {spanish ? "Enviar nuevo enlace" : "Send a new link"}
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="auth-page">
       <section className="auth-card">
         <Logo />
         <div className="auth-heading">
           <span className="auth-icon"><LockKeyhole size={22} /></span>
-          <h1>{spanish ? "Elige una nueva contraseña" : "Choose a new password"}</h1>
+          <h1>{spanish ? "Elige una nueva contrasena" : "Choose a new password"}</h1>
           <p>{passwordRequirements}</p>
         </div>
         <form onSubmit={submit}>
           <label className="auth-field">
-            <span>{spanish ? "Nueva contraseña" : "New password"}</span>
+            <span>{spanish ? "Nueva contrasena" : "New password"}</span>
             <input
               autoComplete="new-password"
               minLength={PASSWORD_MIN_LENGTH}
@@ -85,7 +282,7 @@ export function ResetPasswordForm() {
             />
           </label>
           <label className="auth-field">
-            <span>{spanish ? "Confirmar contraseña" : "Confirm password"}</span>
+            <span>{spanish ? "Confirmar contrasena" : "Confirm password"}</span>
             <input
               autoComplete="new-password"
               minLength={PASSWORD_MIN_LENGTH}
@@ -103,7 +300,7 @@ export function ResetPasswordForm() {
                 ? "Guardando..."
                 : "Saving..."
               : spanish
-                ? "Guardar nueva contraseña"
+                ? "Guardar nueva contrasena"
                 : "Save new password"}
           </button>
         </form>

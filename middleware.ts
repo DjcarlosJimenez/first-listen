@@ -9,7 +9,6 @@ const privatePaths = [
   "/profile",
   "/admin",
   "/owner",
-  "/reset-password",
 ];
 const authPaths = ["/login", "/signup"];
 

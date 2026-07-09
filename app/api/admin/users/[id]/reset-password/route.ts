@@ -185,15 +185,16 @@ export async function POST(
   const siteUrl =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
     "https://www.firstlisten.net";
+  const recoveryRedirectTo = `${siteUrl}/reset-password`;
   logResetDiagnostic(requestId, "reset_password_for_email", {
-    redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
+    redirectTo: recoveryRedirectTo,
     targetEmail: maskEmail(targetData.user.email),
     status: "requesting",
   });
   const { error: recoveryError } = await admin.auth.resetPasswordForEmail(
     targetData.user.email,
     {
-      redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
+      redirectTo: recoveryRedirectTo,
     },
   );
   if (recoveryError) {
