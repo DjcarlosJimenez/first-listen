@@ -15038,6 +15038,251 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   line-height: 1.35;
 }
 
+.workspace-v2-help-assistant {
+  bottom: 22px;
+  pointer-events: none;
+  position: fixed;
+  right: 22px;
+  z-index: 120;
+}
+
+.workspace-v2-help-assistant-fab,
+.workspace-v2-help-assistant-panel,
+.workspace-v2-help-assistant-panel button,
+.workspace-v2-help-assistant-panel a {
+  pointer-events: auto;
+}
+
+.workspace-v2-help-assistant-fab {
+  align-items: center;
+  background: var(--acid);
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 999px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 32%);
+  color: #071008;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 950;
+  gap: 8px;
+  min-height: 44px;
+  padding: 11px 15px;
+}
+
+.workspace-v2-help-assistant-panel {
+  background: color-mix(in srgb, var(--workspace-v2-panel-bg) 94%, #000 6%);
+  border: 1px solid var(--workspace-v2-panel-border);
+  border-radius: 22px;
+  box-shadow: 0 28px 90px rgb(0 0 0 / 42%);
+  color: var(--text);
+  display: grid;
+  gap: 12px;
+  max-height: min(76dvh, 690px);
+  overflow: auto;
+  padding: 14px 14px 18px;
+  width: min(430px, calc(100vw - 32px));
+}
+
+.workspace-v2-help-assistant-panel header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.workspace-v2-help-assistant-panel header h2 {
+  color: var(--text-strong);
+  font-size: clamp(20px, 4vw, 28px);
+  letter-spacing: -0.05em;
+  margin: 3px 0 0;
+}
+
+.workspace-v2-help-assistant-panel header > button {
+  align-items: center;
+  background: var(--workspace-v2-card-bg);
+  border: 1px solid var(--workspace-v2-card-border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.workspace-v2-help-topic-list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workspace-v2-help-topic-list button {
+  align-items: center;
+  background: var(--workspace-v2-card-bg);
+  border: 1px solid var(--workspace-v2-card-border);
+  border-radius: 15px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 8px;
+  justify-content: flex-start;
+  min-height: 44px;
+  padding: 10px;
+  text-align: left;
+}
+
+.workspace-v2-help-topic-list button.active,
+.workspace-v2-help-topic-list button:hover {
+  background: var(--workspace-v2-accent-bg);
+  border-color: var(--accent);
+  color: var(--text-strong);
+}
+
+.workspace-v2-help-topic-list button svg {
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.workspace-v2-help-answer {
+  background: var(--workspace-v2-card-bg);
+  border: 1px solid var(--workspace-v2-card-border);
+  border-radius: 18px;
+  display: grid;
+  gap: 12px;
+  padding: 13px 13px 17px;
+}
+
+.workspace-v2-help-answer > span {
+  align-items: center;
+  color: var(--text-strong);
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 950;
+  gap: 8px;
+}
+
+.workspace-v2-help-answer > span svg {
+  color: var(--accent);
+}
+
+.workspace-v2-help-answer p,
+.workspace-v2-help-answer li {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.workspace-v2-help-answer p {
+  margin: 0;
+}
+
+.workspace-v2-help-answer ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.workspace-v2-help-answer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 0 4px;
+}
+
+.workspace-v2-help-answer-actions a,
+.workspace-v2-help-answer-actions button {
+  align-items: center;
+  background: var(--acid);
+  border: 0;
+  border-radius: 999px;
+  color: #071008;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 950;
+  justify-content: center;
+  min-height: 38px;
+  padding: 9px 13px;
+  text-decoration: none;
+}
+
+.workspace-v2-help-answer-actions a + a,
+.workspace-v2-help-answer-actions a + button,
+.workspace-v2-help-answer-actions button + a,
+.workspace-v2-help-answer-actions button + button {
+  background: var(--workspace-v2-card-bg);
+  border: 1px solid var(--workspace-v2-card-border);
+  color: var(--text);
+}
+
+@media (max-width: 620px) {
+  .workspace-v2-help-assistant {
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+  }
+
+  .workspace-v2-help-assistant-fab {
+    justify-content: center;
+    min-height: 42px;
+    width: 100%;
+  }
+
+  .workspace-v2-help-assistant-panel {
+    border-radius: 18px;
+    max-height: calc(100dvh - 24px);
+    padding: 12px;
+    width: 100%;
+  }
+
+  .workspace-v2-help-topic-list {
+    grid-template-columns: 1fr;
+    max-height: 212px;
+    overflow: auto;
+    padding-right: 2px;
+  }
+
+  .workspace-v2-help-topic-list button {
+    min-height: 40px;
+    padding: 9px 10px;
+  }
+
+  .workspace-v2-help-answer {
+    border-radius: 16px;
+  }
+
+  .workspace-v2-help-answer-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-v2-help-answer-actions a,
+  .workspace-v2-help-answer-actions button {
+    width: 100%;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 960px) {
+  .workspace-v2-help-assistant {
+    bottom: 8px;
+    right: 8px;
+  }
+
+  .workspace-v2-help-assistant-fab {
+    min-height: 36px;
+    padding: 8px 12px;
+  }
+
+  .workspace-v2-help-assistant-panel {
+    max-height: calc(100dvh - 16px);
+    width: min(460px, calc(100vw - 16px));
+  }
+}
+
 .workspace-v2-trust-layer {
   display: grid;
   gap: 10px;

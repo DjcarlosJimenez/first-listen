@@ -20,6 +20,7 @@ import {
   ExternalLink,
   Flag,
   Gauge,
+  HelpCircle,
   Inbox,
   ListMusic,
   LockKeyhole,
@@ -42,6 +43,7 @@ import {
   User,
   Users,
   Wrench,
+  X,
 } from "lucide-react";
 import { SubmitView, type SongSubmission } from "@/components/first-listen-app";
 import { ProfilePanel, type ProfilePanelProps } from "@/components/profile-panel";
@@ -2675,7 +2677,355 @@ function WorkspaceV2ShellClient({
           />
         )}
       </main>
+
+      <WorkspaceV2HelpAssistant
+        canSubmit={canSubmit}
+        locale={workspaceLocale}
+        onDiscoveryViewChange={handleDiscoveryViewChange}
+        onPanelChange={handlePanelChange}
+        viewerMode={viewerMode}
+      />
     </section>
+  );
+}
+
+type WorkspaceV2HelpTopicId =
+  | "listen"
+  | "earn"
+  | "submit"
+  | "platforms"
+  | "account"
+  | "artist";
+
+function WorkspaceV2HelpAssistant({
+  canSubmit,
+  locale,
+  onDiscoveryViewChange,
+  onPanelChange,
+  viewerMode,
+}: {
+  canSubmit: boolean;
+  locale: InterfaceLocale;
+  onDiscoveryViewChange: (view: WorkspaceV2DiscoveryView) => void;
+  onPanelChange: (panel: WorkspaceV2Panel) => void;
+  viewerMode: WorkspaceV2ViewerMode;
+}) {
+  const spanish = locale === "es";
+  const [open, setOpen] = useState(false);
+  const [activeTopic, setActiveTopic] = useState<WorkspaceV2HelpTopicId>("listen");
+
+  const goDiscover = () => {
+    onPanelChange("discover");
+    onDiscoveryViewChange("home");
+    setOpen(false);
+  };
+
+  const goInternalDiscovery = () => {
+    onPanelChange("discover");
+    onDiscoveryViewChange("internal");
+    setOpen(false);
+  };
+
+  const goExternalDiscovery = () => {
+    onPanelChange("discover");
+    onDiscoveryViewChange("external");
+    setOpen(false);
+  };
+
+  const goSubmit = () => {
+    onPanelChange("submit");
+    setOpen(false);
+  };
+
+  const goProfile = () => {
+    onPanelChange("profile");
+    setOpen(false);
+  };
+
+  const topics: Array<{
+    body: string;
+    icon: typeof HelpCircle;
+    id: WorkspaceV2HelpTopicId;
+    primaryAction?: {
+      href?: string;
+      label: string;
+      onClick?: () => void;
+    };
+    secondaryAction?: {
+      href?: string;
+      label: string;
+      onClick?: () => void;
+    };
+    steps: string[];
+    title: string;
+  }> = [
+    {
+      body: spanish
+        ? "Presiona Play y deja que First Listen avance por la cola. Tambien puedes explorar canciones por estilo."
+        : "Press Play and let First Listen move through the queue. You can also explore songs by style.",
+      icon: Play,
+      id: "listen",
+      primaryAction: {
+        label: spanish ? "Ir a escuchar" : "Go listen",
+        onClick: goInternalDiscovery,
+      },
+      secondaryAction: {
+        label: spanish ? "Ver inicio" : "View home",
+        onClick: goDiscover,
+      },
+      steps: spanish
+        ? [
+            "Usa el reproductor principal.",
+            "La cola sigue sonando mientras navegas.",
+            "Busca por estilo si quieres descubrir algo especifico.",
+          ]
+        : [
+            "Use the main player.",
+            "The queue keeps playing while you move around.",
+            "Search by style when you want something specific.",
+          ],
+      title: spanish ? "Quiero escuchar música" : "I want to listen",
+    },
+    {
+      body: spanish
+        ? "Tu reproducción válida suma Banco de Tiempo. Ese tiempo se convierte en tokens para enviar música."
+        : "Valid playback adds Time Bank progress. That time turns into tokens for submitting music.",
+      icon: Clock3,
+      id: "earn",
+      primaryAction: {
+        label: spanish ? "Empezar a ganar" : "Start earning",
+        onClick: goInternalDiscovery,
+      },
+      steps: spanish
+        ? [
+            "Escucha contenido que reproduce dentro de First Listen.",
+            "Mira el Banco de Tiempo arriba.",
+            "Cuando el token esté listo, presiona Reclamar token.",
+          ]
+        : [
+            "Listen to content that plays inside First Listen.",
+            "Watch the Time Bank above.",
+            "When a token is ready, press Claim token.",
+          ],
+      title: spanish ? "Quiero ganar tiempo" : "I want to earn time",
+    },
+    {
+      body: spanish
+        ? "Para subir música necesitas una cuenta y tokens de envío. Puedes seguir escuchando mientras preparas tu envío."
+        : "To submit music you need an account and submission tokens. You can keep listening while preparing your submission.",
+      icon: Send,
+      id: "submit",
+      primaryAction: viewerMode === "guest"
+        ? {
+            href: "/signup?next=/dashboard",
+            label: spanish ? "Crear cuenta gratis" : "Create free account",
+          }
+        : {
+            label: canSubmit
+              ? spanish
+                ? "Ir a enviar canción"
+                : "Go submit song"
+              : spanish
+                ? "Ver envío"
+                : "View submit",
+            onClick: goSubmit,
+          },
+      steps: spanish
+        ? [
+            "Escucha para ganar Banco de Tiempo.",
+            "Reclama tokens cuando estén listos.",
+            "Abre Enviar canción y completa tu información.",
+          ]
+        : [
+            "Listen to earn Time Bank progress.",
+            "Claim tokens when they are ready.",
+            "Open Submit song and complete your details.",
+          ],
+      title: spanish ? "Quiero subir mi canción" : "I want to submit my song",
+    },
+    {
+      body: spanish
+        ? "Las plataformas externas sirven para descubrir y apoyar artistas fuera de First Listen. Abren Spotify, TikTok, Apple Music y otros enlaces."
+        : "External platforms help people discover and support artists outside First Listen. They open Spotify, TikTok, Apple Music, and other links.",
+      icon: ExternalLink,
+      id: "platforms",
+      primaryAction: {
+        label: spanish ? "Ver plataformas externas" : "View external platforms",
+        onClick: goExternalDiscovery,
+      },
+      secondaryAction: viewerMode === "guest"
+        ? undefined
+        : {
+            label: spanish ? "Mi perfil" : "My profile",
+            onClick: goProfile,
+          },
+      steps: spanish
+        ? [
+            "Interno = puede sumar Banco de Tiempo.",
+            "Externo = abre fuera de First Listen.",
+            "Los artistas pueden agregar enlaces desde su perfil o canción.",
+          ]
+        : [
+            "Internal = can add Time Bank progress.",
+            "External = opens outside First Listen.",
+            "Artists can add links from their profile or song.",
+          ],
+      title: spanish ? "Quiero agregar plataformas" : "I want to add platforms",
+    },
+    {
+      body: spanish
+        ? "Si no puedes entrar, usa recuperar contraseña. Si sigues atorado, intenta una ventana nueva y revisa tu correo."
+        : "If you cannot sign in, use password recovery. If you are still stuck, try a fresh window and check your email.",
+      icon: LockKeyhole,
+      id: "account",
+      primaryAction: {
+        href: "/forgot-password",
+        label: spanish ? "Recuperar contraseña" : "Reset password",
+      },
+      secondaryAction: {
+        href: "/login",
+        label: spanish ? "Iniciar sesión" : "Log in",
+      },
+      steps: spanish
+        ? [
+            "Abre Recuperar contraseña.",
+            "Escribe el correo de tu cuenta.",
+            "Usa el enlace que llega a tu email.",
+          ]
+        : [
+            "Open password recovery.",
+            "Enter your account email.",
+            "Use the link sent to your email.",
+          ],
+      title: spanish ? "No puedo entrar a mi cuenta" : "I cannot access my account",
+    },
+    {
+      body: spanish
+        ? "First Listen funciona así: escuchas artistas reales, ganas tiempo y usas tokens para que otros descubran tu música."
+        : "First Listen works like this: you listen to real artists, earn time, and use tokens so others can discover your music.",
+      icon: Music2,
+      id: "artist",
+      primaryAction: {
+        label: spanish ? "Escuchar primero" : "Listen first",
+        onClick: goInternalDiscovery,
+      },
+      secondaryAction: viewerMode === "guest"
+        ? {
+            href: "/signup?next=/dashboard",
+            label: spanish ? "Crear cuenta" : "Create account",
+          }
+        : {
+            label: spanish ? "Subir música" : "Submit music",
+            onClick: goSubmit,
+          },
+      steps: spanish
+        ? [
+            "Escucha y apoya canciones de otros artistas.",
+            "Gana Banco de Tiempo y reclama tokens.",
+            "Sube tu canción para recibir descubrimiento real.",
+          ]
+        : [
+            "Listen to and support other artists.",
+            "Earn Time Bank progress and claim tokens.",
+            "Submit your song to receive real discovery.",
+          ],
+      title: spanish ? "Soy artista nuevo" : "I am a new artist",
+    },
+  ];
+
+  const currentTopic =
+    topics.find((topic) => topic.id === activeTopic) ?? topics[0];
+  const CurrentIcon = currentTopic.icon;
+
+  return (
+    <aside
+      aria-label={spanish ? "Asistente de ayuda First Listen" : "First Listen help assistant"}
+      className="workspace-v2-help-assistant"
+      data-open={open ? "true" : "false"}
+    >
+      {!open && (
+        <button
+          className="workspace-v2-help-assistant-fab"
+          onClick={() => setOpen(true)}
+          type="button"
+        >
+          <HelpCircle size={18} />
+          <span>{spanish ? "¿Necesitas ayuda?" : "Need help?"}</span>
+        </button>
+      )}
+
+      {open && (
+        <section className="workspace-v2-help-assistant-panel" role="dialog">
+          <header>
+            <div>
+              <span className="eyebrow">
+                <HelpCircle size={13} />
+                {spanish ? "Asistente First Listen" : "First Listen Assistant"}
+              </span>
+              <h2>{spanish ? "Te ayudo en 30 segundos." : "I can help in 30 seconds."}</h2>
+            </div>
+            <button
+              aria-label={spanish ? "Cerrar ayuda" : "Close help"}
+              onClick={() => setOpen(false)}
+              type="button"
+            >
+              <X size={16} />
+            </button>
+          </header>
+
+          <div className="workspace-v2-help-topic-list" role="list">
+            {topics.map((topic) => {
+              const TopicIcon = topic.icon;
+              return (
+                <button
+                  aria-pressed={topic.id === currentTopic.id}
+                  className={topic.id === currentTopic.id ? "active" : ""}
+                  key={topic.id}
+                  onClick={() => setActiveTopic(topic.id)}
+                  type="button"
+                >
+                  <TopicIcon size={14} />
+                  <span>{topic.title}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <article className="workspace-v2-help-answer">
+            <span>
+              <CurrentIcon size={16} />
+              {currentTopic.title}
+            </span>
+            <p>{currentTopic.body}</p>
+            <ol>
+              {currentTopic.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+            <div className="workspace-v2-help-answer-actions">
+              {currentTopic.primaryAction?.href ? (
+                <Link href={currentTopic.primaryAction.href}>
+                  {currentTopic.primaryAction.label}
+                </Link>
+              ) : currentTopic.primaryAction ? (
+                <button onClick={currentTopic.primaryAction.onClick} type="button">
+                  {currentTopic.primaryAction.label}
+                </button>
+              ) : null}
+              {currentTopic.secondaryAction?.href ? (
+                <Link href={currentTopic.secondaryAction.href}>
+                  {currentTopic.secondaryAction.label}
+                </Link>
+              ) : currentTopic.secondaryAction ? (
+                <button onClick={currentTopic.secondaryAction.onClick} type="button">
+                  {currentTopic.secondaryAction.label}
+                </button>
+              ) : null}
+            </div>
+          </article>
+        </section>
+      )}
+    </aside>
   );
 }
 
