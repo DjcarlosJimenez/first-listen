@@ -58,6 +58,28 @@ Write-Host "  http://localhost:$port/dashboard"
 Write-Host "  http://localhost:$port/workspace-v2"
 Write-Host "  http://localhost:$port/workspace-v2/guest"
 Write-Host ""
+Write-Host "Playback Bank local preview:" -ForegroundColor Cyan
+Write-Host "  Nueva:       http://localhost:$port/workspace-v2/guest?bankPreview=fresh"
+Write-Host "  Parcial:     http://localhost:$port/workspace-v2/guest?bankPreview=partial"
+Write-Host "  Completa:    http://localhost:$port/workspace-v2/guest?bankPreview=complete"
+Write-Host "  Repetida:    http://localhost:$port/workspace-v2/guest?bankPreview=replay"
+Write-Host "  Preparado:   http://localhost:$port/workspace-v2/guest?bankPreview=idle"
+$localIPv4 = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+  Where-Object {
+    $_.IPAddress -notlike "127.*" -and
+    ($_.IPAddress -like "10.*" -or $_.IPAddress -like "192.168.*" -or $_.IPAddress -match "^172\.(1[6-9]|2\d|3[0-1])\.")
+  } |
+  Select-Object -First 1 -ExpandProperty IPAddress
+if ($localIPv4) {
+  Write-Host ""
+  Write-Host "Phone/tablet preview on this network:" -ForegroundColor Cyan
+  Write-Host "  Nueva:       http://${localIPv4}:$port/workspace-v2/guest?bankPreview=fresh"
+  Write-Host "  Parcial:     http://${localIPv4}:$port/workspace-v2/guest?bankPreview=partial"
+  Write-Host "  Completa:    http://${localIPv4}:$port/workspace-v2/guest?bankPreview=complete"
+  Write-Host "  Repetida:    http://${localIPv4}:$port/workspace-v2/guest?bankPreview=replay"
+  Write-Host "  Preparado:   http://${localIPv4}:$port/workspace-v2/guest?bankPreview=idle"
+}
+Write-Host ""
 Write-Host "Tip: if the browser still shows old UI, use Ctrl+F5 or open a new private window." -ForegroundColor DarkGray
 Write-Host ""
 

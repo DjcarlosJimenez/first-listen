@@ -110,6 +110,27 @@ type WorkspaceV2DiscoveryStyleId =
   | "alternative"
   | "instrumental"
   | "other";
+type PlaybackBankState = "idle" | "fresh" | "partial" | "complete" | "replay";
+
+type PlaybackEarningStatus = {
+  canEarnMore: boolean;
+  durationSeconds: number;
+  earnedSeconds: number;
+  remainingSeconds: number;
+  replayState: PlaybackBankState;
+  suggestedResumeSeconds: number | null;
+};
+
+type PlaybackEarningOpportunity = {
+  artist: string;
+  coverUrl: string;
+  durationSeconds: number;
+  earnedSeconds: number;
+  remainingSeconds: number;
+  songId: string;
+  suggestedResumeSeconds: number | null;
+  title: string;
+};
 
 type InstrumentationLog = {
   at: number;
@@ -206,6 +227,53 @@ function clock(seconds: number) {
   const safe = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(safe / 60);
   return `${String(minutes).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
+}
+
+function normalizePlaybackBankState(value: unknown): PlaybackBankState {
+  if (value === "fresh" || value === "new") return "fresh";
+  if (value === "partial") return "partial";
+  if (value === "complete" || value === "completed") return "complete";
+  if (value === "replay" || value === "heard") return "replay";
+  return "idle";
+}
+
+function parsePlaybackEarningStatus(
+  value: Record<string, unknown> | null,
+): PlaybackEarningStatus | null {
+  if (!value) return null;
+  return {
+    canEarnMore: Boolean(value.can_earn_more),
+    durationSeconds: Number(value.duration_seconds ?? 0),
+    earnedSeconds: Number(value.earned_seconds ?? 0),
+    remainingSeconds: Number(value.remaining_seconds ?? 0),
+    replayState: normalizePlaybackBankState(value.replay_state),
+    suggestedResumeSeconds:
+      value.suggested_resume_seconds === null ||
+      value.suggested_resume_seconds === undefined
+        ? null
+        : Math.max(0, Number(value.suggested_resume_seconds)),
+  };
+}
+
+function parsePlaybackEarningOpportunity(
+  value: Record<string, unknown>,
+): PlaybackEarningOpportunity | null {
+  const songId = String(value.song_id ?? "").trim();
+  if (!songId) return null;
+  return {
+    artist: String(value.artist_name ?? "Unknown Artist"),
+    coverUrl: String(value.cover_image_url ?? ""),
+    durationSeconds: Number(value.duration_seconds ?? 0),
+    earnedSeconds: Number(value.earned_seconds ?? 0),
+    remainingSeconds: Number(value.remaining_seconds ?? 0),
+    songId,
+    suggestedResumeSeconds:
+      value.suggested_resume_seconds === null ||
+      value.suggested_resume_seconds === undefined
+        ? null
+        : Math.max(0, Number(value.suggested_resume_seconds)),
+    title: String(value.title ?? "Untitled"),
+  };
 }
 
 function pushLog(logs: InstrumentationLog[], entry: InstrumentationLog) {
@@ -713,6 +781,16 @@ function WorkspaceV2ShellClient({
   const [providerSkipNotice, setProviderSkipNotice] = useState("");
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [localPlaybackBankPreview, setLocalPlaybackBankPreview] = useState<
+    PlaybackBankState | null
+  >(null);
+  const [playbackEarningStatus, setPlaybackEarningStatus] =
+    useState<PlaybackEarningStatus | null>(null);
+  const [
+    playbackEarningOpportunities,
+    setPlaybackEarningOpportunities,
+  ] = useState<PlaybackEarningOpportunity[]>([]);
+  const [playbackBankMenuOpen, setPlaybackBankMenuOpen] = useState(false);
   const [pipelineDebug, setPipelineDebug] =
     useState<PlaybackPipelineDebug>(initialPipelineDebug);
   const [providerDebug, setProviderDebug] =
@@ -739,6 +817,62 @@ function WorkspaceV2ShellClient({
   const touchStartYRef = useRef<number | null>(null);
   const trustedPlaybackRequestRef = useRef<(() => void) | null>(null);
   const validationRef = useRef("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hostname = window.location.hostname;
+    const localHostnames = new Set(["localhost", "127.0.0.1", "::1"]);
+    const privateIpv4 =
+      /^10\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
+    const localPreviewHost =
+      localHostnames.has(hostname) ||
+      privateIpv4 ||
+      window.location.port === "3000" ||
+      window.location.port === "3100";
+    if (!localPreviewHost) return;
+
+    const syncLocalPlaybackBankPreview = () => {
+      const preview = new URL(window.location.href).searchParams
+        .get("bankPreview")
+        ?.trim()
+        .toLowerCase();
+      const normalizedPreview =
+        preview === "fresh" || preview === "new" || preview === "nueva"
+          ? "fresh"
+          : preview === "partial" ||
+              preview === "restante" ||
+              preview === "disponible" ||
+              preview === "resume" ||
+              preview === "reanudar"
+            ? "partial"
+            : preview === "complete" ||
+                preview === "completed" ||
+                preview === "completa" ||
+                preview === "agotada"
+              ? "complete"
+          : preview === "replay" ||
+              preview === "heard" ||
+              preview === "escuchada" ||
+              preview === "repetida" ||
+              preview === "ya-la-escuche"
+            ? "replay"
+            : preview === "idle" ||
+                preview === "ready" ||
+                preview === "preparado"
+              ? "idle"
+              : null;
+      setLocalPlaybackBankPreview(
+        normalizedPreview,
+      );
+    };
+
+    syncLocalPlaybackBankPreview();
+    window.addEventListener("popstate", syncLocalPlaybackBankPreview);
+    return () =>
+      window.removeEventListener("popstate", syncLocalPlaybackBankPreview);
+  }, []);
 
   const recordLog = useCallback(
     ({
@@ -807,6 +941,10 @@ function WorkspaceV2ShellClient({
   useEffect(() => {
     setMobileQueueExpanded(false);
   }, [activePanel]);
+
+  useEffect(() => {
+    setPlaybackBankMenuOpen(false);
+  }, [controller.activeSong?.id]);
 
   useEffect(() => {
     if (!economy.state.lastUpdatedAt) return;
@@ -1407,6 +1545,14 @@ function WorkspaceV2ShellClient({
   }, [recordError]);
 
   const activeSongId = controller.activeSong?.id ?? "none";
+  const activePlaybackDurationSeconds = Math.max(
+    0,
+    Math.floor(
+      controller.telemetry.durationSeconds ||
+        controller.activeSong?.durationSeconds ||
+        0,
+    ),
+  );
   const nextSong = controller.remainingSongs[0] ?? null;
   const nextSongId = nextSong?.id ?? "none";
   const queueTitle = controller.queue.activeQueue?.title ?? initialQueue.title;
@@ -1421,6 +1567,102 @@ function WorkspaceV2ShellClient({
   const positionCurrent = controller.position.current;
   const positionTotal = controller.position.total;
   const remainingCount = controller.remainingSongs.length;
+
+  useEffect(() => {
+    let cancelled = false;
+    setPlaybackEarningStatus(null);
+    if (!controller.activeSong) return;
+
+    const supabase = createClient();
+    if (!supabase) return;
+
+    const params: Record<string, unknown> = {
+      target_song_id: controller.activeSong.id,
+      playback_duration_seconds:
+        activePlaybackDurationSeconds > 0
+          ? activePlaybackDurationSeconds
+          : null,
+    };
+    if (viewerMode === "guest" && guestToken) {
+      params.guest_access_token = guestToken;
+    }
+
+    const loadPlaybackEarningStatus = async () => {
+      try {
+        const { data, error } = await supabase.rpc(
+          "get_playback_earning_status",
+          params,
+        );
+        if (cancelled || error) return;
+        setPlaybackEarningStatus(
+          parsePlaybackEarningStatus(
+            firstRow(data as Record<string, unknown>[] | Record<string, unknown> | null),
+          ),
+        );
+      } catch {
+        // Older local databases will not have this RPC until the new migration is applied.
+      }
+    };
+
+    void loadPlaybackEarningStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activePlaybackDurationSeconds,
+    activeSongId,
+    controller.activeSong,
+    economy.state.lastUpdatedAt,
+    guestToken,
+    viewerMode,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPlaybackEarningOpportunities([]);
+
+    const supabase = createClient();
+    if (!supabase) return;
+
+    const params: Record<string, unknown> = {
+      p_opportunity_limit: 8,
+    };
+    if (viewerMode === "guest" && guestToken) {
+      params.p_guest_access_token = guestToken;
+    }
+
+    const loadPlaybackEarningOpportunities = async () => {
+      try {
+        const { data, error } = await supabase.rpc(
+          "get_playback_earning_opportunities",
+          params,
+        );
+        if (cancelled || error) return;
+        setPlaybackEarningOpportunities(
+          ((data ?? []) as Record<string, unknown>[])
+            .map(parsePlaybackEarningOpportunity)
+            .filter(
+              (item): item is PlaybackEarningOpportunity => Boolean(item),
+            ),
+        );
+      } catch {
+        // Older local databases will not have this RPC until the new migration is applied.
+      }
+    };
+
+    void loadPlaybackEarningOpportunities();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeSongId,
+    economy.state.lastUpdatedAt,
+    guestToken,
+    viewerMode,
+  ]);
+
   const sessionValid =
     economy.state.validListenRecorded || controller.validation.validListen;
   const displayedTimePlayed = Math.max(
@@ -1472,6 +1714,133 @@ function WorkspaceV2ShellClient({
   const playbackTrustIndicatorLabel = spanish
     ? "✔ Reproducción válida"
     : "✔ Valid playback";
+  const previewPlaybackEarningStatus: PlaybackEarningStatus | null =
+    localPlaybackBankPreview
+      ? {
+          canEarnMore:
+            localPlaybackBankPreview === "fresh" ||
+            localPlaybackBankPreview === "partial",
+          durationSeconds: activePlaybackDurationSeconds || 240,
+          earnedSeconds:
+            localPlaybackBankPreview === "fresh"
+              ? 0
+              : localPlaybackBankPreview === "partial"
+                ? Math.max(0, (activePlaybackDurationSeconds || 240) - 120)
+                : activePlaybackDurationSeconds || 240,
+          remainingSeconds:
+            localPlaybackBankPreview === "fresh"
+              ? activePlaybackDurationSeconds || 240
+              : localPlaybackBankPreview === "partial"
+                ? 120
+                : 0,
+          replayState: localPlaybackBankPreview,
+          suggestedResumeSeconds:
+            localPlaybackBankPreview === "partial"
+              ? Math.max(0, (activePlaybackDurationSeconds || 240) - 120)
+              : null,
+        }
+      : null;
+  const effectivePlaybackEarningStatus =
+    previewPlaybackEarningStatus ?? playbackEarningStatus;
+  const detectedPlaybackBankState = !controller.activeSong
+    ? "idle"
+    : effectivePlaybackEarningStatus
+      ? effectivePlaybackEarningStatus.replayState
+      : controller.activeSong.lastHeardAt
+      ? "replay"
+      : "fresh";
+  const playbackBankState = detectedPlaybackBankState;
+  const playbackBankRemainingSeconds =
+    effectivePlaybackEarningStatus?.remainingSeconds ?? 0;
+  const playbackBankResumeSeconds =
+    effectivePlaybackEarningStatus?.suggestedResumeSeconds ?? null;
+  const playbackBankCanEarnMore =
+    effectivePlaybackEarningStatus?.canEarnMore ??
+    (playbackBankState === "fresh" || playbackBankState === "partial");
+  const playbackBankTitle =
+    playbackBankState === "fresh"
+      ? spanish
+        ? "Canción nueva"
+        : "New song"
+      : playbackBankState === "partial"
+        ? spanish
+          ? `Puedes ganar ${clock(playbackBankRemainingSeconds)} restantes`
+          : `${clock(playbackBankRemainingSeconds)} still available`
+        : playbackBankState === "complete"
+          ? spanish
+            ? "Tiempo ganado completo"
+            : "Earnable time complete"
+          : playbackBankState === "replay"
+        ? spanish
+          ? "Ya la escuchaste"
+          : "Heard before"
+        : spanish
+          ? "Banco preparado"
+          : "Bank ready";
+  const playbackBankChipText =
+    playbackBankState === "partial"
+      ? spanish
+        ? `Tiempo pendiente • ${clock(playbackBankRemainingSeconds)}`
+        : `Available time • ${clock(playbackBankRemainingSeconds)}`
+      : playbackBankState === "complete"
+        ? spanish
+          ? "Tiempo de esta canción completo"
+          : "Song time complete"
+        : playbackBankState === "replay"
+          ? spanish
+            ? "Repetida • descubre más para ganar"
+            : "Replay • discover more to earn"
+          : playbackBankState === "fresh"
+            ? spanish
+              ? "Banco activo"
+              : "Bank active"
+            : spanish
+              ? "Banco preparado"
+              : "Bank ready";
+  const currentPlaybackOpportunity: PlaybackEarningOpportunity | null =
+    controller.activeSong &&
+    playbackBankState === "partial" &&
+    playbackBankCanEarnMore &&
+    playbackBankRemainingSeconds > 0
+      ? {
+          artist: controller.activeSong.artist,
+          coverUrl: controller.activeSong.coverUrl,
+          durationSeconds:
+            effectivePlaybackEarningStatus?.durationSeconds ??
+            activePlaybackDurationSeconds,
+          earnedSeconds: effectivePlaybackEarningStatus?.earnedSeconds ?? 0,
+          remainingSeconds: playbackBankRemainingSeconds,
+          songId: controller.activeSong.id,
+          suggestedResumeSeconds: playbackBankResumeSeconds,
+          title: controller.activeSong.title,
+        }
+      : null;
+  const playbackBankOpportunityMap = new Map<string, PlaybackEarningOpportunity>();
+  playbackEarningOpportunities.forEach((item) =>
+    playbackBankOpportunityMap.set(item.songId, item),
+  );
+  if (currentPlaybackOpportunity) {
+    playbackBankOpportunityMap.set(
+      currentPlaybackOpportunity.songId,
+      currentPlaybackOpportunity,
+    );
+  }
+  const playbackBankVisibleOpportunities = Array.from(
+    playbackBankOpportunityMap.values(),
+  ).slice(0, 5);
+  const playbackBankHasOpportunities =
+    playbackBankVisibleOpportunities.length > 0;
+  const playbackBankMenuLabel = playbackBankHasOpportunities
+    ? spanish
+      ? `Tiempo disponible (${playbackBankVisibleOpportunities.length})`
+      : `Available time (${playbackBankVisibleOpportunities.length})`
+    : spanish
+      ? "Tiempo disponible"
+      : "Available time";
+  const playbackBankMenuAvailable =
+    Boolean(controller.activeSong) &&
+    (playbackBankHasOpportunities ||
+      playbackBankState === "partial");
   const heroHeadline = workspaceSessionHeadline({
     activeSong: controller.activeSong,
     resumeTitle: resumedSession?.currentSongTitle ?? null,
@@ -1808,6 +2177,32 @@ function WorkspaceV2ShellClient({
     economy.markInteraction();
     controller.pause();
   }, [controller, economy]);
+
+  const handlePlaybackBankSeek = useCallback(
+    (seconds: number) => {
+      if (!controller.activeSong) return;
+      try {
+        economy.markInteraction();
+        dispatchWorkspaceV2PlaybackCommand("seek", {
+          autoPlay: true,
+          channel: WORKSPACE_V2_PLAYBACK_COMMAND_CHANNEL,
+          seconds,
+          source: "user-click",
+        });
+        controller.play();
+        recordTransition(
+          "PLAYBACK_BANK_SEEK",
+          `${controller.activeSong.id} / ${Math.max(0, Math.floor(seconds))}s`,
+        );
+      } catch (error) {
+        recordError(
+          "PLAYBACK_BANK_SEEK_FAILED",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    },
+    [controller, economy, recordError, recordTransition],
+  );
 
   const handleNext = useCallback(() => {
     try {
@@ -2292,6 +2687,16 @@ function WorkspaceV2ShellClient({
             </small>
           </div>
 
+          {localPlaybackBankPreview && (
+            <small
+              className="workspace-v2-local-bank-preview"
+              data-bank-state={playbackBankState}
+            >
+              {spanish ? "Vista local" : "Local preview"}:{" "}
+              {playbackBankTitle}
+            </small>
+          )}
+
           <div
             className="workspace-v2-player-surface"
             data-player-mode={playerIsVideo ? "video" : "audio"}
@@ -2373,6 +2778,27 @@ function WorkspaceV2ShellClient({
               <Maximize2 size={16} />{" "}
               {spanish ? "Pantalla completa" : "Fullscreen"}
             </button>
+            {controller.activeSong && (
+              <span
+                className="workspace-v2-playback-bank-chip"
+                data-bank-state={playbackBankState}
+              >
+                <Clock3 size={14} aria-hidden="true" />
+                {playbackBankChipText}
+              </span>
+            )}
+            {playbackBankMenuAvailable && (
+              <button
+                aria-expanded={playbackBankMenuOpen}
+                className="workspace-v2-playback-bank-menu-trigger"
+                onClick={() =>
+                  setPlaybackBankMenuOpen((current) => !current)
+                }
+                type="button"
+              >
+                <Clock3 size={16} /> {playbackBankMenuLabel}
+              </button>
+            )}
             {playbackTrustIndicatorVisible && (
               <div
                 aria-hidden="true"
@@ -2390,6 +2816,85 @@ function WorkspaceV2ShellClient({
               {spanish ? "de" : "of"} {positionTotal}
             </span>
           </div>
+
+          {playbackBankMenuOpen && playbackBankMenuAvailable && (
+            <section
+              className="workspace-v2-playback-bank-menu"
+              role="status"
+            >
+              <div className="workspace-v2-playback-bank-menu-heading">
+                <div>
+                  <span>
+                    {spanish ? "Tiempo disponible" : "Available time"}
+                  </span>
+                  <strong>
+                    {spanish
+                      ? "Termina canciones pendientes cuando quieras."
+                      : "Finish pending songs whenever you want."}
+                  </strong>
+                </div>
+                <button
+                  aria-label={spanish ? "Cerrar" : "Close"}
+                  onClick={() => setPlaybackBankMenuOpen(false)}
+                  type="button"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+              {playbackBankVisibleOpportunities.length ? (
+                <ol className="workspace-v2-playback-bank-menu-list">
+                  {playbackBankVisibleOpportunities.map((item) => {
+                    const isCurrentSong = item.songId === activeSongId;
+                    return (
+                      <li key={item.songId}>
+                        <div>
+                          <strong>{item.title}</strong>
+                          <small>
+                            {item.artist} • {clock(item.remainingSeconds)}{" "}
+                            {spanish ? "disponibles" : "available"}
+                          </small>
+                        </div>
+                        {isCurrentSong ? (
+                          <div className="workspace-v2-playback-bank-menu-actions">
+                            {item.suggestedResumeSeconds !== null && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handlePlaybackBankSeek(
+                                    item.suggestedResumeSeconds ?? 0,
+                                  )
+                                }
+                              >
+                                {spanish ? "Reanudar" : "Resume"}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handlePlaybackBankSeek(0)}
+                            >
+                              {spanish ? "Inicio" : "Start"}
+                            </button>
+                          </div>
+                        ) : (
+                          <small className="workspace-v2-playback-bank-menu-note">
+                            {spanish
+                              ? "La cola puede llegar aquí automáticamente."
+                              : "The queue can reach this automatically."}
+                          </small>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <p>
+                  {spanish
+                    ? "La cola seguirá reproduciendo música nueva. Cuando haya canciones con tiempo pendiente, aparecerán aquí."
+                    : "The queue will keep playing new music. Songs with available time will appear here."}
+                </p>
+              )}
+            </section>
+          )}
 
           {controller.activeSong && (
             <WorkspaceV2ActiveSongActions

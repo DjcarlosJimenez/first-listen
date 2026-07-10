@@ -114,6 +114,7 @@ type SoundCloudWidget = {
   unbind: (event: string) => void;
   pause: () => void;
   play: () => void;
+  seekTo?: (milliseconds: number) => void;
   getDuration: (callback: (duration: number) => void) => void;
   getPosition: (callback: (position: number) => void) => void;
   getVolume: (callback: (volume: number) => void) => void;
@@ -978,6 +979,35 @@ export function ProviderPlayer({
     requestPlayback();
   }, [requestPlayback]);
 
+  const seekPlayback = useCallback(
+    (seconds: number, shouldAutoPlay = true) => {
+      const safeSeconds = Math.max(0, Math.floor(seconds));
+      manualPauseRef.current = !shouldAutoPlay;
+      setShowAutoplayFallback(false);
+      lastInteractionAtRef.current = Date.now();
+      try {
+        if (youtubePlayerRef.current) {
+          youtubePlayerRef.current.seekTo(safeSeconds, true);
+          if (shouldAutoPlay) {
+            youtubePlayerRef.current.playVideo();
+            scheduleYouTubeAutoplayRetries(
+              youtubePlayerRef.current,
+              latestYouTubeTargetRef.current,
+            );
+          }
+        }
+        if (soundCloudWidgetRef.current?.seekTo) {
+          soundCloudWidgetRef.current.seekTo(safeSeconds * 1000);
+          if (shouldAutoPlay) soundCloudWidgetRef.current.play();
+        }
+        if (shouldAutoPlay) spotifyControllerRef.current?.play();
+      } catch (error) {
+        console.info("[First Listen player] Seek request was deferred", error);
+      }
+    },
+    [scheduleYouTubeAutoplayRetries],
+  );
+
   useEffect(() => {
     onTrustedPlaybackRequestReady?.(requestTrustedPlayback);
     return () => onTrustedPlaybackRequestReady?.(null);
@@ -1034,6 +1064,9 @@ export function ProviderPlayer({
         }
         requestPlayback();
       }
+      if (detail.command === "seek") {
+        seekPlayback(detail.seconds ?? 0, detail.autoPlay ?? true);
+      }
       if (detail.command === "pause") pausePlayback();
     };
 
@@ -1043,7 +1076,13 @@ export function ProviderPlayer({
         WORKSPACE_V2_PLAYBACK_COMMAND_EVENT,
         handleCommand,
       );
-  }, [controlChannel, pausePlayback, requestPlayback, requestTrustedPlayback]);
+  }, [
+    controlChannel,
+    pausePlayback,
+    requestPlayback,
+    requestTrustedPlayback,
+    seekPlayback,
+  ]);
 
   useEffect(() => {
     const pauseForAnotherPlayer = (event: Event) => {
