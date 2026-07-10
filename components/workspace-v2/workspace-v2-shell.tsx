@@ -1509,8 +1509,9 @@ function WorkspaceV2ShellClient({
           100,
           ((bankSecondsForDisplay % exchangeSeconds) / exchangeSeconds) * 100,
         );
-  const queueSongs = controller.queue.activeQueue?.songs ?? initialQueue.songs;
-  const consumedSongs = queueSongs.filter((song) =>
+  const activeQueueSongs = controller.queue.activeQueue?.songs ?? initialQueue.songs;
+  const discoveryCatalogSongs = initialQueue.songs;
+  const consumedSongs = activeQueueSongs.filter((song) =>
     controller.queue.consumedSongIds.includes(song.id),
   );
   const activeArtist = controller.activeSong?.artist;
@@ -2580,7 +2581,7 @@ function WorkspaceV2ShellClient({
             founderFree={founderSubmissionsRemaining > 0}
             founderOperations={founderOperations}
             initialQueue={initialQueue}
-            internalQueueSongs={queueSongs}
+            internalQueueSongs={discoveryCatalogSongs}
             locale={workspaceLocale}
             onDiscoveryStyleChange={handleDiscoveryStyleChange}
             onDiscoveryViewChange={handleDiscoveryViewChange}
@@ -2789,6 +2790,18 @@ function WorkspaceV2ContentPanel({
   const spanish = locale === "es";
   const [discoverySearch, setDiscoverySearch] = useState("");
 
+  useEffect(() => {
+    setDiscoverySearch("");
+  }, [discoveryView, selectedDiscoveryStyle]);
+
+  const handleContentDiscoveryViewChange = useCallback(
+    (view: WorkspaceV2DiscoveryView) => {
+      setDiscoverySearch("");
+      onDiscoveryViewChange(view);
+    },
+    [onDiscoveryViewChange],
+  );
+
   if (activePanel === "submit") {
     if (canSubmit) {
       return (
@@ -2972,13 +2985,6 @@ function WorkspaceV2ContentPanel({
   }
 
   const previewSongs = initialQueue.songs.slice(0, 4);
-  const initialQueueTitle =
-    initialQueue.title === "Continuous Discovery" ||
-    initialQueue.title === "Descubrimiento continuo"
-      ? spanish
-        ? "Cola de reproducción"
-        : "Playback queue"
-      : initialQueue.title;
   const visibleInternalSongs = filterItemsByDiscoveryStyle(
     internalQueueSongs,
     selectedDiscoveryStyle,
@@ -2993,6 +2999,14 @@ function WorkspaceV2ContentPanel({
   const searchedExternalItems = visibleExternalItems.filter((item) =>
     itemMatchesDiscoverySearch(item, discoverySearch),
   );
+  const hasDiscoverySearch = discoverySearch.trim().length > 0;
+  const availableStyleCount = workspaceV2DiscoveryStyles.filter(
+    (style) => filterItemsByDiscoveryStyle(internalQueueSongs, style.id).length > 0,
+  ).length;
+  const resetDiscoveryFilters = () => {
+    setDiscoverySearch("");
+    onDiscoveryStyleChange("all");
+  };
   const selectedStyle =
     selectedDiscoveryStyle === "all"
       ? null
@@ -3011,7 +3025,7 @@ function WorkspaceV2ContentPanel({
         <nav className="workspace-v2-discovery-breadcrumb" aria-label="Discovery breadcrumb">
           <button
             className="workspace-v2-back-action"
-            onClick={() => onDiscoveryViewChange("home")}
+            onClick={() => handleContentDiscoveryViewChange("home")}
             type="button"
           >
             <ArrowLeft size={15} />
@@ -3028,12 +3042,12 @@ function WorkspaceV2ContentPanel({
           {spanish ? "Descubrimiento interno" : "Internal discovery"}
         </span>
         <h2>
-          {spanish ? "Canciones que reproducen aquí." : "Songs that play here."}
+          {spanish ? "Escucha dentro de First Listen." : "Listen inside First Listen."}
         </h2>
         <p>
           {spanish
-            ? "Esta cola usa contenido que puede reproducirse dentro de First Listen y puede sumar Banco de Tiempo cuando la reproducción es válida."
-            : "This queue uses content that can play inside First Listen and can add Time Bank progress when playback is valid."}
+            ? "Estas canciones pueden reproducirse aquí, apoyar artistas y sumar Banco de Tiempo cuando la reproducción es válida."
+            : "These songs can play here, support artists, and add Time Bank progress when playback is valid."}
         </p>
         <div className="workspace-v2-platform-chip-row" aria-label="Internal platforms">
           <span>▶ YouTube</span>
@@ -3047,12 +3061,12 @@ function WorkspaceV2ContentPanel({
         />
         <label className="workspace-v2-discovery-search">
           <Search size={15} />
-          <span>{spanish ? "Buscar cancion o artista" : "Search song or artist"}</span>
+          <span>{spanish ? "Buscar canción o artista" : "Search song or artist"}</span>
           <input
             onChange={(event) => setDiscoverySearch(event.target.value)}
             placeholder={
               spanish
-                ? "Buscar por cancion, artista o plataforma"
+                ? "Buscar por canción, artista o plataforma"
                 : "Search by song, artist, or platform"
             }
             type="search"
@@ -3089,15 +3103,29 @@ function WorkspaceV2ContentPanel({
         {!searchedInternalSongs.length && (
           <div className="workspace-v2-discovery-empty-state">
             <strong>
-              {spanish
-                ? "No encontramos canciones con ese filtro."
-                : "No songs match that filter."}
+              {hasDiscoverySearch
+                ? spanish
+                  ? "No encontramos canciones con esa búsqueda."
+                  : "No songs match that search."
+                : spanish
+                  ? "Todavía no hay canciones en este estilo."
+                  : "There are no songs in this style yet."}
             </strong>
             <small>
               {spanish
-                ? "Prueba Todos, borra la busqueda o presiona Regresar."
-                : "Try All, clear the search, or press Back."}
+                ? "Puedes ver todos los estilos, borrar la búsqueda o regresar al inicio."
+                : "You can view all styles, clear the search, or go back home."}
             </small>
+            <div className="workspace-v2-discovery-empty-actions">
+              <button onClick={resetDiscoveryFilters} type="button">
+                {spanish ? "Ver todos" : "View all"}
+              </button>
+              {hasDiscoverySearch && (
+                <button onClick={() => setDiscoverySearch("")} type="button">
+                  {spanish ? "Borrar búsqueda" : "Clear search"}
+                </button>
+              )}
+            </div>
           </div>
         )}
         <ol className="workspace-v2-internal-song-list">
@@ -3140,7 +3168,7 @@ function WorkspaceV2ContentPanel({
         </ol>
         <button
           className="workspace-v2-back-action workspace-v2-back-action-bottom"
-          onClick={() => onDiscoveryViewChange("home")}
+          onClick={() => handleContentDiscoveryViewChange("home")}
           type="button"
         >
           <ArrowLeft size={15} />
@@ -3156,7 +3184,7 @@ function WorkspaceV2ContentPanel({
         <nav className="workspace-v2-discovery-breadcrumb" aria-label="Discovery breadcrumb">
           <button
             className="workspace-v2-back-action"
-            onClick={() => onDiscoveryViewChange("home")}
+            onClick={() => handleContentDiscoveryViewChange("home")}
             type="button"
           >
             <ArrowLeft size={15} />
@@ -3173,12 +3201,12 @@ function WorkspaceV2ContentPanel({
           {spanish ? "Plataformas externas" : "External platforms"}
         </span>
         <h2>
-          {spanish ? "Explora música fuera de First Listen." : "Explore music outside First Listen."}
+          {spanish ? "Descubre artistas en otras plataformas." : "Discover artists on other platforms."}
         </h2>
         <p>
           {spanish
-            ? "Spotify, Apple Music y otros destinos abren fuera de First Listen. Sirven para descubrimiento, no para Banco de Tiempo."
-            : "Spotify, Apple Music, and other destinations open outside First Listen. They are for discovery, not Time Bank progress."}
+            ? "Estos enlaces abren fuera de First Listen. Son para descubrir, seguir y apoyar artistas en sus plataformas."
+            : "These links open outside First Listen. They are for discovering, following, and supporting artists on their platforms."}
         </p>
         <div className="workspace-v2-platform-chip-row" aria-label="External platforms">
           <span>↗ Spotify</span>
@@ -3194,7 +3222,7 @@ function WorkspaceV2ContentPanel({
         />
         <label className="workspace-v2-discovery-search">
           <Search size={15} />
-          <span>{spanish ? "Buscar cancion, artista o plataforma" : "Search song, artist, or platform"}</span>
+          <span>{spanish ? "Buscar canción, artista o plataforma" : "Search song, artist, or platform"}</span>
           <input
             onChange={(event) => setDiscoverySearch(event.target.value)}
             placeholder={
@@ -3215,15 +3243,29 @@ function WorkspaceV2ContentPanel({
         {externalDiscoveryItems.length && !searchedExternalItems.length && (
           <div className="workspace-v2-discovery-empty-state">
             <strong>
-              {spanish
-                ? "No encontramos destinos externos con ese filtro."
-                : "No external destinations match that filter."}
+              {hasDiscoverySearch
+                ? spanish
+                  ? "No encontramos destinos con esa búsqueda."
+                  : "No destinations match that search."
+                : spanish
+                  ? "Todavía no hay destinos en este estilo."
+                  : "There are no destinations in this style yet."}
             </strong>
             <small>
               {spanish
-                ? "Prueba Todos, borra la busqueda o presiona Regresar."
-                : "Try All, clear the search, or press Back."}
+                ? "Puedes ver todos los estilos, borrar la búsqueda o regresar al inicio."
+                : "You can view all styles, clear the search, or go back home."}
             </small>
+            <div className="workspace-v2-discovery-empty-actions">
+              <button onClick={resetDiscoveryFilters} type="button">
+                {spanish ? "Ver todos" : "View all"}
+              </button>
+              {hasDiscoverySearch && (
+                <button onClick={() => setDiscoverySearch("")} type="button">
+                  {spanish ? "Borrar búsqueda" : "Clear search"}
+                </button>
+              )}
+            </div>
           </div>
         )}
         {searchedExternalItems.length ? (
@@ -3274,7 +3316,7 @@ function WorkspaceV2ContentPanel({
         ) : null}
         <button
           className="workspace-v2-back-action workspace-v2-back-action-bottom"
-          onClick={() => onDiscoveryViewChange("home")}
+          onClick={() => handleContentDiscoveryViewChange("home")}
           type="button"
         >
           <ArrowLeft size={15} />
@@ -3295,9 +3337,42 @@ function WorkspaceV2ContentPanel({
       </h2>
       <p>
         {spanish
-          ? "Presiona Play, deja que la cola avance y convierte tu reproducción válida en tiempo para subir tu música."
-          : "Press Play, let the queue move, and turn valid playback into time to submit your music."}
+          ? "Escucha música nueva, apoya artistas y gana tiempo para subir la tuya."
+          : "Listen to new music, support artists, and earn time to submit yours."}
       </p>
+
+      <div className="workspace-v2-start-panel">
+        <div>
+          <span className="eyebrow">
+            <Play size={13} />
+            {spanish ? "Empieza aquí" : "Start here"}
+          </span>
+          <strong>
+            {spanish
+              ? "Primero descubre canciones que reproducen dentro de First Listen."
+              : "Start with songs that play inside First Listen."}
+          </strong>
+          <small>
+            {spanish
+              ? "Las plataformas externas siguen disponibles para descubrir artistas, pero la reproducción interna es la que puede sumar Banco de Tiempo."
+              : "External platforms are still available for artist discovery, but internal playback is what can add Time Bank progress."}
+          </small>
+        </div>
+        <div className="workspace-v2-start-actions">
+          <button onClick={() => handleContentDiscoveryViewChange("internal")} type="button">
+            <Play size={14} />
+            {spanish ? "Escuchar aquí" : "Listen here"}
+          </button>
+          <button onClick={() => handleContentDiscoveryViewChange("external")} type="button">
+            <ExternalLink size={14} />
+            {spanish ? "Ver externas" : "External"}
+          </button>
+          <button onClick={() => onPanelChange("submit")} type="button">
+            <Send size={14} />
+            {spanish ? "Subir música" : "Submit music"}
+          </button>
+        </div>
+      </div>
 
       <div
         aria-label={spanish ? "Opciones de descubrimiento" : "Discovery options"}
@@ -3305,7 +3380,7 @@ function WorkspaceV2ContentPanel({
       >
         <button
           className="workspace-v2-discovery-entry-card workspace-v2-discovery-entry-card-internal"
-          onClick={() => onDiscoveryViewChange("internal")}
+          onClick={() => handleContentDiscoveryViewChange("internal")}
           type="button"
         >
           <span className="workspace-v2-discovery-card-icon">
@@ -3315,8 +3390,8 @@ function WorkspaceV2ContentPanel({
             <strong>{spanish ? "Descubrimiento interno" : "Internal discovery"}</strong>
             <small>
               {spanish
-                ? "Reproduce aqui y puede sumar Banco de Tiempo."
-                : "Plays here and can add Time Bank progress."}
+                ? "Canciones que reproducen aquí. Prioridad First Listen."
+                : "Songs that play here. First Listen priority."}
             </small>
           </span>
           <span className="workspace-v2-discovery-card-badge">
@@ -3329,7 +3404,7 @@ function WorkspaceV2ContentPanel({
         </button>
         <button
           className="workspace-v2-discovery-entry-card workspace-v2-discovery-entry-card-external"
-          onClick={() => onDiscoveryViewChange("external")}
+          onClick={() => handleContentDiscoveryViewChange("external")}
           type="button"
         >
           <span className="workspace-v2-discovery-card-icon">
@@ -3339,8 +3414,8 @@ function WorkspaceV2ContentPanel({
             <strong>{spanish ? "Plataformas externas" : "External platforms"}</strong>
             <small>
               {spanish
-                ? "Encuentra enlaces de artistas en Spotify, TikTok y mas."
-                : "Find artist links on Spotify, TikTok, and more."}
+                ? "Spotify, TikTok, Apple Music y más. Abren fuera."
+                : "Spotify, TikTok, Apple Music, and more. Opens out."}
             </small>
           </span>
           <span className="workspace-v2-discovery-card-badge">
@@ -3363,11 +3438,11 @@ function WorkspaceV2ContentPanel({
             <Clock3 size={14} />
             {spanish ? "Banco de Tiempo" : "Time Bank"}
           </span>
-          <strong>{spanish ? "Siempre visible" : "Always visible"}</strong>
+          <strong>{spanish ? "Gana tiempo" : "Earn time"}</strong>
           <small>
             {spanish
-              ? "Tu tiempo aparece arriba mientras escuchas."
-              : "Your time stays visible while you listen."}
+              ? "Tu reproducción válida se convierte en tokens para subir música."
+              : "Your valid playback turns into tokens to submit music."}
           </small>
         </article>
         <article>
@@ -3375,39 +3450,27 @@ function WorkspaceV2ContentPanel({
             <ListMusic size={14} />
             {spanish ? "Canciones disponibles" : "Available songs"}
           </span>
-          <strong>{initialQueue.songs.length}</strong>
-          <small>{spanish ? "en la cola actual" : "in the current queue"}</small>
+          <strong>{internalQueueSongs.length}</strong>
+          <small>{spanish ? "reproducen dentro de First Listen" : "play inside First Listen"}</small>
         </article>
         <article>
           <span>
             <Music2 size={14} />
-            {spanish ? "Reproducción" : "Playback"}
+            {spanish ? "Estilos" : "Styles"}
           </span>
-          <strong>{spanish ? "Cola activa" : "Active queue"}</strong>
-          <small>{initialQueueTitle}</small>
+          <strong>{availableStyleCount}</strong>
+          <small>{spanish ? "con canciones disponibles" : "with available songs"}</small>
         </article>
         <article>
           <span>
-            <Coins size={14} />
-            {spanish ? "Siguiente paso" : "Next step"}
+            <ExternalLink size={14} />
+            {spanish ? "Externas" : "External"}
           </span>
-          <strong>
-            {viewerMode === "guest"
-              ? spanish
-                ? "Activa recompensas"
-                : "Activate rewards"
-              : spanish
-                ? "Reclama y sube"
-                : "Claim and submit"}
-          </strong>
+          <strong>{externalDiscoveryItems.length}</strong>
           <small>
-            {viewerMode === "guest"
-              ? spanish
-                ? "Crea una cuenta gratis cuando estés listo."
-                : "Create a free account when you are ready."
-              : spanish
-                ? "Usa tus tokens para compartir música."
-                : "Use your tokens to share music."}
+            {spanish
+              ? "enlaces para apoyar artistas fuera de First Listen"
+              : "links to support artists outside First Listen"}
           </small>
         </article>
       </div>
@@ -3417,7 +3480,7 @@ function WorkspaceV2ContentPanel({
         className="workspace-v2-flow-strip"
       >
         <span>{spanish ? "▶ Reproducir" : "▶ Play"}</span>
-        <span>{spanish ? "⏱ Sumar tiempo" : "⏱ Earn time"}</span>
+        <span>{spanish ? "⏱ Ganar tiempo" : "⏱ Earn time"}</span>
         <span>{spanish ? "🎟 Reclamar token" : "🎟 Claim token"}</span>
         <span>{spanish ? "🎵 Subir música" : "🎵 Submit music"}</span>
       </div>
@@ -3451,10 +3514,10 @@ function WorkspaceV2ContentPanel({
       <details className="workspace-v2-help-card">
         <summary>{spanish ? "¿Necesitas ayuda? Te explico rápido" : "Need help? Quick guide"}</summary>
         <div>
-          <span>{spanish ? "1. Presiona Play y descubre una canción." : "1. Press Play and discover a song."}</span>
-          <span>{spanish ? "2. La reproducción válida suma Banco de Tiempo." : "2. Valid playback adds Time Bank progress."}</span>
+          <span>{spanish ? "1. Presiona Play y descubre canciones nuevas." : "1. Press Play and discover new songs."}</span>
+          <span>{spanish ? "2. Tu reproducción válida suma Banco de Tiempo." : "2. Your valid playback adds Time Bank progress."}</span>
           <span>{spanish ? "3. Reclama tokens cuando estén listos." : "3. Claim tokens when they are ready."}</span>
-          <span>{spanish ? "4. Usa “Quiero subir mi música” para compartir la tuya." : "4. Use “I want to submit my music” to share yours."}</span>
+          <span>{spanish ? "4. Usa tus tokens para compartir tu música." : "4. Use your tokens to share your music."}</span>
           {viewerMode === "guest" && (
             <strong>
               {spanish
