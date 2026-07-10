@@ -1237,6 +1237,10 @@ function WorkspaceV2ShellClient({
           "--workspace-v2-return-strip-top",
           `${safeTop}px`,
         );
+        document.documentElement.style.setProperty(
+          "--workspace-v2-return-strip-top",
+          `${safeTop}px`,
+        );
       });
     };
 
@@ -1267,6 +1271,9 @@ function WorkspaceV2ShellClient({
         window.cancelAnimationFrame(returnStripFrameRef.current);
         returnStripFrameRef.current = null;
       }
+      document.documentElement.style.removeProperty(
+        "--workspace-v2-return-strip-top",
+      );
     };
   }, [activePanel, discoveryView, heroCollapsed]);
 
@@ -2060,6 +2067,7 @@ function WorkspaceV2ShellClient({
   return (
     <section
       className={`workspace-v2-product-shell${darkMode ? " theme-dark" : ""}`}
+      data-discovery-view={discoveryView}
       data-sidebar={sidebarExpanded ? "expanded" : "compact"}
       data-viewer-mode={viewerMode}
       data-workspace-mode={workspaceMode}
