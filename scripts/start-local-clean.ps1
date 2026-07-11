@@ -12,7 +12,7 @@ if ($env:FIRST_LISTEN_PORT) {
 }
 
 Write-Host ""
-Write-Host "First Listen local autorun" -ForegroundColor Green
+Write-Host "First Listen local test autorun" -ForegroundColor Green
 Write-Host "Project: $repoRoot"
 Write-Host "Port:    $port"
 Write-Host ""
@@ -53,12 +53,12 @@ $env:NEXT_TELEMETRY_DISABLED = "1"
 $env:FIRST_LISTEN_LOCAL_RUN_ID = (Get-Date).ToString("yyyyMMdd-HHmmss")
 
 Write-Host ""
-Write-Host "Open these after the server says Ready:" -ForegroundColor Cyan
-Write-Host "  http://localhost:$port/dashboard"
-Write-Host "  http://localhost:$port/workspace-v2"
-Write-Host "  http://localhost:$port/workspace-v2/guest"
+Write-Host "PC links:" -ForegroundColor Cyan
+Write-Host "  Main account test:  http://localhost:$port/dashboard"
+Write-Host "  Workspace V2:       http://localhost:$port/workspace-v2"
+Write-Host "  Guest preview:      http://localhost:$port/workspace-v2/guest"
 Write-Host ""
-Write-Host "Playback Bank local preview:" -ForegroundColor Cyan
+Write-Host "Playback Bank guest previews:" -ForegroundColor Cyan
 Write-Host "  Nueva:       http://localhost:$port/workspace-v2/guest?bankPreview=fresh"
 Write-Host "  Parcial:     http://localhost:$port/workspace-v2/guest?bankPreview=partial"
 Write-Host "  Completa:    http://localhost:$port/workspace-v2/guest?bankPreview=complete"
@@ -72,15 +72,25 @@ $localIPv4 = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue 
   Select-Object -First 1 -ExpandProperty IPAddress
 if ($localIPv4) {
   Write-Host ""
-  Write-Host "Phone/tablet preview on this network:" -ForegroundColor Cyan
+  Write-Host "Phone/tablet links on the same Wi-Fi:" -ForegroundColor Cyan
+  Write-Host "  Main account test:  http://${localIPv4}:$port/dashboard"
+  Write-Host "  Workspace V2:       http://${localIPv4}:$port/workspace-v2"
+  Write-Host "  Guest preview:      http://${localIPv4}:$port/workspace-v2/guest"
+  Write-Host ""
+  Write-Host "Phone/tablet Playback Bank guest previews:" -ForegroundColor Cyan
   Write-Host "  Nueva:       http://${localIPv4}:$port/workspace-v2/guest?bankPreview=fresh"
   Write-Host "  Parcial:     http://${localIPv4}:$port/workspace-v2/guest?bankPreview=partial"
   Write-Host "  Completa:    http://${localIPv4}:$port/workspace-v2/guest?bankPreview=complete"
   Write-Host "  Repetida:    http://${localIPv4}:$port/workspace-v2/guest?bankPreview=replay"
   Write-Host "  Preparado:   http://${localIPv4}:$port/workspace-v2/guest?bankPreview=idle"
+} else {
+  Write-Host ""
+  Write-Host "No local Wi-Fi IP was detected. Make sure the phone and PC are on the same network." -ForegroundColor Yellow
 }
 Write-Host ""
-Write-Host "Tip: if the browser still shows old UI, use Ctrl+F5 or open a new private window." -ForegroundColor DarkGray
+Write-Host "Keep this window open while testing." -ForegroundColor Yellow
+Write-Host "If the phone cannot open the link, allow Node.js through Windows Firewall." -ForegroundColor Yellow
+Write-Host "If the browser still shows old UI, use Ctrl+F5, close the PWA, or open a private window." -ForegroundColor DarkGray
 Write-Host ""
 
-npm.cmd run dev -- -p $port
+npm.cmd run dev -- -H 0.0.0.0 -p $port

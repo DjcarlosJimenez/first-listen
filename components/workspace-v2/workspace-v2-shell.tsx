@@ -738,8 +738,7 @@ function WorkspaceV2ShellClient({
     validation: controller.validation,
   });
   const { loadQueue } = controller;
-  const [workspaceLocale, setWorkspaceLocale] =
-    useState<InterfaceLocale>(locale);
+  const [workspaceLocale, setWorkspaceLocale] = useState<InterfaceLocale>("es");
   const spanish = workspaceLocale === "es";
   const canAccessAdmin = viewerMode === "founder" || viewerMode === "admin";
   const canAccessFounderOperations = viewerMode === "founder";
@@ -766,6 +765,12 @@ function WorkspaceV2ShellClient({
           ? "Plataformas externas"
           : "External platforms"
         : "";
+  const workspaceReturnVisible =
+    activePanel !== "discover" || discoveryView !== "home";
+  const workspaceReturnLabel =
+    activePanel === "discover"
+      ? activeDiscoveryLabel
+      : panelLabel(activePanel, spanish);
   const [darkMode, setDarkMode] = useState(false);
   const [debugOpen, setDebugOpen] = useState(debugMode && debugAllowed);
   const [
@@ -925,13 +930,38 @@ function WorkspaceV2ShellClient({
 
   useEffect(() => {
     const stored = window.localStorage.getItem("first-listen-locale");
-    setWorkspaceLocale(stored === "en" || stored === "es" ? stored : locale);
+    const fallbackLocale: InterfaceLocale =
+      locale === "en" || locale === "es" ? locale : "es";
+    setWorkspaceLocale(
+      stored === "en" || stored === "es"
+        ? stored
+        : fallbackLocale === "en"
+          ? "es"
+          : fallbackLocale,
+    );
   }, [locale]);
 
   useEffect(() => {
-    document.documentElement.lang = workspaceLocale;
-    window.localStorage.setItem("first-listen-locale", workspaceLocale);
+    if (typeof document !== "undefined") {
+      document.documentElement.lang = workspaceLocale;
+    }
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("first-listen-locale", workspaceLocale);
+    }
   }, [workspaceLocale]);
+
+  const handleWorkspaceLocaleChange = useCallback(
+    (nextLocale: InterfaceLocale) => {
+      setWorkspaceLocale(nextLocale);
+      if (typeof document !== "undefined") {
+        document.documentElement.lang = nextLocale;
+      }
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("first-listen-locale", nextLocale);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     document.documentElement.classList.toggle("theme-dark", darkMode);
@@ -1260,19 +1290,28 @@ function WorkspaceV2ShellClient({
     };
 
     const readWorkspaceScroll = () => {
-      const offsets = [
+      const scrollingElement = document.scrollingElement ?? document.documentElement;
+      const rootOffset = Math.max(
         window.scrollY,
+        scrollingElement?.scrollTop ?? 0,
         document.documentElement?.scrollTop ?? 0,
         document.body?.scrollTop ?? 0,
-      ];
+      );
 
-      let current = heroRef.current?.parentElement;
-      while (current) {
-        offsets.push(current.scrollTop);
+      if (rootOffset > 0 || !heroRef.current) {
+        return rootOffset;
+      }
+
+      let current = heroRef.current.parentElement;
+      while (current && current !== document.body && current !== document.documentElement) {
+        const scrollable = current.scrollHeight > current.clientHeight + 4;
+        if (scrollable && current.scrollTop > 0) {
+          return current.scrollTop;
+        }
         current = current.parentElement;
       }
 
-      return Math.max(...offsets);
+      return 0;
     };
 
     const updateCollapsedState = () => {
@@ -1280,8 +1319,8 @@ function WorkspaceV2ShellClient({
       heroCollapseFrameRef.current = window.requestAnimationFrame(() => {
         heroCollapseFrameRef.current = null;
         const mobile = window.matchMedia("(max-width: 900px)").matches;
-        const collapseAt = mobile ? 12 : 32;
-        const expandAt = mobile ? 2 : 10;
+        const collapseAt = mobile ? 64 : 44;
+        const expandAt = mobile ? 32 : 18;
         const scrollOffset = readWorkspaceScroll();
         const nextCollapsed = heroCollapsedRef.current
           ? scrollOffset > expandAt
@@ -1295,7 +1334,7 @@ function WorkspaceV2ShellClient({
         setCollapsedState(true);
         return;
       }
-      if (event.deltaY < -4 && readWorkspaceScroll() <= 10) {
+      if (event.deltaY < -4 && readWorkspaceScroll() <= 32) {
         setCollapsedState(false);
       }
     };
@@ -1313,7 +1352,14 @@ function WorkspaceV2ShellClient({
         setCollapsedState(true);
         return;
       }
-      if (delta < -8 && readWorkspaceScroll() <= 10) {
+      if (delta < -8 && readWorkspaceScroll() <= 32) {
+        setCollapsedState(false);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      touchStartYRef.current = null;
+      if (readWorkspaceScroll() <= 32) {
         setCollapsedState(false);
       }
     };
@@ -1335,6 +1381,10 @@ function WorkspaceV2ShellClient({
       capture: true,
       passive: true,
     });
+    document.addEventListener("touchend", handleTouchEnd, {
+      capture: true,
+      passive: true,
+    });
     window.addEventListener("scroll", updateCollapsedState, { passive: true });
     window.addEventListener("resize", updateCollapsedState);
     return () => {
@@ -1350,6 +1400,9 @@ function WorkspaceV2ShellClient({
       document.removeEventListener("touchmove", handleTouchMove, {
         capture: true,
       });
+      document.removeEventListener("touchend", handleTouchEnd, {
+        capture: true,
+      });
       window.removeEventListener("scroll", updateCollapsedState);
       window.removeEventListener("resize", updateCollapsedState);
       if (heroCollapseFrameRef.current !== null) {
@@ -1359,7 +1412,7 @@ function WorkspaceV2ShellClient({
   }, []);
 
   useEffect(() => {
-    if (activePanel !== "discover" || discoveryView === "home") return;
+    if (!workspaceReturnVisible) return;
 
     const updateReturnStripOffset = () => {
       if (returnStripFrameRef.current !== null) return;
@@ -1413,7 +1466,7 @@ function WorkspaceV2ShellClient({
         "--workspace-v2-return-strip-top",
       );
     };
-  }, [activePanel, discoveryView, heroCollapsed]);
+  }, [activePanel, discoveryView, heroCollapsed, workspaceReturnVisible]);
 
   const handleProviderDebug = useCallback(
     (event: WorkspaceV2ProviderDebugEvent) => {
@@ -2303,6 +2356,19 @@ function WorkspaceV2ShellClient({
     }
   }, []);
 
+  const handleWorkspaceReturn = useCallback(() => {
+    if (activePanel === "discover" && discoveryView !== "home") {
+      handleDiscoveryViewChange("home");
+      return;
+    }
+    handlePanelChange("discover");
+  }, [
+    activePanel,
+    discoveryView,
+    handleDiscoveryViewChange,
+    handlePanelChange,
+  ]);
+
   const handleMobileSubmitCta = useCallback(() => {
     if (viewerMode === "guest") {
       window.location.assign("/signup?next=/dashboard");
@@ -2538,7 +2604,7 @@ function WorkspaceV2ShellClient({
           <button
             aria-pressed={workspaceLocale === "es"}
             className={workspaceLocale === "es" ? "active" : ""}
-            onClick={() => setWorkspaceLocale("es")}
+            onClick={() => handleWorkspaceLocaleChange("es")}
             type="button"
           >
             ES
@@ -2547,7 +2613,7 @@ function WorkspaceV2ShellClient({
           <button
             aria-pressed={workspaceLocale === "en"}
             className={workspaceLocale === "en" ? "active" : ""}
-            onClick={() => setWorkspaceLocale("en")}
+            onClick={() => handleWorkspaceLocaleChange("en")}
             type="button"
           >
             EN
@@ -3079,19 +3145,19 @@ function WorkspaceV2ShellClient({
           )}
         </section>
 
-        {activePanel === "discover" && discoveryView !== "home" && (
+        {workspaceReturnVisible && (
           <div
             className="workspace-v2-discovery-return-strip"
             ref={returnStripRef}
           >
             <button
-              onClick={() => handleDiscoveryViewChange("home")}
+              onClick={handleWorkspaceReturn}
               type="button"
             >
               <ArrowLeft size={16} />
               {spanish ? "Regresar" : "Back"}
             </button>
-            <span>{activeDiscoveryLabel}</span>
+            <span>{workspaceReturnLabel}</span>
           </div>
         )}
 
@@ -4219,6 +4285,54 @@ function WorkspaceV2ContentPanel({
 
   return (
     <section className="workspace-v2-content-panel workspace-v2-discovery-home">
+      <div className="workspace-v2-welcome-card">
+        <span className="eyebrow">
+          <Compass size={13} />
+          {spanish ? "Bienvenido a First Listen" : "Welcome to First Listen"}
+        </span>
+        <h2>{spanish ? "Gracias por suscribirte." : "Thanks for joining."}</h2>
+        <p>
+          {spanish
+            ? "Puedes subir tus primeras 3 canciones y empezar a ganar tiempo escuchando musica nueva."
+            : "You can upload your first 3 songs and start earning time by listening to new music."}
+        </p>
+        <div className="workspace-v2-welcome-actions">
+          <button
+            className="workspace-v2-submit-music-cta workspace-v2-submit-music-cta-primary"
+            onClick={() => onPanelChange("submit")}
+            type="button"
+          >
+            <Send size={19} />
+            <span>
+              <strong>{spanish ? "Sube tu musica" : "Submit your music"}</strong>
+              <small>
+                {viewerMode === "guest"
+                  ? spanish
+                    ? "Crea una cuenta gratis para activar envios."
+                    : "Create a free account to activate submissions."
+                  : spanish
+                    ? "Empieza con tus canciones y comparte tu perfil."
+                    : "Start with your songs and share your profile."}
+              </small>
+            </span>
+          </button>
+          <button
+            className="workspace-v2-submit-music-cta workspace-v2-profile-cta"
+            onClick={() => onPanelChange("profile")}
+            type="button"
+          >
+            <User size={18} />
+            <span>
+              <strong>{spanish ? "Explorar perfil" : "Explore profile"}</strong>
+              <small>
+                {spanish
+                  ? "Revisa tu progreso, cuenta y actividad."
+                  : "View your progress, account, and activity."}
+              </small>
+            </span>
+          </button>
+        </div>
+      </div>
       <span className="eyebrow">
         <Compass size={13} />
         {spanish ? "Inicio First Listen" : "First Listen Home"}
@@ -4316,6 +4430,46 @@ function WorkspaceV2ContentPanel({
             <span>↗ Spotify</span>
             <span>↗ Apple Music</span>
             <span>↗ TikTok</span>
+          </span>
+        </button>
+      </div>
+
+      <div className="workspace-v2-primary-action-stack workspace-v2-late-actions">
+        <button
+          className="workspace-v2-submit-music-cta workspace-v2-submit-music-cta-primary"
+          onClick={() => onPanelChange("submit")}
+          type="button"
+        >
+          <span className="workspace-v2-primary-action-badge">
+            {spanish ? "Accion principal" : "Main action"}
+          </span>
+          <Send size={19} />
+          <span>
+            <strong>{spanish ? "Sube tu musica" : "Submit your music"}</strong>
+            <small>
+              {viewerMode === "guest"
+                ? spanish
+                  ? "Crea una cuenta gratis para activar envios."
+                  : "Create a free account to activate submissions."
+                : spanish
+                  ? "Usa tus tokens cuando estes listo para compartir."
+                  : "Use your tokens when you are ready to share."}
+            </small>
+          </span>
+        </button>
+        <button
+          className="workspace-v2-submit-music-cta workspace-v2-profile-cta"
+          onClick={() => onPanelChange("profile")}
+          type="button"
+        >
+          <User size={18} />
+          <span>
+            <strong>{spanish ? "Explorar perfil" : "Explore profile"}</strong>
+            <small>
+              {spanish
+                ? "Revisa tu progreso, cuenta y actividad."
+                : "View your progress, account, and activity."}
+            </small>
           </span>
         </button>
       </div>
