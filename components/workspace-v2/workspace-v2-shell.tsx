@@ -2435,6 +2435,27 @@ function WorkspaceV2ShellClient({
     });
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mobilePortrait = window.matchMedia(
+      "(max-width: 620px) and (orientation: portrait)",
+    ).matches;
+    if (!mobilePortrait) return;
+    if (activePanel === "discover" && discoveryView === "home") return;
+
+    const timeout = window.setTimeout(() => {
+      const panel = document.querySelector<HTMLElement>(
+        ".workspace-v2-content-panel",
+      );
+      panel?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 120);
+
+    return () => window.clearTimeout(timeout);
+  }, [activePanel, discoveryView]);
+
   const handlePlayInternalDiscoverySongs = useCallback(
     ({
       songs,

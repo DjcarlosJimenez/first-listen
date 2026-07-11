@@ -15787,6 +15787,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   padding: 20px;
 }
 
+.workspace-v2-content-panel {
+  scroll-margin-top: 220px;
+}
+
 .workspace-v2-product-body[data-workspace-mode="productivity"] .workspace-v2-content-panel {
   min-width: 0;
 }
@@ -17872,6 +17876,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     border-radius: 18px;
     gap: 10px;
     padding: 14px;
+  }
+
+  .workspace-v2-content-panel {
+    scroll-margin-top: 174px;
   }
 
   .workspace-v2-founder-ops-heading,

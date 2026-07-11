@@ -8442,6 +8442,33 @@ function toggleFocus(values: FeedbackFocus[], value: FeedbackFocus) {
     : [...values, value];
 }
 
+function cleanSubmissionMetadataText(value?: string) {
+  return (value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function cleanSubmissionArtistName(value?: string) {
+  return cleanSubmissionMetadataText(value)
+    .replace(/\s*[-\u2013\u2014]\s*Topic$/i, "")
+    .replace(/\s*\(\s*Topic\s*\)$/i, "")
+    .trim();
+}
+
+function metadataDurationParts(value?: number | string | null) {
+  const totalSeconds = Math.round(Number(value));
+  if (
+    !Number.isFinite(totalSeconds) ||
+    totalSeconds < 15 ||
+    totalSeconds > 43200
+  ) {
+    return null;
+  }
+
+  return {
+    minutes: String(Math.floor(totalSeconds / 60)),
+    seconds: String(totalSeconds % 60),
+  };
+}
+
 export function SubmitView({
   reviewCount,
   notify,
@@ -8482,6 +8509,11 @@ export function SubmitView({
   const [submittedForApproval, setSubmittedForApproval] = useState(false);
   const [saving, setSaving] = useState(false);
   const [metadataLoading, setMetadataLoading] = useState(false);
+  const autoFilledArtistNameRef = useRef("");
+  const autoFilledCoverImageUrlRef = useRef("");
+  const autoFilledDurationMinutesRef = useRef("");
+  const autoFilledDurationSecondsRef = useRef("");
+  const autoFilledSongTitleRef = useRef("");
   const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false);
   const [duplicateMatches, setDuplicateMatches] = useState<
     SubmissionDuplicate[]
@@ -8706,11 +8738,68 @@ export function SubmitView({
         const metadata = (await response.json()) as {
           artistName?: string;
           coverImageUrl?: string;
+          durationSeconds?: number | string | null;
           title?: string;
         };
-        setSongTitle((current) => current || metadata.title?.trim() || "");
-        setArtistName((current) => current || metadata.artistName?.trim() || "");
-        setCoverImageUrl((current) => current || metadata.coverImageUrl?.trim() || "");
+        const nextTitle = cleanSubmissionMetadataText(metadata.title);
+        const nextArtistName = cleanSubmissionArtistName(metadata.artistName);
+        const nextCoverImageUrl = cleanSubmissionMetadataText(
+          metadata.coverImageUrl,
+        );
+        const nextDuration = metadataDurationParts(metadata.durationSeconds);
+
+        setSongTitle((current) => {
+          if (
+            !nextTitle ||
+            (current.trim() && current !== autoFilledSongTitleRef.current)
+          ) {
+            return current;
+          }
+          autoFilledSongTitleRef.current = nextTitle;
+          return nextTitle;
+        });
+        setArtistName((current) => {
+          if (
+            !nextArtistName ||
+            (current.trim() && current !== autoFilledArtistNameRef.current)
+          ) {
+            return current;
+          }
+          autoFilledArtistNameRef.current = nextArtistName;
+          return nextArtistName;
+        });
+        setCoverImageUrl((current) => {
+          if (
+            !nextCoverImageUrl ||
+            (current.trim() && current !== autoFilledCoverImageUrlRef.current)
+          ) {
+            return current;
+          }
+          autoFilledCoverImageUrlRef.current = nextCoverImageUrl;
+          return nextCoverImageUrl;
+        });
+        if (nextDuration) {
+          setDurationMinutes((current) => {
+            if (
+              current &&
+              current !== autoFilledDurationMinutesRef.current
+            ) {
+              return current;
+            }
+            autoFilledDurationMinutesRef.current = nextDuration.minutes;
+            return nextDuration.minutes;
+          });
+          setDurationSeconds((current) => {
+            if (
+              current &&
+              current !== autoFilledDurationSecondsRef.current
+            ) {
+              return current;
+            }
+            autoFilledDurationSecondsRef.current = nextDuration.seconds;
+            return nextDuration.seconds;
+          });
+        }
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
           console.warn("[First Listen submission] Metadata lookup failed", error);
@@ -8889,6 +8978,11 @@ export function SubmitView({
     setContentKind("song");
     setDurationMinutes("");
     setDurationSeconds("");
+    autoFilledArtistNameRef.current = "";
+    autoFilledCoverImageUrlRef.current = "";
+    autoFilledDurationMinutesRef.current = "";
+    autoFilledDurationSecondsRef.current = "";
+    autoFilledSongTitleRef.current = "";
     setSubmittedForApproval(false);
     setMetadataLoading(false);
     setDuplicateCheckLoading(false);

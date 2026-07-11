@@ -6,6 +6,9 @@ type OEmbedResponse = {
   title?: string;
   author_name?: string;
   thumbnail_url?: string;
+  duration?: number | string;
+  duration_ms?: number | string;
+  duration_seconds?: number | string;
 };
 
 const DEFAULT_COVER = "https://www.firstlisten.net/covers/default-song.svg";
@@ -22,6 +25,21 @@ async function readOEmbed(url: string) {
     console.warn("[First Listen metadata] Provider lookup failed", { error, url });
     return null;
   }
+}
+
+function normalizeDurationSeconds(metadata: OEmbedResponse | null) {
+  if (!metadata) return null;
+  const directDuration = Number(metadata.duration_seconds ?? metadata.duration);
+  if (Number.isFinite(directDuration) && directDuration > 0) {
+    return Math.round(directDuration);
+  }
+
+  const durationMs = Number(metadata.duration_ms);
+  if (Number.isFinite(durationMs) && durationMs > 0) {
+    return Math.round(durationMs / 1000);
+  }
+
+  return null;
 }
 
 export async function GET(request: Request) {
@@ -69,5 +87,6 @@ export async function GET(request: Request) {
     title: metadata?.title ?? "",
     artistName: metadata?.author_name ?? "",
     coverImageUrl: metadata?.thumbnail_url ?? DEFAULT_COVER,
+    durationSeconds: normalizeDurationSeconds(metadata),
   });
 }
