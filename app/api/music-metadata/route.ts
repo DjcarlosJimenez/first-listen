@@ -13,6 +13,17 @@ type OEmbedResponse = {
 
 const DEFAULT_COVER = "https://www.firstlisten.net/covers/default-song.svg";
 
+function cleanMetadataText(value?: string) {
+  return (value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function cleanArtistName(value?: string) {
+  return cleanMetadataText(value)
+    .replace(/\s*[-\u2013\u2014]\s*Topic$/i, "")
+    .replace(/\s*\(\s*Topic\s*\)$/i, "")
+    .trim();
+}
+
 async function readOEmbed(url: string) {
   try {
     const response = await fetch(url, {
@@ -25,6 +36,15 @@ async function readOEmbed(url: string) {
     console.warn("[First Listen metadata] Provider lookup failed", { error, url });
     return null;
   }
+}
+
+async function readFirstOEmbed(urls: string[]) {
+  for (const url of urls) {
+    const metadata = await readOEmbed(url);
+    if (metadata) return metadata;
+  }
+
+  return null;
 }
 
 function normalizeDurationSeconds(metadata: OEmbedResponse | null) {
@@ -64,9 +84,14 @@ export async function GET(request: Request) {
     detection.platform === "YouTube" ||
     detection.platform === "YouTube Music"
   ) {
-    metadata = await readOEmbed(
+    const youtubeWatchUrl =
+      detection.resourceId && detection.resourceType !== "playlist"
+        ? `https://www.youtube.com/watch?v=${encodeURIComponent(detection.resourceId)}`
+        : detection.parsedUrl;
+    metadata = await readFirstOEmbed([
+      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(youtubeWatchUrl)}`,
       `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(detection.parsedUrl)}`,
-    );
+    ]);
   } else if (detection.platform === "Spotify") {
     metadata = await readOEmbed(
       `https://open.spotify.com/oembed?url=${encodeURIComponent(detection.parsedUrl)}`,
@@ -84,8 +109,8 @@ export async function GET(request: Request) {
     resourceType: detection.resourceType,
     embedUrl: embed?.src ?? null,
     telemetry: embed?.telemetry ?? null,
-    title: metadata?.title ?? "",
-    artistName: metadata?.author_name ?? "",
+    title: cleanMetadataText(metadata?.title),
+    artistName: cleanArtistName(metadata?.author_name),
     coverImageUrl: metadata?.thumbnail_url ?? DEFAULT_COVER,
     durationSeconds: normalizeDurationSeconds(metadata),
   });
