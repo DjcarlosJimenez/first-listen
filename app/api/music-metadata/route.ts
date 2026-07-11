@@ -11,10 +11,17 @@ type OEmbedResponse = {
   duration_seconds?: number | string;
 };
 
+type PageMetadata = {
+  artistName?: string;
+  coverImageUrl?: string;
+  durationSeconds?: number | string;
+  title?: string;
+};
+
 const DEFAULT_COVER = "https://www.firstlisten.net/covers/default-song.svg";
 
 function cleanMetadataText(value?: string) {
-  return (value ?? "").replace(/\s+/g, " ").trim();
+  return decodeHtmlEntities(value ?? "").replace(/\s+/g, " ").trim();
 }
 
 function cleanArtistName(value?: string) {
@@ -34,6 +41,58 @@ async function readOEmbed(url: string) {
     return (await response.json()) as OEmbedResponse;
   } catch (error) {
     console.warn("[First Listen metadata] Provider lookup failed", { error, url });
+    return null;
+  }
+}
+
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function readMetaContent(html: string, key: string) {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const keyFirst = new RegExp(
+    `<meta\\s+[^>]*(?:name|property)=["']${escapedKey}["'][^>]*content=["']([^"']*)["'][^>]*>`,
+    "i",
+  );
+  const contentFirst = new RegExp(
+    `<meta\\s+[^>]*content=["']([^"']*)["'][^>]*(?:name|property)=["']${escapedKey}["'][^>]*>`,
+    "i",
+  );
+  return keyFirst.exec(html)?.[1] ?? contentFirst.exec(html)?.[1] ?? "";
+}
+
+async function readSpotifyPageMetadata(url: string): Promise<PageMetadata | null> {
+  try {
+    const response = await fetch(url, {
+      headers: { "User-Agent": "First Listen Metadata Resolver/1.0" },
+      next: { revalidate: 3600 },
+    });
+    if (!response.ok) return null;
+    const html = await response.text();
+    return {
+      artistName:
+        readMetaContent(html, "music:musician_description") ||
+        readMetaContent(html, "twitter:description").split("·")[0],
+      coverImageUrl:
+        readMetaContent(html, "og:image") ||
+        readMetaContent(html, "twitter:image"),
+      durationSeconds: readMetaContent(html, "music:duration"),
+      title:
+        readMetaContent(html, "og:title") ||
+        readMetaContent(html, "twitter:title"),
+    };
+  } catch (error) {
+    console.warn("[First Listen metadata] Spotify page lookup failed", {
+      error,
+      url,
+    });
     return null;
   }
 }
@@ -96,6 +155,17 @@ export async function GET(request: Request) {
     metadata = await readOEmbed(
       `https://open.spotify.com/oembed?url=${encodeURIComponent(detection.parsedUrl)}`,
     );
+    const pageMetadata = await readSpotifyPageMetadata(detection.parsedUrl);
+    if (pageMetadata) {
+      metadata = {
+        ...metadata,
+        author_name: metadata?.author_name || pageMetadata.artistName,
+        duration_seconds:
+          metadata?.duration_seconds || pageMetadata.durationSeconds,
+        thumbnail_url: metadata?.thumbnail_url || pageMetadata.coverImageUrl,
+        title: metadata?.title || pageMetadata.title,
+      };
+    }
   } else if (detection.platform === "SoundCloud") {
     metadata = await readOEmbed(
       `https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(detection.parsedUrl)}`,

@@ -1,4 +1,4 @@
-const CACHE_VERSION = "first-listen-pwa-v7-submit-metadata";
+const CACHE_VERSION = "first-listen-pwa-v8-spotify-metadata";
 const OFFLINE_URL = "/offline";
 const APP_SHELL = [
   OFFLINE_URL,
