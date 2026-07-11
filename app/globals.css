@@ -14787,6 +14787,13 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: var(--acid);
 }
 
+.workspace-v2-claim-token-control {
+  background: linear-gradient(135deg, var(--acid), #77c900) !important;
+  border-color: rgba(185, 255, 47, 0.62) !important;
+  color: #071008 !important;
+  font-weight: 950;
+}
+
 .workspace-v2-playback-bank-menu {
   background:
     linear-gradient(135deg, rgba(185, 255, 47, 0.08), rgba(185, 255, 47, 0.02)),
@@ -15500,8 +15507,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     box-shadow: 0 12px 34px rgb(0 0 0 / 26%);
     font-size: 11px;
     justify-content: center;
-    min-height: 36px;
-    padding: 8px 10px;
+    min-height: 32px;
+    padding: 7px 9px;
     width: 100%;
   }
 
@@ -16261,6 +16268,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  scroll-margin-top: 280px;
 }
 
 .workspace-v2-discovery-search {
@@ -17189,7 +17197,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .workspace-v2-player-surface,
   .workspace-v2-player-surface .workspace-v2-provider-player,
   .workspace-v2-player-surface .provider-player {
-    min-height: 280px;
+    min-height: 220px;
   }
 
   .workspace-v2-player-surface[data-player-mode="audio"],
@@ -17349,6 +17357,105 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     text-overflow: ellipsis;
   }
 
+  .workspace-v2-product-hero:not([data-collapsed="true"]) {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .workspace-v2-product-hero:not([data-collapsed="true"]) .workspace-v2-compact-listener-status {
+    gap: 6px;
+  }
+
+  .workspace-v2-product-hero:not([data-collapsed="true"]) .workspace-v2-compact-listener-status article {
+    border-radius: 12px;
+    padding: 7px 8px;
+  }
+
+  .workspace-v2-product-hero:not([data-collapsed="true"]) .workspace-v2-compact-listener-status span {
+    font-size: 8px;
+  }
+
+  .workspace-v2-product-hero:not([data-collapsed="true"]) .workspace-v2-compact-listener-status strong {
+    font-size: 12px;
+  }
+
+  .workspace-v2-product-hero:not([data-collapsed="true"]) .workspace-v2-sticky-controls {
+    gap: 6px;
+    padding-top: 6px;
+  }
+
+  .workspace-v2-product-hero:not([data-collapsed="true"]) .workspace-v2-sticky-controls button {
+    border-radius: 13px;
+    font-size: 11px;
+    min-height: 36px;
+    padding: 7px 9px;
+  }
+
+  .workspace-v2-product-hero:not([data-collapsed="true"]) .workspace-v2-queue-position-pill {
+    flex: 1 1 calc(50% - 3px);
+    min-height: 32px;
+    min-width: 0;
+    padding: 7px 10px;
+    width: auto;
+  }
+
+  .workspace-v2-product-hero:not([data-collapsed="true"]) .workspace-v2-playback-trust-pill {
+    min-height: 32px;
+    padding: 7px 10px;
+  }
+
+  .workspace-v2-product-hero:not([data-collapsed="true"]) .workspace-v2-claim-token-control {
+    flex: 1 1 calc(50% - 3px);
+    min-width: 0;
+  }
+
+  .workspace-v2-discovery-detail-actions {
+    scroll-margin-top: 170px;
+  }
+
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-help-assistant,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-help-assistant {
+    top: calc(var(--workspace-v2-return-strip-top, 72px) + 2px);
+    width: min(168px, calc((100vw - 28px) / 2));
+  }
+
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-help-assistant-fab,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-help-assistant-fab {
+    font-size: 11px;
+    min-height: 32px;
+    padding: 7px 9px;
+  }
+
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-product-hero,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-product-hero {
+    gap: 0;
+    padding: 6px;
+  }
+
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-product-hero .workspace-v2-hero-copy,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-product-hero .workspace-v2-hero-copy,
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-product-hero .workspace-v2-compact-listener-status,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-product-hero .workspace-v2-compact-listener-status,
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-product-hero .workspace-v2-sticky-controls,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-product-hero .workspace-v2-sticky-controls,
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-product-hero .workspace-v2-active-actions,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-product-hero .workspace-v2-active-actions,
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-product-hero .workspace-v2-playback-bank-menu,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-product-hero .workspace-v2-playback-bank-menu {
+    display: none;
+  }
+
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-product-hero .workspace-v2-player-surface,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-product-hero .workspace-v2-player-surface,
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-product-hero .workspace-v2-player-surface .workspace-v2-provider-player,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-product-hero .workspace-v2-player-surface .workspace-v2-provider-player,
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-product-hero .workspace-v2-player-surface .provider-player,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-product-hero .workspace-v2-player-surface .provider-player {
+    height: clamp(128px, 38vw, 158px);
+    max-height: 158px;
+    min-height: 0;
+  }
+
   .workspace-v2-playback-bank-menu {
     border-radius: 16px;
     padding: 10px;
@@ -17377,6 +17484,15 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
   .workspace-v2-trust-layer {
     grid-template-columns: 1fr;
+  }
+
+  .workspace-v2-resume-card {
+    display: none;
+  }
+
+  .workspace-v2-product-shell[data-active-panel="discover"] .workspace-v2-trust-layer,
+  .workspace-v2-product-shell[data-active-panel="discover"] .workspace-v2-motivation-layer {
+    display: none;
   }
 
   .workspace-v2-time-bank-card,

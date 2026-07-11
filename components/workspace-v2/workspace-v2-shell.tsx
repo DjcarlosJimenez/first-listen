@@ -1784,19 +1784,13 @@ function WorkspaceV2ShellClient({
         : `Available time • ${clock(playbackBankRemainingSeconds)}`
       : playbackBankState === "complete"
         ? spanish
-          ? "Tiempo de esta canción completo"
-          : "Song time complete"
+          ? "Tiempo completo"
+          : "Time complete"
         : playbackBankState === "replay"
           ? spanish
-            ? "Repetida • descubre más para ganar"
-            : "Replay • discover more to earn"
-          : playbackBankState === "fresh"
-            ? spanish
-              ? "Banco activo"
-              : "Bank active"
-            : spanish
-              ? "Banco preparado"
-              : "Bank ready";
+            ? "Repetida"
+            : "Replay"
+          : "";
   const currentPlaybackOpportunity: PlaybackEarningOpportunity | null =
     controller.activeSong &&
     playbackBankState === "partial" &&
@@ -1841,6 +1835,11 @@ function WorkspaceV2ShellClient({
     Boolean(controller.activeSong) &&
     (playbackBankHasOpportunities ||
       playbackBankState === "partial");
+  const playbackBankChipVisible =
+    Boolean(playbackBankChipText) &&
+    (playbackBankState === "partial" ||
+      playbackBankState === "complete" ||
+      playbackBankState === "replay");
   const heroHeadline = workspaceSessionHeadline({
     activeSong: controller.activeSong,
     resumeTitle: resumedSession?.currentSongTitle ?? null,
@@ -2462,6 +2461,7 @@ function WorkspaceV2ShellClient({
   return (
     <section
       className={`workspace-v2-product-shell${darkMode ? " theme-dark" : ""}`}
+      data-active-panel={activePanel}
       data-discovery-view={discoveryView}
       data-sidebar={sidebarExpanded ? "expanded" : "compact"}
       data-viewer-mode={viewerMode}
@@ -2778,7 +2778,7 @@ function WorkspaceV2ShellClient({
               <Maximize2 size={16} />{" "}
               {spanish ? "Pantalla completa" : "Fullscreen"}
             </button>
-            {controller.activeSong && (
+            {playbackBankChipVisible && (
               <span
                 className="workspace-v2-playback-bank-chip"
                 data-bank-state={playbackBankState}
@@ -2786,6 +2786,17 @@ function WorkspaceV2ShellClient({
                 <Clock3 size={14} aria-hidden="true" />
                 {playbackBankChipText}
               </span>
+            )}
+            {rewardReady && (
+              <button
+                className="workspace-v2-claim-token-control"
+                disabled={!canClaimRewards}
+                onClick={economy.claimReward}
+                type="button"
+              >
+                <Coins size={16} />
+                {spanish ? "Reclamar token" : "Claim token"}
+              </button>
             )}
             {playbackBankMenuAvailable && (
               <button
@@ -3652,6 +3663,7 @@ function WorkspaceV2ContentPanel({
 }) {
   const spanish = locale === "es";
   const [discoverySearch, setDiscoverySearch] = useState("");
+  const discoveryResultsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setDiscoverySearch("");
@@ -3870,6 +3882,16 @@ function WorkspaceV2ContentPanel({
     setDiscoverySearch("");
     onDiscoveryStyleChange("all");
   };
+  const handleDiscoveryStyleSelect = (styleId: WorkspaceV2DiscoveryStyleId) => {
+    setDiscoverySearch("");
+    onDiscoveryStyleChange(styleId);
+    window.setTimeout(() => {
+      discoveryResultsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 80);
+  };
   const selectedStyle =
     selectedDiscoveryStyle === "all"
       ? null
@@ -3919,7 +3941,7 @@ function WorkspaceV2ContentPanel({
         <WorkspaceV2StyleFolders
           items={internalQueueSongs}
           locale={locale}
-          onSelect={onDiscoveryStyleChange}
+          onSelect={handleDiscoveryStyleSelect}
           selectedStyle={selectedDiscoveryStyle}
         />
         <label className="workspace-v2-discovery-search">
@@ -3936,7 +3958,10 @@ function WorkspaceV2ContentPanel({
             value={discoverySearch}
           />
         </label>
-        <div className="workspace-v2-discovery-detail-actions">
+        <div
+          className="workspace-v2-discovery-detail-actions"
+          ref={discoveryResultsRef}
+        >
           <button
             className="workspace-v2-secondary-action"
             disabled={!searchedInternalSongs.length}
@@ -4080,7 +4105,7 @@ function WorkspaceV2ContentPanel({
         <WorkspaceV2StyleFolders
           items={externalDiscoveryItems}
           locale={locale}
-          onSelect={onDiscoveryStyleChange}
+          onSelect={handleDiscoveryStyleSelect}
           selectedStyle={selectedDiscoveryStyle}
         />
         <label className="workspace-v2-discovery-search">
@@ -4097,7 +4122,10 @@ function WorkspaceV2ContentPanel({
             value={discoverySearch}
           />
         </label>
-        <div className="workspace-v2-discovery-detail-actions">
+        <div
+          className="workspace-v2-discovery-detail-actions"
+          ref={discoveryResultsRef}
+        >
           <span>
             {searchedExternalItems.length} / {visibleExternalItems.length}{" "}
             {spanish ? `en ${selectedStyleName}` : `in ${selectedStyleName}`}
