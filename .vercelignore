@@ -1,0 +1,13 @@
+.codex-remote-attachments/
+.codex/
+.agents/
+.env
+.env.*
+!.env.example
+.next/
+backups/
+outputs/
+supabase/.temp/
+*.rar
+node_modules/
+scripts/*.mjs
