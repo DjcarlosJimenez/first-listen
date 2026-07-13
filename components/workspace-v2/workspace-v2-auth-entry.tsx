@@ -463,7 +463,7 @@ export async function WorkspaceV2AuthEntry({
       .eq("user_id", user.id),
     supabase.rpc("get_my_removed_song_history"),
     supabase.rpc("get_content_economy_settings"),
-    supabase.rpc("get_external_discovery_feed", { feed_limit: 36 }),
+    supabase.rpc("get_external_discovery_feed", { feed_limit: 200 }),
   ]);
 
   const typedProfile = profile as WorkspaceV2Profile | null;

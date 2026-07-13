@@ -3813,6 +3813,57 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   padding: 24px 24px 0;
 }
 
+.landing-public-beta-banner {
+  align-items: center;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--ink);
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 18px;
+  padding: 10px 18px;
+}
+
+.landing-public-beta-banner span {
+  background: var(--dark);
+  border-radius: 999px;
+  color: var(--accent);
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  padding: 7px 10px;
+  text-transform: uppercase;
+}
+
+.landing-public-beta-banner strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.landing-public-beta-banner button {
+  align-items: center;
+  background: var(--dark);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  gap: 8px;
+  padding: 9px 14px;
+}
+
+.founder-sticky-banner,
+.founder-top-section {
+  display: none;
+}
+
 .landing-nav > a {
   color: var(--ink);
   text-decoration: none;
@@ -8460,6 +8511,25 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
     gap: 10px;
     padding-left: 15px;
     padding-right: 15px;
+  }
+
+  .landing-public-beta-banner {
+    align-items: center;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: auto 1fr auto;
+    justify-content: stretch;
+    margin-top: 12px;
+    padding: 8px 14px;
+  }
+
+  .landing-public-beta-banner strong {
+    font-size: 10px;
+  }
+
+  .landing-public-beta-banner button {
+    font-size: 9px;
+    padding: 8px 10px;
   }
 
   .landing-nav .brand-name {

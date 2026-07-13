@@ -54,6 +54,7 @@ $env:FIRST_LISTEN_LOCAL_RUN_ID = (Get-Date).ToString("yyyyMMdd-HHmmss")
 
 Write-Host ""
 Write-Host "PC links:" -ForegroundColor Cyan
+Write-Host "  Public landing:    http://localhost:$port/"
 Write-Host "  Main account test:  http://localhost:$port/dashboard"
 Write-Host "  Workspace V2:       http://localhost:$port/workspace-v2"
 Write-Host "  Guest preview:      http://localhost:$port/workspace-v2/guest"
@@ -73,6 +74,7 @@ $localIPv4 = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue 
 if ($localIPv4) {
   Write-Host ""
   Write-Host "Phone/tablet links on the same Wi-Fi:" -ForegroundColor Cyan
+  Write-Host "  Public landing:    http://${localIPv4}:$port/"
   Write-Host "  Main account test:  http://${localIPv4}:$port/dashboard"
   Write-Host "  Workspace V2:       http://${localIPv4}:$port/workspace-v2"
   Write-Host "  Guest preview:      http://${localIPv4}:$port/workspace-v2/guest"

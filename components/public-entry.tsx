@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/client";
 export function PublicEntry({ initialFounderRemaining }: { initialFounderRemaining: number }) {
   const router = useRouter();
   const [founderRemaining, setFounderRemaining] = useState(initialFounderRemaining);
-  const [locale, setLocale] = useState<InterfaceLocale>("en");
+  const [locale, setLocale] = useState<InterfaceLocale>("es");
   const [platformConfig, setPlatformConfig] =
     useState<PlatformControlConfig | null>(null);
 
@@ -22,6 +22,9 @@ export function PublicEntry({ initialFounderRemaining }: { initialFounderRemaini
     if (storedLocale === "en" || storedLocale === "es") {
       setLocale(storedLocale);
       document.documentElement.lang = storedLocale;
+    } else {
+      window.localStorage.setItem("first-listen-locale", "es");
+      document.documentElement.lang = "es";
     }
 
     const supabase = createClient();

@@ -195,7 +195,7 @@ export function WorkspaceV2GuestEntry() {
       if (!supabase) throw new Error("First Listen is not configured.");
       const { data, error } = await supabase.rpc("get_guest_song_queue", {
         guest_access_token: token,
-        queue_limit: 50,
+        queue_limit: 200,
       });
       if (error) throw error;
       setQueue(
@@ -209,7 +209,7 @@ export function WorkspaceV2GuestEntry() {
     const supabase = createClient();
     if (!supabase) return;
     const { data } = await supabase.rpc("get_external_discovery_feed", {
-      feed_limit: 36,
+      feed_limit: 200,
     });
     setExternalDiscoveryItems(
       ((data ?? []) as GuestExternalDiscoveryRow[])

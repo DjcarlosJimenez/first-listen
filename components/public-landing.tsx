@@ -74,6 +74,39 @@ export function PublicLanding({
 
   return (
     <div className="landing-page">
+      <header className="landing-nav">
+        <a href="#top" aria-label="First Listen home">
+          <Logo />
+        </a>
+        <nav aria-label="Public navigation">
+          <a href="#how-it-works">{copy.landing.nav.how}</a>
+          <a href="#features">{copy.landing.nav.features}</a>
+          <a href="#faq">{copy.landing.nav.faq}</a>
+          <a href="/help">{locale === "es" ? "Ayuda" : "Need Help?"}</a>
+        </nav>
+        <div className="landing-actions">
+          <LanguageSelector compact locale={locale} onChange={onLocaleChange} />
+          <PwaInstallButton compact iconOnly locale={locale} />
+          <button className="landing-login" onClick={onLogin}>{copy.common.login}</button>
+          <button className="landing-signup" onClick={onSignUp}>
+            {copy.common.signup} <ArrowRight size={15} />
+          </button>
+        </div>
+      </header>
+
+      <div className="landing-public-beta-banner" role="status">
+        <span>{copy.common.publicBeta}</span>
+        <strong>
+          {locale === "es"
+            ? "Escucha gratis. Sube tus primeras canciones con una cuenta gratuita."
+            : "Listen free. Submit your first songs with a free account."}
+        </strong>
+        <button type="button" onClick={onSignUp}>
+          {locale === "es" ? "Subir música" : "Upload music"}
+          <ArrowRight size={14} />
+        </button>
+      </div>
+
       <section
         className="landing-paths-section landing-primary-paths"
         id="top"
@@ -115,7 +148,7 @@ export function PublicLanding({
               "creatorHeadline",
               locale === "es"
                 ? "Sube contenido. Gana tokens. Recibe reproducciones reales."
-                : "Submit music. Earn tokens. Receive real listens.",
+                : "Submit music. Earn tokens. Receive real plays.",
             )}
           </h2>
           <p>
@@ -128,7 +161,7 @@ export function PublicLanding({
           </p>
           <ul>
             <li><Check size={14} /> {locale === "es" ? "Envía canciones para recibir feedback" : "Submit songs for honest feedback"}</li>
-            <li><Check size={14} /> {locale === "es" ? "Recibe escuchas y apoyo comunitario" : "Receive listens and community support"}</li>
+            <li><Check size={14} /> {locale === "es" ? "Recibe reproducciones reales y apoyo comunitario" : "Receive real plays and community support"}</li>
             <li><Check size={14} /> {locale === "es" ? "Descubre y apoya otros artistas" : "Discover and support other artists"}</li>
           </ul>
           <button className="landing-primary" onClick={onSignUp}>
@@ -159,28 +192,6 @@ export function PublicLanding({
           <ArrowRight size={14} />
         </button>
       </div>
-
-      <header className="landing-nav">
-        <a href="#top" aria-label="First Listen home">
-          <Logo />
-        </a>
-        <nav aria-label="Public navigation">
-          <a href="#how-it-works">{copy.landing.nav.how}</a>
-          <a href="#features">{copy.landing.nav.features}</a>
-          <a href="#founders">{copy.landing.nav.founder}</a>
-          <a href="#faq">{copy.landing.nav.faq}</a>
-          <a href="/help">Need Help?</a>
-        </nav>
-        <div className="landing-actions">
-          <LanguageSelector compact locale={locale} onChange={onLocaleChange} />
-          <PwaInstallButton compact locale={locale} />
-          <span className="beta-pill">{copy.common.publicBeta}</span>
-          <button className="landing-login" onClick={onLogin}>{copy.common.login}</button>
-          <button className="landing-signup" onClick={onSignUp}>
-            {copy.common.signup} <ArrowRight size={15} />
-          </button>
-        </div>
-      </header>
 
       <main>
         <section className="founder-section founder-top-section" id="founders">
