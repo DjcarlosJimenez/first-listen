@@ -4104,7 +4104,7 @@ function WorkspaceV2ContentPanel({
           </div>
         )}
         <ol className="workspace-v2-internal-song-list">
-          {searchedInternalSongs.map((song, index) => (
+          {searchedInternalSongs.slice(0, 24).map((song, index) => (
             <li key={song.id}>
               <span className="workspace-v2-song-index">{index + 1}</span>
               <span
@@ -4248,7 +4248,7 @@ function WorkspaceV2ContentPanel({
         )}
         {searchedExternalItems.length ? (
           <div className="workspace-v2-external-discovery-grid">
-            {searchedExternalItems.map((item) => (
+            {searchedExternalItems.slice(0, 24).map((item) => (
               <article key={`${item.feedKind ?? "external"}-${item.id}-${item.link}`}>
                 <span
                   aria-hidden="true"
