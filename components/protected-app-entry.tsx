@@ -9,6 +9,7 @@ import {
 } from "@/components/first-listen-app";
 import { Onboarding, type OnboardingPreferences } from "@/components/onboarding";
 import type { ProfilePanelProps } from "@/components/profile-panel";
+import { clearBrowserAuthSession } from "@/lib/auth-session-cleanup";
 import type { Genre, InterfaceLocale, ListenerLanguage } from "@/lib/catalog";
 import type { PlatformControlConfig } from "@/lib/platform-control";
 import { createClient } from "@/lib/supabase/client";
@@ -83,21 +84,11 @@ export function ProtectedAppEntry({
       "first-listen-guest-token",
     );
     if (!guestToken) return;
-    const supabase = createClient();
-    if (!supabase) return;
-    void supabase
-      .rpc("convert_guest_to_account", {
-        guest_access_token: guestToken,
-      })
-      .then(({ error }) => {
-        if (error) return;
-        window.localStorage.removeItem("first-listen-guest-token");
-        window.localStorage.removeItem("first-listen-guest-recovery-code");
-        document.cookie =
-          "first-listen-guest-token=; Max-Age=0; Path=/; SameSite=Lax; Secure";
-        router.refresh();
-      });
-  }, [router]);
+    window.localStorage.removeItem("first-listen-guest-token");
+    window.localStorage.removeItem("first-listen-guest-recovery-code");
+    document.cookie =
+      "first-listen-guest-token=; Max-Age=0; Path=/; SameSite=Lax";
+  }, []);
 
   const changeLocale = (nextLocale: InterfaceLocale) => {
     setLocale(nextLocale);
@@ -127,8 +118,9 @@ export function ProtectedAppEntry({
 
   const logout = async () => {
     const supabase = createClient();
-    if (supabase) await supabase.auth.signOut();
-    router.replace("/login");
+    if (supabase) await supabase.auth.signOut({ scope: "global" });
+    clearBrowserAuthSession();
+    router.replace("/guest");
     router.refresh();
   };
 

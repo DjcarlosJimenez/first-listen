@@ -32,6 +32,13 @@ function authErrorMessage(message: string, spanish: boolean) {
   return "No pudimos completar la solicitud. Inténtalo de nuevo.";
 }
 
+function clearGuestAccess() {
+  window.localStorage.removeItem("first-listen-guest-token");
+  window.localStorage.removeItem("first-listen-guest-recovery-code");
+  document.cookie =
+    "first-listen-guest-token=; Max-Age=0; Path=/; SameSite=Lax";
+}
+
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const locale = useInterfaceLocale();
   const spanish = locale === "es";
@@ -100,8 +107,6 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               full_name: name,
               legal_accepted: true,
               explicit_content_acknowledged: true,
-              guest_access_token:
-                window.localStorage.getItem("first-listen-guest-token"),
             },
             emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
           },
@@ -120,10 +125,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
     if (isSignup && !result.data.session) {
       window.sessionStorage.setItem("first-listen-pending-email", email);
+      clearGuestAccess();
       router.replace("/verify-email");
       return;
     }
 
+    clearGuestAccess();
     router.replace(isSignup ? "/dashboard" : nextPath);
     router.refresh();
   };

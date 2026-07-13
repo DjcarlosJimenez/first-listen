@@ -12,6 +12,7 @@ import {
   getContentClassification,
   isExternalPlatform,
 } from "@/lib/content-economy";
+import { clearBrowserAuthSession } from "@/lib/auth-session-cleanup";
 import { safeCoverUrl } from "@/lib/media";
 import { createClient } from "@/lib/supabase/client";
 import type { Platform } from "@/lib/types";
@@ -195,7 +196,7 @@ export function WorkspaceV2GuestEntry() {
       if (!supabase) throw new Error("First Listen is not configured.");
       const { data, error } = await supabase.rpc("get_guest_song_queue", {
         guest_access_token: token,
-        queue_limit: 50,
+        queue_limit: 200,
       });
       if (error) throw error;
       setQueue(
@@ -209,7 +210,7 @@ export function WorkspaceV2GuestEntry() {
     const supabase = createClient();
     if (!supabase) return;
     const { data } = await supabase.rpc("get_external_discovery_feed", {
-      feed_limit: 36,
+      feed_limit: 200,
     });
     setExternalDiscoveryItems(
       ((data ?? []) as GuestExternalDiscoveryRow[])
@@ -233,6 +234,9 @@ export function WorkspaceV2GuestEntry() {
         setLoading(false);
         return;
       }
+
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      clearBrowserAuthSession({ clearGuest: false });
 
       let token = window.localStorage.getItem("first-listen-guest-token");
       let identity: GuestSession | null = null;
@@ -328,6 +332,9 @@ export function WorkspaceV2GuestEntry() {
       <header className="account-header workspace-v2-preview-topbar">
         <Logo />
         <div className="owner-header-actions">
+          <Link href="/login?next=/dashboard">
+            {spanish ? "Ya tengo cuenta" : "Log in"}
+          </Link>
           <Link href="/signup">
             <LockKeyhole size={16} />
             {spanish ? "Crear cuenta gratis" : "Create free account"}

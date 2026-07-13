@@ -49,6 +49,7 @@ import { SubmitView, type SongSubmission } from "@/components/first-listen-app";
 import { ProfilePanel, type ProfilePanelProps } from "@/components/profile-panel";
 import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import { SongActionBar } from "@/components/song-action-bar";
+import { clearBrowserAuthSession } from "@/lib/auth-session-cleanup";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { databasePlatform } from "@/lib/content-economy";
 import type {
@@ -1916,8 +1917,8 @@ function WorkspaceV2ShellClient({
   const rewardStatusText =
     viewerMode === "guest"
       ? spanish
-        ? "Crea una cuenta gratis para activar recompensas."
-        : "Create a free account to activate rewards."
+        ? "Crea una cuenta para empezar a ganar tokens."
+        : "Create an account to start earning tokens."
       : rewardReady
         ? spanish
           ? "Token listo para reclamar"
@@ -2504,16 +2505,21 @@ function WorkspaceV2ShellClient({
     try {
       const supabase = createClient();
       if (supabase) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "global" });
       }
-      window.localStorage.removeItem("first-listen-guest-token");
-      window.sessionStorage.removeItem("first-listen-pending-email");
-      document.cookie =
-        "first-listen-guest-token=; Max-Age=0; Path=/; SameSite=Lax";
+      clearBrowserAuthSession();
     } finally {
-      window.location.assign("/login?next=/dashboard");
+      window.location.assign("/guest");
     }
   }, [signingOut]);
+
+  const handleAccountAction = useCallback(() => {
+    if (viewerMode === "guest") {
+      window.location.assign("/login?next=/dashboard");
+      return;
+    }
+    void handleSignOut();
+  }, [handleSignOut, viewerMode]);
 
   const navItems = useMemo(
     () =>
@@ -2572,6 +2578,14 @@ function WorkspaceV2ShellClient({
           <span aria-hidden="true">🎵</span>
           <strong>{spanish ? "Subir" : "Upload"}</strong>
         </button>
+        {viewerMode === "guest" && (
+          <Link
+            className="workspace-v2-mobile-login-cta"
+            href="/login?next=/dashboard"
+          >
+            {spanish ? "Entrar" : "Log in"}
+          </Link>
+        )}
         <button
           aria-expanded={sidebarExpanded}
           aria-label={
@@ -2714,11 +2728,19 @@ function WorkspaceV2ShellClient({
             <span aria-hidden="true">{darkMode ? "☀" : "🌙"}</span>
           </button>
           <button
-            aria-label={spanish ? "Cerrar sesión" : "Sign out"}
+            aria-label={
+              viewerMode === "guest"
+                ? spanish
+                  ? "Ingresar a mi cuenta"
+                  : "Log in to my account"
+                : spanish
+                  ? "Cerrar sesión"
+                  : "Sign out"
+            }
             disabled={signingOut}
             onClick={() => {
               setSidebarExpanded(false);
-              void handleSignOut();
+              handleAccountAction();
             }}
             type="button"
           >
@@ -2728,7 +2750,7 @@ function WorkspaceV2ShellClient({
         <button
           className="workspace-v2-signout-button"
           disabled={signingOut}
-          onClick={handleSignOut}
+          onClick={handleAccountAction}
           type="button"
         >
           <LogOut size={15} />
@@ -2739,8 +2761,8 @@ function WorkspaceV2ShellClient({
                 : "Signing out..."
                 : viewerMode === "guest"
                   ? spanish
-                    ? "Cambiar cuenta"
-                    : "Switch account"
+                    ? "Ingresar"
+                    : "Log in"
                 : spanish
                   ? "Cerrar sesion"
                   : "Sign out"}
@@ -2915,6 +2937,14 @@ function WorkspaceV2ShellClient({
             </span>
           </div>
 
+          {viewerMode === "guest" && (
+            <p className="workspace-v2-guest-player-note">
+              {spanish
+                ? "Apoya a tu artista favorito. Crea una cuenta para empezar a ganar tokens."
+                : "Support your favorite artist. Create an account to start earning tokens."}
+            </p>
+          )}
+
           {playbackBankMenuOpen && playbackBankMenuAvailable && (
             <section
               className="workspace-v2-playback-bank-menu"
@@ -3066,8 +3096,8 @@ function WorkspaceV2ShellClient({
             <small>
               {viewerMode === "guest"
                 ? spanish
-                  ? "Tu progreso se guarda. Crea una cuenta gratis para activar recompensas."
-                  : "Your progress is saved. Create a free account to activate rewards."
+                  ? "Escucha como invitado. Regístrate para empezar a ganar tokens."
+                  : "Listen as a guest. Join to start earning tokens."
                 : rewardReady
                   ? spanish
                     ? "Recompensa disponible ahora"
@@ -3159,8 +3189,8 @@ function WorkspaceV2ShellClient({
               <span>{spanish ? "Recompensas" : "Rewards"}</span>
               <strong>
                 {spanish
-                  ? "Tu progreso se guarda. Crea una cuenta gratis para activar recompensas."
-                  : "Your progress is saved. Create a free account to activate rewards."}
+                  ? "Escucha libremente. Crea una cuenta para ganar tokens."
+                  : "Listen freely. Create an account to earn tokens."}
               </strong>
             </article>
           )}
@@ -3811,8 +3841,8 @@ function WorkspaceV2ContentPanel({
               ? "Envía tu canción sin detener la reproducción. Tu Banco de Tiempo y tokens siguen visibles."
               : "Submit your song without stopping playback. Your Time Bank and tokens stay visible."
             : spanish
-              ? "Sigue descubriendo como invitado. Crea una cuenta gratis para activar recompensas, tokens y envíos."
-              : "Keep discovering as a guest. Create a free account to activate rewards, tokens, and submissions."}
+              ? "Sigue descubriendo como invitado. Crea una cuenta para empezar a ganar tokens y enviar música."
+              : "Keep discovering as a guest. Create an account to start earning tokens and submit music."}
         </p>
         {canSubmit ? (
           <Link href="/submit">{spanish ? "Abrir Enviar Canción" : "Open Submit Song"}</Link>
@@ -3858,8 +3888,8 @@ function WorkspaceV2ContentPanel({
         <h2>
           {viewerMode === "guest"
             ? spanish
-              ? "Tu actividad de invitado puede convertirse en cuenta."
-              : "Your guest activity can become an account."
+              ? "Tu modo invitado se queda separado de tu cuenta."
+              : "Guest mode stays separate from your account."
             : spanish
               ? "Tu perfil está disponible sin detener la música."
               : "Your profile is available without stopping the music."}
@@ -3867,8 +3897,8 @@ function WorkspaceV2ContentPanel({
         <p>
           {viewerMode === "guest"
             ? spanish
-              ? "Sigue descubriendo. Cuando te registres, puedes activar recompensas y herramientas de creador."
-              : "Keep discovering. When you join, you can activate rewards and creator tools."
+              ? "Escucha libremente. Cuando te registres, empiezas limpio con recompensas y herramientas de creador."
+              : "Listen freely. When you join, you start fresh with rewards and creator tools."
             : spanish
               ? "Revisa tu actividad, canciones y herramientas personales mientras la reproducción continúa."
               : "Review your activity, songs, and personal tools while playback continues."}
@@ -4104,7 +4134,10 @@ function WorkspaceV2ContentPanel({
           </div>
         )}
         <ol className="workspace-v2-internal-song-list">
-          {searchedInternalSongs.slice(0, 24).map((song, index) => (
+          {(viewerMode === "guest"
+            ? searchedInternalSongs
+            : searchedInternalSongs.slice(0, 24)
+          ).map((song, index) => (
             <li key={song.id}>
               <span className="workspace-v2-song-index">{index + 1}</span>
               <span
@@ -4248,7 +4281,10 @@ function WorkspaceV2ContentPanel({
         )}
         {searchedExternalItems.length ? (
           <div className="workspace-v2-external-discovery-grid">
-            {searchedExternalItems.slice(0, 24).map((item) => (
+            {(viewerMode === "guest"
+              ? searchedExternalItems
+              : searchedExternalItems.slice(0, 24)
+            ).map((item) => (
               <article key={`${item.feedKind ?? "external"}-${item.id}-${item.link}`}>
                 <span
                   aria-hidden="true"
@@ -4587,8 +4623,8 @@ function WorkspaceV2ContentPanel({
           {viewerMode === "guest" && (
             <strong>
               {spanish
-                ? "Crea una cuenta gratis para activar recompensas y envíos."
-                : "Create a free account to activate rewards and submissions."}
+                ? "Crea una cuenta para empezar a ganar tokens y enviar música."
+                : "Create an account to start earning tokens and submit music."}
             </strong>
           )}
         </div>

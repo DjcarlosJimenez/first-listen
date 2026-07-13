@@ -74,6 +74,28 @@ export function PublicLanding({
 
   return (
     <div className="landing-page">
+      <header className="landing-nav">
+        <a href="#top" aria-label="First Listen home">
+          <Logo />
+        </a>
+        <nav aria-label="Public navigation">
+          <a href="#how-it-works">{copy.landing.nav.how}</a>
+          <a href="#features">{copy.landing.nav.features}</a>
+          <a href="#founders">{copy.landing.nav.founder}</a>
+          <a href="#faq">{copy.landing.nav.faq}</a>
+          <a href="/help">Need Help?</a>
+        </nav>
+        <div className="landing-actions">
+          <LanguageSelector compact locale={locale} onChange={onLocaleChange} />
+          <PwaInstallButton compact locale={locale} />
+          <span className="beta-pill">{copy.common.publicBeta}</span>
+          <button className="landing-login" onClick={onLogin}>{copy.common.login}</button>
+          <button className="landing-signup" onClick={onSignUp}>
+            {copy.common.signup} <ArrowRight size={15} />
+          </button>
+        </div>
+      </header>
+
       <section
         className="landing-paths-section landing-primary-paths"
         id="top"
@@ -159,28 +181,6 @@ export function PublicLanding({
           <ArrowRight size={14} />
         </button>
       </div>
-
-      <header className="landing-nav">
-        <a href="#top" aria-label="First Listen home">
-          <Logo />
-        </a>
-        <nav aria-label="Public navigation">
-          <a href="#how-it-works">{copy.landing.nav.how}</a>
-          <a href="#features">{copy.landing.nav.features}</a>
-          <a href="#founders">{copy.landing.nav.founder}</a>
-          <a href="#faq">{copy.landing.nav.faq}</a>
-          <a href="/help">Need Help?</a>
-        </nav>
-        <div className="landing-actions">
-          <LanguageSelector compact locale={locale} onChange={onLocaleChange} />
-          <PwaInstallButton compact locale={locale} />
-          <span className="beta-pill">{copy.common.publicBeta}</span>
-          <button className="landing-login" onClick={onLogin}>{copy.common.login}</button>
-          <button className="landing-signup" onClick={onSignUp}>
-            {copy.common.signup} <ArrowRight size={15} />
-          </button>
-        </div>
-      </header>
 
       <main>
         <section className="founder-section founder-top-section" id="founders">

@@ -14344,6 +14344,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   display: none;
 }
 
+.workspace-v2-mobile-login-cta {
+  display: none;
+}
+
 .workspace-v2-mobile-submit-cta strong {
   font: inherit;
 }
@@ -14742,6 +14746,18 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .workspace-v2-playback-trust-pill[data-playback-state="playing"] {
   border-color: rgba(185, 255, 47, 0.5);
+}
+
+.workspace-v2-guest-player-note {
+  background: color-mix(in srgb, var(--accent) 11%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 16px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.35;
+  margin: -2px 0 8px;
+  padding: 10px 12px;
 }
 
 .workspace-v2-playback-bank-chip {
@@ -17223,7 +17239,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     box-sizing: border-box;
     display: grid;
     gap: 6px;
-    grid-template-columns: max-content max-content max-content 34px;
+    grid-template-columns: max-content max-content max-content max-content 34px;
     justify-content: space-between;
     justify-self: center;
     max-width: calc(100vw - 20px);
@@ -17263,7 +17279,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .workspace-v2-language-switcher {
     justify-self: center;
     min-height: 30px;
-    order: 3;
+    order: 4;
     padding: 0 6px;
     width: min(104px, 100%);
   }
@@ -17293,7 +17309,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     justify-self: end;
     min-height: 30px;
     min-width: 34px;
-    order: 4;
+    order: 5;
   }
 
   .workspace-v2-mobile-submit-cta {
@@ -17309,6 +17325,25 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     padding: 0 8px;
     white-space: nowrap;
     width: auto;
+  }
+
+  .workspace-v2-mobile-login-cta {
+    align-items: center;
+    background: var(--workspace-v2-control-bg);
+    border: 1px solid var(--workspace-v2-control-border);
+    border-radius: 999px;
+    color: var(--text);
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 900;
+    justify-content: center;
+    justify-self: center;
+    line-height: 1;
+    min-height: 30px;
+    order: 3;
+    padding: 0 8px;
+    text-decoration: none;
+    white-space: nowrap;
   }
 
   .workspace-v2-desktop-sidebar-icon {
