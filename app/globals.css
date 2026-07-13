@@ -14389,6 +14389,52 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: var(--acid);
 }
 
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel a:hover,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel a:focus,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel a:focus-visible,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel a:active,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:hover,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:focus,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:focus-visible,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:active {
+  border-color: var(--workspace-v2-readable-accent-border);
+  color: var(--workspace-v2-text);
+}
+
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel a:hover svg,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel a:focus svg,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel a:active svg,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:hover svg,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:focus svg,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:active svg,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:hover strong,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:focus strong,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:active strong,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:hover small,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:focus small,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:active small,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-discovery-card-copy strong,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-discovery-card-copy small,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-submit-music-cta strong,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-submit-music-cta small,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-style-folders button strong {
+  color: var(--workspace-v2-text);
+}
+
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-discovery-card-icon,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-discovery-card-badge,
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-platform-chip-row span {
+  color: var(--workspace-v2-readable-accent-strong);
+}
+
+@media (hover: none) {
+  .workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel button:hover,
+  .workspace-v2-product-shell:not(.theme-dark) .workspace-v2-content-panel a:hover,
+  .workspace-v2-product-shell:not(.theme-dark) .workspace-v2-discover-list button:hover {
+    color: var(--workspace-v2-text);
+  }
+}
+
 .workspace-v2-debug-toggle {
   align-self: end;
 }
@@ -16219,6 +16265,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .workspace-v2-submit-music-cta > svg {
   color: var(--acid);
+}
+
+.workspace-v2-product-shell:not(.theme-dark) .workspace-v2-profile-cta > svg {
+  color: var(--workspace-v2-readable-accent-strong);
 }
 
 .workspace-v2-submit-music-cta-primary > svg {
