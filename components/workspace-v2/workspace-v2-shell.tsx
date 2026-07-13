@@ -122,6 +122,17 @@ type PlaybackEarningStatus = {
   suggestedResumeSeconds: number | null;
 };
 
+type WorkspaceV2ActionEconomySummary = {
+  bankLabel: string;
+  creditsLabel: string;
+  guidanceText: string;
+  guidanceTitle: string;
+  playbackBankState: PlaybackBankState;
+  rewardLabel: string;
+  rewardProgressPercent: number;
+  showGuidance: boolean;
+};
+
 type PlaybackEarningOpportunity = {
   artist: string;
   coverUrl: string;
@@ -1917,8 +1928,8 @@ function WorkspaceV2ShellClient({
   const rewardStatusText =
     viewerMode === "guest"
       ? spanish
-        ? "Crea una cuenta para empezar a ganar tokens."
-        : "Create an account to start earning tokens."
+        ? "Activa cuenta"
+        : "Create account"
       : rewardReady
         ? spanish
           ? "Token listo para reclamar"
@@ -1940,8 +1951,88 @@ function WorkspaceV2ShellClient({
           100,
           ((bankSecondsForDisplay % exchangeSeconds) / exchangeSeconds) * 100,
         );
+  const actionCreditsLabel =
+    viewerMode === "guest"
+      ? spanish
+        ? "Activa cuenta"
+        : "Create account"
+      : `${economy.state.credits} ${
+          economy.state.credits === 1
+            ? spanish
+              ? "token"
+              : "token"
+            : spanish
+              ? "tokens"
+              : "tokens"
+        }`;
   const activeQueueSongs = controller.queue.activeQueue?.songs ?? initialQueue.songs;
   const discoveryCatalogSongs = initialQueue.songs;
+  const unplayedQueueCount = activeQueueSongs.filter(
+    (song) => song.id !== controller.activeSong?.id && !song.lastHeardAt,
+  ).length;
+  const playbackBankGuidanceTitle =
+    playbackBankState === "partial"
+      ? spanish
+        ? "Tiempo pendiente disponible"
+        : "Available time remains"
+      : playbackBankState === "complete"
+        ? spanish
+          ? "Tiempo de esta canción completado"
+          : "Song time completed"
+        : playbackBankState === "replay"
+          ? spanish
+            ? "Canción ya escuchada"
+            : "Song heard before"
+          : playbackBankState === "fresh"
+            ? spanish
+              ? "Canción nueva para tu Banco"
+              : "New song for your bank"
+            : spanish
+              ? "Banco de Tiempo"
+              : "Time Bank";
+  const playbackBankGuidanceText =
+    viewerMode === "guest"
+      ? spanish
+        ? "Regístrate para activar Banco de Tiempo y tokens."
+        : "Sign up to activate Time Bank and tokens."
+      : playbackBankState === "partial"
+        ? spanish
+          ? `Aún puedes ganar ${clock(playbackBankRemainingSeconds)} de esta canción.`
+          : `You can still earn ${clock(playbackBankRemainingSeconds)} from this song.`
+        : playbackBankState === "complete"
+          ? spanish
+            ? unplayedQueueCount > 0
+              ? `Esta canción ya dio todo su tiempo. Usa Siguiente para descubrir nuevas (${unplayedQueueCount} en cola).`
+              : "Esta canción ya dio todo su tiempo. Sigue descubriendo más música."
+            : unplayedQueueCount > 0
+              ? `This song already counted fully. Use Next to discover new songs (${unplayedQueueCount} in queue).`
+              : "This song already counted fully. Keep discovering for more available songs."
+          : playbackBankState === "replay"
+            ? spanish
+              ? unplayedQueueCount > 0
+                ? `Ya escuchaste esta canción. Para sumar más tiempo, sigue con canciones nuevas (${unplayedQueueCount} en cola).`
+                : "Ya escuchaste esta canción. Cuando haya música nueva, First Listen la priorizará."
+              : unplayedQueueCount > 0
+                ? `You already heard this song. To earn more time, continue with new songs (${unplayedQueueCount} in queue).`
+                : "You already heard this song. First Listen will prioritize new music when available."
+            : spanish
+              ? "Esta canción puede sumar Banco de Tiempo cuando la reproducción sea válida."
+              : "This song can add Time Bank when playback is valid.";
+  const actionEconomySummary: WorkspaceV2ActionEconomySummary = {
+    bankLabel: clock(bankSecondsForDisplay),
+    creditsLabel: actionCreditsLabel,
+    guidanceText: playbackBankGuidanceText,
+    guidanceTitle: playbackBankGuidanceTitle,
+    playbackBankState,
+    rewardLabel: rewardStatusText,
+    rewardProgressPercent: bankProgressPercent,
+    showGuidance:
+      Boolean(controller.activeSong) &&
+      (viewerMode === "guest" ||
+        playbackBankState === "partial" ||
+        playbackBankState === "complete" ||
+        playbackBankState === "replay"),
+  };
   const consumedSongs = activeQueueSongs.filter((song) =>
     controller.queue.consumedSongIds.includes(song.id),
   );
@@ -3026,6 +3117,7 @@ function WorkspaceV2ShellClient({
 
           {controller.activeSong && (
             <WorkspaceV2ActiveSongActions
+              economySummary={actionEconomySummary}
               locale={workspaceLocale}
               song={controller.activeSong}
               guestToken={guestToken}
@@ -5245,11 +5337,13 @@ function FounderOperationsPanel({
 }
 
 function WorkspaceV2ActiveSongActions({
+  economySummary,
   guestToken,
   locale,
   song,
   viewerMode,
 }: {
+  economySummary: WorkspaceV2ActionEconomySummary;
   guestToken?: string | null;
   locale: InterfaceLocale;
   song: WorkspaceV2Song;
@@ -5303,6 +5397,38 @@ function WorkspaceV2ActiveSongActions({
         songId={song.id}
         title={song.title}
       />
+      <div
+        className="workspace-v2-action-economy-strip"
+        data-bank-state={economySummary.playbackBankState}
+      >
+        <article>
+          <Clock3 size={14} aria-hidden="true" />
+          <span>{spanish ? "Banco" : "Time Bank"}</span>
+          <strong>{economySummary.bankLabel}</strong>
+        </article>
+        <article>
+          <Coins size={14} aria-hidden="true" />
+          <span>{spanish ? "Tokens" : "Tokens"}</span>
+          <strong>{economySummary.creditsLabel}</strong>
+        </article>
+        <article>
+          <Activity size={14} aria-hidden="true" />
+          <span>{spanish ? "Recompensa" : "Reward"}</span>
+          <strong>{economySummary.rewardLabel}</strong>
+          <i aria-hidden="true">
+            <b style={{ width: `${economySummary.rewardProgressPercent}%` }} />
+          </i>
+        </article>
+      </div>
+      {economySummary.showGuidance && (
+        <p
+          className="workspace-v2-playback-earning-guidance"
+          data-bank-state={economySummary.playbackBankState}
+        >
+          <strong>{economySummary.guidanceTitle}</strong>
+          <span>{economySummary.guidanceText}</span>
+        </p>
+      )}
       <details className="workspace-v2-report-action">
         <summary>
           <Flag size={14} />
