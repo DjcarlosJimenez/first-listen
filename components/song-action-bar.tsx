@@ -11,7 +11,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/client";
 import type { Platform } from "@/lib/types";
@@ -83,11 +83,14 @@ export function SongActionBar({
   );
   const [comments, setComments] = useState<SongComment[]>([]);
   const [comment, setComment] = useState("");
+  const [commentFocused, setCommentFocused] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
   const [storedGuestToken, setStoredGuestToken] = useState<string>();
+  const commentBoxRef = useRef<HTMLTextAreaElement | null>(null);
   const spanish = locale === "es";
   const effectiveGuestToken = guestToken ?? storedGuestToken;
+  const commentDraftKey = `first-listen-comment-draft:${songId}`;
 
   useEffect(() => {
     if (guestToken || typeof window === "undefined") return;
@@ -95,6 +98,27 @@ export function SongActionBar({
       window.localStorage.getItem("first-listen-guest-token") ?? undefined,
     );
   }, [guestToken]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setComment(window.localStorage.getItem(commentDraftKey) ?? "");
+  }, [commentDraftKey]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    const attribute = "data-song-action-panel-open";
+
+    if (panel) {
+      root.setAttribute(attribute, panel);
+    } else {
+      root.removeAttribute(attribute);
+    }
+
+    return () => {
+      root.removeAttribute(attribute);
+    };
+  }, [panel]);
 
   const refresh = useCallback(async () => {
     const supabase = createClient();
@@ -211,8 +235,36 @@ export function SongActionBar({
       setMessage(error.message);
       return;
     }
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(commentDraftKey);
+    }
     setComment("");
+    setMessage(
+      spanish
+        ? "Comentario publicado. Aparece abajo en esta canción."
+        : "Comment posted. It appears below on this song.",
+    );
     await Promise.all([loadComments(), refresh()]);
+  };
+
+  const handleCommentChange = (nextComment: string) => {
+    setComment(nextComment);
+    if (typeof window === "undefined") return;
+    const trimmed = nextComment.trim();
+    if (trimmed.length > 0) {
+      window.localStorage.setItem(commentDraftKey, nextComment);
+    } else {
+      window.localStorage.removeItem(commentDraftKey);
+    }
+  };
+
+  const focusCommentBox = () => {
+    window.requestAnimationFrame(() => {
+      commentBoxRef.current?.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
+    });
   };
 
   const share = async (kind: "community" | "original_platform") => {
@@ -353,7 +405,10 @@ export function SongActionBar({
       </div>
 
       {panel && (
-        <section className="song-action-panel">
+        <section
+          className={`song-action-panel${panel === "comments" ? " song-action-panel-comments" : ""}${commentFocused ? " is-writing" : ""}`}
+          onClick={(event) => event.stopPropagation()}
+        >
           <button
             aria-label={spanish ? "Cerrar" : "Close"}
             className="song-action-close"
@@ -367,16 +422,43 @@ export function SongActionBar({
             <>
               <h4>{spanish ? "Comentarios de la comunidad" : "Community comments"}</h4>
               <form onSubmit={submitComment}>
-                <input
+                <textarea
+                  aria-label={spanish ? "Escribe un comentario" : "Write a comment"}
+                  autoCapitalize="sentences"
+                  autoComplete="off"
+                  inputMode="text"
                   maxLength={1000}
-                  onChange={(event) => setComment(event.target.value)}
+                  onChange={(event) => handleCommentChange(event.target.value)}
+                  onBlur={() => {
+                    window.setTimeout(() => setCommentFocused(false), 120);
+                  }}
+                  onFocus={() => {
+                    setCommentFocused(true);
+                    focusCommentBox();
+                  }}
                   placeholder={spanish ? "Escribe un comentario..." : "Write a comment..."}
+                  ref={commentBoxRef}
+                  rows={2}
                   value={comment}
                 />
                 <button disabled={busy === "comment" || comment.trim().length < 2} type="submit">
                   <Send size={14} /> {spanish ? "Publicar" : "Post"}
                 </button>
               </form>
+              <p className="song-comment-helper">
+                {spanish
+                  ? "Tu comentario queda público en esta canción. Si cierras este panel, guardo tu borrador en este dispositivo."
+                  : "Your comment appears publicly on this song. If you close this panel, your draft stays saved on this device."}
+              </p>
+              {message && (
+                <p className="song-action-message song-action-message-inline" role="status">
+                  {message}
+                </p>
+              )}
+              <div className="song-comment-list-heading">
+                <strong>{spanish ? "Comentarios publicados aquí" : "Published here"}</strong>
+                <span>{comments.length}</span>
+              </div>
               <div className="song-comment-list">
                 {comments.map((item) => (
                   <article key={item.id}>
@@ -392,6 +474,15 @@ export function SongActionBar({
                   <p>{spanish ? "Sé la primera persona en comentar." : "Be the first to comment."}</p>
                 )}
               </div>
+              <p className="song-comment-end">
+                {comments.length
+                  ? spanish
+                    ? "Ya viste todos los comentarios."
+                    : "You have seen all comments."
+                  : spanish
+                    ? "Todavía no hay comentarios. Sé la primera persona en apoyar esta canción."
+                    : "When someone comments, it will appear here."}
+              </p>
             </>
           )}
 
@@ -444,7 +535,7 @@ export function SongActionBar({
             </>
           )}
 
-          {message && <p className="song-action-message" role="status">{message}</p>}
+          {message && panel !== "comments" && <p className="song-action-message" role="status">{message}</p>}
         </section>
       )}
       {message && !panel && (
