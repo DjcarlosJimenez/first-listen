@@ -175,6 +175,9 @@ const SPOTIFY_API_SRC = "https://open.spotify.com/embed/iframe-api/v1";
 const MAX_INITIALIZATION_ATTEMPTS = 3;
 const ACTIVE_PLAYBACK_EVENT = "first-listen:active-playback";
 const USER_CLICK_PLAY_DEDUPE_MS = 850;
+const AUTOPLAY_RETRY_DELAYS_MS = [0, 250, 750, 1500, 2500, 4000, 6000];
+const AUTOPLAY_FALLBACK_DELAY_MS =
+  AUTOPLAY_RETRY_DELAYS_MS[AUTOPLAY_RETRY_DELAYS_MS.length - 1] + 900;
 let youtubeApiPromise: Promise<YouTubeApi> | null = null;
 let soundCloudApiPromise: Promise<SoundCloudApi> | null = null;
 let spotifyApiPromise: Promise<SpotifyIframeApi> | null = null;
@@ -536,8 +539,32 @@ export function ProviderPlayer({
       if (!targetKey) return;
       clearAutoplayRetryTimers();
       const token = autoplayRetryTokenRef.current;
-      const retryDelays = [0, 250, 750, 1500, 2500, 4000, 6000];
-      autoplayRetryTimersRef.current = retryDelays.map((delay) =>
+      autoplayRetryTimersRef.current = [
+        ...AUTOPLAY_RETRY_DELAYS_MS.map((delay) =>
+          window.setTimeout(() => {
+            if (
+              manualPauseRef.current ||
+              token !== autoplayRetryTokenRef.current ||
+              latestYouTubeTargetRef.current !== targetKey ||
+              youtubePlaybackTargetRef.current !== targetKey
+            ) {
+              return;
+            }
+            try {
+              const state = mapYouTubeState(player.getPlayerState());
+              if (state === "playing" || state === "completed") return;
+              setShowAutoplayFallback(false);
+              player.playVideo();
+            } catch (error) {
+              if (debugEnabledRef.current) {
+                console.info("[First Listen player] YouTube autoplay retry deferred", {
+                  error,
+                  targetKey,
+                });
+              }
+            }
+          }, delay),
+        ),
         window.setTimeout(() => {
           if (
             manualPauseRef.current ||
@@ -550,18 +577,17 @@ export function ProviderPlayer({
           try {
             const state = mapYouTubeState(player.getPlayerState());
             if (state === "playing" || state === "completed") return;
-            setShowAutoplayFallback(false);
-            player.playVideo();
+            setShowAutoplayFallback(true);
           } catch (error) {
             if (debugEnabledRef.current) {
-              console.info("[First Listen player] YouTube autoplay retry deferred", {
+              console.info("[First Listen player] YouTube autoplay fallback deferred", {
                 error,
                 targetKey,
               });
             }
           }
-        }, delay),
-      );
+        }, AUTOPLAY_FALLBACK_DELAY_MS),
+      ];
     },
     [clearAutoplayRetryTimers],
   );
@@ -1904,10 +1930,10 @@ export function ProviderPlayer({
       {showAutoplayFallback && (
         <div className="provider-autoplay-fallback" role="status">
           <strong>
-            {spanish ? "La reproducción necesita un toque" : "Playback needs one tap"}
+            {spanish ? "Toca para activar sonido" : "Tap to turn on sound"}
           </strong>
           <button onClick={requestPlayback} type="button">
-            {spanish ? "▶ Toca para empezar a escuchar" : "▶ Tap To Start Listening"}
+            {spanish ? "Activar reproducción" : "Start playback"}
           </button>
         </div>
       )}

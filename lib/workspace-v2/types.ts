@@ -24,6 +24,7 @@ export type WorkspaceV2Song = {
   exposureScore?: number | null;
   genre?: string | null;
   id: string;
+  language?: string | null;
   lastHeardAt?: number | null;
   link: string;
   playbackKind: WorkspaceV2PlaybackKind;
@@ -41,6 +42,7 @@ export type WorkspaceV2ExternalDiscoveryItem = {
   feedKind?: string;
   genre?: string | null;
   id: string;
+  language?: string | null;
   link: string;
   platform: string;
   subcategory?: string | null;

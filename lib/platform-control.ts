@@ -230,7 +230,7 @@ export const discoveryHubDefaultSections: DiscoveryHubSectionConfig[] = [
     visible: true,
     title: {
       en: "Most listened",
-      es: "Mas escuchadas",
+      es: "Mas reproducidas",
     },
   },
 ];
@@ -761,9 +761,9 @@ const moduleOrder = Object.keys(
 
 export const defaultHomepageCopyConfig: HomepageCopyConfig = {
   en: {
-    welcomeHeadline: "Listen to music. Discover artists. Support creators.",
-    welcomeDescription: "No registration is required to listen. Always free.",
-    creatorHeadline: "Submit music. Earn tokens. Receive real listens.",
+    welcomeHeadline: "Play music without registration.",
+    welcomeDescription: "Enter as a guest, explore, and play free forever.",
+    creatorHeadline: "Publish your links. Earn tokens. Receive real plays.",
     creatorDescription: "Grow your audience with a free creator account.",
     heroLabel: "Public beta now open",
     heroHeadline: "Real Listeners. Real Viewers. Real Reactions.",
@@ -776,9 +776,9 @@ export const defaultHomepageCopyConfig: HomepageCopyConfig = {
     betaMessage: "First Listen is live in public beta.",
   },
   es: {
-    welcomeHeadline: "Escucha música. Descubre artistas. Apoya creadores.",
-    welcomeDescription: "No necesitas registrarte para escuchar. Siempre gratis.",
-    creatorHeadline: "Sube contenido. Gana tokens. Recibe reproducciones reales.",
+    welcomeHeadline: "Reproduce musica sin registro.",
+    welcomeDescription: "Entra como invitado, explora y reproduce siempre gratis.",
+    creatorHeadline: "Publica tus links. Gana tokens. Recibe reproducciones reales.",
     creatorDescription: "Haz crecer tu audiencia con una cuenta gratuita.",
     heroLabel: "Beta pública abierta",
     heroHeadline: "Oyentes reales. Vistas reales. Reacciones reales.",

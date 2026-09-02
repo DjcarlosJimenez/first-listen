@@ -16254,7 +16254,6 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: #061008;
 }
 
-.workspace-v2-start-actions button:nth-child(3),
 .workspace-v2-late-actions,
 .connected-platforms-card {
   display: none;
@@ -16756,6 +16755,68 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+}
+
+.workspace-v2-language-filters {
+  background:
+    linear-gradient(135deg, var(--workspace-v2-readable-accent-bg), rgba(255, 255, 255, 0.035)),
+    var(--workspace-v2-card-bg);
+  border: 1px solid var(--workspace-v2-readable-accent-border);
+  border-radius: 18px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.workspace-v2-language-filters > span {
+  align-items: center;
+  color: var(--workspace-v2-muted);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 950;
+  gap: 6px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-v2-language-filters > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.workspace-v2-language-filters button {
+  align-items: center;
+  background: var(--workspace-v2-card-bg);
+  border: 1px solid var(--workspace-v2-card-border);
+  border-radius: 999px;
+  color: var(--workspace-v2-text);
+  display: inline-flex;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.workspace-v2-language-filters button.is-active {
+  background: var(--workspace-v2-readable-accent-bg);
+  border-color: var(--workspace-v2-readable-accent);
+  color: var(--workspace-v2-readable-accent-strong);
+}
+
+.workspace-v2-language-filters button strong {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.workspace-v2-language-filters button small {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 950;
+  min-width: 20px;
+  padding: 2px 6px;
+  text-align: center;
 }
 
 .workspace-v2-discovery-detail {
@@ -18064,6 +18125,125 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
   .workspace-v2-guest-conversion-card {
     grid-column: auto;
+  }
+
+  .workspace-v2-discovery-home {
+    gap: 10px;
+  }
+
+  .workspace-v2-welcome-card {
+    border-radius: 16px;
+    gap: 9px;
+    padding: 12px;
+  }
+
+  .workspace-v2-welcome-card h2 {
+    font-size: clamp(24px, 8vw, 34px);
+    letter-spacing: 0;
+    line-height: 1.04;
+  }
+
+  .workspace-v2-welcome-card p {
+    font-size: 14px;
+    line-height: 1.32;
+  }
+
+  .workspace-v2-welcome-actions {
+    gap: 8px;
+  }
+
+  .workspace-v2-submit-music-cta {
+    border-radius: 16px;
+    min-height: 58px;
+    padding: 11px;
+  }
+
+  .workspace-v2-submit-music-cta-primary {
+    min-height: 70px;
+    padding: 14px 12px;
+  }
+
+  .workspace-v2-submit-music-cta-primary strong {
+    font-size: clamp(20px, 6.2vw, 26px);
+    letter-spacing: 0;
+  }
+
+  .workspace-v2-start-panel {
+    border-radius: 16px;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .workspace-v2-start-panel strong {
+    font-size: clamp(18px, 6vw, 23px);
+    letter-spacing: 0;
+  }
+
+  .workspace-v2-start-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .workspace-v2-start-actions button {
+    justify-content: center;
+    min-width: 0;
+    padding: 8px 6px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .workspace-v2-discovery-options {
+    gap: 8px;
+  }
+
+  .workspace-v2-discovery-options button {
+    border-radius: 16px;
+    grid-template-columns: 40px minmax(0, 1fr);
+    min-height: 74px;
+  }
+
+  .workspace-v2-discovery-card-badge,
+  .workspace-v2-platform-chip-row-strong {
+    display: none;
+  }
+
+  .workspace-v2-discovery-card-copy strong {
+    font-size: 16px;
+    letter-spacing: 0;
+  }
+
+  .workspace-v2-discovery-home .workspace-v2-heart-grid article:nth-child(n+3),
+  .workspace-v2-discovery-home .workspace-v2-up-next-preview {
+    display: none;
+  }
+
+  .workspace-v2-flow-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace-v2-flow-strip span {
+    white-space: normal;
+  }
+
+  .workspace-v2-style-folders section > div,
+  .workspace-v2-language-filters > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace-v2-style-folders > button,
+  .workspace-v2-style-folders section button,
+  .workspace-v2-language-filters button {
+    border-radius: 14px;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .workspace-v2-language-filters {
+    border-radius: 16px;
+    padding: 9px;
   }
 }
 

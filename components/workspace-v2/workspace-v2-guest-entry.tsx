@@ -37,11 +37,16 @@ type GuestQueueRow = {
   content_duration_seconds?: number | null;
   content_type?: string | null;
   cover_image_url?: string | null;
+  created_at?: string | null;
+  exposure_score?: number | string | null;
+  featured?: boolean | null;
   genre?: string | null;
   music_url?: string | null;
   platform?: string | null;
+  song_language?: string | null;
   song_id?: string | null;
   subcategory?: string | null;
+  submitted_at?: string | null;
   title?: string | null;
 };
 
@@ -56,6 +61,34 @@ type GuestExternalDiscoveryRow = GuestQueueRow & {
 function firstRow<T>(value: T | T[] | null): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
+}
+
+function numericValue(value: number | string | null | undefined) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function timestampMs(value: string | null | undefined) {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function prioritizeGuestQueueRows(rows: GuestQueueRow[]) {
+  return [...rows].sort((left, right) => {
+    const featuredDiff = Number(Boolean(right.featured)) - Number(Boolean(left.featured));
+    if (featuredDiff !== 0) return featuredDiff;
+    const exposureDiff =
+      (numericValue(left.exposure_score) ?? (left.featured ? 0 : 25)) -
+      (numericValue(right.exposure_score) ?? (right.featured ? 0 : 25));
+    if (exposureDiff !== 0) return exposureDiff;
+    return (
+      (timestampMs(right.created_at ?? right.submitted_at) ?? 0) -
+      (timestampMs(left.created_at ?? left.submitted_at) ?? 0)
+    );
+  });
 }
 
 function storedLocale(): InterfaceLocale {
@@ -101,9 +134,10 @@ function mapQueueSong(row: GuestQueueRow): WorkspaceV2Song | null {
       typeof row.content_duration_seconds === "number"
         ? row.content_duration_seconds
         : null,
-    exposureScore: 25,
+    exposureScore: numericValue(row.exposure_score) ?? (row.featured ? 0 : 25),
     genre: row.genre ?? row.subcategory ?? null,
     id,
+    language: row.song_language ?? null,
     link,
     playbackKind:
       getContentClassification(platform) === "internal" ? "internal" : "external",
@@ -158,6 +192,7 @@ function mapExternalDiscoveryItem(
     feedKind: row.feed_kind ?? undefined,
     genre: row.genre ?? row.subcategory ?? null,
     id,
+    language: row.song_language ?? null,
     link: destination.url,
     platform: destination.platform,
     subcategory: row.subcategory ?? row.genre ?? null,
@@ -169,14 +204,14 @@ function buildGuestQueue(rows: GuestQueueRow[], locale: InterfaceLocale): Worksp
   return {
     id: "guest-workspace-v2",
     mode: "discovery",
-    songs: rows
+    songs: prioritizeGuestQueueRows(rows)
       .map(mapQueueSong)
       .filter((song): song is WorkspaceV2Song => Boolean(song)),
-    source: "random",
+    source: "featured",
     title:
       locale === "es"
-        ? "Cola de descubrimiento invitado"
-        : "Guest discovery queue",
+        ? "Destacadas por First Listen"
+        : "Featured by First Listen",
   };
 }
 

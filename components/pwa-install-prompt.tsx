@@ -36,6 +36,7 @@ const PwaInstallContext = createContext<PwaInstallContextValue | null>(null);
 
 const DISMISS_KEY = "first-listen-install-dismissed-at";
 const DISMISS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const INSTALL_INSTRUCTION_DELAY_MS = 45000;
 const UPDATE_REMINDER_MS = 10 * 60 * 1000;
 
 async function readServiceWorkerVersion() {
@@ -191,7 +192,6 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       setPromptEvent(event as BeforeInstallPromptEvent);
-      if (!recentlyDismissed() && !isStandaloneMode()) setVisible(true);
     };
     const onInstalled = () => {
       setInstalled(true);
@@ -227,7 +227,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       if (!recentlyDismissed() && !isStandaloneMode()) {
         setVisible(true);
       }
-    }, 1600);
+    }, INSTALL_INSTRUCTION_DELAY_MS);
 
     return () => {
       cancelled = true;

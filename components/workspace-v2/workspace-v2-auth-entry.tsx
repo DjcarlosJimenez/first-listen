@@ -55,6 +55,7 @@ type WorkspaceV2SongRow = {
   last_heard_at?: string | null;
   music_url: string | null;
   platform: string | null;
+  song_language?: string | null;
   subcategory?: string | null;
   title: string | null;
   user_id: string | null;
@@ -127,6 +128,18 @@ function timestampMs(value: string | null | undefined) {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+function prioritizeWorkspaceV2Rows(rows: WorkspaceV2SongRow[]) {
+  return [...rows].sort((left, right) => {
+    const featuredDiff = Number(Boolean(right.featured)) - Number(Boolean(left.featured));
+    if (featuredDiff !== 0) return featuredDiff;
+    const exposureDiff =
+      (numericValue(left.exposure_score) ?? 50) -
+      (numericValue(right.exposure_score) ?? 50);
+    if (exposureDiff !== 0) return exposureDiff;
+    return (timestampMs(right.created_at) ?? 0) - (timestampMs(left.created_at) ?? 0);
+  });
+}
+
 function toWorkspaceSong(row: WorkspaceV2SongRow): WorkspaceV2Song | null {
   const platform = displayPlatform[String(row.platform ?? "")] ?? "YouTube Music";
   const link = String(row.music_url ?? "").trim();
@@ -145,6 +158,7 @@ function toWorkspaceSong(row: WorkspaceV2SongRow): WorkspaceV2Song | null {
     exposureScore: exposureScore ?? (row.featured ? 0 : 50),
     genre: row.genre ?? row.subcategory ?? null,
     id: row.id,
+    language: row.song_language ?? null,
     lastHeardAt,
     link,
     playbackKind:
@@ -199,6 +213,7 @@ function toExternalDiscoveryItem(
     feedKind: row.feed_kind ?? undefined,
     genre: row.genre ?? row.subcategory ?? null,
     id: row.id ?? row.song_id ?? "",
+    language: row.song_language ?? null,
     link: destination.url,
     platform: destination.platform,
     subcategory: row.subcategory ?? row.genre ?? null,
@@ -207,7 +222,7 @@ function toExternalDiscoveryItem(
 }
 
 function buildPublicBetaQueue(rows: WorkspaceV2SongRow[], locale: InterfaceLocale): WorkspaceV2Queue {
-  const songs = rows
+  const songs = prioritizeWorkspaceV2Rows(rows)
     .map(toWorkspaceSong)
     .filter((song): song is WorkspaceV2Song => Boolean(song))
     .filter((song) => song.playbackKind === "internal");
@@ -216,11 +231,11 @@ function buildPublicBetaQueue(rows: WorkspaceV2SongRow[], locale: InterfaceLocal
     id: "workspace-v2-public-beta",
     mode: "discovery",
     songs,
-    source: "discovery_pool",
+    source: "featured",
     title:
       locale === "es"
-        ? "Descubrimiento continuo"
-        : "Continuous Discovery",
+        ? "Destacadas por First Listen"
+        : "Featured by First Listen",
   };
 }
 
@@ -229,7 +244,7 @@ async function enrichWorkspaceV2SongRows(
   rows: WorkspaceV2SongRow[],
 ) {
   const missingMetadata = rows.some(
-    (row) => !row.genre && !row.category && !row.subcategory,
+    (row) => !row.genre && !row.category && !row.subcategory && !row.song_language,
   );
   if (!rows.length || !missingMetadata) return rows;
 
@@ -238,7 +253,7 @@ async function enrichWorkspaceV2SongRows(
 
   const { data } = await supabase
     .from("songs")
-    .select("id, genre, category, subcategory, content_type")
+    .select("id, genre, category, subcategory, content_type, song_language")
     .in("id", ids);
   const metadataById = new Map(
     ((data ?? []) as WorkspaceV2SongRow[]).map((row) => [row.id, row]),
@@ -252,6 +267,7 @@ async function enrichWorkspaceV2SongRows(
       category: row.category ?? metadata.category ?? metadata.content_type ?? null,
       content_type: row.content_type ?? metadata.content_type ?? null,
       genre: row.genre ?? metadata.genre ?? metadata.subcategory ?? null,
+      song_language: row.song_language ?? metadata.song_language ?? null,
       subcategory: row.subcategory ?? metadata.subcategory ?? metadata.genre ?? null,
     };
   });
@@ -411,7 +427,7 @@ export async function WorkspaceV2AuthEntry({
       const fallback = await supabase
         .from("songs")
         .select(
-          "id, user_id, title, artist_name, genre, category, subcategory, content_type, cover_image_url, music_url, platform, content_duration_seconds, featured, created_at",
+          "id, user_id, title, artist_name, genre, category, subcategory, content_type, song_language, cover_image_url, music_url, platform, content_duration_seconds, featured, created_at",
         )
         .eq("is_active", true)
         .is("archived_at", null)

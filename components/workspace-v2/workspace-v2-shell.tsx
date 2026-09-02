@@ -22,6 +22,7 @@ import {
   Gauge,
   HelpCircle,
   Inbox,
+  Languages,
   ListMusic,
   LockKeyhole,
   LogOut,
@@ -109,6 +110,12 @@ type WorkspaceV2DiscoveryStyleId =
   | "country"
   | "indie"
   | "alternative"
+  | "instrumental"
+  | "other";
+type WorkspaceV2DiscoveryLanguageId =
+  | "all"
+  | "spanish"
+  | "english"
   | "instrumental"
   | "other";
 type PlaybackBankState = "idle" | "fresh" | "partial" | "complete" | "replay";
@@ -332,7 +339,7 @@ function panelLabel(panel: WorkspaceV2Panel, spanish: boolean) {
         "founder-operations": "Centro de Operaciones",
         owner: "Owner",
         profile: "Mi perfil",
-        submit: "Enviar canción",
+        submit: "Publicar link",
       }
     : {
         admin: "Admin",
@@ -340,7 +347,7 @@ function panelLabel(panel: WorkspaceV2Panel, spanish: boolean) {
         "founder-operations": "Centro de Operaciones",
         owner: "Owner",
         profile: "My profile",
-        submit: "Submit song",
+        submit: "Publish link",
       };
   return labels[panel];
 }
@@ -354,8 +361,8 @@ function queueSourceLabel(source: string | undefined, spanish: boolean) {
       es: "Cola de descubrimiento",
     },
     featured: {
-      en: "Featured discovery",
-      es: "Descubrimiento destacado",
+      en: "Featured by First Listen",
+      es: "Destacadas por First Listen",
     },
     genre: {
       en: "Genre discovery",
@@ -367,7 +374,7 @@ function queueSourceLabel(source: string | undefined, spanish: boolean) {
     },
     most_played: {
       en: "Most played",
-      es: "Más escuchadas",
+      es: "Mas reproducidas",
     },
     new_releases: {
       en: "New releases",
@@ -457,6 +464,46 @@ const workspaceV2DiscoveryStyles = workspaceV2DiscoveryStyleSections.flatMap(
   (section) => section.styles,
 );
 
+type WorkspaceV2DiscoveryLanguage = {
+  aliases: string[];
+  id: WorkspaceV2DiscoveryLanguageId;
+  labelEn: string;
+  labelEs: string;
+};
+
+const workspaceV2DiscoveryLanguages: WorkspaceV2DiscoveryLanguage[] = [
+  {
+    aliases: [],
+    id: "all",
+    labelEn: "All",
+    labelEs: "Todos",
+  },
+  {
+    aliases: ["es", "espanol", "español", "spanish", "spa"],
+    id: "spanish",
+    labelEn: "Spanish",
+    labelEs: "Español",
+  },
+  {
+    aliases: ["en", "english", "ingles", "inglés", "eng"],
+    id: "english",
+    labelEn: "English",
+    labelEs: "Ingles",
+  },
+  {
+    aliases: ["instrumental", "instrumental only", "sin voz"],
+    id: "instrumental",
+    labelEn: "Instrumental",
+    labelEs: "Instrumental",
+  },
+  {
+    aliases: ["other", "otro", "otra"],
+    id: "other",
+    labelEn: "Other",
+    labelEs: "Otro",
+  },
+];
+
 function normalizeDiscoveryStyleValue(value: string | null | undefined) {
   return String(value ?? "")
     .normalize("NFD")
@@ -498,6 +545,46 @@ function discoveryStyleLabel(
   return spanish ? style.labelEs : style.labelEn;
 }
 
+function itemDiscoveryLanguageValue(
+  item: Pick<
+    WorkspaceV2Song,
+    "category" | "genre" | "language" | "subcategory"
+  >,
+) {
+  const language = normalizeDiscoveryStyleValue(item.language);
+  if (language) return language;
+  return styleForDiscoveryItem(item).id === "instrumental" ? "instrumental" : "";
+}
+
+function languageForDiscoveryItem(
+  item: Pick<
+    WorkspaceV2Song,
+    "category" | "genre" | "language" | "subcategory"
+  >,
+) {
+  const value = itemDiscoveryLanguageValue(item);
+  const fallback = workspaceV2DiscoveryLanguages.find(
+    (language) => language.id === "other",
+  )!;
+  if (!value) return fallback;
+  return (
+    workspaceV2DiscoveryLanguages.find(
+      (language) =>
+        language.id !== "all" &&
+        language.aliases.some(
+          (alias) => normalizeDiscoveryStyleValue(alias) === value,
+        ),
+    ) ?? fallback
+  );
+}
+
+function discoveryLanguageLabel(
+  language: WorkspaceV2DiscoveryLanguage,
+  spanish: boolean,
+) {
+  return spanish ? language.labelEs : language.labelEn;
+}
+
 function filterItemsByDiscoveryStyle<
   T extends Pick<WorkspaceV2Song, "category" | "genre" | "subcategory">,
 >(items: T[], styleId: WorkspaceV2DiscoveryStyleId) {
@@ -505,10 +592,26 @@ function filterItemsByDiscoveryStyle<
   return items.filter((item) => styleForDiscoveryItem(item).id === styleId);
 }
 
+function filterItemsByDiscoveryLanguage<
+  T extends Pick<
+    WorkspaceV2Song,
+    "category" | "genre" | "language" | "subcategory"
+  >,
+>(items: T[], languageId: WorkspaceV2DiscoveryLanguageId) {
+  if (languageId === "all") return items;
+  return items.filter((item) => languageForDiscoveryItem(item).id === languageId);
+}
+
 function itemMatchesDiscoverySearch(
   item: Pick<
     WorkspaceV2Song,
-    "artist" | "category" | "genre" | "platform" | "subcategory" | "title"
+    | "artist"
+    | "category"
+    | "genre"
+    | "language"
+    | "platform"
+    | "subcategory"
+    | "title"
   >,
   query: string,
 ) {
@@ -520,6 +623,7 @@ function itemMatchesDiscoverySearch(
       item.artist,
       item.platform,
       item.genre,
+      item.language,
       item.category,
       item.subcategory,
     ].join(" "),
@@ -1623,11 +1727,18 @@ function WorkspaceV2ShellClient({
   const queueTitle = controller.queue.activeQueue?.title ?? initialQueue.title;
   const queueSource = controller.queue.activeQueue?.source ?? initialQueue.source;
   const localizedQueueTitle =
-    queueTitle === "Continuous Discovery" ||
-    queueTitle === "Descubrimiento continuo"
+    queueTitle === "Featured by First Listen" ||
+    queueTitle === "Destacadas por First Listen"
       ? spanish
-        ? "Cola de reproducción"
-        : "Playback queue"
+        ? "Destacadas por First Listen"
+        : "Featured by First Listen"
+      : queueTitle === "Continuous Discovery" ||
+          queueTitle === "Descubrimiento continuo" ||
+          queueTitle === "Guest discovery queue" ||
+          queueTitle === "Cola de descubrimiento invitado"
+      ? spanish
+        ? "Destacadas por First Listen"
+        : "Featured by First Listen"
       : queueTitle;
   const positionCurrent = controller.position.current;
   const positionTotal = controller.position.total;
@@ -1835,9 +1946,9 @@ function WorkspaceV2ShellClient({
           ? spanish
             ? "Tiempo ganado completo"
             : "Earnable time complete"
-          : playbackBankState === "replay"
+        : playbackBankState === "replay"
         ? spanish
-          ? "Ya la escuchaste"
+          ? "Ya la reproduciste"
           : "Heard before"
         : spanish
           ? "Banco preparado"
@@ -1981,7 +2092,7 @@ function WorkspaceV2ShellClient({
           : "Song time completed"
         : playbackBankState === "replay"
           ? spanish
-            ? "Canción ya escuchada"
+            ? "Cancion ya reproducida"
             : "Song heard before"
           : playbackBankState === "fresh"
             ? spanish
@@ -2010,8 +2121,8 @@ function WorkspaceV2ShellClient({
           : playbackBankState === "replay"
             ? spanish
               ? unplayedQueueCount > 0
-                ? `Ya escuchaste esta canción. Para sumar más tiempo, sigue con canciones nuevas (${unplayedQueueCount} en cola).`
-                : "Ya escuchaste esta canción. Cuando haya música nueva, First Listen la priorizará."
+                ? `Ya reproduciste esta cancion. Para sumar mas tiempo, sigue con canciones nuevas (${unplayedQueueCount} en cola).`
+                : "Ya reproduciste esta cancion. Cuando haya musica nueva, First Listen la priorizara."
               : unplayedQueueCount > 0
                 ? `You already heard this song. To earn more time, continue with new songs (${unplayedQueueCount} in queue).`
                 : "You already heard this song. First Listen will prioritize new music when available."
@@ -2237,7 +2348,7 @@ function WorkspaceV2ShellClient({
               controller.validation.minimumListenSeconds,
             )}`,
           message: controller.validation.validListen
-            ? "Escucha valida"
+            ? "Reproduccion valida"
             : "Validacion actualizada",
         }),
       );
@@ -2661,13 +2772,13 @@ function WorkspaceV2ShellClient({
           <small>{displayIdentity}</small>
         </div>
         <button
-          aria-label={spanish ? "Subir canción" : "Upload song"}
+          aria-label={spanish ? "Publicar link de musica" : "Publish music link"}
           className="workspace-v2-mobile-submit-cta"
           onClick={handleMobileSubmitCta}
           type="button"
         >
           <span aria-hidden="true">🎵</span>
-          <strong>{spanish ? "Subir" : "Upload"}</strong>
+          <strong>{spanish ? "Publicar" : "Publish"}</strong>
         </button>
         {viewerMode === "guest" && (
           <Link
@@ -2882,8 +2993,8 @@ function WorkspaceV2ShellClient({
             </p>
             <small className="workspace-v2-mission-line">
               {spanish
-                ? "Escucha. Apoya. Gana tiempo. Sube tu música."
-                : "Listen. Support. Earn time. Submit your music."}
+                ? "Reproduce gratis. Apoya artistas. Publica tu link con cuenta."
+                : "Play free. Support artists. Publish your link with an account."}
             </small>
           </div>
 
@@ -3031,8 +3142,8 @@ function WorkspaceV2ShellClient({
           {viewerMode === "guest" && (
             <p className="workspace-v2-guest-player-note">
               {spanish
-                ? "Apoya a tu artista favorito. Crea una cuenta para empezar a ganar tokens."
-                : "Support your favorite artist. Create an account to start earning tokens."}
+                ? "Puedes reproducir siempre sin registro. Para publicar tu link, crea una cuenta gratis."
+                : "You can always play without registration. To publish your link, create a free account."}
             </p>
           )}
 
@@ -3188,8 +3299,8 @@ function WorkspaceV2ShellClient({
             <small>
               {viewerMode === "guest"
                 ? spanish
-                  ? "Escucha como invitado. Regístrate para empezar a ganar tokens."
-                  : "Listen as a guest. Join to start earning tokens."
+                  ? "Reproduce como invitado sin registro. Crea cuenta para ganar tokens."
+                  : "Play as a guest without registration. Join to earn tokens."
                 : rewardReady
                   ? spanish
                     ? "Recompensa disponible ahora"
@@ -3257,11 +3368,11 @@ function WorkspaceV2ShellClient({
         <section
           className="workspace-v2-motivation-layer"
           aria-label={
-            spanish ? "Motivación de reproducción" : "Playback motivation"
+            spanish ? "Resumen de reproducciones" : "Playback summary"
           }
         >
           <article>
-            <span>{spanish ? "Canciones hoy" : "Songs today"}</span>
+            <span>{spanish ? "Reproducciones hoy" : "Plays today"}</span>
             <strong>{songsListenedToday}</strong>
           </article>
           <article>
@@ -3281,8 +3392,8 @@ function WorkspaceV2ShellClient({
               <span>{spanish ? "Recompensas" : "Rewards"}</span>
               <strong>
                 {spanish
-                  ? "Escucha libremente. Crea una cuenta para ganar tokens."
-                  : "Listen freely. Create an account to earn tokens."}
+                  ? "Reproduce gratis. Crea una cuenta para publicar links."
+                  : "Play free. Create an account to publish links."}
               </strong>
             </article>
           )}
@@ -3494,12 +3605,12 @@ function WorkspaceV2HelpAssistant({
   }> = [
     {
       body: spanish
-        ? "Presiona Play y deja que First Listen avance por la cola. Tambien puedes explorar canciones por estilo."
-        : "Press Play and let First Listen move through the queue. You can also explore songs by style.",
+        ? "Presiona Reproducir y deja que First Listen avance por la cola. Tambien puedes explorar por genero o idioma."
+        : "Press Play and let First Listen move through the queue. You can also explore by genre or language.",
       icon: Play,
       id: "listen",
       primaryAction: {
-        label: spanish ? "Ir a escuchar" : "Go listen",
+        label: spanish ? "Ir a reproducir" : "Go play",
         onClick: goInternalDiscovery,
       },
       secondaryAction: {
@@ -3510,14 +3621,14 @@ function WorkspaceV2HelpAssistant({
         ? [
             "Usa el reproductor principal.",
             "La cola sigue sonando mientras navegas.",
-            "Busca por estilo si quieres descubrir algo especifico.",
+            "Filtra por genero o idioma si quieres algo especifico.",
           ]
         : [
             "Use the main player.",
             "The queue keeps playing while you move around.",
             "Search by style when you want something specific.",
           ],
-      title: spanish ? "Quiero escuchar música" : "I want to listen",
+      title: spanish ? "Quiero reproducir musica" : "I want to play music",
     },
     {
       body: spanish
@@ -3531,7 +3642,7 @@ function WorkspaceV2HelpAssistant({
       },
       steps: spanish
         ? [
-            "Escucha contenido que reproduce dentro de First Listen.",
+            "Reproduce contenido dentro de First Listen.",
             "Mira el Banco de Tiempo arriba.",
             "Cuando el token esté listo, presiona Reclamar token.",
           ]
@@ -3544,8 +3655,8 @@ function WorkspaceV2HelpAssistant({
     },
     {
       body: spanish
-        ? "Para subir música necesitas una cuenta y tokens de envío. Puedes seguir escuchando mientras preparas tu envío."
-        : "To submit music you need an account and submission tokens. You can keep listening while preparing your submission.",
+        ? "Para publicar musica necesitas una cuenta y tokens de envio. Puedes seguir reproduciendo mientras preparas tu link."
+        : "To publish music you need an account and submission tokens. You can keep playing while preparing your link.",
       icon: Send,
       id: "submit",
       primaryAction: viewerMode === "guest"
@@ -3556,25 +3667,25 @@ function WorkspaceV2HelpAssistant({
         : {
             label: canSubmit
               ? spanish
-                ? "Ir a enviar canción"
-                : "Go submit song"
+                ? "Ir a publicar link"
+                : "Go publish link"
               : spanish
-                ? "Ver envío"
-                : "View submit",
+                ? "Ver publicacion"
+                : "View publishing",
             onClick: goSubmit,
           },
       steps: spanish
         ? [
-            "Escucha para ganar Banco de Tiempo.",
+            "Reproduce para ganar Banco de Tiempo.",
             "Reclama tokens cuando estén listos.",
-            "Abre Enviar canción y completa tu información.",
+            "Abre Publicar link y completa tu informacion.",
           ]
         : [
-            "Listen to earn Time Bank progress.",
+            "Play to earn Time Bank progress.",
             "Claim tokens when they are ready.",
-            "Open Submit song and complete your details.",
+            "Open Publish link and complete your details.",
           ],
-      title: spanish ? "Quiero subir mi canción" : "I want to submit my song",
+      title: spanish ? "Quiero publicar mi link" : "I want to publish my link",
     },
     {
       body: spanish
@@ -3634,12 +3745,12 @@ function WorkspaceV2HelpAssistant({
     },
     {
       body: spanish
-        ? "First Listen funciona así: escuchas artistas reales, ganas tiempo y usas tokens para que otros descubran tu música."
-        : "First Listen works like this: you listen to real artists, earn time, and use tokens so others can discover your music.",
+        ? "First Listen funciona asi: reproduces artistas reales, ganas tiempo y usas tokens para que otros descubran tu musica."
+        : "First Listen works like this: you play real artists, earn time, and use tokens so others can discover your music.",
       icon: Music2,
       id: "artist",
       primaryAction: {
-        label: spanish ? "Escuchar primero" : "Listen first",
+        label: spanish ? "Reproducir primero" : "Play first",
         onClick: goInternalDiscovery,
       },
       secondaryAction: viewerMode === "guest"
@@ -3648,19 +3759,19 @@ function WorkspaceV2HelpAssistant({
             label: spanish ? "Crear cuenta" : "Create account",
           }
         : {
-            label: spanish ? "Subir música" : "Submit music",
+            label: spanish ? "Publicar link" : "Publish link",
             onClick: goSubmit,
           },
       steps: spanish
         ? [
-            "Escucha y apoya canciones de otros artistas.",
+            "Reproduce y apoya canciones de otros artistas.",
             "Gana Banco de Tiempo y reclama tokens.",
-            "Sube tu canción para recibir descubrimiento real.",
+            "Publica tu link para recibir descubrimiento real.",
           ]
         : [
-            "Listen to and support other artists.",
+            "Play and support other artists.",
             "Earn Time Bank progress and claim tokens.",
-            "Submit your song to receive real discovery.",
+            "Publish your link to receive real discovery.",
           ],
       title: spanish ? "Soy artista nuevo" : "I am a new artist",
     },
@@ -3812,6 +3923,53 @@ function WorkspaceV2StyleFolders({
   );
 }
 
+function WorkspaceV2LanguageFilters({
+  items,
+  locale,
+  onSelect,
+  selectedLanguage,
+}: {
+  items: Array<
+    Pick<WorkspaceV2Song, "category" | "genre" | "language" | "subcategory">
+  >;
+  locale: InterfaceLocale;
+  onSelect: (languageId: WorkspaceV2DiscoveryLanguageId) => void;
+  selectedLanguage: WorkspaceV2DiscoveryLanguageId;
+}) {
+  const spanish = locale === "es";
+
+  return (
+    <div
+      aria-label={spanish ? "Filtros por idioma" : "Language filters"}
+      className="workspace-v2-language-filters"
+    >
+      <span>
+        <Languages size={14} />
+        {spanish ? "Idioma" : "Language"}
+      </span>
+      <div>
+        {workspaceV2DiscoveryLanguages.map((language) => {
+          const count =
+            language.id === "all"
+              ? items.length
+              : filterItemsByDiscoveryLanguage(items, language.id).length;
+          return (
+            <button
+              className={selectedLanguage === language.id ? "is-active" : ""}
+              key={language.id}
+              onClick={() => onSelect(language.id)}
+              type="button"
+            >
+              <strong>{discoveryLanguageLabel(language, spanish)}</strong>
+              <small>{count}</small>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function WorkspaceV2ContentPanel({
   activePanel,
   canAccessAdmin,
@@ -3872,10 +4030,13 @@ function WorkspaceV2ContentPanel({
 }) {
   const spanish = locale === "es";
   const [discoverySearch, setDiscoverySearch] = useState("");
+  const [selectedDiscoveryLanguage, setSelectedDiscoveryLanguage] =
+    useState<WorkspaceV2DiscoveryLanguageId>("all");
   const discoveryResultsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setDiscoverySearch("");
+    setSelectedDiscoveryLanguage("all");
   }, [discoveryView, selectedDiscoveryStyle]);
 
   const handleContentDiscoveryViewChange = useCallback(
@@ -3890,7 +4051,7 @@ function WorkspaceV2ContentPanel({
     if (canSubmit) {
       return (
         <section
-          aria-label={spanish ? "Enviar cancion" : "Submit song"}
+          aria-label={spanish ? "Publicar link" : "Publish link"}
           className="workspace-v2-content-panel workspace-v2-submit-panel"
         >
           {submitNotice && (
@@ -3916,28 +4077,28 @@ function WorkspaceV2ContentPanel({
       <section className="workspace-v2-content-panel">
         <span className="eyebrow">
           <Send size={13} />
-          {spanish ? "Enviar canción" : "Submit Song"}
+          {spanish ? "Publicar link" : "Publish Link"}
         </span>
         <h2>
           {canSubmit
             ? spanish
-              ? "Tu flujo de envío está listo."
-              : "Your submission workflow is ready."
+              ? "Tu publicacion esta lista."
+              : "Your publishing flow is ready."
             : spanish
-              ? "Regístrate gratis para enviar música."
-              : "Create a free account to submit music."}
+              ? "Registrate gratis para publicar tu link."
+              : "Create a free account to publish your link."}
         </h2>
         <p>
           {canSubmit
             ? spanish
-              ? "Envía tu canción sin detener la reproducción. Tu Banco de Tiempo y tokens siguen visibles."
-              : "Submit your song without stopping playback. Your Time Bank and tokens stay visible."
+              ? "Publica tu link sin detener la reproduccion. Tu Banco de Tiempo y tokens siguen visibles."
+              : "Publish your link without stopping playback. Your Time Bank and tokens stay visible."
             : spanish
-              ? "Sigue descubriendo como invitado. Crea una cuenta para empezar a ganar tokens y enviar música."
-              : "Keep discovering as a guest. Create an account to start earning tokens and submit music."}
+              ? "Sigue reproduciendo como invitado. Crea una cuenta solo cuando quieras publicar links y ganar tokens."
+              : "Keep playing as a guest. Create an account only when you want to publish links and earn tokens."}
         </p>
         {canSubmit ? (
-          <Link href="/submit">{spanish ? "Abrir Enviar Canción" : "Open Submit Song"}</Link>
+          <Link href="/submit">{spanish ? "Abrir Publicar Link" : "Open Publish Link"}</Link>
         ) : (
           <Link href="/signup">{spanish ? "Crear cuenta gratis" : "Create free account"}</Link>
         )}
@@ -3989,8 +4150,8 @@ function WorkspaceV2ContentPanel({
         <p>
           {viewerMode === "guest"
             ? spanish
-              ? "Escucha libremente. Cuando te registres, empiezas limpio con recompensas y herramientas de creador."
-              : "Listen freely. When you join, you start fresh with rewards and creator tools."
+              ? "Reproduce libremente. Cuando te registres, podras publicar links y activar recompensas."
+              : "Play freely. When you join, you can publish links and activate rewards."
             : spanish
               ? "Revisa tu actividad, canciones y herramientas personales mientras la reproducción continúa."
               : "Review your activity, songs, and personal tools while playback continues."}
@@ -4069,13 +4230,21 @@ function WorkspaceV2ContentPanel({
   }
 
   const previewSongs = initialQueue.songs.slice(0, 4);
-  const visibleInternalSongs = filterItemsByDiscoveryStyle(
+  const styleFilteredInternalSongs = filterItemsByDiscoveryStyle(
     internalQueueSongs,
     selectedDiscoveryStyle,
   );
-  const visibleExternalItems = filterItemsByDiscoveryStyle(
+  const styleFilteredExternalItems = filterItemsByDiscoveryStyle(
     externalDiscoveryItems,
     selectedDiscoveryStyle,
+  );
+  const visibleInternalSongs = filterItemsByDiscoveryLanguage(
+    styleFilteredInternalSongs,
+    selectedDiscoveryLanguage,
+  );
+  const visibleExternalItems = filterItemsByDiscoveryLanguage(
+    styleFilteredExternalItems,
+    selectedDiscoveryLanguage,
   );
   const searchedInternalSongs = visibleInternalSongs.filter((song) =>
     itemMatchesDiscoverySearch(song, discoverySearch),
@@ -4089,11 +4258,25 @@ function WorkspaceV2ContentPanel({
   ).length;
   const resetDiscoveryFilters = () => {
     setDiscoverySearch("");
+    setSelectedDiscoveryLanguage("all");
     onDiscoveryStyleChange("all");
   };
   const handleDiscoveryStyleSelect = (styleId: WorkspaceV2DiscoveryStyleId) => {
     setDiscoverySearch("");
+    setSelectedDiscoveryLanguage("all");
     onDiscoveryStyleChange(styleId);
+    window.setTimeout(() => {
+      discoveryResultsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 80);
+  };
+  const handleDiscoveryLanguageSelect = (
+    languageId: WorkspaceV2DiscoveryLanguageId,
+  ) => {
+    setDiscoverySearch("");
+    setSelectedDiscoveryLanguage(languageId);
     window.setTimeout(() => {
       discoveryResultsRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -4112,6 +4295,25 @@ function WorkspaceV2ContentPanel({
     : spanish
       ? "Todos los estilos"
       : "All styles";
+  const selectedLanguage =
+    selectedDiscoveryLanguage === "all"
+      ? null
+      : workspaceV2DiscoveryLanguages.find(
+          (language) => language.id === selectedDiscoveryLanguage,
+        ) ?? null;
+  const selectedLanguageName = selectedLanguage
+    ? discoveryLanguageLabel(selectedLanguage, spanish)
+    : spanish
+      ? "Todos los idiomas"
+      : "All languages";
+  const selectedDiscoveryName =
+    selectedStyle || selectedLanguage
+      ? [selectedStyleName, selectedLanguage ? selectedLanguageName : null]
+          .filter(Boolean)
+          .join(" / ")
+      : spanish
+        ? "Destacadas por First Listen"
+        : "Featured by First Listen";
 
   if (discoveryView === "internal") {
     return (
@@ -4133,15 +4335,15 @@ function WorkspaceV2ContentPanel({
         </nav>
         <span className="eyebrow">
           <ListMusic size={13} />
-          {spanish ? "Descubrimiento interno" : "Internal discovery"}
+          {spanish ? "Reproducciones en First Listen" : "First Listen playback"}
         </span>
         <h2>
-          {spanish ? "Escucha dentro de First Listen." : "Listen inside First Listen."}
+          {spanish ? "Elige que te gustaria reproducir." : "Choose what you want to play."}
         </h2>
         <p>
           {spanish
-            ? "Estas canciones pueden reproducirse aquí, apoyar artistas y sumar Banco de Tiempo cuando la reproducción es válida."
-            : "These songs can play here, support artists, and add Time Bank progress when playback is valid."}
+            ? "Puedes reproducir canciones aqui sin registro. Filtra por genero o idioma y el reproductor seguira activo mientras exploras."
+            : "You can play songs here without registration. Filter by genre or language while the player keeps going."}
         </p>
         <div className="workspace-v2-platform-chip-row" aria-label="Internal platforms">
           <span>▶ YouTube</span>
@@ -4152,6 +4354,12 @@ function WorkspaceV2ContentPanel({
           locale={locale}
           onSelect={handleDiscoveryStyleSelect}
           selectedStyle={selectedDiscoveryStyle}
+        />
+        <WorkspaceV2LanguageFilters
+          items={styleFilteredInternalSongs}
+          locale={locale}
+          onSelect={handleDiscoveryLanguageSelect}
+          selectedLanguage={selectedDiscoveryLanguage}
         />
         <label className="workspace-v2-discovery-search">
           <Search size={15} />
@@ -4180,12 +4388,7 @@ function WorkspaceV2ContentPanel({
               onPlayInternalDiscoverySongs({
                 songs: searchedInternalSongs,
                 startSongId: firstSong.id,
-                title:
-                  selectedDiscoveryStyle === "all"
-                    ? spanish
-                      ? "Descubrimiento interno"
-                      : "Internal discovery"
-                    : selectedStyleName,
+                title: selectedDiscoveryName,
               });
             }}
             type="button"
@@ -4194,7 +4397,7 @@ function WorkspaceV2ContentPanel({
           </button>
           <span>
             {searchedInternalSongs.length} / {visibleInternalSongs.length}{" "}
-            {spanish ? `en ${selectedStyleName}` : `in ${selectedStyleName}`}
+            {spanish ? `en ${selectedDiscoveryName}` : `in ${selectedDiscoveryName}`}
           </span>
         </div>
         {!searchedInternalSongs.length && (
@@ -4241,7 +4444,8 @@ function WorkspaceV2ContentPanel({
                 <strong>{song.title}</strong>
                 <small>
                   {song.artist} / {song.platform} /{" "}
-                  {discoveryStyleLabel(styleForDiscoveryItem(song), spanish)}
+                  {discoveryStyleLabel(styleForDiscoveryItem(song), spanish)} /{" "}
+                  {discoveryLanguageLabel(languageForDiscoveryItem(song), spanish)}
                 </small>
               </div>
               <button
@@ -4250,12 +4454,7 @@ function WorkspaceV2ContentPanel({
                   onPlayInternalDiscoverySongs({
                     songs: searchedInternalSongs,
                     startSongId: song.id,
-                    title:
-                      selectedDiscoveryStyle === "all"
-                        ? spanish
-                          ? "Descubrimiento interno"
-                          : "Internal discovery"
-                        : selectedStyleName,
+                    title: selectedDiscoveryName,
                   })
                 }
                 type="button"
@@ -4305,8 +4504,8 @@ function WorkspaceV2ContentPanel({
         </h2>
         <p>
           {spanish
-            ? "Estos enlaces abren fuera de First Listen. Son para descubrir, seguir y apoyar artistas en sus plataformas."
-            : "These links open outside First Listen. They are for discovering, following, and supporting artists on their platforms."}
+            ? "Estos enlaces abren fuera de First Listen. Puedes filtrar por genero o idioma para apoyar artistas en sus plataformas."
+            : "These links open outside First Listen. Filter by genre or language to support artists on their platforms."}
         </p>
         <div className="workspace-v2-platform-chip-row" aria-label="External platforms">
           <span>↗ Spotify</span>
@@ -4319,6 +4518,12 @@ function WorkspaceV2ContentPanel({
           locale={locale}
           onSelect={handleDiscoveryStyleSelect}
           selectedStyle={selectedDiscoveryStyle}
+        />
+        <WorkspaceV2LanguageFilters
+          items={styleFilteredExternalItems}
+          locale={locale}
+          onSelect={handleDiscoveryLanguageSelect}
+          selectedLanguage={selectedDiscoveryLanguage}
         />
         <label className="workspace-v2-discovery-search">
           <Search size={15} />
@@ -4340,7 +4545,7 @@ function WorkspaceV2ContentPanel({
         >
           <span>
             {searchedExternalItems.length} / {visibleExternalItems.length}{" "}
-            {spanish ? `en ${selectedStyleName}` : `in ${selectedStyleName}`}
+            {spanish ? `en ${selectedDiscoveryName}` : `in ${selectedDiscoveryName}`}
           </span>
         </div>
         {externalDiscoveryItems.length && !searchedExternalItems.length && (
@@ -4388,7 +4593,8 @@ function WorkspaceV2ContentPanel({
                   <strong>{item.title}</strong>
                   <small>
                     {item.artist} /{" "}
-                    {discoveryStyleLabel(styleForDiscoveryItem(item), spanish)}
+                    {discoveryStyleLabel(styleForDiscoveryItem(item), spanish)} /{" "}
+                    {discoveryLanguageLabel(languageForDiscoveryItem(item), spanish)}
                   </small>
                 </div>
                 <div className="workspace-v2-external-actions">
@@ -4439,44 +4645,80 @@ function WorkspaceV2ContentPanel({
           <Compass size={13} />
           {spanish ? "Bienvenido a First Listen" : "Welcome to First Listen"}
         </span>
-        <h2>{spanish ? "Gracias por suscribirte." : "Thanks for joining."}</h2>
+        <h2>
+          {viewerMode === "guest"
+            ? spanish
+              ? "REPRODUCCIONES gratis sin registro."
+              : "Free plays without registration."
+            : spanish
+              ? "Publica tu link y recibe reproducciones."
+              : "Publish your link and receive plays."}
+        </h2>
         <p>
-          {spanish
-            ? "Puedes subir tus primeras 3 canciones y empezar a ganar tiempo escuchando musica nueva."
-            : "You can upload your first 3 songs and start earning time by listening to new music."}
+          {viewerMode === "guest"
+            ? spanish
+              ? "Entra, reproduce Destacadas por First Listen y explora por genero o idioma. Crear cuenta solo es necesario para publicar links."
+              : "Enter, play First Listen featured songs, and explore by genre or language. An account is only needed to publish links."
+            : spanish
+              ? "Reproduce musica nueva para ganar tiempo y usa tus tokens cuando estes listo para publicar tus links."
+              : "Play new music to earn time and use your tokens when you are ready to publish your links."}
         </p>
         <div className="workspace-v2-welcome-actions">
           <button
             className="workspace-v2-submit-music-cta workspace-v2-submit-music-cta-primary"
-            onClick={() => onPanelChange("submit")}
+            onClick={() =>
+              viewerMode === "guest"
+                ? handleContentDiscoveryViewChange("internal")
+                : onPanelChange("submit")
+            }
             type="button"
           >
-            <Send size={19} />
+            {viewerMode === "guest" ? <Play size={19} /> : <Send size={19} />}
             <span>
-              <strong>{spanish ? "Sube tu musica" : "Submit your music"}</strong>
+              <strong>
+                {viewerMode === "guest"
+                  ? spanish
+                    ? "Reproducir destacadas"
+                    : "Play featured"
+                  : spanish
+                    ? "Publicar mi link"
+                    : "Publish my link"}
+              </strong>
               <small>
                 {viewerMode === "guest"
                   ? spanish
-                    ? "Crea una cuenta gratis para activar envios."
-                    : "Create a free account to activate submissions."
+                    ? "Sin registro. El reproductor sigue activo mientras exploras."
+                    : "No registration. The player keeps going while you explore."
                   : spanish
-                    ? "Empieza con tus canciones y comparte tu perfil."
-                    : "Start with your songs and share your profile."}
+                    ? "Comparte YouTube o YouTube Music desde tu cuenta."
+                    : "Share YouTube or YouTube Music from your account."}
               </small>
             </span>
           </button>
           <button
             className="workspace-v2-submit-music-cta workspace-v2-profile-cta"
-            onClick={() => onPanelChange("profile")}
+            onClick={() => onPanelChange(viewerMode === "guest" ? "submit" : "profile")}
             type="button"
           >
-            <User size={18} />
+            {viewerMode === "guest" ? <Send size={18} /> : <User size={18} />}
             <span>
-              <strong>{spanish ? "Explorar perfil" : "Explore profile"}</strong>
+              <strong>
+                {viewerMode === "guest"
+                  ? spanish
+                    ? "Publicar link"
+                    : "Publish link"
+                  : spanish
+                    ? "Explorar perfil"
+                    : "Explore profile"}
+              </strong>
               <small>
-                {spanish
-                  ? "Revisa tu progreso, cuenta y actividad."
-                  : "View your progress, account, and activity."}
+                {viewerMode === "guest"
+                  ? spanish
+                    ? "Te pedira crear cuenta gratis antes de publicar."
+                    : "You will create a free account before publishing."
+                  : spanish
+                    ? "Revisa tu progreso, cuenta y actividad."
+                    : "View your progress, account, and activity."}
               </small>
             </span>
           </button>
@@ -4487,12 +4729,12 @@ function WorkspaceV2ContentPanel({
         {spanish ? "Inicio First Listen" : "First Listen Home"}
       </span>
       <h2>
-        {spanish ? "Escucha para ser escuchado." : "Listen to be heard."}
+        {spanish ? "Que te gustaria reproducir hoy?" : "What would you like to play today?"}
       </h2>
       <p>
         {spanish
-          ? "Escucha música nueva, apoya artistas y gana tiempo para subir la tuya."
-          : "Listen to new music, support artists, and earn time to submit yours."}
+          ? "Primero suenan las Destacadas por First Listen. Luego puedes elegir por genero, idioma o plataformas externas."
+          : "First Listen featured songs play first. Then you can choose by genre, language, or external platforms."}
       </p>
 
       <div className="workspace-v2-start-panel">
@@ -4503,27 +4745,27 @@ function WorkspaceV2ContentPanel({
           </span>
           <strong>
             {spanish
-              ? "Primero descubre canciones que reproducen dentro de First Listen."
-              : "Start with songs that play inside First Listen."}
+              ? "Empieza con Destacadas por First Listen."
+              : "Start with Featured by First Listen."}
           </strong>
           <small>
             {spanish
-              ? "Las plataformas externas siguen disponibles para descubrir artistas, pero la reproducción interna es la que puede sumar Banco de Tiempo."
-              : "External platforms are still available for artist discovery, but internal playback is what can add Time Bank progress."}
+              ? "Puedes reproducir sin registro. Si quieres publicar tu link, crea cuenta gratis."
+              : "You can play without registration. To publish your link, create a free account."}
           </small>
         </div>
         <div className="workspace-v2-start-actions">
           <button onClick={() => handleContentDiscoveryViewChange("internal")} type="button">
             <Play size={14} />
-            {spanish ? "Escuchar aquí" : "Listen here"}
+            {spanish ? "Destacadas" : "Featured"}
+          </button>
+          <button onClick={() => handleContentDiscoveryViewChange("internal")} type="button">
+            <Languages size={14} />
+            {spanish ? "Genero / idioma" : "Genre / language"}
           </button>
           <button onClick={() => handleContentDiscoveryViewChange("external")} type="button">
             <ExternalLink size={14} />
             {spanish ? "Ver externas" : "External"}
-          </button>
-          <button onClick={() => onPanelChange("submit")} type="button">
-            <Send size={14} />
-            {spanish ? "Subir música" : "Submit music"}
           </button>
         </div>
       </div>
@@ -4541,15 +4783,15 @@ function WorkspaceV2ContentPanel({
             <ListMusic size={22} />
           </span>
           <span className="workspace-v2-discovery-card-copy">
-            <strong>{spanish ? "Descubrimiento interno" : "Internal discovery"}</strong>
+            <strong>{spanish ? "Destacadas y generos" : "Featured and genres"}</strong>
             <small>
               {spanish
-                ? "Canciones que reproducen aquí. Prioridad First Listen."
-                : "Songs that play here. First Listen priority."}
+                ? "Reproducciones aqui: YouTube y YouTube Music."
+                : "Plays here: YouTube and YouTube Music."}
             </small>
           </span>
           <span className="workspace-v2-discovery-card-badge">
-            {spanish ? "Prioridad" : "Priority"}
+            {spanish ? "Reproduce aqui" : "Plays here"}
           </span>
           <span className="workspace-v2-platform-chip-row workspace-v2-platform-chip-row-strong">
             <span>▶ YouTube</span>
@@ -4565,7 +4807,7 @@ function WorkspaceV2ContentPanel({
             <ExternalLink size={22} />
           </span>
           <span className="workspace-v2-discovery-card-copy">
-            <strong>{spanish ? "Plataformas externas" : "External platforms"}</strong>
+            <strong>{spanish ? "Explorar fuera" : "Explore outside"}</strong>
             <small>
               {spanish
                 ? "Spotify, TikTok, Apple Music y más. Abren fuera."
@@ -4635,25 +4877,25 @@ function WorkspaceV2ContentPanel({
           <strong>{spanish ? "Gana tiempo" : "Earn time"}</strong>
           <small>
             {spanish
-              ? "Tu reproducción válida se convierte en tokens para subir música."
+              ? "Tus reproducciones validas se convierten en tokens para publicar links."
               : "Your valid playback turns into tokens to submit music."}
           </small>
         </article>
         <article>
           <span>
             <ListMusic size={14} />
-            {spanish ? "Canciones disponibles" : "Available songs"}
+            {spanish ? "Destacadas" : "Featured"}
           </span>
           <strong>{internalQueueSongs.length}</strong>
-          <small>{spanish ? "reproducen dentro de First Listen" : "play inside First Listen"}</small>
+          <small>{spanish ? "primeras en la cola" : "first in the queue"}</small>
         </article>
         <article>
           <span>
             <Music2 size={14} />
-            {spanish ? "Estilos" : "Styles"}
+            {spanish ? "Generos" : "Genres"}
           </span>
           <strong>{availableStyleCount}</strong>
-          <small>{spanish ? "con canciones disponibles" : "with available songs"}</small>
+          <small>{spanish ? "elige tus gustos" : "choose your taste"}</small>
         </article>
         <article>
           <span>
@@ -4673,10 +4915,10 @@ function WorkspaceV2ContentPanel({
         aria-label={spanish ? "Cómo funciona" : "How it works"}
         className="workspace-v2-flow-strip"
       >
-        <span>{spanish ? "▶ Reproducir" : "▶ Play"}</span>
-        <span>{spanish ? "⏱ Ganar tiempo" : "⏱ Earn time"}</span>
-        <span>{spanish ? "🎟 Reclamar token" : "🎟 Claim token"}</span>
-        <span>{spanish ? "🎵 Subir música" : "🎵 Submit music"}</span>
+        <span>{spanish ? "1. Reproduce gratis" : "1. Play free"}</span>
+        <span>{spanish ? "2. Elige gusto" : "2. Pick taste"}</span>
+        <span>{spanish ? "3. Gana tiempo" : "3. Earn time"}</span>
+        <span>{spanish ? "4. Publica link" : "4. Publish link"}</span>
       </div>
 
       <section
@@ -4686,11 +4928,11 @@ function WorkspaceV2ContentPanel({
         <div>
           <span className="eyebrow">
             <ListMusic size={13} />
-            {spanish ? "Próximas en la cola" : "Up next"}
+            {spanish ? "Destacadas por First Listen" : "Featured by First Listen"}
           </span>
           <p>
             {spanish
-              ? "La cola avanza automáticamente. Usa Siguiente solo cuando esté disponible."
+              ? "La cola avanza automaticamente con canciones destacadas primero."
               : "The queue advances automatically. Use Next only when it is available."}
           </p>
         </div>
@@ -4708,15 +4950,15 @@ function WorkspaceV2ContentPanel({
       <details className="workspace-v2-help-card">
         <summary>{spanish ? "¿Necesitas ayuda? Te explico rápido" : "Need help? Quick guide"}</summary>
         <div>
-          <span>{spanish ? "1. Presiona Play y descubre canciones nuevas." : "1. Press Play and discover new songs."}</span>
-          <span>{spanish ? "2. Tu reproducción válida suma Banco de Tiempo." : "2. Your valid playback adds Time Bank progress."}</span>
+          <span>{spanish ? "1. Presiona Reproducir. No necesitas cuenta." : "1. Press Play. No account needed."}</span>
+          <span>{spanish ? "2. Elige por genero o idioma si quieres explorar." : "2. Choose genre or language if you want to explore."}</span>
           <span>{spanish ? "3. Reclama tokens cuando estén listos." : "3. Claim tokens when they are ready."}</span>
-          <span>{spanish ? "4. Usa tus tokens para compartir tu música." : "4. Use your tokens to share your music."}</span>
+          <span>{spanish ? "4. Crea cuenta solo para publicar links." : "4. Create an account only to publish links."}</span>
           {viewerMode === "guest" && (
             <strong>
               {spanish
-                ? "Crea una cuenta para empezar a ganar tokens y enviar música."
-                : "Create an account to start earning tokens and submit music."}
+                ? "Reproducir como invitado seguira siendo gratis."
+                : "Playing as a guest will remain free."}
             </strong>
           )}
         </div>
@@ -4727,7 +4969,7 @@ function WorkspaceV2ContentPanel({
         onClick={() => onPanelChange("submit")}
         type="button"
       >
-        {spanish ? "Quiero subir mi música" : "I want to submit my music"}
+        {spanish ? "Quiero publicar mi link" : "I want to publish my link"}
       </button>
     </section>
   );

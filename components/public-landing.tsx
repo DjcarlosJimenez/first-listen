@@ -102,21 +102,21 @@ export function PublicLanding({
         aria-label="Choose how to begin"
       >
         <article className="landing-path-card guest-path-card">
-          <span className="eyebrow"><Headphones size={14} /> {locale === "es" ? "Visita para escuchar" : "Guest Listener"}</span>
+          <span className="eyebrow"><Headphones size={14} /> {locale === "es" ? "Reproducciones gratis" : "Free Plays"}</span>
           <h1>
             {managedText(
               "welcomeHeadline",
               locale === "es"
-                ? "Escucha música. Descubre artistas. Apoya creadores."
-                : "Listen to music. Discover artists. Support creators.",
+                ? "Reproduce musica sin registro."
+                : "Play music without registration.",
             )}
           </h1>
           <p>
             {managedText(
               "welcomeDescription",
               locale === "es"
-                ? "No necesitas registrarte para escuchar. Siempre gratis."
-                : "No registration is required to listen. Always free.",
+                ? "Entra como invitado, explora y reproduce siempre gratis."
+                : "Enter as a guest, explore, and play free forever.",
             )}
           </p>
           <ul>
@@ -136,8 +136,8 @@ export function PublicLanding({
             {managedText(
               "creatorHeadline",
               locale === "es"
-                ? "Sube contenido. Gana tokens. Recibe reproducciones reales."
-                : "Submit music. Earn tokens. Receive real listens.",
+                ? "Publica tus links. Recibe reproducciones reales."
+                : "Publish your links. Receive real plays.",
             )}
           </h2>
           <p>
@@ -149,8 +149,8 @@ export function PublicLanding({
             )}
           </p>
           <ul>
-            <li><Check size={14} /> {locale === "es" ? "Envía canciones para recibir feedback" : "Submit songs for honest feedback"}</li>
-            <li><Check size={14} /> {locale === "es" ? "Recibe escuchas y apoyo comunitario" : "Receive listens and community support"}</li>
+            <li><Check size={14} /> {locale === "es" ? "Publica links para recibir feedback" : "Publish links for honest feedback"}</li>
+            <li><Check size={14} /> {locale === "es" ? "Recibe reproducciones y apoyo comunitario" : "Receive plays and community support"}</li>
             <li><Check size={14} /> {locale === "es" ? "Descubre y apoya otros artistas" : "Discover and support other artists"}</li>
           </ul>
           <button className="landing-primary" onClick={onSignUp}>
