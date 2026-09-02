@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   createContext,
   type ReactNode,
@@ -10,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { usePathname } from "next/navigation";
 import { Download, Share2, Smartphone, X } from "lucide-react";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { useInterfaceLocale } from "@/lib/use-interface-locale";
@@ -38,6 +40,65 @@ const DISMISS_KEY = "first-listen-install-dismissed-at";
 const DISMISS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const INSTALL_INSTRUCTION_DELAY_MS = 45000;
 const UPDATE_REMINDER_MS = 10 * 60 * 1000;
+const DJ_CARLOS_PATH_PREFIX = "/DJCarlosJimenez";
+const DJ_CARLOS_ICON_URL = "/artist/dj-carlos-jimenez/icon-192.png";
+
+type InstallPromptBrand = {
+  actionLabel: string;
+  cardClassName: string;
+  iconUrl: string | null;
+  iosInstruction: ReactNode;
+  manualInstruction: string;
+  nativeInstruction: string;
+  title: string;
+};
+
+function installPromptBrandFor(pathname: string | null, spanish: boolean): InstallPromptBrand {
+  const artistPage = pathname?.startsWith(DJ_CARLOS_PATH_PREFIX) ?? false;
+  if (artistPage) {
+    return {
+      actionLabel: spanish ? "Instalar DJ Carlos" : "Install DJ Carlos",
+      cardClassName: "pwa-install-card djcx-pwa-install-card",
+      iconUrl: DJ_CARLOS_ICON_URL,
+      iosInstruction: (
+        <>
+          {spanish ? "En iPhone o iPad, toca Compartir" : "On iPhone or iPad, tap Share"}{" "}
+          <Share2 size={13} />{" "}
+          {spanish
+            ? "y luego Agregar a inicio para abrir esta pagina directa."
+            : "then Add to Home Screen to open this artist page directly."}
+        </>
+      ),
+      manualInstruction: spanish
+        ? "Usa el menu del navegador para instalar la pagina de DJ Carlos."
+        : "Use your browser menu to install the DJ Carlos page.",
+      nativeInstruction: spanish
+        ? "Agrega la pagina de DJ Carlos a tu pantalla de inicio con su logo."
+        : "Add the DJ Carlos page to your home screen with its logo.",
+      title: spanish ? "Instalar DJ Carlos" : "Install DJ Carlos",
+    };
+  }
+
+  return {
+    actionLabel: spanish ? "Instalar" : "Install",
+    cardClassName: "pwa-install-card",
+    iconUrl: null,
+    iosInstruction: (
+      <>
+        {spanish ? "En iPhone o iPad, toca Compartir" : "On iPhone or iPad, tap Share"}{" "}
+        <Share2 size={13} />{" "}
+        {spanish ? "y luego Agregar a inicio." : "then Add to Home Screen."}
+      </>
+    ),
+    manualInstruction: spanish
+      ? "Usa el menú del navegador para instalar o agregar First Listen."
+      : "Use your browser menu to install or add First Listen.",
+    nativeInstruction: spanish
+      ? "Agrega First Listen a tu pantalla de inicio para volver más rápido."
+      : "Add First Listen to your home screen and return faster.",
+    title: spanish ? "Instalar First Listen" : "Install First Listen",
+  };
+}
 
 async function readServiceWorkerVersion() {
   try {
@@ -333,12 +394,14 @@ export function PwaInstallButton({
   className = "pwa-header-install-button",
   compact = false,
   iconOnly = false,
+  label,
   locale = "en",
   onAfterRequest,
 }: {
   className?: string;
   compact?: boolean;
   iconOnly?: boolean;
+  label?: string;
   locale?: InterfaceLocale;
   onAfterRequest?: () => void;
 }) {
@@ -347,7 +410,7 @@ export function PwaInstallButton({
   if (installed) return null;
 
   const spanish = locale === "es";
-  const label = spanish ? "Instalar First Listen" : "Install First Listen";
+  const buttonLabel = label ?? (spanish ? "Instalar First Listen" : "Install First Listen");
   const hint = nativePromptAvailable
     ? spanish
       ? "Abrir instalación de la app"
@@ -358,7 +421,7 @@ export function PwaInstallButton({
 
   return (
     <button
-      aria-label={label}
+      aria-label={buttonLabel}
       className={className}
       disabled={installing}
       onClick={() => {
@@ -370,7 +433,7 @@ export function PwaInstallButton({
     >
       <Smartphone size={compact ? 15 : 16} />
       {!iconOnly && (
-        <span>{installing ? (spanish ? "Instalando..." : "Installing...") : label}</span>
+        <span>{installing ? (spanish ? "Instalando..." : "Installing...") : buttonLabel}</span>
       )}
     </button>
   );
@@ -386,35 +449,29 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
     requestInstall,
   } = usePwaInstall();
   const locale = useInterfaceLocale();
+  const pathname = usePathname();
   const spanish = locale === "es";
+  const brand = installPromptBrandFor(pathname, spanish);
 
   if (installed || !visible) return null;
 
   return (
-    <aside className="pwa-install-card" aria-live="polite">
+    <aside className={brand.cardClassName} aria-live="polite">
       <div className="pwa-install-icon" aria-hidden="true">
-        <Smartphone size={20} />
+        {brand.iconUrl ? (
+          <Image alt="" height={40} src={brand.iconUrl} unoptimized width={40} />
+        ) : (
+          <Smartphone size={20} />
+        )}
       </div>
       <div>
-        <strong>{spanish ? "Instalar First Listen" : "Install First Listen"}</strong>
+        <strong>{brand.title}</strong>
         {nativePromptAvailable ? (
-          <span>
-            {spanish
-              ? "Agrega First Listen a tu pantalla de inicio para volver más rápido."
-              : "Add First Listen to your home screen and return faster."}
-          </span>
+          <span>{brand.nativeInstruction}</span>
         ) : iosSafari ? (
-          <span>
-            {spanish ? "En iPhone o iPad, toca Compartir" : "On iPhone or iPad, tap Share"}{" "}
-            <Share2 size={13} />{" "}
-            {spanish ? "y luego Agregar a inicio." : "then Add to Home Screen."}
-          </span>
+          <span>{brand.iosInstruction}</span>
         ) : (
-          <span>
-            {spanish
-              ? "Usa el menú del navegador para instalar o agregar First Listen."
-              : "Use your browser menu to install or add First Listen."}
-          </span>
+          <span>{brand.manualInstruction}</span>
         )}
       </div>
       <div className="pwa-install-actions">
@@ -425,9 +482,7 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
               ? spanish
                 ? "Instalando..."
                 : "Installing..."
-              : spanish
-                ? "Instalar"
-                : "Install"}
+              : brand.actionLabel}
           </button>
         ) : (
           <button onClick={dismissInstructions} type="button">

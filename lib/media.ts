@@ -17,6 +17,7 @@ const providerPageHosts = new Set([
 
 export function safeCoverUrl(value: string | null | undefined) {
   if (!value) return defaultCoverUrl;
+  if (value.startsWith("/") && !value.startsWith("//")) return value;
   try {
     const parsed = new URL(value);
     if (parsed.protocol !== "https:" || providerPageHosts.has(parsed.hostname)) {
