@@ -11,7 +11,6 @@ import {
   getContentClassification,
   isExternalPlatform,
 } from "@/lib/content-economy";
-import { loadFounderOperationsSnapshot } from "@/lib/founder-operations";
 import { safeCoverUrl } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -497,8 +496,7 @@ export async function WorkspaceV2AuthEntry({
     .filter((item): item is WorkspaceV2ExternalDiscoveryItem => Boolean(item));
   const viewerMode = viewerModeFromProfile(typedProfile);
   const canAccessAdmin = viewerMode === "founder" || viewerMode === "admin";
-  const founderOperations =
-    viewerMode === "founder" ? await loadFounderOperationsSnapshot() : null;
+  const founderOperations = null;
   const profilePanel = buildProfilePanelPayload({
     activityRows,
     connectedPlatformRows,

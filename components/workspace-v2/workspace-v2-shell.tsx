@@ -857,7 +857,8 @@ function WorkspaceV2ShellClient({
   const [workspaceLocale, setWorkspaceLocale] = useState<InterfaceLocale>("es");
   const spanish = workspaceLocale === "es";
   const canAccessAdmin = viewerMode === "founder" || viewerMode === "admin";
-  const canAccessFounderOperations = viewerMode === "founder";
+  const canAccessFounderOperations =
+    viewerMode === "founder" && Boolean(founderOperations);
   const canClaimRewards = viewerMode !== "guest" && economy.enabled;
   const canSubmit = viewerMode !== "guest";
   const copy = useMemo(() => getCopy(workspaceLocale), [workspaceLocale]);
@@ -936,8 +937,15 @@ function WorkspaceV2ShellClient({
   const returnStripRef = useRef<HTMLDivElement | null>(null);
   const telemetryRef = useRef("");
   const touchStartYRef = useRef<number | null>(null);
+  const touchLastDeltaYRef = useRef(0);
   const trustedPlaybackRequestRef = useRef<(() => void) | null>(null);
   const validationRef = useRef("");
+
+  const collapseHeroForExploration = useCallback(() => {
+    if (heroCollapsedRef.current) return;
+    heroCollapsedRef.current = true;
+    setHeroCollapsed(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1435,8 +1443,8 @@ function WorkspaceV2ShellClient({
       heroCollapseFrameRef.current = window.requestAnimationFrame(() => {
         heroCollapseFrameRef.current = null;
         const mobile = window.matchMedia("(max-width: 900px)").matches;
-        const collapseAt = mobile ? 64 : 44;
-        const expandAt = mobile ? 32 : 18;
+        const collapseAt = mobile ? 18 : 44;
+        const expandAt = mobile ? 6 : 18;
         const scrollOffset = readWorkspaceScroll();
         const nextCollapsed = heroCollapsedRef.current
           ? scrollOffset > expandAt
@@ -1450,13 +1458,14 @@ function WorkspaceV2ShellClient({
         setCollapsedState(true);
         return;
       }
-      if (event.deltaY < -4 && readWorkspaceScroll() <= 32) {
+      if (event.deltaY < -4 && readWorkspaceScroll() <= 12) {
         setCollapsedState(false);
       }
     };
 
     const handleTouchStart = (event: TouchEvent) => {
       touchStartYRef.current = event.touches[0]?.clientY ?? null;
+      touchLastDeltaYRef.current = 0;
     };
 
     const handleTouchMove = (event: TouchEvent) => {
@@ -1464,18 +1473,21 @@ function WorkspaceV2ShellClient({
       const currentY = event.touches[0]?.clientY ?? null;
       if (startY === null || currentY === null) return;
       const delta = startY - currentY;
+      touchLastDeltaYRef.current = delta;
       if (delta > 8) {
         setCollapsedState(true);
         return;
       }
-      if (delta < -8 && readWorkspaceScroll() <= 32) {
+      if (delta < -8 && readWorkspaceScroll() <= 12) {
         setCollapsedState(false);
       }
     };
 
     const handleTouchEnd = () => {
+      const lastDelta = touchLastDeltaYRef.current;
       touchStartYRef.current = null;
-      if (readWorkspaceScroll() <= 32) {
+      touchLastDeltaYRef.current = 0;
+      if (lastDelta < -8 && readWorkspaceScroll() <= 12) {
         setCollapsedState(false);
       }
     };
@@ -2480,6 +2492,7 @@ function WorkspaceV2ShellClient({
 
   const handleDiscoveryStyleChange = useCallback(
     (styleId: WorkspaceV2DiscoveryStyleId) => {
+      collapseHeroForExploration();
       setSelectedDiscoveryStyle(styleId);
       if (typeof window === "undefined") return;
       const nextUrl = new URL(window.location.href);
@@ -2498,12 +2511,15 @@ function WorkspaceV2ShellClient({
         nextUrl,
       );
     },
-    [discoveryView],
+    [collapseHeroForExploration, discoveryView],
   );
 
   const handleDiscoveryViewChange = useCallback(
     (view: WorkspaceV2DiscoveryView) => {
       const nextStyle: WorkspaceV2DiscoveryStyleId = "all";
+      if (view !== "home") {
+        collapseHeroForExploration();
+      }
       setDiscoveryView(view);
       setSelectedDiscoveryStyle(nextStyle);
       if (typeof window === "undefined") return;
@@ -2528,10 +2544,13 @@ function WorkspaceV2ShellClient({
         nextUrl,
       );
     },
-    [],
+    [collapseHeroForExploration],
   );
 
   const handlePanelChange = useCallback((panel: WorkspaceV2Panel) => {
+    if (panel !== "discover") {
+      collapseHeroForExploration();
+    }
     setActivePanel(panel);
     if (panel === "discover") {
       setDiscoveryView("home");
@@ -2557,7 +2576,7 @@ function WorkspaceV2ShellClient({
     ) {
       setSidebarExpanded(false);
     }
-  }, []);
+  }, [collapseHeroForExploration]);
 
   const handleWorkspaceReturn = useCallback(() => {
     if (activePanel === "discover" && discoveryView !== "home") {
@@ -2605,6 +2624,7 @@ function WorkspaceV2ShellClient({
       setDiscoveryView(view);
       setSelectedDiscoveryStyle(view === "home" ? "all" : style);
       if (view !== "home") {
+        collapseHeroForExploration();
         setActivePanel("discover");
       }
     };
@@ -2612,7 +2632,7 @@ function WorkspaceV2ShellClient({
     syncDiscoveryFromUrl();
     window.addEventListener("popstate", syncDiscoveryFromUrl);
     return () => window.removeEventListener("popstate", syncDiscoveryFromUrl);
-  }, []);
+  }, [collapseHeroForExploration]);
 
   const handleFullscreen = useCallback(async () => {
     const target = heroRef.current;
@@ -2645,6 +2665,7 @@ function WorkspaceV2ShellClient({
     ).matches;
     if (!mobilePortrait) return;
     if (activePanel === "discover" && discoveryView === "home") return;
+    collapseHeroForExploration();
 
     const timeout = window.setTimeout(() => {
       const panel = document.querySelector<HTMLElement>(
@@ -2657,7 +2678,7 @@ function WorkspaceV2ShellClient({
     }, 120);
 
     return () => window.clearTimeout(timeout);
-  }, [activePanel, discoveryView]);
+  }, [activePanel, collapseHeroForExploration, discoveryView]);
 
   const handlePlayInternalDiscoverySongs = useCallback(
     ({
@@ -2690,9 +2711,17 @@ function WorkspaceV2ShellClient({
           songs[startIndex]?.title ?? "Selected song"
         }`,
       );
+      const mobileExplorer =
+        typeof window !== "undefined" &&
+        window.matchMedia("(max-width: 900px)").matches;
+      if (mobileExplorer) {
+        collapseHeroForExploration();
+        return;
+      }
       handleFocusPlayer();
     },
     [
+      collapseHeroForExploration,
       economy,
       handleFocusPlayer,
       loadQueue,
@@ -3431,6 +3460,7 @@ function WorkspaceV2ShellClient({
             locale={workspaceLocale}
             onDiscoveryStyleChange={handleDiscoveryStyleChange}
             onDiscoveryViewChange={handleDiscoveryViewChange}
+            onExploreIntent={collapseHeroForExploration}
             onPanelChange={handlePanelChange}
             onPlayInternalDiscoverySongs={handlePlayInternalDiscoverySongs}
             onSubmitNotice={notifySubmit}
@@ -3985,6 +4015,7 @@ function WorkspaceV2ContentPanel({
   locale,
   onDiscoveryStyleChange,
   onDiscoveryViewChange,
+  onExploreIntent,
   onPanelChange,
   onPlayInternalDiscoverySongs,
   onSubmitNotice,
@@ -4010,6 +4041,7 @@ function WorkspaceV2ContentPanel({
   locale: InterfaceLocale;
   onDiscoveryStyleChange: (styleId: WorkspaceV2DiscoveryStyleId) => void;
   onDiscoveryViewChange: (view: WorkspaceV2DiscoveryView) => void;
+  onExploreIntent: () => void;
   onPanelChange: (panel: WorkspaceV2Panel) => void;
   onPlayInternalDiscoverySongs: (request: {
     songs: WorkspaceV2Song[];
@@ -4042,9 +4074,12 @@ function WorkspaceV2ContentPanel({
   const handleContentDiscoveryViewChange = useCallback(
     (view: WorkspaceV2DiscoveryView) => {
       setDiscoverySearch("");
+      if (view !== "home") {
+        onExploreIntent();
+      }
       onDiscoveryViewChange(view);
     },
-    [onDiscoveryViewChange],
+    [onDiscoveryViewChange, onExploreIntent],
   );
 
   if (activePanel === "submit") {
@@ -4264,6 +4299,7 @@ function WorkspaceV2ContentPanel({
   const handleDiscoveryStyleSelect = (styleId: WorkspaceV2DiscoveryStyleId) => {
     setDiscoverySearch("");
     setSelectedDiscoveryLanguage("all");
+    onExploreIntent();
     onDiscoveryStyleChange(styleId);
     window.setTimeout(() => {
       discoveryResultsRef.current?.scrollIntoView({
@@ -4276,6 +4312,7 @@ function WorkspaceV2ContentPanel({
     languageId: WorkspaceV2DiscoveryLanguageId,
   ) => {
     setDiscoverySearch("");
+    onExploreIntent();
     setSelectedDiscoveryLanguage(languageId);
     window.setTimeout(() => {
       discoveryResultsRef.current?.scrollIntoView({
@@ -4366,6 +4403,7 @@ function WorkspaceV2ContentPanel({
           <span>{spanish ? "Buscar canción o artista" : "Search song or artist"}</span>
           <input
             onChange={(event) => setDiscoverySearch(event.target.value)}
+            onFocus={onExploreIntent}
             placeholder={
               spanish
                 ? "Buscar por canción, artista o plataforma"
@@ -4530,6 +4568,7 @@ function WorkspaceV2ContentPanel({
           <span>{spanish ? "Buscar canción, artista o plataforma" : "Search song, artist, or platform"}</span>
           <input
             onChange={(event) => setDiscoverySearch(event.target.value)}
+            onFocus={onExploreIntent}
             placeholder={
               spanish
                 ? "Buscar Spotify, TikTok, artista..."

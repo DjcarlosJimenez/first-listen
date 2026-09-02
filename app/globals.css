@@ -12066,6 +12066,148 @@ html[data-listening-bank-desktop-size="expanded"] .listening-bank-panel {
   font-weight: 900;
 }
 
+/* Admin readability guard: keep operational controls legible even when the
+   public theme is tuned for the listener-facing experience. */
+.admin-page {
+  --admin-action: #171a18;
+  --admin-action-text: #c8ff4f;
+  --admin-card: #f5f7f1;
+  --admin-field: #ffffff;
+  --admin-line: #d5dbcf;
+  --admin-muted: #4d574c;
+  --admin-panel: #ffffff;
+  --admin-text: #111611;
+  --admin-text-soft: #273226;
+  color: var(--admin-text);
+}
+
+.admin-page .admin-nav,
+.admin-page .admin-content,
+.admin-page .legal-page article {
+  background: var(--admin-panel);
+  border-color: var(--admin-line);
+  color: var(--admin-text);
+}
+
+.admin-page h1,
+.admin-page h2,
+.admin-page h3,
+.admin-page strong,
+.admin-page label {
+  color: var(--admin-text);
+}
+
+.admin-page .eyebrow,
+.admin-page .admin-section-copy,
+.admin-page .admin-table small,
+.admin-page .admin-table span,
+.admin-page .admin-discovery-divider .eyebrow {
+  color: var(--admin-muted);
+}
+
+.admin-page .admin-nav button,
+.admin-page .admin-actions button,
+.admin-page .admin-owner-link,
+.admin-page .report-control button {
+  background: #eef2ea;
+  border-color: var(--admin-line);
+  color: var(--admin-text-soft);
+}
+
+.admin-page .admin-nav button.active,
+.admin-page .admin-owner-link,
+.admin-page .admin-spotlight-grid .primary-button {
+  background: var(--admin-action);
+  color: var(--admin-action-text);
+}
+
+.admin-page .admin-nav button svg,
+.admin-page .admin-owner-link svg,
+.admin-page .admin-actions button svg {
+  color: currentColor;
+}
+
+.admin-page .admin-content {
+  overflow: hidden;
+}
+
+.admin-page .admin-spotlight-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+
+.admin-page .admin-spotlight-grid article,
+.admin-page .admin-table article,
+.admin-page .empty-state {
+  background: var(--admin-card);
+  border-color: var(--admin-line);
+  color: var(--admin-text);
+}
+
+.admin-page .admin-spotlight-grid article {
+  min-width: 0;
+}
+
+.admin-page .admin-spotlight-grid label {
+  color: var(--admin-text-soft);
+  font-size: max(11px, 0.74rem);
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-transform: none;
+}
+
+.admin-page .admin-spotlight-grid input,
+.admin-page .admin-spotlight-grid select,
+.admin-page .admin-actions select,
+.admin-page .admin-actions input {
+  background: var(--admin-field);
+  border-color: var(--admin-line);
+  box-sizing: border-box;
+  color: var(--admin-text);
+  font-size: max(12px, 0.8rem);
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-page .admin-spotlight-grid input::placeholder,
+.admin-page .admin-spotlight-grid select::placeholder {
+  color: #667064;
+  opacity: 1;
+}
+
+.admin-page .admin-spotlight-grid .primary-button {
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-page .admin-table article {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.admin-page .admin-table article > div:first-child {
+  min-width: 0;
+}
+
+.admin-page .admin-table strong,
+.admin-page .admin-table small {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .admin-page .admin-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-page .admin-shell {
+    gap: 14px;
+  }
+
+  .admin-page .admin-spotlight-grid,
+  .admin-page .admin-table article {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 420px) {
   .mobile-logo .brand-name,
   .app-status-pill {
@@ -18030,6 +18172,15 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
   .workspace-v2-discovery-detail-actions {
     scroll-margin-top: 170px;
+  }
+
+  .workspace-v2-discovery-breadcrumb {
+    display: none;
+  }
+
+  .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-discovery-detail,
+  .workspace-v2-product-shell[data-discovery-view="external"] .workspace-v2-discovery-detail {
+    padding-top: 58px;
   }
 
   .workspace-v2-product-shell[data-discovery-view="internal"] .workspace-v2-help-assistant,
