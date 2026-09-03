@@ -73,7 +73,7 @@ function installPromptBrandFor(pathname: string | null, spanish: boolean): Insta
         ? "Instala un acceso directo para entrar facil y rapido a la pagina de DJ Carlos."
         : "Install a shortcut for fast access to the DJ Carlos page.",
       nativeInstruction: spanish
-        ? "Instala un acceso directo con tu logo para abrir DJ Carlos rapido."
+        ? "Instala un acceso directo con el logo de DJ Carlos para entrar facil y rapido a su pagina."
         : "Install a shortcut with your logo to open DJ Carlos quickly.",
       title: spanish ? "Instalar DJ Carlos" : "Install DJ Carlos",
     };

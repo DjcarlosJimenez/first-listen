@@ -40,17 +40,51 @@ function playbackLabel(snapshot: ProviderTelemetrySnapshot | null) {
   return "CARGANDO";
 }
 
+function albumsForConfig(config: DjCarlosPageConfig) {
+  return config.albums?.length ? config.albums : [config.album];
+}
+
+function selectedAlbumForConfig(
+  config: DjCarlosPageConfig,
+  albumSlug?: string,
+) {
+  const albums = albumsForConfig(config);
+  return (
+    albums.find((album) => album.slug === albumSlug) ??
+    albums[0] ??
+    config.album
+  );
+}
+
+function firstTrackIdForAlbum(config: DjCarlosPageConfig, albumSlug?: string) {
+  const album = selectedAlbumForConfig(config, albumSlug);
+  return (
+    config.tracks.find(
+      (track) => track.section === "album" && track.albumId === album.id,
+    )?.id ??
+    config.tracks[0]?.id ??
+    ""
+  );
+}
+
 export function DjCarlosArtistPage({
   initialConfig,
+  initialAlbumSlug,
   logoUrl,
 }: {
   initialConfig: DjCarlosPageConfig;
+  initialAlbumSlug?: string;
   logoUrl: string;
 }) {
   const requestPlaybackRef = useRef<(() => void) | null>(null);
-  const [config, setConfig] = useState(() => initialConfig);
-  const [activeId, setActiveId] = useState(() => initialConfig.tracks[0]?.id ?? "");
+  const [config, setConfig] = useState(() =>
+    normalizeDjCarlosPageConfig(initialConfig),
+  );
+  const [activeId, setActiveId] = useState(() =>
+    firstTrackIdForAlbum(initialConfig, initialAlbumSlug),
+  );
   const [autoPlayEnabled, setAutoPlayEnabled] = useState(true);
+  const [playerPausedByUser, setPlayerPausedByUser] = useState(false);
   const [playerVersion, setPlayerVersion] = useState(0);
   const [snapshot, setSnapshot] = useState<ProviderTelemetrySnapshot | null>(null);
 
@@ -72,7 +106,10 @@ export function DjCarlosArtistPage({
           return;
         }
         setConfig(nextConfig);
-        setActiveId((current) => current || nextConfig.tracks[0]?.id || "");
+        setActiveId(
+          (current) =>
+            current || firstTrackIdForAlbum(nextConfig, initialAlbumSlug),
+        );
       } catch {
         window.localStorage.removeItem(DJ_CARLOS_PAGE_STORAGE_KEY);
       }
@@ -89,12 +126,21 @@ export function DjCarlosArtistPage({
       window.removeEventListener("focus", loadLocalConfig);
       window.removeEventListener("storage", handleStorage);
     };
-  }, [initialConfig]);
+  }, [initialAlbumSlug, initialConfig]);
 
-  const { album, tracks } = config;
+  const { tracks } = config;
+  const albums = useMemo(() => albumsForConfig(config), [config]);
+  const album = useMemo(
+    () => selectedAlbumForConfig(config, initialAlbumSlug),
+    [config, initialAlbumSlug],
+  );
+  const isAlbumDetail = Boolean(initialAlbumSlug);
   const albumTracks = useMemo(
-    () => tracks.filter((track) => track.section === "album"),
-    [tracks],
+    () =>
+      tracks.filter(
+        (track) => track.section === "album" && track.albumId === album.id,
+      ),
+    [album.id, tracks],
   );
   const topTenTracks = useMemo(
     () => tracks.filter((track) => track.section === "top-ten").slice(0, 10),
@@ -104,6 +150,14 @@ export function DjCarlosArtistPage({
     () => tracks.filter((track) => track.section === "official-video"),
     [tracks],
   );
+  const albumTrackCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    tracks.forEach((track) => {
+      if (track.section !== "album" || !track.albumId) return;
+      counts.set(track.albumId, (counts.get(track.albumId) ?? 0) + 1);
+    });
+    return counts;
+  }, [tracks]);
   const albumPlayerTrack = useMemo<DjCarlosTrack | null>(() => {
     if (!isPlayableDjCarlosLink(album.link)) return null;
     return {
@@ -126,8 +180,13 @@ export function DjCarlosArtistPage({
   );
   const activeTrack = useMemo(() => {
     if (albumPlayerTrack?.id === activeId) return albumPlayerTrack;
-    return tracks.find((track) => track.id === activeId) ?? tracks[0] ?? null;
-  }, [activeId, albumPlayerTrack, tracks]);
+    return (
+      tracks.find((track) => track.id === activeId) ??
+      playQueue[0] ??
+      tracks[0] ??
+      null
+    );
+  }, [activeId, albumPlayerTrack, playQueue, tracks]);
   const moodFilters = useMemo(() => {
     const moods = tracks
       .map((track) => track.mood)
@@ -137,13 +196,14 @@ export function DjCarlosArtistPage({
   }, [tracks]);
 
   useEffect(() => {
-    if (activeTrack || !tracks[0]) return;
-    setActiveId(tracks[0].id);
-  }, [activeTrack, tracks]);
+    if (activeTrack || !playQueue[0]) return;
+    setActiveId(playQueue[0].id);
+  }, [activeTrack, playQueue]);
 
   const playTrack = (trackId: string) => {
     setSnapshot(null);
     setAutoPlayEnabled(true);
+    setPlayerPausedByUser(false);
     setActiveId(trackId);
     setPlayerVersion((version) => version + 1);
   };
@@ -157,16 +217,21 @@ export function DjCarlosArtistPage({
   };
 
   const playCurrent = () => {
+    setSnapshot(null);
     setAutoPlayEnabled(true);
+    setPlayerPausedByUser(false);
     requestPlaybackRef.current?.();
     dispatchWorkspaceV2PlaybackCommand("play", {
       channel: PLAYER_CHANNEL,
       source: "user-click",
     });
+    setPlayerVersion((version) => version + 1);
   };
 
   const pauseCurrent = () => {
+    requestPlaybackRef.current = null;
     setAutoPlayEnabled(false);
+    setPlayerPausedByUser(true);
     setSnapshot((current) =>
       current
         ? { ...current, playbackState: "paused" }
@@ -176,6 +241,7 @@ export function DjCarlosArtistPage({
       channel: PLAYER_CHANNEL,
       source: "user-click",
     });
+    setPlayerVersion((version) => version + 1);
   };
 
   const jumpTrack = (direction: 1 | -1) => {
@@ -219,7 +285,7 @@ export function DjCarlosArtistPage({
           </div>
 
           <div className="djcx-player-frame">
-            {activeTrack && (
+            {activeTrack && !playerPausedByUser && (
               <ProviderPlayer
                 artist={activeTrack.artist}
                 autoPlay={autoPlayEnabled}
@@ -236,6 +302,25 @@ export function DjCarlosArtistPage({
                 songLoadedAt={new Date().toISOString()}
                 title={activeTrack.title}
               />
+            )}
+            {activeTrack && playerPausedByUser && (
+              <button
+                className="djcx-player-paused"
+                onClick={playCurrent}
+                type="button"
+              >
+                <Image
+                  alt={`${activeTrack.title} cover`}
+                  fill
+                  sizes="(max-width: 760px) 100vw, 420px"
+                  src={activeTrack.coverUrl}
+                  unoptimized
+                />
+                <span>
+                  <Play fill="currentColor" size={18} />
+                  Pausado
+                </span>
+              </button>
             )}
           </div>
 
@@ -272,12 +357,12 @@ export function DjCarlosArtistPage({
           <span className="djcx-eyebrow">
             <Sparkles size={14} /> Pagina oficial
           </span>
-          <h1>DJ Carlos Jimenez</h1>
-          <p>{album.subtitle}</p>
+          <h1>{isAlbumDetail ? album.title : "DJ Carlos Jimenez"}</h1>
+          <p>{isAlbumDetail ? album.description : album.subtitle}</p>
           <div className="djcx-hero-actions">
             <button onClick={playAlbum} type="button">
               <Disc3 size={17} />
-              Reproducir album
+              {isAlbumDetail ? "Reproducir este album" : "Reproducir album"}
             </button>
             <button onClick={playFirstVideo} type="button">
               <Video size={17} />
@@ -334,7 +419,7 @@ export function DjCarlosArtistPage({
         <article className="djcx-quick-stats">
           <div>
             <strong>{albumTracks.length}</strong>
-            <span>Album</span>
+            <span>{isAlbumDetail ? "Canciones" : "Album actual"}</span>
           </div>
           <div>
             <strong>{topTenTracks.length}</strong>
@@ -347,9 +432,15 @@ export function DjCarlosArtistPage({
         </article>
       </section>
 
+      <AlbumLibrary
+        activeAlbumId={album.id}
+        albums={albums}
+        trackCounts={albumTrackCounts}
+      />
+
       <TrackSection
-        heading="Album en orden"
-        kicker="Playlist oficial"
+        heading={isAlbumDetail ? album.title : "Album en orden"}
+        kicker={isAlbumDetail ? "Canciones del album" : "Playlist oficial"}
         onPlayAll={playAlbum}
         onPlayTrack={playTrack}
         tracks={albumTracks}
@@ -403,6 +494,7 @@ export function DjCarlosArtistPage({
       </section>
 
       <footer className="djcx-footer">
+        {isAlbumDetail && <Link href="/DJCarlosJimenez">Volver a la pagina principal</Link>}
         <Link href="/DJCarlosJimenez/admin">Panel artista</Link>
         <Link href="/guest?localPreview=1">Explorar First Listen</Link>
         <a
@@ -417,9 +509,65 @@ export function DjCarlosArtistPage({
   );
 }
 
-function AlbumCase({ album }: { album: DjCarlosAlbum }) {
+function AlbumLibrary({
+  activeAlbumId,
+  albums,
+  trackCounts,
+}: {
+  activeAlbumId: string;
+  albums: DjCarlosAlbum[];
+  trackCounts: Map<string, number>;
+}) {
   return (
-    <div className="djcx-cd-case" aria-label={`Portada de ${album.title}`}>
+    <section className="djcx-list-section djcx-album-library">
+      <div className="djcx-section-heading">
+        <div>
+          <span>
+            <Disc3 size={14} /> Biblioteca
+          </span>
+          <h2>Albumes principales</h2>
+        </div>
+      </div>
+
+      <div className="djcx-album-library-grid">
+        {albums.map((album) => (
+          <Link
+            className={
+              album.id === activeAlbumId
+                ? "djcx-album-card is-active"
+                : "djcx-album-card"
+            }
+            href={`/DJCarlosJimenez/album/${album.slug}`}
+            key={album.id}
+          >
+            <AlbumCase album={album} compact />
+            <div>
+              <span>{album.badge}</span>
+              <strong>{album.title}</strong>
+              <small>{trackCounts.get(album.id) ?? 0} canciones</small>
+            </div>
+            <em>
+              Abrir album <ExternalLink size={13} />
+            </em>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AlbumCase({
+  album,
+  compact = false,
+}: {
+  album: DjCarlosAlbum;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={compact ? "djcx-cd-case djcx-cd-case-small" : "djcx-cd-case"}
+      aria-label={`Portada de ${album.title}`}
+    >
       <div className="djcx-cd-spine">DJ CARLOS JIMENEZ</div>
       <div className="djcx-cd-cover">
         <Image
@@ -447,7 +595,7 @@ function ArtistInstallPanel({ logoUrl }: { logoUrl: string }) {
           <Smartphone size={14} /> App directa
         </span>
         <h2>Acceso directo DJ Carlos</h2>
-        <p>Instala un acceso directo con tu logo para entrar facil y rapido a esta pagina.</p>
+        <p>Instala un acceso directo con el logo de DJ Carlos para entrar facil y rapido a esta pagina.</p>
         <PwaInstallButton
           className="djcx-install-button"
           label="Instalar DJ Carlos"

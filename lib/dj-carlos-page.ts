@@ -6,6 +6,7 @@ export type DjCarlosTrackSection = "album" | "top-ten" | "official-video";
 export type DjCarlosPlayablePlatform = "YouTube" | "YouTube Music";
 
 export type DjCarlosTrack = {
+  albumId?: string;
   id: string;
   artist: string;
   badge: string;
@@ -20,6 +21,8 @@ export type DjCarlosTrack = {
 };
 
 export type DjCarlosAlbum = {
+  id: string;
+  slug: string;
   badge: string;
   coverUrl: string;
   description: string;
@@ -30,6 +33,7 @@ export type DjCarlosAlbum = {
 
 export type DjCarlosPageConfig = {
   album: DjCarlosAlbum;
+  albums: DjCarlosAlbum[];
   tracks: DjCarlosTrack[];
   updatedAt: string;
 };
@@ -44,6 +48,8 @@ type DefaultSongSeed = {
 };
 
 export const defaultDjCarlosAlbum: DjCarlosAlbum = {
+  id: "sonidero-2027",
+  slug: "sonidero-2027",
   badge: "Nuevo album",
   coverUrl: DJ_CARLOS_LOGO_URL,
   description:
@@ -54,8 +60,59 @@ export const defaultDjCarlosAlbum: DjCarlosAlbum = {
   title: "SONIDERO 2027",
 };
 
+export function slugifyDjCarlosAlbumTitle(
+  title: string,
+  fallback = "album",
+) {
+  const slug = title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 72);
+
+  return slug || fallback;
+}
+
+export function getDjCarlosYouTubeVideoId(link: string) {
+  try {
+    const url = new URL(link.trim());
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const pathParts = url.pathname.split("/").filter(Boolean);
+    let videoId: string | null = null;
+
+    if (host === "youtu.be") {
+      videoId = pathParts[0] ?? null;
+    } else if (
+      host === "youtube.com" ||
+      host === "m.youtube.com" ||
+      host === "music.youtube.com"
+    ) {
+      if (url.pathname === "/watch") {
+        videoId = url.searchParams.get("v");
+      } else if (pathParts[0] === "shorts" || pathParts[0] === "embed") {
+        videoId = pathParts[1] ?? null;
+      }
+    }
+
+    if (!videoId || !/^[A-Za-z0-9_-]{6,}$/.test(videoId)) return null;
+    return videoId;
+  } catch {
+    return null;
+  }
+}
+
+export function getDjCarlosTrackThumbnail(link: string) {
+  const videoId = getDjCarlosYouTubeVideoId(link);
+  return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
+}
+
 function fallbackTrack({
+  albumId,
   badge = "Top Ten",
+  coverUrl,
   id,
   link,
   mood = "Cumbia Sonidera",
@@ -65,7 +122,9 @@ function fallbackTrack({
   subtitle,
   title,
 }: {
+  albumId?: string;
   badge?: string;
+  coverUrl?: string;
   id: string;
   link: string;
   mood?: string;
@@ -76,10 +135,14 @@ function fallbackTrack({
   title: string;
 }): DjCarlosTrack {
   return {
+    albumId,
     id,
     artist: "DJ Carlos Jimenez Compositor",
     badge,
-    coverUrl: DJ_CARLOS_LOGO_URL,
+    coverUrl: cleanDjCarlosImageUrl(
+      coverUrl,
+      getDjCarlosTrackThumbnail(link) ?? DJ_CARLOS_LOGO_URL,
+    ),
     link,
     mood,
     platform,
@@ -166,6 +229,7 @@ const defaultSongSeeds: DefaultSongSeed[] = [
 
 const defaultAlbumTracks = defaultSongSeeds.map((song) =>
   fallbackTrack({
+    albumId: defaultDjCarlosAlbum.id,
     badge: "Album",
     id: `dj-carlos-album-${song.id}`,
     link: song.link,
@@ -226,6 +290,7 @@ export const defaultDjCarlosTracks: DjCarlosTrack[] = [
 
 export const defaultDjCarlosPageConfig: DjCarlosPageConfig = {
   album: defaultDjCarlosAlbum,
+  albums: [defaultDjCarlosAlbum],
   tracks: defaultDjCarlosTracks,
   updatedAt: "2026-09-02T00:00:00.000Z",
 };
@@ -302,7 +367,23 @@ export function isDjCarlosTrack(value: unknown): value is DjCarlosTrack {
 function cleanAlbum(value: unknown, fallback: DjCarlosAlbum): DjCarlosAlbum {
   if (!value || typeof value !== "object") return fallback;
   const album = value as Record<string, unknown>;
+  const title =
+    typeof album.title === "string" && album.title.trim()
+      ? album.title.trim()
+      : fallback.title;
+  const fallbackSlug = fallback.slug || slugifyDjCarlosAlbumTitle(fallback.title);
+  const idSource =
+    typeof album.id === "string" && album.id.trim()
+      ? album.id.trim()
+      : fallback.id || fallbackSlug;
+  const slugSource =
+    typeof album.slug === "string" && album.slug.trim()
+      ? album.slug.trim()
+      : title;
+
   return {
+    id: slugifyDjCarlosAlbumTitle(idSource, fallbackSlug),
+    slug: slugifyDjCarlosAlbumTitle(slugSource, fallbackSlug),
     badge:
       typeof album.badge === "string" && album.badge.trim()
         ? album.badge.trim()
@@ -313,24 +394,89 @@ function cleanAlbum(value: unknown, fallback: DjCarlosAlbum): DjCarlosAlbum {
         ? album.description.trim()
         : fallback.description,
     link:
-      typeof album.link === "string" && album.link.trim()
+      typeof album.link === "string"
         ? album.link.trim()
         : fallback.link,
     subtitle:
       typeof album.subtitle === "string" && album.subtitle.trim()
         ? album.subtitle.trim()
         : fallback.subtitle,
-    title:
-      typeof album.title === "string" && album.title.trim()
-        ? album.title.trim()
-        : fallback.title,
+    title,
   };
 }
 
-function cleanTrack(track: DjCarlosTrack, fallbackCoverUrl: string): DjCarlosTrack {
+function uniqueAlbumSlug(baseSlug: string, usedSlugs: Set<string>) {
+  let slug = baseSlug;
+  let index = 2;
+  while (usedSlugs.has(slug)) {
+    slug = `${baseSlug}-${index}`;
+    index += 1;
+  }
+  usedSlugs.add(slug);
+  return slug;
+}
+
+function uniqueAlbumId(baseId: string, usedIds: Set<string>) {
+  let id = baseId;
+  let index = 2;
+  while (usedIds.has(id)) {
+    id = `${baseId}-${index}`;
+    index += 1;
+  }
+  usedIds.add(id);
+  return id;
+}
+
+function normalizeAlbums(
+  config: Record<string, unknown>,
+  fallback: DjCarlosPageConfig,
+) {
+  const fallbackAlbums = Array.isArray(fallback.albums) && fallback.albums.length
+    ? fallback.albums
+    : [fallback.album];
+  const sourceAlbums =
+    Array.isArray(config.albums) && config.albums.length
+      ? config.albums
+      : config.album
+        ? [config.album]
+        : fallbackAlbums;
+  const usedIds = new Set<string>();
+  const usedSlugs = new Set<string>();
+  const albums = sourceAlbums
+    .map((album, index) =>
+      cleanAlbum(
+        album,
+        fallbackAlbums[index] ??
+          {
+            ...fallback.album,
+            id: `album-${index + 1}`,
+            slug: `album-${index + 1}`,
+          },
+      ),
+    )
+    .map((album) => {
+      const id = uniqueAlbumId(album.id, usedIds);
+      const slug = uniqueAlbumSlug(album.slug, usedSlugs);
+      return { ...album, id, slug };
+    });
+
+  return albums.length ? albums : fallbackAlbums;
+}
+
+function cleanTrack(
+  track: DjCarlosTrack,
+  fallbackCoverUrl: string,
+  albumId?: string,
+): DjCarlosTrack {
+  const thumbnailUrl = getDjCarlosTrackThumbnail(track.link);
   return {
     ...track,
-    coverUrl: cleanDjCarlosImageUrl(track.coverUrl, fallbackCoverUrl),
+    albumId: track.section === "album" ? albumId : undefined,
+    coverUrl: thumbnailUrl ?? cleanDjCarlosImageUrl(track.coverUrl, fallbackCoverUrl),
+    platform:
+      track.section === "official-video"
+        ? "YouTube"
+        : detectDjCarlosPlatform(track.link),
   };
 }
 
@@ -340,35 +486,40 @@ export function normalizeDjCarlosPageConfig(
 ): DjCarlosPageConfig {
   if (!value || typeof value !== "object") return fallback;
   const config = value as Record<string, unknown>;
+  const albums = normalizeAlbums(config, fallback);
+  const primaryAlbum = albums[0] ?? fallback.album;
+  const albumIds = new Set(albums.map((album) => album.id));
   const rawTracks = Array.isArray(config.tracks)
     ? config.tracks.filter(isDjCarlosTrack)
     : fallback.tracks;
-  const fallbackAlbumTracks = fallback.tracks.filter(
-    (track) => track.section === "album",
-  );
-  const fallbackTopTenTracks = fallback.tracks.filter(
-    (track) => track.section === "top-ten",
-  );
-  const fallbackVideoTracks = fallback.tracks.filter(
-    (track) => track.section === "official-video",
-  );
-  const albumTracks = rawTracks.filter((track) => track.section === "album");
-  const topTenTracks = rawTracks.filter((track) => track.section === "top-ten");
-  const videoTracks = rawTracks.filter(
-    (track) => track.section === "official-video",
-  );
-  const tracks = [
-    ...(albumTracks.length ? albumTracks : fallbackAlbumTracks),
-    ...(topTenTracks.length ? topTenTracks : fallbackTopTenTracks),
-    ...(videoTracks.length ? videoTracks : fallbackVideoTracks),
-  ].map((track) => cleanTrack(track, fallback.album.coverUrl));
+  const tracks = rawTracks.map((track) => {
+    const requestedAlbumId =
+      typeof track.albumId === "string" && track.albumId.trim()
+        ? track.albumId.trim()
+        : primaryAlbum.id;
+    const albumId = albumIds.has(requestedAlbumId)
+      ? requestedAlbumId
+      : primaryAlbum.id;
+    const album = albums.find((item) => item.id === albumId) ?? primaryAlbum;
+    return cleanTrack(track, album.coverUrl, albumId);
+  });
 
   return {
-    album: cleanAlbum(config.album, fallback.album),
+    album: primaryAlbum,
+    albums,
     tracks: tracks.length ? tracks : fallback.tracks,
     updatedAt:
       typeof config.updatedAt === "string" && config.updatedAt.trim()
         ? config.updatedAt
         : fallback.updatedAt,
   };
+}
+
+export function tracksForDjCarlosAlbum(
+  config: DjCarlosPageConfig,
+  albumId: string,
+) {
+  return config.tracks.filter(
+    (track) => track.section === "album" && track.albumId === albumId,
+  );
 }

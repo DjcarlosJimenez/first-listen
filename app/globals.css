@@ -19422,6 +19422,42 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   padding: 8px 10px;
 }
 
+.djcx-player-paused {
+  background: #050505;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+  width: 100%;
+}
+
+.djcx-player-paused img {
+  filter: brightness(0.52);
+  object-fit: cover;
+}
+
+.djcx-player-paused span {
+  align-items: center;
+  background: rgba(5, 5, 5, 0.72);
+  border: 1px solid rgba(246, 200, 79, 0.36);
+  border-radius: 8px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 950;
+  gap: 8px;
+  left: 50%;
+  padding: 10px 12px;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+
 .djcx-player-controls {
   align-items: center;
   display: flex;
@@ -19566,6 +19602,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .djcx-album-panel,
 .djcx-quick-stats,
+.djcx-album-card,
 .djcx-track-row,
 .djcx-video-card,
 .djcx-install-panel,
@@ -19598,6 +19635,63 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   line-height: 1.55;
   margin: 0 0 18px;
   max-width: 680px;
+}
+
+.djcx-album-library-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.djcx-album-card {
+  align-items: center;
+  color: #fff;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: 14px;
+  text-decoration: none;
+}
+
+.djcx-album-card.is-active {
+  border-color: rgba(255, 217, 94, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(255, 217, 94, 0.18);
+}
+
+.djcx-album-card span {
+  color: var(--djcx-gold-strong);
+  display: block;
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.djcx-album-card strong {
+  color: #fff;
+  display: block;
+  font-size: 16px;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.djcx-album-card small {
+  color: var(--djcx-muted);
+  display: block;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.djcx-album-card em {
+  align-items: center;
+  color: var(--djcx-gold);
+  display: inline-flex;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
+  gap: 6px;
+  justify-content: flex-end;
+  white-space: nowrap;
 }
 
 .djcx-quick-stats {
@@ -19883,6 +19977,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .djcx-video-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .djcx-album-library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -20000,6 +20098,15 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .djcx-video-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .djcx-album-library-grid,
+  .djcx-album-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .djcx-album-card {
+    justify-items: start;
+  }
 }
 
 @media (max-height: 680px) and (max-width: 760px) {
@@ -20028,6 +20135,32 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   overflow: hidden;
   position: relative;
   width: min(250px, 100%);
+}
+
+.djcx-cd-case-small {
+  min-width: 92px;
+  width: 104px;
+}
+
+.djcx-cd-case-small .djcx-cd-spine {
+  font-size: 5px;
+  width: 12px;
+}
+
+.djcx-cd-case-small .djcx-cd-cover {
+  bottom: 8px;
+  left: 16px;
+  top: 8px;
+  width: calc(100% - 42px);
+}
+
+.djcx-cd-case-small .djcx-cd-disc {
+  right: -11px;
+  width: 44px;
+}
+
+.djcx-cd-case-small .djcx-cd-disc span {
+  inset: 6px;
 }
 
 .djcx-cd-case::before {
@@ -20357,6 +20490,97 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   text-align: right;
 }
 
+.djcx-admin-albums-panel {
+  margin-top: 16px;
+}
+
+.djcx-admin-album-list {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.djcx-admin-album-row {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px;
+}
+
+.djcx-admin-album-row.is-active {
+  border-color: rgba(255, 217, 94, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(255, 217, 94, 0.14);
+}
+
+.djcx-admin-album-select {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 10px;
+  grid-template-columns: 52px 34px minmax(0, 1fr);
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.djcx-admin-album-select img {
+  background: #050505;
+  border: 1px solid rgba(246, 200, 79, 0.26);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.djcx-admin-album-select > span {
+  color: var(--djcx-gold);
+  font-size: 13px;
+  font-weight: 950;
+  text-align: center;
+}
+
+.djcx-admin-album-select strong {
+  display: block;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.djcx-admin-album-select small {
+  color: var(--djcx-muted);
+  display: block;
+  font-size: 11px;
+  font-weight: 850;
+  margin-top: 4px;
+}
+
+.djcx-admin-album-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.djcx-admin-album-actions a,
+.djcx-admin-album-actions button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(246, 200, 79, 0.22);
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  text-decoration: none;
+  width: 38px;
+}
+
 .djcx-admin-form-grid,
 .djcx-admin-add {
   display: grid;
@@ -20674,7 +20898,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   }
 
   .djcx-admin-track-row,
-  .djcx-admin-add {
+  .djcx-admin-add,
+  .djcx-admin-album-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -20697,6 +20922,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .djcx-admin-grid,
   .djcx-admin-form-grid,
   .djcx-admin-add,
+  .djcx-admin-album-list,
+  .djcx-admin-album-row,
   .djcx-admin-track-row {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -20716,6 +20943,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   }
 
   .djcx-admin-track-row > div {
+    justify-content: flex-end;
+  }
+
+  .djcx-admin-album-actions {
     justify-content: flex-end;
   }
 }

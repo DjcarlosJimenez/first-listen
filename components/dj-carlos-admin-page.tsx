@@ -32,10 +32,13 @@ import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import {
   DJ_CARLOS_PAGE_STORAGE_KEY,
   detectDjCarlosPlatform,
+  getDjCarlosTrackThumbnail,
   isPlayableDjCarlosLink,
   labelForDjCarlosTrackSection,
   normalizeDjCarlosPageConfig,
   sectionBadge,
+  slugifyDjCarlosAlbumTitle,
+  type DjCarlosAlbum,
   type DjCarlosPageConfig,
   type DjCarlosTrack,
   type DjCarlosTrackSection,
@@ -57,6 +60,38 @@ const emptyDraft: TrackDraft = {
   title: "",
 };
 
+function albumsForConfig(config: DjCarlosPageConfig) {
+  return config.albums?.length ? config.albums : [config.album];
+}
+
+function syncAlbums(
+  config: DjCarlosPageConfig,
+  albums: DjCarlosAlbum[],
+): DjCarlosPageConfig {
+  const safeAlbums = albums.length ? albums : [config.album];
+  return {
+    ...config,
+    album: safeAlbums[0],
+    albums: safeAlbums,
+  };
+}
+
+function newArtistAlbum(index: number, logoUrl: string): DjCarlosAlbum {
+  const title = `Nuevo album ${index}`;
+  const slug = slugifyDjCarlosAlbumTitle(title);
+  const stamp = Date.now().toString(36);
+  return {
+    id: `${slug}-${stamp}`,
+    slug: `${slug}-${stamp}`,
+    badge: "Album",
+    coverUrl: logoUrl,
+    description: "Agrega la descripcion de este album.",
+    link: "",
+    subtitle: "Canciones en el orden oficial del album.",
+    title,
+  };
+}
+
 export function DjCarlosAdminPage({
   initialConfig,
   logoUrl,
@@ -65,7 +100,12 @@ export function DjCarlosAdminPage({
   logoUrl: string;
 }) {
   const storageReadyRef = useRef(false);
-  const [config, setConfig] = useState(() => initialConfig);
+  const [config, setConfig] = useState(() =>
+    normalizeDjCarlosPageConfig(initialConfig),
+  );
+  const [selectedAlbumId, setSelectedAlbumId] = useState(
+    () => initialConfig.album.id,
+  );
   const [draft, setDraft] = useState(emptyDraft);
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -101,6 +141,7 @@ export function DjCarlosAdminPage({
         ) {
           hasLocalChangesRef.current = true;
           setConfig(savedConfig);
+          setSelectedAlbumId(savedConfig.album.id);
           setStatus("Hay un borrador local mas nuevo. Guarda para publicarlo.");
         }
       }
@@ -117,9 +158,21 @@ export function DjCarlosAdminPage({
     persistLocalDraft(nextConfig);
   }, [config, persistLocalDraft]);
 
+  const albums = useMemo(() => albumsForConfig(config), [config]);
+  const selectedAlbum = useMemo(
+    () =>
+      albums.find((album) => album.id === selectedAlbumId) ??
+      albums[0] ??
+      config.album,
+    [albums, config.album, selectedAlbumId],
+  );
   const albumTracks = useMemo(
-    () => config.tracks.filter((track) => track.section === "album"),
-    [config.tracks],
+    () =>
+      config.tracks.filter(
+        (track) =>
+          track.section === "album" && track.albumId === selectedAlbum.id,
+      ),
+    [config.tracks, selectedAlbum.id],
   );
   const topTenTracks = useMemo(
     () => config.tracks.filter((track) => track.section === "top-ten"),
@@ -129,20 +182,115 @@ export function DjCarlosAdminPage({
     () => config.tracks.filter((track) => track.section === "official-video"),
     [config.tracks],
   );
+  const albumTrackCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    config.tracks.forEach((track) => {
+      if (track.section !== "album" || !track.albumId) return;
+      counts.set(track.albumId, (counts.get(track.albumId) ?? 0) + 1);
+    });
+    return counts;
+  }, [config.tracks]);
+
+  useEffect(() => {
+    if (albums.some((album) => album.id === selectedAlbumId)) return;
+    setSelectedAlbumId(albums[0]?.id ?? "");
+  }, [albums, selectedAlbumId]);
 
   const updateAlbum = (
     field: keyof DjCarlosPageConfig["album"],
     value: string,
   ) => {
     hasLocalChangesRef.current = true;
-    setConfig((current) => ({
-      ...current,
-      album: {
-        ...current.album,
-        [field]: value,
-      },
-    }));
+    setConfig((current) => {
+      const nextAlbums = albumsForConfig(current).map((album) =>
+        album.id === selectedAlbum.id
+          ? {
+              ...album,
+              [field]: value,
+              slug:
+                field === "title" &&
+                (album.slug === slugifyDjCarlosAlbumTitle(album.title) ||
+                  album.slug.startsWith("nuevo-album"))
+                  ? slugifyDjCarlosAlbumTitle(value, album.slug)
+                  : album.slug,
+            }
+          : album,
+      );
+      const nextConfig = syncAlbums(current, nextAlbums);
+      if (field !== "title") return nextConfig;
+      return {
+        ...nextConfig,
+        tracks: nextConfig.tracks.map((track) =>
+          track.section === "album" && track.albumId === selectedAlbum.id
+            ? {
+                ...track,
+                release: value,
+                subtitle:
+                  track.subtitle === selectedAlbum.title ? value : track.subtitle,
+              }
+            : track,
+        ),
+      };
+    });
     setStatus("Album actualizado. Toca Guardar cambios para publicarlo.");
+  };
+
+  const addAlbum = () => {
+    hasLocalChangesRef.current = true;
+    const nextAlbum = newArtistAlbum(albums.length + 1, logoUrl);
+    setSelectedAlbumId(nextAlbum.id);
+    setConfig((current) => {
+      return syncAlbums(current, [...albumsForConfig(current), nextAlbum]);
+    });
+    setStatus("Album agregado. Toca Guardar cambios para publicarlo.");
+  };
+
+  const moveAlbum = (albumId: string, direction: 1 | -1) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => {
+      const nextAlbums = [...albumsForConfig(current)];
+      const index = nextAlbums.findIndex((album) => album.id === albumId);
+      const swapIndex = index + direction;
+      if (index < 0 || swapIndex < 0 || swapIndex >= nextAlbums.length) {
+        return current;
+      }
+      [nextAlbums[index], nextAlbums[swapIndex]] = [
+        nextAlbums[swapIndex],
+        nextAlbums[index],
+      ];
+      return syncAlbums(current, nextAlbums);
+    });
+    setStatus("Orden de albumes actualizado. Toca Guardar cambios.");
+  };
+
+  const removeAlbum = (albumId: string) => {
+    const currentAlbums = albumsForConfig(config);
+    if (currentAlbums.length <= 1) {
+      setStatus("Debe quedar por lo menos un album en la pagina.");
+      return;
+    }
+
+    hasLocalChangesRef.current = true;
+    const nextSelectedAlbumId =
+      selectedAlbumId === albumId
+        ? currentAlbums.find((album) => album.id !== albumId)?.id ?? ""
+        : selectedAlbumId;
+    setSelectedAlbumId(nextSelectedAlbumId);
+    setConfig((current) => {
+      const nextAlbums = albumsForConfig(current).filter(
+        (album) => album.id !== albumId,
+      );
+      return syncAlbums(
+        {
+          ...current,
+          tracks: current.tracks.filter(
+            (track) => track.section !== "album" || track.albumId !== albumId,
+          ),
+        },
+        nextAlbums,
+      );
+    });
+    setStatus("Album quitado. Toca Guardar cambios para publicarlo.");
   };
 
   const updateTrack = (
@@ -157,19 +305,32 @@ export function DjCarlosAdminPage({
         if (track.id !== trackId) return track;
         if (field === "section") {
           const section = value as DjCarlosTrackSection;
+          const thumbnailUrl = getDjCarlosTrackThumbnail(track.link);
           return {
             ...track,
+            albumId: section === "album" ? selectedAlbum.id : undefined,
             badge: sectionBadge(section),
+            coverUrl: thumbnailUrl ?? track.coverUrl,
             platform:
               section === "official-video"
                 ? "YouTube"
                 : detectDjCarlosPlatform(track.link),
+            release:
+              section === "album" ? selectedAlbum.title : "DJ Carlos Jimenez",
             section,
+            subtitle:
+              section === "official-video"
+                ? "Video en YouTube"
+                : section === "top-ten"
+                  ? "Top Ten de DJ Carlos"
+                  : selectedAlbum.title,
           };
         }
         if (field === "link") {
+          const thumbnailUrl = getDjCarlosTrackThumbnail(value);
           return {
             ...track,
+            coverUrl: thumbnailUrl ?? track.coverUrl,
             link: value,
             platform: detectDjCarlosPlatform(value),
           };
@@ -189,7 +350,9 @@ export function DjCarlosAdminPage({
       const track = current.tracks.find((item) => item.id === trackId);
       if (!track) return current;
       const groupTracks = current.tracks.filter(
-        (item) => item.section === track.section,
+        (item) =>
+          item.section === track.section &&
+          (track.section !== "album" || item.albumId === track.albumId),
       );
       const groupIndex = groupTracks.findIndex((item) => item.id === trackId);
       const swapTrack = groupTracks[groupIndex + direction];
@@ -230,21 +393,23 @@ export function DjCarlosAdminPage({
 
     hasLocalChangesRef.current = true;
     const track: DjCarlosTrack = {
+      albumId: draft.section === "album" ? selectedAlbum.id : undefined,
       artist: "DJ Carlos Jimenez Compositor",
       badge: sectionBadge(draft.section),
-      coverUrl: config.album.coverUrl || logoUrl,
+      coverUrl: getDjCarlosTrackThumbnail(link) ?? logoUrl,
       id: `dj-carlos-local-${Date.now()}`,
       link,
       mood: draft.mood.trim() || "DJ Carlos",
       platform: detectDjCarlosPlatform(link),
-      release: config.album.title,
+      release:
+        draft.section === "album" ? selectedAlbum.title : "DJ Carlos Jimenez",
       section: draft.section,
       subtitle:
         draft.section === "official-video"
           ? "Video en YouTube"
           : draft.section === "top-ten"
             ? "Top Ten de DJ Carlos"
-            : config.album.title,
+            : selectedAlbum.title,
       title,
     };
 
@@ -307,12 +472,17 @@ export function DjCarlosAdminPage({
   const resetConfig = () => {
     hasLocalChangesRef.current = true;
     window.localStorage.removeItem(DJ_CARLOS_PAGE_STORAGE_KEY);
-    setConfig(initialConfig);
+    const cleanInitialConfig = normalizeDjCarlosPageConfig(initialConfig);
+    setConfig(cleanInitialConfig);
+    setSelectedAlbumId(cleanInitialConfig.album.id);
     setStatus("Pagina restaurada en el editor. Toca Guardar cambios para publicarla.");
   };
 
   const saveConfig = async (nextStatus = "Cambios publicados.") => {
-    const nextConfig = { ...config, updatedAt: new Date().toISOString() };
+    const nextConfig = normalizeDjCarlosPageConfig(
+      { ...config, updatedAt: new Date().toISOString() },
+      config,
+    );
     setSaving(true);
 
     try {
@@ -413,17 +583,91 @@ export function DjCarlosAdminPage({
         </nav>
       </header>
 
+      <section className="djcx-admin-panel djcx-admin-albums-panel">
+        <div className="djcx-admin-panel-heading">
+          <span>
+            <Disc3 size={15} /> Biblioteca de albumes
+          </span>
+          <button onClick={addAlbum} type="button">
+            <Plus size={15} />
+            Agregar album
+          </button>
+        </div>
+
+        <div className="djcx-admin-album-list">
+          {albums.map((album, index) => (
+            <article
+              className={
+                album.id === selectedAlbum.id
+                  ? "djcx-admin-album-row is-active"
+                  : "djcx-admin-album-row"
+              }
+              key={album.id}
+            >
+              <button
+                className="djcx-admin-album-select"
+                onClick={() => setSelectedAlbumId(album.id)}
+                type="button"
+              >
+                <Image
+                  alt={`Portada de ${album.title}`}
+                  height={52}
+                  src={album.coverUrl || logoUrl}
+                  unoptimized
+                  width={52}
+                />
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <strong>{album.title}</strong>
+                  <small>
+                    {albumTrackCounts.get(album.id) ?? 0} canciones
+                    {index === 0 ? " / principal" : ""}
+                  </small>
+                </div>
+              </button>
+
+              <div className="djcx-admin-album-actions">
+                <Link href={`/DJCarlosJimenez/album/${album.slug}`}>
+                  <ExternalLink size={15} />
+                </Link>
+                <button
+                  aria-label="Mover album arriba"
+                  onClick={() => moveAlbum(album.id, -1)}
+                  type="button"
+                >
+                  <ArrowUp size={15} />
+                </button>
+                <button
+                  aria-label="Mover album abajo"
+                  onClick={() => moveAlbum(album.id, 1)}
+                  type="button"
+                >
+                  <ArrowDown size={15} />
+                </button>
+                <button
+                  aria-label="Quitar album"
+                  onClick={() => removeAlbum(album.id)}
+                  type="button"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="djcx-admin-grid">
         <article className="djcx-admin-preview">
           <div className="djcx-cd-case">
             <div className="djcx-cd-spine">DJ CARLOS JIMENEZ</div>
             <div className="djcx-cd-cover">
               <Image
-                alt={`Portada de ${config.album.title}`}
+                alt={`Portada de ${selectedAlbum.title}`}
                 fill
                 priority
                 sizes="(max-width: 900px) 70vw, 260px"
-                src={config.album.coverUrl || logoUrl}
+                src={selectedAlbum.coverUrl || logoUrl}
                 unoptimized
               />
             </div>
@@ -432,16 +676,16 @@ export function DjCarlosAdminPage({
             </div>
           </div>
           <div>
-            <span>{config.album.badge}</span>
-            <h2>{config.album.title}</h2>
-            <p>{config.album.subtitle}</p>
+            <span>{selectedAlbum.badge}</span>
+            <h2>{selectedAlbum.title}</h2>
+            <p>{selectedAlbum.subtitle}</p>
           </div>
         </article>
 
         <section className="djcx-admin-panel">
           <div className="djcx-admin-panel-heading">
             <span>
-              <Disc3 size={15} /> Album promocionado
+              <Disc3 size={15} /> Album seleccionado
             </span>
             <strong>{status}</strong>
           </div>
@@ -451,21 +695,33 @@ export function DjCarlosAdminPage({
               Titulo del album
               <input
                 onChange={(event) => updateAlbum("title", event.target.value)}
-                value={config.album.title}
+                value={selectedAlbum.title}
+              />
+            </label>
+            <label>
+              Nombre en enlace
+              <input
+                onChange={(event) =>
+                  updateAlbum(
+                    "slug",
+                    slugifyDjCarlosAlbumTitle(event.target.value, selectedAlbum.slug),
+                  )
+                }
+                value={selectedAlbum.slug}
               />
             </label>
             <label>
               Badge
               <input
                 onChange={(event) => updateAlbum("badge", event.target.value)}
-                value={config.album.badge}
+                value={selectedAlbum.badge}
               />
             </label>
             <label className="djcx-admin-wide">
               Frase principal
               <input
                 onChange={(event) => updateAlbum("subtitle", event.target.value)}
-                value={config.album.subtitle}
+                value={selectedAlbum.subtitle}
               />
             </label>
             <label className="djcx-admin-wide">
@@ -475,7 +731,7 @@ export function DjCarlosAdminPage({
                   updateAlbum("description", event.target.value)
                 }
                 rows={3}
-                value={config.album.description}
+                value={selectedAlbum.description}
               />
             </label>
             <label className="djcx-admin-wide">
@@ -483,14 +739,14 @@ export function DjCarlosAdminPage({
               <input
                 onChange={(event) => updateAlbum("link", event.target.value)}
                 placeholder="https://music.youtube.com/watch?v=..."
-                value={config.album.link}
+                value={selectedAlbum.link}
               />
             </label>
             <label className="djcx-admin-wide">
               URL de portada
               <input
                 onChange={(event) => updateAlbum("coverUrl", event.target.value)}
-                value={config.album.coverUrl}
+                value={selectedAlbum.coverUrl}
               />
             </label>
             <label
@@ -511,8 +767,12 @@ export function DjCarlosAdminPage({
 
       <section className="djcx-admin-stats">
         <article>
+          <strong>{albums.length}</strong>
+          <span>albumes en biblioteca</span>
+        </article>
+        <article>
           <strong>{albumTracks.length}</strong>
-          <span>canciones del album</span>
+          <span>canciones del album seleccionado</span>
         </article>
         <article>
           <strong>{topTenTracks.length}</strong>
@@ -599,7 +859,7 @@ export function DjCarlosAdminPage({
         onMoveUp={(trackId) => moveTrack(trackId, -1)}
         onRemove={removeTrack}
         onUpdate={updateTrack}
-        title="Orden del album"
+        title={`Orden del album: ${selectedAlbum.title}`}
         tracks={albumTracks}
       />
 
