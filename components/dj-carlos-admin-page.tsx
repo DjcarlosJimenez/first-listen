@@ -16,6 +16,7 @@ import {
   ArrowDown,
   ArrowUp,
   Disc3,
+  Download,
   ExternalLink,
   ImagePlus,
   ListMusic,
@@ -33,6 +34,7 @@ import {
   DJ_CARLOS_PAGE_STORAGE_KEY,
   detectDjCarlosPlatform,
   getDjCarlosTrackThumbnail,
+  isDjCarlosTrack,
   isPlayableDjCarlosLink,
   labelForDjCarlosTrackSection,
   normalizeDjCarlosPageConfig,
@@ -53,6 +55,13 @@ type TrackDraft = {
 
 type EditableTrackField = "link" | "mood" | "section" | "subtitle" | "title";
 
+type AlbumImportResponse = {
+  album?: Partial<DjCarlosAlbum>;
+  error?: string;
+  tracks?: unknown[];
+  warning?: string | null;
+};
+
 const emptyDraft: TrackDraft = {
   link: "",
   mood: "Cumbia Sonidera",
@@ -62,6 +71,42 @@ const emptyDraft: TrackDraft = {
 
 function albumsForConfig(config: DjCarlosPageConfig) {
   return config.albums?.length ? config.albums : [config.album];
+}
+
+function hasYouTubePlaylistId(link: string) {
+  try {
+    const url = new URL(link.trim());
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    return (
+      (host === "music.youtube.com" ||
+        host === "youtube.com" ||
+        host === "m.youtube.com") &&
+      Boolean(url.searchParams.get("list"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function uniqueAlbumSlugForConfig(
+  baseSlug: string,
+  albums: DjCarlosAlbum[],
+  albumId: string,
+) {
+  let slug = baseSlug || "album";
+  let index = 2;
+  const usedSlugs = new Set(
+    albums
+      .filter((album) => album.id !== albumId)
+      .map((album) => album.slug.toLowerCase()),
+  );
+
+  while (usedSlugs.has(slug.toLowerCase())) {
+    slug = `${baseSlug}-${index}`;
+    index += 1;
+  }
+
+  return slug;
 }
 
 function syncAlbums(
@@ -107,8 +152,12 @@ export function DjCarlosAdminPage({
     () => initialConfig.album.id,
   );
   const [draft, setDraft] = useState(emptyDraft);
+  const [albumImportLink, setAlbumImportLink] = useState(
+    () => initialConfig.album.link,
+  );
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [importingAlbum, setImportingAlbum] = useState(false);
   const [status, setStatus] = useState("Panel listo para editar.");
   const hasLocalChangesRef = useRef(false);
 
@@ -142,6 +191,7 @@ export function DjCarlosAdminPage({
           hasLocalChangesRef.current = true;
           setConfig(savedConfig);
           setSelectedAlbumId(savedConfig.album.id);
+          setAlbumImportLink(savedConfig.album.link);
           setStatus("Hay un borrador local mas nuevo. Guarda para publicarlo.");
         }
       }
@@ -193,8 +243,15 @@ export function DjCarlosAdminPage({
 
   useEffect(() => {
     if (albums.some((album) => album.id === selectedAlbumId)) return;
-    setSelectedAlbumId(albums[0]?.id ?? "");
+    const nextAlbum = albums[0];
+    setSelectedAlbumId(nextAlbum?.id ?? "");
+    setAlbumImportLink(nextAlbum?.link ?? "");
   }, [albums, selectedAlbumId]);
+
+  const selectAlbum = (album: DjCarlosAlbum) => {
+    setSelectedAlbumId(album.id);
+    setAlbumImportLink(album.link);
+  };
 
   const updateAlbum = (
     field: keyof DjCarlosPageConfig["album"],
@@ -239,6 +296,7 @@ export function DjCarlosAdminPage({
     hasLocalChangesRef.current = true;
     const nextAlbum = newArtistAlbum(albums.length + 1, logoUrl);
     setSelectedAlbumId(nextAlbum.id);
+    setAlbumImportLink(nextAlbum.link);
     setConfig((current) => {
       return syncAlbums(current, [...albumsForConfig(current), nextAlbum]);
     });
@@ -275,7 +333,11 @@ export function DjCarlosAdminPage({
       selectedAlbumId === albumId
         ? currentAlbums.find((album) => album.id !== albumId)?.id ?? ""
         : selectedAlbumId;
+    const nextSelectedAlbum =
+      currentAlbums.find((album) => album.id === nextSelectedAlbumId) ??
+      currentAlbums.find((album) => album.id !== albumId);
     setSelectedAlbumId(nextSelectedAlbumId);
+    setAlbumImportLink(nextSelectedAlbum?.link ?? "");
     setConfig((current) => {
       const nextAlbums = albumsForConfig(current).filter(
         (album) => album.id !== albumId,
@@ -419,6 +481,135 @@ export function DjCarlosAdminPage({
     }));
     setDraft(emptyDraft);
     setStatus("Cancion agregada. Toca Guardar cambios para publicarla.");
+  };
+
+  const importAlbumFromLink = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const link = albumImportLink.trim();
+
+    if (!hasYouTubePlaylistId(link)) {
+      setStatus("Pega el link de compartir del album de YouTube Music.");
+      return;
+    }
+
+    setImportingAlbum(true);
+    setStatus("Importando album desde YouTube Music...");
+
+    try {
+      const response = await fetch("/DJCarlosJimenez/import-album", {
+        body: JSON.stringify({
+          albumId: selectedAlbum.id,
+          link,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const data = (await response.json().catch(() => ({}))) as AlbumImportResponse;
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "No se pudo importar el album.",
+        );
+      }
+
+      const importedTracks = Array.isArray(data.tracks)
+        ? data.tracks.filter(isDjCarlosTrack)
+        : [];
+      const importedAlbum = data.album ?? {};
+      const importedTitle =
+        typeof importedAlbum.title === "string" && importedAlbum.title.trim()
+          ? importedAlbum.title.trim()
+          : selectedAlbum.title;
+      const importedSlug =
+        typeof importedAlbum.slug === "string" && importedAlbum.slug.trim()
+          ? importedAlbum.slug.trim()
+          : slugifyDjCarlosAlbumTitle(importedTitle, selectedAlbum.slug);
+      const importedCoverUrl =
+        typeof importedAlbum.coverUrl === "string" && importedAlbum.coverUrl.trim()
+          ? importedAlbum.coverUrl.trim()
+          : selectedAlbum.coverUrl || logoUrl;
+      const importedSubtitle =
+        typeof importedAlbum.subtitle === "string" && importedAlbum.subtitle.trim()
+          ? importedAlbum.subtitle.trim()
+          : selectedAlbum.subtitle;
+      const importedDescription =
+        typeof importedAlbum.description === "string" &&
+        importedAlbum.description.trim()
+          ? importedAlbum.description.trim()
+          : selectedAlbum.description;
+      const stamp = Date.now();
+
+      hasLocalChangesRef.current = true;
+      setConfig((current) => {
+        const currentAlbums = albumsForConfig(current);
+        let nextAlbumTitle = importedTitle;
+        const nextAlbums = currentAlbums.map((album) => {
+          if (album.id !== selectedAlbum.id) return album;
+          const autoSlug =
+            album.slug === slugifyDjCarlosAlbumTitle(album.title) ||
+            album.slug.startsWith("nuevo-album");
+          const slug = autoSlug
+            ? uniqueAlbumSlugForConfig(importedSlug, currentAlbums, album.id)
+            : album.slug;
+          nextAlbumTitle = importedTitle || album.title;
+
+          return {
+            ...album,
+            badge:
+              typeof importedAlbum.badge === "string" && importedAlbum.badge.trim()
+                ? importedAlbum.badge.trim()
+                : album.badge,
+            coverUrl: importedCoverUrl,
+            description: importedDescription,
+            link,
+            slug,
+            subtitle: importedSubtitle,
+            title: nextAlbumTitle,
+          };
+        });
+        const nextImportedTracks = importedTracks.map((track, index) => ({
+          ...track,
+          albumId: selectedAlbum.id,
+          badge: "Album",
+          coverUrl:
+            track.coverUrl ||
+            getDjCarlosTrackThumbnail(track.link) ||
+            importedCoverUrl,
+          id: `dj-carlos-import-${selectedAlbum.id}-${stamp}-${index + 1}`,
+          mood: track.mood || "Album",
+          platform: detectDjCarlosPlatform(track.link),
+          release: nextAlbumTitle,
+          section: "album" as const,
+          subtitle: nextAlbumTitle,
+        }));
+        const tracks = importedTracks.length
+          ? [
+              ...current.tracks.filter(
+                (track) =>
+                  track.section !== "album" ||
+                  track.albumId !== selectedAlbum.id,
+              ),
+              ...nextImportedTracks,
+            ]
+          : current.tracks;
+
+        return syncAlbums({ ...current, tracks }, nextAlbums);
+      });
+      setStatus(
+        data.warning ||
+          `Album importado con ${importedTracks.length} canciones. Toca Guardar cambios para publicarlo.`,
+      );
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "No se pudo importar el album ahora.",
+      );
+    } finally {
+      setImportingAlbum(false);
+    }
   };
 
   const handleCoverFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -606,7 +797,7 @@ export function DjCarlosAdminPage({
             >
               <button
                 className="djcx-admin-album-select"
-                onClick={() => setSelectedAlbumId(album.id)}
+                onClick={() => selectAlbum(album)}
                 type="button"
               >
                 <Image
@@ -762,6 +953,25 @@ export function DjCarlosAdminPage({
               />
             </label>
           </div>
+
+          <form className="djcx-admin-import" onSubmit={importAlbumFromLink}>
+            <label>
+              Importar album completo
+              <input
+                disabled={importingAlbum}
+                onChange={(event) => setAlbumImportLink(event.target.value)}
+                placeholder="https://music.youtube.com/playlist?list=..."
+                value={albumImportLink}
+              />
+            </label>
+            <button disabled={importingAlbum} type="submit">
+              <Download size={16} />
+              {importingAlbum ? "Importando..." : "Importar album"}
+            </button>
+            <small>
+              Reemplaza solo las canciones del album seleccionado. Top Ten y videos no cambian.
+            </small>
+          </form>
         </section>
       </section>
 

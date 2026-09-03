@@ -20531,6 +20531,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .djcx-admin-secondary,
 .djcx-admin-header a,
 .djcx-admin-panel-heading button,
+.djcx-admin-import button,
 .djcx-admin-add button,
 .djcx-admin-track-row button {
   align-items: center;
@@ -20831,6 +20832,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .djcx-admin-form-grid,
+.djcx-admin-import,
 .djcx-admin-add {
   display: grid;
   gap: 12px;
@@ -20842,6 +20844,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .djcx-admin-form-grid label,
+.djcx-admin-import label,
 .djcx-admin-add label,
 .djcx-admin-track-row label {
   color: var(--djcx-muted);
@@ -20855,6 +20858,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .djcx-admin-form-grid input,
 .djcx-admin-form-grid textarea,
+.djcx-admin-import input,
 .djcx-admin-add input,
 .djcx-admin-add select,
 .djcx-admin-track-row input,
@@ -20872,6 +20876,27 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .djcx-admin-form-grid textarea {
   resize: vertical;
+}
+
+.djcx-admin-import {
+  align-items: end;
+  border-top: 1px solid rgba(246, 200, 79, 0.16);
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.djcx-admin-import button:disabled {
+  cursor: progress;
+  opacity: 0.68;
+}
+
+.djcx-admin-import small {
+  color: var(--djcx-muted);
+  font-size: 12px;
+  font-weight: 850;
+  grid-column: 1 / -1;
+  line-height: 1.45;
 }
 
 .djcx-file-control {
@@ -21148,6 +21173,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
   .djcx-admin-track-row,
   .djcx-admin-add,
+  .djcx-admin-import,
   .djcx-admin-album-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -21171,6 +21197,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .djcx-admin-grid,
   .djcx-admin-form-grid,
   .djcx-admin-add,
+  .djcx-admin-import,
   .djcx-admin-album-list,
   .djcx-admin-album-row,
   .djcx-admin-track-row {
