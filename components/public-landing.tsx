@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { ArtistPagesPromo } from "@/components/artist-pages-promo";
 import { LanguageSelector } from "@/components/language-selector";
 import { Logo } from "@/components/logo";
 import { PwaInstallButton } from "@/components/pwa-install-prompt";
@@ -318,6 +319,8 @@ export function PublicLanding({
             <span><Link2 size={18} /> {copy.landing.proof.platform}</span>
           </div>
         </section>
+
+        <ArtistPagesPromo locale={locale} surface="landing" />
 
         <section className="brand-positioning-section">
           <span className="eyebrow">

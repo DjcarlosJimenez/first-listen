@@ -70,6 +70,10 @@ import {
   type WorkspaceV2Song,
 } from "@/lib/workspace-v2";
 import {
+  ArtistPagesAppNotice,
+  ArtistPagesPromo,
+} from "@/components/artist-pages-promo";
+import {
   WorkspaceV2ProviderPlayerAdapter,
   type WorkspaceV2ProviderDebugEvent,
 } from "@/components/workspace-v2/workspace-v2-provider-player-adapter";
@@ -3266,6 +3270,8 @@ function WorkspaceV2ShellClient({
           )}
         </section>
 
+        <ArtistPagesAppNotice locale={workspaceLocale} />
+
         {resumedSession && (
           <section className="workspace-v2-resume-card" role="status">
             <div>
@@ -3427,6 +3433,10 @@ function WorkspaceV2ShellClient({
             </article>
           )}
         </section>
+
+        {activePanel === "discover" && discoveryView === "home" && (
+          <ArtistPagesPromo locale={workspaceLocale} surface="workspace" />
+        )}
 
         {workspaceReturnVisible && (
           <div
