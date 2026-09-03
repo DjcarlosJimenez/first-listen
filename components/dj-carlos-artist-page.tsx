@@ -63,6 +63,14 @@ export function DjCarlosArtistPage({
           JSON.parse(saved),
           initialConfig,
         );
+        const savedAt = Date.parse(nextConfig.updatedAt);
+        const serverAt = Date.parse(initialConfig.updatedAt);
+        if (
+          Number.isFinite(serverAt) &&
+          (!Number.isFinite(savedAt) || savedAt <= serverAt)
+        ) {
+          return;
+        }
         setConfig(nextConfig);
         setActiveId((current) => current || nextConfig.tracks[0]?.id || "");
       } catch {

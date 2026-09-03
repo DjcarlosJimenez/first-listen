@@ -66,13 +66,26 @@ export function DjCarlosAdminPage({
   const storageReadyRef = useRef(false);
   const [config, setConfig] = useState(() => initialConfig);
   const [draft, setDraft] = useState(emptyDraft);
-  const [status, setStatus] = useState("Cambios locales listos.");
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState("Panel listo para editar.");
 
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(DJ_CARLOS_PAGE_STORAGE_KEY);
       if (saved) {
-        setConfig(normalizeDjCarlosPageConfig(JSON.parse(saved), initialConfig));
+        const savedConfig = normalizeDjCarlosPageConfig(
+          JSON.parse(saved),
+          initialConfig,
+        );
+        const savedAt = Date.parse(savedConfig.updatedAt);
+        const serverAt = Date.parse(initialConfig.updatedAt);
+        if (
+          Number.isFinite(savedAt) &&
+          (!Number.isFinite(serverAt) || savedAt > serverAt)
+        ) {
+          setConfig(savedConfig);
+          setStatus("Hay un borrador local mas nuevo. Guarda para publicarlo.");
+        }
       }
     } catch {
       window.localStorage.removeItem(DJ_CARLOS_PAGE_STORAGE_KEY);
@@ -114,7 +127,7 @@ export function DjCarlosAdminPage({
         [field]: value,
       },
     }));
-    setStatus("Album actualizado localmente.");
+    setStatus("Album actualizado. Toca Guardar cambios para publicarlo.");
   };
 
   const updateTrack = (
@@ -151,7 +164,7 @@ export function DjCarlosAdminPage({
         };
       }),
     }));
-    setStatus("Cancion actualizada localmente.");
+    setStatus("Cancion actualizada. Toca Guardar cambios para publicarla.");
   };
 
   const moveTrack = (trackId: string, direction: 1 | -1) => {
@@ -173,7 +186,7 @@ export function DjCarlosAdminPage({
         }),
       };
     });
-    setStatus("Orden actualizado localmente.");
+    setStatus("Orden actualizado. Toca Guardar cambios para publicarlo.");
   };
 
   const removeTrack = (trackId: string) => {
@@ -181,7 +194,7 @@ export function DjCarlosAdminPage({
       ...current,
       tracks: current.tracks.filter((track) => track.id !== trackId),
     }));
-    setStatus("Cancion quitada localmente.");
+    setStatus("Cancion quitada. Toca Guardar cambios para publicarlo.");
   };
 
   const addTrack = (event: FormEvent<HTMLFormElement>) => {
@@ -221,7 +234,7 @@ export function DjCarlosAdminPage({
       tracks: [...current.tracks, track],
     }));
     setDraft(emptyDraft);
-    setStatus("Cancion agregada localmente.");
+    setStatus("Cancion agregada. Toca Guardar cambios para publicarla.");
   };
 
   const handleCoverFile = (event: ChangeEvent<HTMLInputElement>) => {
@@ -231,7 +244,7 @@ export function DjCarlosAdminPage({
     reader.addEventListener("load", () => {
       if (typeof reader.result !== "string") return;
       updateAlbum("coverUrl", reader.result);
-      setStatus("Portada cargada localmente.");
+      setStatus("Portada cargada. Toca Guardar cambios para publicarla.");
     });
     reader.readAsDataURL(file);
   };
@@ -239,21 +252,55 @@ export function DjCarlosAdminPage({
   const resetConfig = () => {
     window.localStorage.removeItem(DJ_CARLOS_PAGE_STORAGE_KEY);
     setConfig(initialConfig);
-    setStatus("Pagina restaurada a la version base local.");
+    setStatus("Pagina restaurada en el editor. Toca Guardar cambios para publicarla.");
   };
 
-  const saveConfig = (nextStatus = "Cambios guardados localmente.") => {
+  const saveConfig = async (nextStatus = "Cambios publicados.") => {
     const nextConfig = { ...config, updatedAt: new Date().toISOString() };
-    window.localStorage.setItem(
-      DJ_CARLOS_PAGE_STORAGE_KEY,
-      JSON.stringify(nextConfig),
-    );
-    setConfig(nextConfig);
-    setStatus(nextStatus);
+    setSaving(true);
+
+    try {
+      const response = await fetch("/DJCarlosJimenez/config", {
+        body: JSON.stringify(nextConfig),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : "No se pudo publicar.",
+        );
+      }
+
+      const publishedConfig = normalizeDjCarlosPageConfig(
+        data.config ?? nextConfig,
+        nextConfig,
+      );
+      window.localStorage.setItem(
+        DJ_CARLOS_PAGE_STORAGE_KEY,
+        JSON.stringify(publishedConfig),
+      );
+      setConfig(publishedConfig);
+      setStatus(nextStatus);
+      return true;
+    } catch {
+      window.localStorage.setItem(
+        DJ_CARLOS_PAGE_STORAGE_KEY,
+        JSON.stringify(nextConfig),
+      );
+      setConfig(nextConfig);
+      setStatus(
+        "No se pudo publicar ahora. El borrador quedo guardado en este navegador.",
+      );
+      return false;
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const saveAndViewPage = () => {
-    saveConfig("Cambios guardados. Abriendo la pagina.");
+  const saveAndViewPage = async () => {
+    await saveConfig("Cambios publicados. Abriendo la pagina.");
     window.location.href = "/DJCarlosJimenez";
   };
 
@@ -284,18 +331,20 @@ export function DjCarlosAdminPage({
         <nav>
           <button
             className="djcx-admin-save"
-            onClick={() => saveConfig()}
+            disabled={saving}
+            onClick={() => void saveConfig()}
             type="button"
           >
             <Save size={15} />
-            Guardar cambios
+            {saving ? "Guardando..." : "Guardar cambios"}
           </button>
           <button
             className="djcx-admin-save-view"
-            onClick={saveAndViewPage}
+            disabled={saving}
+            onClick={() => void saveAndViewPage()}
             type="button"
           >
-            Guardar y ver <ExternalLink size={15} />
+            {saving ? "Guardando..." : "Guardar y ver"} <ExternalLink size={15} />
           </button>
           <Link href="/DJCarlosJimenez">
             Ver pagina <ExternalLink size={15} />

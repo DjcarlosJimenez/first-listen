@@ -6,6 +6,7 @@ import {
   DJ_CARLOS_LOGO_URL,
   defaultDjCarlosPageConfig,
 } from "@/lib/dj-carlos-page";
+import { readDjCarlosPageConfig } from "@/lib/dj-carlos-page-store";
 import {
   DJ_CARLOS_ADMIN_COOKIE_NAME,
   isDjCarlosAdminSession,
@@ -53,9 +54,11 @@ export default async function DjCarlosJimenezAdminRoute() {
     return <DjCarlosAdminLogin logoUrl={DJ_CARLOS_LOGO_URL} />;
   }
 
+  const initialConfig = await readDjCarlosPageConfig(defaultDjCarlosPageConfig);
+
   return (
     <DjCarlosAdminPage
-      initialConfig={defaultDjCarlosPageConfig}
+      initialConfig={initialConfig}
       logoUrl={DJ_CARLOS_LOGO_URL}
     />
   );

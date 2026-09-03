@@ -20189,6 +20189,12 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   text-transform: none;
 }
 
+.djcx-admin-save:disabled,
+.djcx-admin-save-view:disabled {
+  cursor: progress;
+  opacity: 0.68;
+}
+
 .pwa-install-card.djcx-pwa-install-card {
   background: linear-gradient(135deg, #fffaf0, #f7e4a8);
   border-color: rgba(93, 70, 14, 0.24);
