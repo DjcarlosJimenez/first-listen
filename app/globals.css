@@ -347,13 +347,12 @@
   color: var(--ink);
 }
 
-.pwa-install-actions button:last-child {
-  width: 38px;
-  height: 38px;
+.pwa-install-actions .pwa-install-secondary {
   border-color: transparent;
   background: color-mix(in srgb, var(--dark) 8%, transparent);
   color: var(--ink);
-  padding: 0;
+  padding: 10px 13px;
+  white-space: nowrap;
 }
 
 html[data-pwa-standalone="true"] body {
@@ -436,7 +435,7 @@ html[data-pwa-standalone="true"] body {
     justify-content: stretch;
   }
 
-  .pwa-install-actions button:first-child,
+  .pwa-install-actions .pwa-install-primary,
   .pwa-update-actions button:first-child {
     flex: 1;
   }
@@ -474,9 +473,9 @@ html[data-pwa-standalone="true"] body {
     padding: 8px 10px;
   }
 
-  .pwa-install-actions button:last-child {
-    height: 34px;
-    width: 34px;
+  .pwa-install-actions .pwa-install-secondary {
+    flex: 0 0 auto;
+    min-width: min(46vw, 168px);
   }
 }
 

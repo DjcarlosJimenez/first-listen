@@ -12,7 +12,7 @@ import {
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
-import { Download, Share2, Smartphone, X } from "lucide-react";
+import { Download, Share2, Smartphone } from "lucide-react";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { useInterfaceLocale } from "@/lib/use-interface-locale";
 
@@ -30,6 +30,7 @@ type PwaInstallContextValue = {
   updateAvailable: boolean;
   requestInstall: () => Promise<void>;
   dismissInstructions: () => void;
+  hideInstructionsForSession: () => void;
   dismissUpdate: () => void;
   refreshApp: () => void;
 };
@@ -155,6 +156,7 @@ function recentlyDismissed(key = DISMISS_KEY) {
   try {
     const value = window.localStorage.getItem(key);
     if (!value) return false;
+    if (value === "never") return true;
     const dismissedAt = Number(value);
     return Number.isFinite(dismissedAt) && Date.now() - dismissedAt < DISMISS_WINDOW_MS;
   } catch {
@@ -162,9 +164,9 @@ function recentlyDismissed(key = DISMISS_KEY) {
   }
 }
 
-function markDismissed(key = DISMISS_KEY) {
+function markDismissed(key = DISMISS_KEY, permanently = false) {
   try {
-    window.localStorage.setItem(key, String(Date.now()));
+    window.localStorage.setItem(key, permanently ? "never" : String(Date.now()));
   } catch {
     // Some private browsing modes can block localStorage. The prompt can still hide for this session.
   }
@@ -357,9 +359,16 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   const dismissInstructions = useCallback(() => {
-    markDismissed(isDjCarlosPath(pathname) ? DJ_CARLOS_DISMISS_KEY : DISMISS_KEY);
+    markDismissed(
+      isDjCarlosPath(pathname) ? DJ_CARLOS_DISMISS_KEY : DISMISS_KEY,
+      true,
+    );
     setVisible(false);
   }, [pathname]);
+
+  const hideInstructionsForSession = useCallback(() => {
+    setVisible(false);
+  }, []);
 
   const dismissUpdate = useCallback(() => {
     setUpdateAvailable(false);
@@ -406,12 +415,14 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       updateAvailable,
       requestInstall,
       dismissInstructions,
+      hideInstructionsForSession,
       dismissUpdate,
       refreshApp,
     }),
     [
       dismissInstructions,
       dismissUpdate,
+      hideInstructionsForSession,
       installed,
       installing,
       iosSafari,
@@ -493,6 +504,7 @@ export function PwaInstallButton({
 function PwaInstallPrompt({ visible }: { visible: boolean }) {
   const {
     dismissInstructions,
+    hideInstructionsForSession,
     installed,
     installing,
     iosSafari,
@@ -505,6 +517,14 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
   const brand = installPromptBrandFor(pathname, spanish);
 
   if (installed || !visible) return null;
+
+  const chooseInstall = () => {
+    if (nativePromptAvailable) {
+      void requestInstall();
+      return;
+    }
+    hideInstructionsForSession();
+  };
 
   return (
     <aside className={brand.cardClassName} aria-live="polite">
@@ -526,26 +546,24 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
         )}
       </div>
       <div className="pwa-install-actions">
-        {nativePromptAvailable ? (
-          <button disabled={installing} onClick={() => void requestInstall()} type="button">
-            <Download size={14} />{" "}
-            {installing
-              ? spanish
-                ? "Instalando..."
-                : "Installing..."
-              : brand.actionLabel}
-          </button>
-        ) : (
-          <button onClick={dismissInstructions} type="button">
-            {spanish ? "Entendido" : "Got it"}
-          </button>
-        )}
         <button
-          aria-label={spanish ? "Cerrar aviso de instalación" : "Dismiss install prompt"}
+          className="pwa-install-primary"
+          disabled={installing}
+          onClick={chooseInstall}
+          type="button"
+        >
+          <Download size={14} />{" "}
+          {installing ? (spanish ? "Instalando..." : "Installing...") : spanish ? "Instalar" : "Install"}
+        </button>
+        <button
+          className="pwa-install-secondary"
+          aria-label={
+            spanish ? "No volver a mostrar este aviso" : "Do not show this prompt again"
+          }
           onClick={dismissInstructions}
           type="button"
         >
-          <X size={14} />
+          {spanish ? "No volver a mostrar" : "Do not show again"}
         </button>
       </div>
     </aside>
