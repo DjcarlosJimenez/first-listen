@@ -4,12 +4,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   defaultDjCarlosPageConfig,
   normalizeDjCarlosPageConfig,
+  normalizeDjCarlosUpcomingSignals,
   type DjCarlosPageConfig,
+  type DjCarlosUpcomingReactionKey,
+  type DjCarlosUpcomingSignals,
 } from "@/lib/dj-carlos-page";
 
 const DJ_CARLOS_STORAGE_BUCKET = "dj-carlos-page";
 const DJ_CARLOS_ASSETS_BUCKET = "dj-carlos-page-assets";
 const DJ_CARLOS_CONFIG_PATH = "config.json";
+const DJ_CARLOS_UPCOMING_SIGNALS_PATH = "upcoming-signals.json";
 const DJ_CARLOS_MAX_COVER_BYTES = 8 * 1024 * 1024;
 const DJ_CARLOS_COVER_TYPES = new Set([
   "image/jpeg",
@@ -68,17 +72,34 @@ async function ensureDjCarlosAssetsBucket() {
 export async function readDjCarlosPageConfig(
   fallback: DjCarlosPageConfig = defaultDjCarlosPageConfig,
 ) {
+  let config = fallback;
+
   try {
     const supabase = createAdminClient();
     const { data, error } = await supabase.storage
       .from(DJ_CARLOS_STORAGE_BUCKET)
       .download(DJ_CARLOS_CONFIG_PATH);
 
-    if (error || !data) return fallback;
-
-    return normalizeDjCarlosPageConfig(JSON.parse(await data.text()), fallback);
+    if (!error && data) {
+      config = normalizeDjCarlosPageConfig(JSON.parse(await data.text()), fallback);
+    }
   } catch {
-    return fallback;
+    config = fallback;
+  }
+
+  try {
+    const signals = await readDjCarlosUpcomingSignals(
+      config.upcomingRelease.signals,
+    );
+    return {
+      ...config,
+      upcomingRelease: {
+        ...config.upcomingRelease,
+        signals,
+      },
+    };
+  } catch {
+    return config;
   }
 }
 
@@ -86,9 +107,16 @@ export async function writeDjCarlosPageConfig(
   config: DjCarlosPageConfig,
   fallback: DjCarlosPageConfig = defaultDjCarlosPageConfig,
 ) {
+  const currentSignals = await readDjCarlosUpcomingSignals(
+    config.upcomingRelease.signals,
+  );
   const cleanConfig = normalizeDjCarlosPageConfig(
     {
       ...config,
+      upcomingRelease: {
+        ...config.upcomingRelease,
+        signals: currentSignals,
+      },
       updatedAt: new Date().toISOString(),
     },
     fallback,
@@ -108,6 +136,64 @@ export async function writeDjCarlosPageConfig(
   if (error) throw error;
 
   return cleanConfig;
+}
+
+export async function readDjCarlosUpcomingSignals(
+  fallback: DjCarlosUpcomingSignals =
+    defaultDjCarlosPageConfig.upcomingRelease.signals,
+) {
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase.storage
+      .from(DJ_CARLOS_STORAGE_BUCKET)
+      .download(DJ_CARLOS_UPCOMING_SIGNALS_PATH);
+
+    if (error || !data) return fallback;
+
+    return normalizeDjCarlosUpcomingSignals(JSON.parse(await data.text()), fallback);
+  } catch {
+    return fallback;
+  }
+}
+
+async function writeDjCarlosUpcomingSignals(signals: DjCarlosUpcomingSignals) {
+  const cleanSignals = normalizeDjCarlosUpcomingSignals(signals);
+  const supabase = await ensureDjCarlosBucket();
+  const file = new Blob([JSON.stringify(cleanSignals, null, 2)], {
+    type: "application/json",
+  });
+  const { error } = await supabase.storage
+    .from(DJ_CARLOS_STORAGE_BUCKET)
+    .upload(DJ_CARLOS_UPCOMING_SIGNALS_PATH, file, {
+      cacheControl: "0",
+      contentType: "application/json",
+      upsert: true,
+    });
+
+  if (error) throw error;
+
+  return cleanSignals;
+}
+
+export async function recordDjCarlosUpcomingSignal({
+  follow = false,
+  reaction,
+}: {
+  follow?: boolean;
+  reaction?: DjCarlosUpcomingReactionKey;
+}) {
+  const current = await readDjCarlosUpcomingSignals();
+  const next: DjCarlosUpcomingSignals = {
+    followers: current.followers + (follow ? 1 : 0),
+    reactions: {
+      ...current.reactions,
+      ...(reaction
+        ? { [reaction]: current.reactions[reaction] + 1 }
+        : {}),
+    },
+  };
+
+  return writeDjCarlosUpcomingSignals(next);
 }
 
 export async function writeDjCarlosCoverFile(file: File) {

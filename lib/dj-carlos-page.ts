@@ -31,10 +31,29 @@ export type DjCarlosAlbum = {
   title: string;
 };
 
+export type DjCarlosUpcomingReactionKey = "waiting" | "video" | "favorite";
+
+export type DjCarlosUpcomingSignals = {
+  followers: number;
+  reactions: Record<DjCarlosUpcomingReactionKey, number>;
+};
+
+export type DjCarlosUpcomingRelease = {
+  enabled: boolean;
+  badge: string;
+  coverUrl: string;
+  note: string;
+  signals: DjCarlosUpcomingSignals;
+  status: string;
+  title: string;
+  tracks: string[];
+};
+
 export type DjCarlosPageConfig = {
   album: DjCarlosAlbum;
   albums: DjCarlosAlbum[];
   tracks: DjCarlosTrack[];
+  upcomingRelease: DjCarlosUpcomingRelease;
   updatedAt: string;
 };
 
@@ -292,6 +311,29 @@ export const defaultDjCarlosPageConfig: DjCarlosPageConfig = {
   album: defaultDjCarlosAlbum,
   albums: [defaultDjCarlosAlbum],
   tracks: defaultDjCarlosTracks,
+  upcomingRelease: {
+    badge: "Exclusivo aqui",
+    coverUrl: DJ_CARLOS_LOGO_URL,
+    enabled: true,
+    note:
+      "Sigue el progreso del proximo album antes de que la musica salga oficialmente.",
+    signals: {
+      followers: 0,
+      reactions: {
+        favorite: 0,
+        video: 0,
+        waiting: 0,
+      },
+    },
+    status: "En preparacion",
+    title: "Nuevo album en proceso",
+    tracks: [
+      "Titulo por confirmar",
+      "Cumbia sonidera nueva",
+      "Tema romantico",
+      "Cancion para bailar",
+    ],
+  },
   updatedAt: "2026-09-02T00:00:00.000Z",
 };
 
@@ -405,6 +447,76 @@ function cleanAlbum(value: unknown, fallback: DjCarlosAlbum): DjCarlosAlbum {
   };
 }
 
+function cleanCount(value: unknown) {
+  const count = Number(value);
+  if (!Number.isFinite(count) || count < 0) return 0;
+  return Math.floor(count);
+}
+
+export function normalizeDjCarlosUpcomingSignals(
+  value: unknown,
+  fallback: DjCarlosUpcomingSignals =
+    defaultDjCarlosPageConfig.upcomingRelease.signals,
+): DjCarlosUpcomingSignals {
+  const signals =
+    value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const reactions =
+    signals.reactions && typeof signals.reactions === "object"
+      ? signals.reactions as Record<string, unknown>
+      : {};
+
+  return {
+    followers: cleanCount(signals.followers ?? fallback.followers),
+    reactions: {
+      favorite: cleanCount(reactions.favorite ?? fallback.reactions.favorite),
+      video: cleanCount(reactions.video ?? fallback.reactions.video),
+      waiting: cleanCount(reactions.waiting ?? fallback.reactions.waiting),
+    },
+  };
+}
+
+function cleanUpcomingRelease(
+  value: unknown,
+  fallback: DjCarlosUpcomingRelease,
+): DjCarlosUpcomingRelease {
+  const release =
+    value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const hasTrackList = Array.isArray(release.tracks);
+  const rawTracks: unknown[] = hasTrackList
+    ? release.tracks as unknown[]
+    : fallback.tracks;
+  const tracks = rawTracks
+    .map((track) => (typeof track === "string" ? track.trim() : ""))
+    .filter(Boolean)
+    .slice(0, 24);
+
+  return {
+    badge:
+      typeof release.badge === "string" && release.badge.trim()
+        ? release.badge.trim()
+        : fallback.badge,
+    coverUrl: cleanDjCarlosImageUrl(release.coverUrl, fallback.coverUrl),
+    enabled:
+      typeof release.enabled === "boolean"
+        ? release.enabled
+        : fallback.enabled,
+    note:
+      typeof release.note === "string" && release.note.trim()
+        ? release.note.trim()
+        : fallback.note,
+    signals: normalizeDjCarlosUpcomingSignals(release.signals, fallback.signals),
+    status:
+      typeof release.status === "string" && release.status.trim()
+        ? release.status.trim()
+        : fallback.status,
+    title:
+      typeof release.title === "string" && release.title.trim()
+        ? release.title.trim()
+        : fallback.title,
+    tracks: hasTrackList ? tracks : fallback.tracks,
+  };
+}
+
 function uniqueAlbumSlug(baseSlug: string, usedSlugs: Set<string>) {
   let slug = baseSlug;
   let index = 2;
@@ -508,6 +620,10 @@ export function normalizeDjCarlosPageConfig(
     album: primaryAlbum,
     albums,
     tracks: tracks.length ? tracks : fallback.tracks,
+    upcomingRelease: cleanUpcomingRelease(
+      config.upcomingRelease,
+      fallback.upcomingRelease,
+    ),
     updatedAt:
       typeof config.updatedAt === "string" && config.updatedAt.trim()
         ? config.updatedAt

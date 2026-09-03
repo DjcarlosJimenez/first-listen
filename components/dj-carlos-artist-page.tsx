@@ -4,9 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Bell,
   Disc3,
   ExternalLink,
+  Heart,
   ListMusic,
+  MessageCircle,
   Pause,
   Play,
   SkipBack,
@@ -26,11 +29,24 @@ import {
   type DjCarlosAlbum,
   type DjCarlosPageConfig,
   type DjCarlosTrack,
+  type DjCarlosUpcomingReactionKey,
+  type DjCarlosUpcomingRelease,
+  type DjCarlosUpcomingSignals,
 } from "@/lib/dj-carlos-page";
 import { nextDjCarlosQueueTrackId } from "@/lib/dj-carlos-playback";
 import { dispatchWorkspaceV2PlaybackCommand } from "@/lib/workspace-v2";
 
 const PLAYER_CHANNEL = "dj-carlos-jimenez";
+const UPCOMING_FOLLOW_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:upcoming-follow`;
+const UPCOMING_REACTION_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:upcoming-reaction`;
+const UPCOMING_REACTIONS: {
+  key: DjCarlosUpcomingReactionKey;
+  label: string;
+}[] = [
+  { key: "waiting", label: "La espero" },
+  { key: "video", label: "Quiero video" },
+  { key: "favorite", label: "Mi favorita" },
+];
 
 function playbackLabel(snapshot: ProviderTelemetrySnapshot | null) {
   if (!snapshot) return "LISTO";
@@ -76,6 +92,41 @@ function firstTrackIdForAlbum(config: DjCarlosPageConfig, albumSlug?: string) {
   );
 }
 
+function updateUpcomingSignals(
+  config: DjCarlosPageConfig,
+  signals: DjCarlosUpcomingSignals,
+) {
+  return {
+    ...config,
+    upcomingRelease: {
+      ...config.upcomingRelease,
+      signals,
+    },
+  };
+}
+
+function bumpUpcomingSignal(
+  signals: DjCarlosUpcomingSignals,
+  action:
+    | { type: "follow" }
+    | { type: "reaction"; reaction: DjCarlosUpcomingReactionKey },
+): DjCarlosUpcomingSignals {
+  if (action.type === "follow") {
+    return {
+      ...signals,
+      followers: signals.followers + 1,
+    };
+  }
+
+  return {
+    ...signals,
+    reactions: {
+      ...signals.reactions,
+      [action.reaction]: signals.reactions[action.reaction] + 1,
+    },
+  };
+}
+
 export function DjCarlosArtistPage({
   initialConfig,
   initialAlbumSlug,
@@ -99,6 +150,9 @@ export function DjCarlosArtistPage({
   const [snapshot, setSnapshot] = useState<ProviderTelemetrySnapshot | null>(null);
   const [usingLocalDraft, setUsingLocalDraft] = useState(false);
   const [showTopTenList, setShowTopTenList] = useState(false);
+  const [followingUpcoming, setFollowingUpcoming] = useState(false);
+  const [selectedUpcomingReaction, setSelectedUpcomingReaction] =
+    useState<DjCarlosUpcomingReactionKey | null>(null);
 
   useEffect(() => {
     const loadLocalConfig = () => {
@@ -153,6 +207,23 @@ export function DjCarlosArtistPage({
     };
   }, [initialAlbumSlug, initialConfig]);
 
+  useEffect(() => {
+    try {
+      setFollowingUpcoming(
+        window.localStorage.getItem(UPCOMING_FOLLOW_KEY) === "true",
+      );
+      const storedReaction = window.localStorage.getItem(UPCOMING_REACTION_KEY);
+      setSelectedUpcomingReaction(
+        UPCOMING_REACTIONS.some((reaction) => reaction.key === storedReaction)
+          ? storedReaction as DjCarlosUpcomingReactionKey
+          : null,
+      );
+    } catch {
+      setFollowingUpcoming(false);
+      setSelectedUpcomingReaction(null);
+    }
+  }, []);
+
   const { tracks } = config;
   const albums = useMemo(() => albumsForConfig(config), [config]);
   const album = useMemo(
@@ -175,6 +246,7 @@ export function DjCarlosArtistPage({
     () => tracks.filter((track) => track.section === "official-video"),
     [tracks],
   );
+  const upcomingRelease = config.upcomingRelease;
   const albumTrackCounts = useMemo(() => {
     const counts = new Map<string, number>();
     tracks.forEach((track) => {
@@ -326,6 +398,63 @@ export function DjCarlosArtistPage({
 
   const playFirstVideo = () => {
     if (officialVideos[0]) playTrack(officialVideos[0].id);
+  };
+
+  const recordUpcomingFollow = async () => {
+    if (followingUpcoming || !upcomingRelease.enabled) return;
+    setFollowingUpcoming(true);
+    try {
+      window.localStorage.setItem(UPCOMING_FOLLOW_KEY, "true");
+    } catch {
+      // Local storage is only used to avoid repeated clicks on this device.
+    }
+    setConfig((current) =>
+      updateUpcomingSignals(
+        current,
+        bumpUpcomingSignal(current.upcomingRelease.signals, { type: "follow" }),
+      ),
+    );
+
+    const response = await fetch("/DJCarlosJimenez/signals", {
+      body: JSON.stringify({ action: "follow" }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    }).catch(() => null);
+    const data = await response?.json().catch(() => null);
+    if (data?.signals) {
+      setConfig((current) => updateUpcomingSignals(current, data.signals));
+    }
+  };
+
+  const recordUpcomingReaction = async (
+    reaction: DjCarlosUpcomingReactionKey,
+  ) => {
+    if (selectedUpcomingReaction || !upcomingRelease.enabled) return;
+    setSelectedUpcomingReaction(reaction);
+    try {
+      window.localStorage.setItem(UPCOMING_REACTION_KEY, reaction);
+    } catch {
+      // Local storage is only used to avoid repeated clicks on this device.
+    }
+    setConfig((current) =>
+      updateUpcomingSignals(
+        current,
+        bumpUpcomingSignal(current.upcomingRelease.signals, {
+          reaction,
+          type: "reaction",
+        }),
+      ),
+    );
+
+    const response = await fetch("/DJCarlosJimenez/signals", {
+      body: JSON.stringify({ action: "reaction", reaction }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    }).catch(() => null);
+    const data = await response?.json().catch(() => null);
+    if (data?.signals) {
+      setConfig((current) => updateUpcomingSignals(current, data.signals));
+    }
   };
 
   return (
@@ -496,6 +625,17 @@ export function DjCarlosArtistPage({
         </article>
       </section>
 
+      {!isAlbumDetail && upcomingRelease.enabled && (
+        <UpcomingReleaseCard
+          following={followingUpcoming}
+          logoUrl={logoUrl}
+          onFollow={() => void recordUpcomingFollow()}
+          onReact={(reaction) => void recordUpcomingReaction(reaction)}
+          release={upcomingRelease}
+          selectedReaction={selectedUpcomingReaction}
+        />
+      )}
+
       {!isAlbumDetail && (
         <AlbumLibrary
           activeAlbumId={album.id}
@@ -553,6 +693,94 @@ export function DjCarlosArtistPage({
         </a>
       </footer>
     </main>
+  );
+}
+
+function UpcomingReleaseCard({
+  following,
+  logoUrl,
+  onFollow,
+  onReact,
+  release,
+  selectedReaction,
+}: {
+  following: boolean;
+  logoUrl: string;
+  onFollow: () => void;
+  onReact: (reaction: DjCarlosUpcomingReactionKey) => void;
+  release: DjCarlosUpcomingRelease;
+  selectedReaction: DjCarlosUpcomingReactionKey | null;
+}) {
+  const tracks = release.tracks.slice(0, 8);
+
+  return (
+    <section className="djcx-upcoming-section" aria-label="Proximo lanzamiento">
+      <article className="djcx-upcoming-card">
+        <div className="djcx-upcoming-art">
+          <Image
+            alt={`Portada de ${release.title}`}
+            fill
+            sizes="(max-width: 760px) 86vw, 220px"
+            src={release.coverUrl || logoUrl}
+            unoptimized
+          />
+          <span>{release.status}</span>
+        </div>
+
+        <div className="djcx-upcoming-copy">
+          <span className="djcx-eyebrow">
+            <Sparkles size={14} /> {release.badge}
+          </span>
+          <h2>{release.title}</h2>
+          <p>{release.note}</p>
+          {tracks.length > 0 && (
+            <div className="djcx-upcoming-tracks">
+              <strong>Posibles canciones</strong>
+              <ol>
+                {tracks.map((track, index) => (
+                  <li key={`${track}-${index}`}>{track}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </div>
+
+        <div className="djcx-upcoming-engagement">
+          <button
+            className={following ? "is-active" : ""}
+            disabled={following}
+            onClick={onFollow}
+            type="button"
+          >
+            <Bell size={16} />
+            {following ? "Siguiendo" : "Seguir progreso"}
+          </button>
+          <small>{release.signals.followers} siguiendo este avance</small>
+
+          <div className="djcx-upcoming-reactions">
+            {UPCOMING_REACTIONS.map((reaction) => (
+              <button
+                className={
+                  selectedReaction === reaction.key ? "is-active" : ""
+                }
+                disabled={Boolean(selectedReaction)}
+                key={reaction.key}
+                onClick={() => onReact(reaction.key)}
+                type="button"
+              >
+                {reaction.key === "favorite" ? (
+                  <Heart size={15} />
+                ) : (
+                  <MessageCircle size={15} />
+                )}
+                <span>{reaction.label}</span>
+                <strong>{release.signals.reactions[reaction.key]}</strong>
+              </button>
+            ))}
+          </div>
+        </div>
+      </article>
+    </section>
   );
 }
 

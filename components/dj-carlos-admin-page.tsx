@@ -15,17 +15,21 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  Bell,
   Disc3,
   Download,
   ExternalLink,
+  Heart,
   ImagePlus,
   ListMusic,
   LogOut,
+  MessageCircle,
   Play,
   Plus,
   RotateCcw,
   Save,
   Smartphone,
+  Sparkles,
   Trash2,
   Video,
 } from "lucide-react";
@@ -44,6 +48,7 @@ import {
   type DjCarlosPageConfig,
   type DjCarlosTrack,
   type DjCarlosTrackSection,
+  type DjCarlosUpcomingReactionKey,
 } from "@/lib/dj-carlos-page";
 
 type TrackDraft = {
@@ -54,6 +59,8 @@ type TrackDraft = {
 };
 
 type EditableTrackField = "link" | "mood" | "section" | "subtitle" | "title";
+
+type EditableUpcomingField = "badge" | "coverUrl" | "note" | "status" | "title";
 
 type AlbumImportResponse = {
   album?: Partial<DjCarlosAlbum>;
@@ -67,6 +74,12 @@ const emptyDraft: TrackDraft = {
   mood: "Cumbia Sonidera",
   section: "album",
   title: "",
+};
+
+const upcomingReactionLabels: Record<DjCarlosUpcomingReactionKey, string> = {
+  favorite: "Mi favorita",
+  video: "Quiero video",
+  waiting: "La espero",
 };
 
 function albumsForConfig(config: DjCarlosPageConfig) {
@@ -157,6 +170,7 @@ export function DjCarlosAdminPage({
   );
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingUpcomingCover, setUploadingUpcomingCover] = useState(false);
   const [importingAlbum, setImportingAlbum] = useState(false);
   const [status, setStatus] = useState("Panel listo para editar.");
   const hasLocalChangesRef = useRef(false);
@@ -232,6 +246,7 @@ export function DjCarlosAdminPage({
     () => config.tracks.filter((track) => track.section === "official-video"),
     [config.tracks],
   );
+  const upcomingRelease = config.upcomingRelease;
   const albumTrackCounts = useMemo(() => {
     const counts = new Map<string, number>();
     config.tracks.forEach((track) => {
@@ -290,6 +305,52 @@ export function DjCarlosAdminPage({
       };
     });
     setStatus("Album actualizado. Toca Guardar cambios para publicarlo.");
+  };
+
+  const updateUpcomingRelease = (
+    field: EditableUpcomingField,
+    value: string,
+  ) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      upcomingRelease: {
+        ...current.upcomingRelease,
+        [field]: value,
+      },
+    }));
+    setStatus("Proximo lanzamiento actualizado. Toca Guardar cambios.");
+  };
+
+  const updateUpcomingEnabled = (enabled: boolean) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      upcomingRelease: {
+        ...current.upcomingRelease,
+        enabled,
+      },
+    }));
+    setStatus(
+      enabled
+        ? "Proximo lanzamiento visible. Toca Guardar cambios."
+        : "Proximo lanzamiento oculto. Toca Guardar cambios.",
+    );
+  };
+
+  const updateUpcomingTracks = (value: string) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      upcomingRelease: {
+        ...current.upcomingRelease,
+        tracks: value
+          .split(/\r?\n/)
+          .map((track) => track.trim())
+          .filter(Boolean),
+      },
+    }));
+    setStatus("Lista tentativa actualizada. Toca Guardar cambios.");
   };
 
   const addAlbum = () => {
@@ -660,6 +721,56 @@ export function DjCarlosAdminPage({
     }
   };
 
+  const handleUpcomingCoverFile = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setStatus("Selecciona una imagen para el proximo lanzamiento.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setStatus("La portada debe pesar menos de 8 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    setUploadingUpcomingCover(true);
+    setStatus("Subiendo portada del proximo lanzamiento...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/DJCarlosJimenez/assets", {
+        body: formData,
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || typeof data.coverUrl !== "string") {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "No se pudo subir la portada.",
+        );
+      }
+
+      updateUpcomingRelease("coverUrl", data.coverUrl);
+      setStatus("Portada subida. Toca Guardar cambios para publicarla.");
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "No se pudo subir la portada.",
+      );
+    } finally {
+      setUploadingUpcomingCover(false);
+      event.target.value = "";
+    }
+  };
+
   const resetConfig = () => {
     hasLocalChangesRef.current = true;
     window.localStorage.removeItem(DJ_CARLOS_PAGE_STORAGE_KEY);
@@ -996,6 +1107,131 @@ export function DjCarlosAdminPage({
           <Smartphone size={18} />
           <span>instalador personalizado</span>
         </article>
+      </section>
+
+      <section className="djcx-admin-panel djcx-admin-upcoming-panel">
+        <div className="djcx-admin-panel-heading">
+          <span>
+            <Sparkles size={15} /> Proximo lanzamiento
+          </span>
+          <strong>{upcomingRelease.enabled ? "Visible en tu pagina" : "Oculto"}</strong>
+        </div>
+
+        <div className="djcx-admin-upcoming-layout">
+          <article className="djcx-admin-upcoming-preview">
+            <div>
+              <Image
+                alt={`Portada de ${upcomingRelease.title}`}
+                fill
+                sizes="(max-width: 760px) 82vw, 190px"
+                src={upcomingRelease.coverUrl || logoUrl}
+                unoptimized
+              />
+              <span>{upcomingRelease.status}</span>
+            </div>
+            <strong>{upcomingRelease.title}</strong>
+            <small>{upcomingRelease.note}</small>
+          </article>
+
+          <div className="djcx-admin-form-grid djcx-admin-upcoming-form">
+            <label className="djcx-admin-toggle djcx-admin-wide">
+              <input
+                checked={upcomingRelease.enabled}
+                onChange={(event) => updateUpcomingEnabled(event.target.checked)}
+                type="checkbox"
+              />
+              Mostrar proximo lanzamiento en mi pagina
+            </label>
+            <label>
+              Badge
+              <input
+                onChange={(event) =>
+                  updateUpcomingRelease("badge", event.target.value)
+                }
+                value={upcomingRelease.badge}
+              />
+            </label>
+            <label>
+              Estado
+              <input
+                onChange={(event) =>
+                  updateUpcomingRelease("status", event.target.value)
+                }
+                placeholder="En preparacion"
+                value={upcomingRelease.status}
+              />
+            </label>
+            <label className="djcx-admin-wide">
+              Titulo posible
+              <input
+                onChange={(event) =>
+                  updateUpcomingRelease("title", event.target.value)
+                }
+                value={upcomingRelease.title}
+              />
+            </label>
+            <label className="djcx-admin-wide">
+              Nota para visitantes
+              <textarea
+                onChange={(event) =>
+                  updateUpcomingRelease("note", event.target.value)
+                }
+                rows={3}
+                value={upcomingRelease.note}
+              />
+            </label>
+            <label className="djcx-admin-wide">
+              Posibles canciones
+              <textarea
+                onChange={(event) => updateUpcomingTracks(event.target.value)}
+                rows={6}
+                value={upcomingRelease.tracks.join("\n")}
+              />
+            </label>
+            <label className="djcx-admin-wide">
+              URL de portada
+              <input
+                onChange={(event) =>
+                  updateUpcomingRelease("coverUrl", event.target.value)
+                }
+                value={upcomingRelease.coverUrl}
+              />
+            </label>
+            <label
+              className={`djcx-file-control${uploadingUpcomingCover ? " is-loading" : ""}`}
+            >
+              <ImagePlus size={17} />
+              {uploadingUpcomingCover ? "Subiendo portada..." : "Cargar portada"}
+              <input
+                accept="image/jpeg,image/png,image/webp"
+                disabled={uploadingUpcomingCover}
+                onChange={(event) => void handleUpcomingCoverFile(event)}
+                type="file"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="djcx-admin-upcoming-signals">
+          <article>
+            <Bell size={16} />
+            <strong>{upcomingRelease.signals.followers}</strong>
+            <span>siguiendo el avance</span>
+          </article>
+          {(Object.keys(upcomingReactionLabels) as DjCarlosUpcomingReactionKey[]).map(
+            (reaction) => (
+              <article key={reaction}>
+                {reaction === "favorite" ? (
+                  <Heart size={16} />
+                ) : (
+                  <MessageCircle size={16} />
+                )}
+                <strong>{upcomingRelease.signals.reactions[reaction]}</strong>
+                <span>{upcomingReactionLabels[reaction]}</span>
+              </article>
+            ),
+          )}
+        </div>
       </section>
 
       <section className="djcx-admin-panel">
