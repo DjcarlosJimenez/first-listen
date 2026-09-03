@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { DjCarlosAdminLogin } from "@/components/dj-carlos-admin-login";
 import { DjCarlosAdminPage } from "@/components/dj-carlos-admin-page";
 import {
   DJ_CARLOS_LOGO_URL,
   defaultDjCarlosPageConfig,
 } from "@/lib/dj-carlos-page";
+import {
+  DJ_CARLOS_ADMIN_COOKIE_NAME,
+  isDjCarlosAdminSession,
+} from "@/lib/dj-carlos-admin-auth";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export const metadata: Metadata = {
   title: "Admin DJ Carlos Jimenez | First Listen",
@@ -34,7 +43,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function DjCarlosJimenezAdminRoute() {
+export default async function DjCarlosJimenezAdminRoute() {
+  const cookieStore = await cookies();
+  const authenticated = isDjCarlosAdminSession(
+    cookieStore.get(DJ_CARLOS_ADMIN_COOKIE_NAME)?.value,
+  );
+
+  if (!authenticated) {
+    return <DjCarlosAdminLogin logoUrl={DJ_CARLOS_LOGO_URL} />;
+  }
+
   return (
     <DjCarlosAdminPage
       initialConfig={defaultDjCarlosPageConfig}

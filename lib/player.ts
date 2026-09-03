@@ -37,7 +37,16 @@ export function getProviderEmbed(
   try {
     const url = new URL(rawUrl);
     const detection = detectMusicPlatform(rawUrl);
-    if (!detection.valid || detection.platform !== platform) return null;
+    const playableYouTubePlaylist =
+      (platform === "YouTube" || platform === "YouTube Music") &&
+      detection.resourceType === "playlist" &&
+      Boolean(detection.resourceId);
+    if (
+      detection.platform !== platform ||
+      (!detection.valid && !playableYouTubePlaylist)
+    ) {
+      return null;
+    }
     if (isExternalPlatform(platform)) return null;
 
     if (platform === "YouTube" || platform === "YouTube Music") {

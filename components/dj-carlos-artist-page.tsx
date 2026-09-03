@@ -50,6 +50,7 @@ export function DjCarlosArtistPage({
   const requestPlaybackRef = useRef<(() => void) | null>(null);
   const [config, setConfig] = useState(() => initialConfig);
   const [activeId, setActiveId] = useState(() => initialConfig.tracks[0]?.id ?? "");
+  const [autoPlayEnabled, setAutoPlayEnabled] = useState(true);
   const [playerVersion, setPlayerVersion] = useState(0);
   const [snapshot, setSnapshot] = useState<ProviderTelemetrySnapshot | null>(null);
 
@@ -84,7 +85,7 @@ export function DjCarlosArtistPage({
 
   const { album, tracks } = config;
   const albumTracks = useMemo(
-    () => tracks.filter((track) => track.section !== "official-video"),
+    () => tracks.filter((track) => track.section === "album"),
     [tracks],
   );
   const topTenTracks = useMemo(
@@ -112,8 +113,8 @@ export function DjCarlosArtistPage({
     };
   }, [album, logoUrl]);
   const playQueue = useMemo(
-    () => [...albumTracks, ...officialVideos],
-    [albumTracks, officialVideos],
+    () => [...albumTracks, ...topTenTracks, ...officialVideos],
+    [albumTracks, officialVideos, topTenTracks],
   );
   const activeTrack = useMemo(() => {
     if (albumPlayerTrack?.id === activeId) return albumPlayerTrack;
@@ -134,6 +135,7 @@ export function DjCarlosArtistPage({
 
   const playTrack = (trackId: string) => {
     setSnapshot(null);
+    setAutoPlayEnabled(true);
     setActiveId(trackId);
     setPlayerVersion((version) => version + 1);
   };
@@ -147,6 +149,7 @@ export function DjCarlosArtistPage({
   };
 
   const playCurrent = () => {
+    setAutoPlayEnabled(true);
     requestPlaybackRef.current?.();
     dispatchWorkspaceV2PlaybackCommand("play", {
       channel: PLAYER_CHANNEL,
@@ -155,6 +158,12 @@ export function DjCarlosArtistPage({
   };
 
   const pauseCurrent = () => {
+    setAutoPlayEnabled(false);
+    setSnapshot((current) =>
+      current
+        ? { ...current, playbackState: "paused" }
+        : current,
+    );
     dispatchWorkspaceV2PlaybackCommand("pause", {
       channel: PLAYER_CHANNEL,
       source: "user-click",
@@ -205,7 +214,7 @@ export function DjCarlosArtistPage({
             {activeTrack && (
               <ProviderPlayer
                 artist={activeTrack.artist}
-                autoPlay
+                autoPlay={autoPlayEnabled}
                 controlChannel={PLAYER_CHANNEL}
                 coverUrl={activeTrack.coverUrl}
                 key={`${activeTrack.id}-${playerVersion}`}
@@ -429,8 +438,8 @@ function ArtistInstallPanel({ logoUrl }: { logoUrl: string }) {
         <span>
           <Smartphone size={14} /> App directa
         </span>
-        <h2>DJ Carlos en First Listen</h2>
-        <p>Instalacion rapida con tu logo y esta pagina como entrada musical.</p>
+        <h2>Acceso directo DJ Carlos</h2>
+        <p>Instala un acceso directo con tu logo para entrar facil y rapido a esta pagina.</p>
         <PwaInstallButton
           className="djcx-install-button"
           label="Instalar DJ Carlos"

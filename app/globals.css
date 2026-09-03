@@ -20146,6 +20146,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .djcx-admin-install,
 .djcx-admin-save,
 .djcx-admin-save-view,
+.djcx-admin-secondary,
 .djcx-admin-header a,
 .djcx-admin-panel-heading button,
 .djcx-admin-add button,
@@ -20170,6 +20171,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .djcx-admin-install,
 .djcx-admin-save,
 .djcx-admin-save-view,
+.djcx-admin-secondary,
 .djcx-install-button {
   color: #10100e !important;
 }
@@ -20177,6 +20179,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .djcx-admin-install span,
 .djcx-admin-save span,
 .djcx-admin-save-view span,
+.djcx-admin-secondary span,
 .djcx-install-button span {
   color: inherit !important;
   display: inline;
@@ -20282,6 +20285,12 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .djcx-admin-header a {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
+}
+
+.djcx-admin-header .djcx-admin-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff !important;
 }
 
 .djcx-admin-grid {
@@ -20435,6 +20444,13 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 0.8fr) 170px auto;
 }
 
+.djcx-admin-add-status {
+  color: var(--djcx-muted);
+  font-size: 12px;
+  font-weight: 850;
+  margin: 12px 0 0;
+}
+
 .djcx-admin-track-list {
   display: grid;
   gap: 10px;
@@ -20483,6 +20499,158 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: #fff;
   min-width: 38px;
   padding: 9px;
+}
+
+.djcx-admin-empty {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px dashed rgba(246, 200, 79, 0.22);
+  border-radius: 8px;
+  color: var(--djcx-muted);
+  font-size: 13px;
+  font-weight: 800;
+  margin: 0;
+  padding: 16px;
+}
+
+.djcx-login-page {
+  align-items: center;
+  display: grid;
+  padding: 18px;
+}
+
+.djcx-login-card {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.09), transparent 52%),
+    rgba(17, 17, 15, 0.94);
+  border: 1px solid rgba(246, 200, 79, 0.22);
+  border-radius: 8px;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34);
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+  margin: 0 auto;
+  max-width: 460px;
+  padding: 24px;
+  width: min(100%, 460px);
+}
+
+.djcx-login-card > img {
+  background: #050505;
+  border: 1px solid rgba(246, 200, 79, 0.34);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.djcx-login-card > span {
+  align-items: center;
+  color: var(--djcx-gold-strong);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 950;
+  gap: 7px;
+  text-transform: uppercase;
+}
+
+.djcx-login-card h1,
+.djcx-login-card p {
+  margin: 0;
+}
+
+.djcx-login-card h1 {
+  color: #fff;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.djcx-login-card p {
+  color: var(--djcx-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.djcx-login-card form {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.djcx-login-card label {
+  color: var(--djcx-muted);
+  display: grid;
+  font-size: 11px;
+  font-weight: 950;
+  gap: 7px;
+  text-transform: uppercase;
+}
+
+.djcx-login-card input[type="password"] {
+  background: #070707;
+  border: 1px solid rgba(246, 200, 79, 0.28);
+  border-radius: 8px;
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  min-height: 46px;
+  padding: 10px 12px;
+}
+
+.djcx-login-remember {
+  align-items: center;
+  display: flex !important;
+  flex-direction: row;
+  gap: 9px !important;
+  justify-content: flex-start;
+  text-transform: none !important;
+}
+
+.djcx-login-remember input {
+  accent-color: var(--djcx-gold);
+  height: 18px;
+  width: 18px;
+}
+
+.djcx-login-card button,
+.djcx-login-card a {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 950;
+  gap: 8px;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 13px;
+  text-decoration: none;
+}
+
+.djcx-login-card button {
+  background: linear-gradient(180deg, #ffd95e, #f6c84f);
+  border: 1px solid rgba(255, 237, 164, 0.82);
+  color: #10100e;
+  cursor: pointer;
+  width: 100%;
+}
+
+.djcx-login-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.djcx-login-card a {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.djcx-login-error {
+  background: rgba(255, 72, 72, 0.12);
+  border: 1px solid rgba(255, 112, 112, 0.32);
+  border-radius: 8px;
+  color: #ffd0d0;
+  font-size: 13px;
+  font-weight: 850;
+  padding: 10px 12px;
+  width: 100%;
 }
 
 @media (max-width: 1080px) {

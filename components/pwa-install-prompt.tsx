@@ -65,16 +65,16 @@ function installPromptBrandFor(pathname: string | null, spanish: boolean): Insta
           {spanish ? "En iPhone o iPad, toca Compartir" : "On iPhone or iPad, tap Share"}{" "}
           <Share2 size={13} />{" "}
           {spanish
-            ? "y luego Agregar a inicio para abrir esta pagina directa."
-            : "then Add to Home Screen to open this artist page directly."}
+            ? "y luego Agregar a inicio para entrar facil y rapido a DJ Carlos."
+            : "then Add to Home Screen for fast access to DJ Carlos."}
         </>
       ),
       manualInstruction: spanish
-        ? "Usa el menu del navegador para instalar la pagina de DJ Carlos."
-        : "Use your browser menu to install the DJ Carlos page.",
+        ? "Instala un acceso directo para entrar facil y rapido a la pagina de DJ Carlos."
+        : "Install a shortcut for fast access to the DJ Carlos page.",
       nativeInstruction: spanish
-        ? "Agrega la pagina de DJ Carlos a tu pantalla de inicio con su logo."
-        : "Add the DJ Carlos page to your home screen with its logo.",
+        ? "Instala un acceso directo con tu logo para abrir DJ Carlos rapido."
+        : "Install a shortcut with your logo to open DJ Carlos quickly.",
       title: spanish ? "Instalar DJ Carlos" : "Install DJ Carlos",
     };
   }

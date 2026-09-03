@@ -18,6 +18,7 @@ import {
   ExternalLink,
   ImagePlus,
   ListMusic,
+  LogOut,
   Play,
   Plus,
   RotateCcw,
@@ -90,15 +91,15 @@ export function DjCarlosAdminPage({
   }, [config]);
 
   const albumTracks = useMemo(
-    () => config.tracks.filter((track) => track.section !== "official-video"),
+    () => config.tracks.filter((track) => track.section === "album"),
+    [config.tracks],
+  );
+  const topTenTracks = useMemo(
+    () => config.tracks.filter((track) => track.section === "top-ten"),
     [config.tracks],
   );
   const videoTracks = useMemo(
     () => config.tracks.filter((track) => track.section === "official-video"),
-    [config.tracks],
-  );
-  const topTenCount = useMemo(
-    () => config.tracks.filter((track) => track.section === "top-ten").length,
     [config.tracks],
   );
 
@@ -157,10 +158,8 @@ export function DjCarlosAdminPage({
     setConfig((current) => {
       const track = current.tracks.find((item) => item.id === trackId);
       if (!track) return current;
-      const groupTracks = current.tracks.filter((item) =>
-        track.section === "official-video"
-          ? item.section === "official-video"
-          : item.section !== "official-video",
+      const groupTracks = current.tracks.filter(
+        (item) => item.section === track.section,
       );
       const groupIndex = groupTracks.findIndex((item) => item.id === trackId);
       const swapTrack = groupTracks[groupIndex + direction];
@@ -205,16 +204,15 @@ export function DjCarlosAdminPage({
       id: `dj-carlos-local-${Date.now()}`,
       link,
       mood: draft.mood.trim() || "DJ Carlos",
-      platform:
-        draft.section === "official-video"
-          ? "YouTube"
-          : detectDjCarlosPlatform(link),
+      platform: detectDjCarlosPlatform(link),
       release: config.album.title,
       section: draft.section,
       subtitle:
         draft.section === "official-video"
           ? "Video en YouTube"
-          : config.album.title,
+          : draft.section === "top-ten"
+            ? "Top Ten de DJ Carlos"
+            : config.album.title,
       title,
     };
 
@@ -259,6 +257,14 @@ export function DjCarlosAdminPage({
     window.location.href = "/DJCarlosJimenez";
   };
 
+  const lockAdmin = async () => {
+    try {
+      await fetch("/DJCarlosJimenez/admin/session", { method: "DELETE" });
+    } finally {
+      window.location.reload();
+    }
+  };
+
   return (
     <main className="djcx-admin-page">
       <header className="djcx-admin-header">
@@ -294,6 +300,10 @@ export function DjCarlosAdminPage({
           <Link href="/DJCarlosJimenez">
             Ver pagina <ExternalLink size={15} />
           </Link>
+          <button className="djcx-admin-secondary" onClick={lockAdmin} type="button">
+            <LogOut size={15} />
+            Salir
+          </button>
           <PwaInstallButton
             className="djcx-admin-install"
             label="Instalar DJ Carlos"
@@ -397,7 +407,7 @@ export function DjCarlosAdminPage({
           <span>canciones del album</span>
         </article>
         <article>
-          <strong>{topTenCount}</strong>
+          <strong>{topTenTracks.length}</strong>
           <span>Top Ten</span>
         </article>
         <article>
@@ -463,7 +473,7 @@ export function DjCarlosAdminPage({
               value={draft.section}
             >
               <option value="album">Album</option>
-              <option value="top-ten">Album + Top Ten</option>
+              <option value="top-ten">Top Ten</option>
               <option value="official-video">Videos oficiales</option>
             </select>
           </label>
@@ -472,6 +482,7 @@ export function DjCarlosAdminPage({
             Agregar
           </button>
         </form>
+        <p className="djcx-admin-add-status" role="status">{status}</p>
       </section>
 
       <AdminTrackGroup
@@ -482,6 +493,16 @@ export function DjCarlosAdminPage({
         onUpdate={updateTrack}
         title="Orden del album"
         tracks={albumTracks}
+      />
+
+      <AdminTrackGroup
+        icon={<ListMusic size={15} />}
+        onMoveDown={(trackId) => moveTrack(trackId, 1)}
+        onMoveUp={(trackId) => moveTrack(trackId, -1)}
+        onRemove={removeTrack}
+        onUpdate={updateTrack}
+        title="Top Ten"
+        tracks={topTenTracks}
       />
 
       <AdminTrackGroup
@@ -557,7 +578,7 @@ function AdminTrackGroup({
                 value={track.section}
               >
                 <option value="album">Album</option>
-                <option value="top-ten">Album + Top Ten</option>
+                <option value="top-ten">Top Ten</option>
                 <option value="official-video">Videos oficiales</option>
               </select>
             </label>
@@ -575,6 +596,11 @@ function AdminTrackGroup({
             </div>
           </article>
         ))}
+        {!tracks.length && (
+          <p className="djcx-admin-empty">
+            Todavia no hay elementos en esta lista. Agrega uno arriba y elige esta lista.
+          </p>
+        )}
       </div>
     </section>
   );

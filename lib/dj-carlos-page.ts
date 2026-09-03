@@ -1,6 +1,6 @@
 export const DJ_CARLOS_LOGO_URL = "/artist/dj-carlos-jimenez/logo.png";
 export const DJ_CARLOS_PAGE_STORAGE_KEY =
-  "first-listen:dj-carlos-jimenez-page-v1";
+  "first-listen:dj-carlos-jimenez-page-v2";
 
 export type DjCarlosTrackSection = "album" | "top-ten" | "official-video";
 export type DjCarlosPlayablePlatform = "YouTube" | "YouTube Music";
@@ -32,6 +32,15 @@ export type DjCarlosPageConfig = {
   album: DjCarlosAlbum;
   tracks: DjCarlosTrack[];
   updatedAt: string;
+};
+
+type DefaultSongSeed = {
+  id: string;
+  link: string;
+  mood: string;
+  platform?: DjCarlosPlayablePlatform;
+  subtitle: string;
+  title: string;
 };
 
 export const defaultDjCarlosAlbum: DjCarlosAlbum = {
@@ -81,78 +90,111 @@ function fallbackTrack({
   };
 }
 
-export const defaultDjCarlosTracks: DjCarlosTrack[] = [
-  fallbackTrack({
-    badge: "Album Focus",
-    id: "dj-carlos-sin-ti-2026",
+const defaultSongSeeds: DefaultSongSeed[] = [
+  {
+    id: "sin-ti-2026",
     link: "https://music.youtube.com/watch?v=EUUVIce6lO0",
-    platform: "YouTube Music",
+    mood: "Cumbia Sonidera",
+    platform: "YouTube Music" as const,
     subtitle: "Destacada por First Listen",
     title: "Sin Ti (Cumbia Sonidera ver 2026)",
-  }),
-  fallbackTrack({
-    id: "dj-carlos-si-ya-te-vas",
+  },
+  {
+    id: "si-ya-te-vas",
     link: "https://www.youtube.com/watch?v=cZ4JIjUWCFo",
     mood: "Regional mexicano",
     subtitle: "YouTube / tema sugerido",
     title: "Si Ya Te Vas",
-  }),
-  fallbackTrack({
-    id: "dj-carlos-no-me-mires-asi",
+  },
+  {
+    id: "no-me-mires-asi",
     link: "https://www.youtube.com/watch?v=Tl1YrfQ9bkY",
     mood: "Cumbia Sonidera",
     subtitle: "YouTube / tema sugerido",
     title: "No Me Mires Asi",
-  }),
-  fallbackTrack({
-    id: "dj-carlos-llegaste-tu",
+  },
+  {
+    id: "llegaste-tu",
     link: "https://www.youtube.com/watch?v=QmpcSnVm1gA",
     mood: "Romantica",
     subtitle: "YouTube / tema sugerido",
     title: "Llegaste Tu",
-  }),
-  fallbackTrack({
-    id: "dj-carlos-ya-te-vieron",
+  },
+  {
+    id: "ya-te-vieron",
     link: "https://www.youtube.com/watch?v=JIVvsdGmmX0",
     mood: "Cumbia Sonidera",
     subtitle: "YouTube / tema sugerido",
     title: "Ya Te Vieron",
-  }),
-  fallbackTrack({
-    id: "dj-carlos-te-amo-ya-no-dice-nada",
+  },
+  {
+    id: "te-amo-ya-no-dice-nada",
     link: "https://www.youtube.com/watch?v=MVql92agP5w",
     mood: "Romantica",
     subtitle: "YouTube / tema sugerido",
     title: "Te Amo Ya No Dice Nada",
-  }),
-  fallbackTrack({
-    id: "dj-carlos-que-mala-costumbre",
+  },
+  {
+    id: "que-mala-costumbre",
     link: "https://www.youtube.com/watch?v=Bw4WHeM9Q7I",
     mood: "Cumbia Sonidera",
     subtitle: "YouTube / tema sugerido",
     title: "Que Mala Costumbre",
-  }),
-  fallbackTrack({
-    id: "dj-carlos-soy-de-puebla",
+  },
+  {
+    id: "soy-de-puebla",
     link: "https://www.youtube.com/watch?v=slnqptPrwdc",
     mood: "Cumbia Sonidera",
     subtitle: "YouTube / tema sugerido",
     title: "Soy De Puebla",
-  }),
-  fallbackTrack({
-    id: "dj-carlos-todo-lo-que-no-te-dije",
+  },
+  {
+    id: "todo-lo-que-no-te-dije",
     link: "https://www.youtube.com/watch?v=eDPD3kpQsEc",
     mood: "Regional mexicano",
     subtitle: "YouTube / tema sugerido",
     title: "Todo Lo Que No Te Dije",
-  }),
-  fallbackTrack({
-    id: "dj-carlos-ya-ando-con-otra",
+  },
+  {
+    id: "ya-ando-con-otra",
     link: "https://www.youtube.com/watch?v=QAabrqX7XjM",
     mood: "Regional mexicano",
     subtitle: "YouTube / tema sugerido",
     title: "Ya Ando Con Otra",
+  },
+];
+
+const defaultAlbumTracks = defaultSongSeeds.map((song) =>
+  fallbackTrack({
+    badge: "Album",
+    id: `dj-carlos-album-${song.id}`,
+    link: song.link,
+    mood: song.mood,
+    platform: song.platform ?? "YouTube",
+    release: defaultDjCarlosAlbum.title,
+    section: "album",
+    subtitle: defaultDjCarlosAlbum.title,
+    title: song.title,
   }),
+);
+
+const defaultTopTenTracks = defaultSongSeeds.map((song, index) =>
+  fallbackTrack({
+    badge: index === 0 ? "Album Focus" : "Top Ten",
+    id: `dj-carlos-top-ten-${song.id}`,
+    link: song.link,
+    mood: song.mood,
+    platform: song.platform ?? "YouTube",
+    release: "Destacadas por First Listen",
+    section: "top-ten",
+    subtitle: song.subtitle,
+    title: song.title,
+  }),
+);
+
+export const defaultDjCarlosTracks: DjCarlosTrack[] = [
+  ...defaultAlbumTracks,
+  ...defaultTopTenTracks,
   fallbackTrack({
     badge: "YouTube",
     id: "dj-carlos-sin-ti-video",
@@ -205,12 +247,28 @@ export function detectDjCarlosPlatform(link: string): DjCarlosPlayablePlatform {
 }
 
 export function isPlayableDjCarlosLink(link: string) {
-  const value = link.trim();
-  return (
-    /^https:\/\/music\.youtube\.com\/watch\?/i.test(value) ||
-    /^https:\/\/(www\.)?youtube\.com\/watch\?/i.test(value) ||
-    /^https:\/\/youtu\.be\//i.test(value)
-  );
+  try {
+    const url = new URL(link.trim());
+    if (url.protocol !== "https:") return false;
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const path = url.pathname.toLowerCase();
+    const hasVideo = Boolean(url.searchParams.get("v"));
+    const hasPlaylist = Boolean(url.searchParams.get("list"));
+
+    if (host === "music.youtube.com") {
+      return (path === "/watch" && (hasVideo || hasPlaylist)) || (path === "/playlist" && hasPlaylist);
+    }
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      return (
+        (path === "/watch" && (hasVideo || hasPlaylist)) ||
+        (path === "/playlist" && hasPlaylist) ||
+        path.startsWith("/shorts/")
+      );
+    }
+    return host === "youtu.be" && url.pathname.split("/").filter(Boolean).length === 1;
+  } catch {
+    return false;
+  }
 }
 
 export function isDjCarlosTrack(value: unknown): value is DjCarlosTrack {
@@ -264,9 +322,28 @@ export function normalizeDjCarlosPageConfig(
 ): DjCarlosPageConfig {
   if (!value || typeof value !== "object") return fallback;
   const config = value as Record<string, unknown>;
-  const tracks = Array.isArray(config.tracks)
+  const rawTracks = Array.isArray(config.tracks)
     ? config.tracks.filter(isDjCarlosTrack)
     : fallback.tracks;
+  const fallbackAlbumTracks = fallback.tracks.filter(
+    (track) => track.section === "album",
+  );
+  const fallbackTopTenTracks = fallback.tracks.filter(
+    (track) => track.section === "top-ten",
+  );
+  const fallbackVideoTracks = fallback.tracks.filter(
+    (track) => track.section === "official-video",
+  );
+  const albumTracks = rawTracks.filter((track) => track.section === "album");
+  const topTenTracks = rawTracks.filter((track) => track.section === "top-ten");
+  const videoTracks = rawTracks.filter(
+    (track) => track.section === "official-video",
+  );
+  const tracks = [
+    ...(albumTracks.length ? albumTracks : fallbackAlbumTracks),
+    ...(topTenTracks.length ? topTenTracks : fallbackTopTenTracks),
+    ...(videoTracks.length ? videoTracks : fallbackVideoTracks),
+  ];
 
   return {
     album: cleanAlbum(config.album, fallback.album),
