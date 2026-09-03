@@ -312,25 +312,35 @@ export function DjCarlosAdminPage({
     value: string,
   ) => {
     hasLocalChangesRef.current = true;
-    setConfig((current) => ({
-      ...current,
-      upcomingRelease: {
-        ...current.upcomingRelease,
-        [field]: value,
-      },
-    }));
+    setConfig((current) => {
+      const nextConfig = {
+        ...current,
+        upcomingRelease: {
+          ...current.upcomingRelease,
+          [field]: value,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      persistLocalDraft(nextConfig);
+      return nextConfig;
+    });
     setStatus("Proximo lanzamiento actualizado. Toca Guardar cambios.");
   };
 
   const updateUpcomingEnabled = (enabled: boolean) => {
     hasLocalChangesRef.current = true;
-    setConfig((current) => ({
-      ...current,
-      upcomingRelease: {
-        ...current.upcomingRelease,
-        enabled,
-      },
-    }));
+    setConfig((current) => {
+      const nextConfig = {
+        ...current,
+        upcomingRelease: {
+          ...current.upcomingRelease,
+          enabled,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      persistLocalDraft(nextConfig);
+      return nextConfig;
+    });
     setStatus(
       enabled
         ? "Proximo lanzamiento visible. Toca Guardar cambios."
@@ -340,16 +350,21 @@ export function DjCarlosAdminPage({
 
   const updateUpcomingTracks = (value: string) => {
     hasLocalChangesRef.current = true;
-    setConfig((current) => ({
-      ...current,
-      upcomingRelease: {
-        ...current.upcomingRelease,
-        tracks: value
-          .split(/\r?\n/)
-          .map((track) => track.trim())
-          .filter(Boolean),
-      },
-    }));
+    setConfig((current) => {
+      const nextConfig = {
+        ...current,
+        upcomingRelease: {
+          ...current.upcomingRelease,
+          tracks: value
+            .split(/\r?\n/)
+            .map((track) => track.trim())
+            .filter(Boolean),
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      persistLocalDraft(nextConfig);
+      return nextConfig;
+    });
     setStatus("Lista tentativa actualizada. Toca Guardar cambios.");
   };
 
@@ -781,9 +796,30 @@ export function DjCarlosAdminPage({
   };
 
   const saveConfig = async (nextStatus = "Cambios publicados.") => {
+    let sourceConfig = config;
+    try {
+      const saved = window.localStorage.getItem(DJ_CARLOS_PAGE_STORAGE_KEY);
+      if (saved) {
+        const savedConfig = normalizeDjCarlosPageConfig(
+          JSON.parse(saved),
+          config,
+        );
+        const savedAt = Date.parse(savedConfig.updatedAt);
+        const currentAt = Date.parse(config.updatedAt);
+        if (
+          Number.isFinite(savedAt) &&
+          (!Number.isFinite(currentAt) || savedAt >= currentAt)
+        ) {
+          sourceConfig = savedConfig;
+        }
+      }
+    } catch {
+      sourceConfig = config;
+    }
+
     const nextConfig = normalizeDjCarlosPageConfig(
-      { ...config, updatedAt: new Date().toISOString() },
-      config,
+      { ...sourceConfig, updatedAt: new Date().toISOString() },
+      sourceConfig,
     );
     setSaving(true);
 

@@ -26,6 +26,7 @@ import {
   isPlayableDjCarlosLink,
   labelForDjCarlosTrackSection,
   normalizeDjCarlosPageConfig,
+  normalizeDjCarlosUpcomingSignals,
   type DjCarlosAlbum,
   type DjCarlosPageConfig,
   type DjCarlosTrack,
@@ -96,11 +97,37 @@ function updateUpcomingSignals(
   config: DjCarlosPageConfig,
   signals: DjCarlosUpcomingSignals,
 ) {
+  const safeSignals = normalizeDjCarlosUpcomingSignals(
+    signals,
+    config.upcomingRelease.signals,
+  );
+
   return {
     ...config,
     upcomingRelease: {
       ...config.upcomingRelease,
-      signals,
+      signals: safeSignals,
+    },
+  };
+}
+
+function mergeUpcomingSignals(
+  current: DjCarlosUpcomingSignals,
+  incoming: unknown,
+): DjCarlosUpcomingSignals {
+  const cleanIncoming = normalizeDjCarlosUpcomingSignals(incoming, current);
+  return {
+    followers: Math.max(current.followers, cleanIncoming.followers),
+    reactions: {
+      favorite: Math.max(
+        current.reactions.favorite,
+        cleanIncoming.reactions.favorite,
+      ),
+      video: Math.max(current.reactions.video, cleanIncoming.reactions.video),
+      waiting: Math.max(
+        current.reactions.waiting,
+        cleanIncoming.reactions.waiting,
+      ),
     },
   };
 }
@@ -151,8 +178,9 @@ export function DjCarlosArtistPage({
   const [usingLocalDraft, setUsingLocalDraft] = useState(false);
   const [showTopTenList, setShowTopTenList] = useState(false);
   const [followingUpcoming, setFollowingUpcoming] = useState(false);
-  const [selectedUpcomingReaction, setSelectedUpcomingReaction] =
-    useState<DjCarlosUpcomingReactionKey | null>(null);
+  const [selectedUpcomingReactions, setSelectedUpcomingReactions] = useState<
+    DjCarlosUpcomingReactionKey[]
+  >([]);
 
   useEffect(() => {
     const loadLocalConfig = () => {
@@ -213,14 +241,28 @@ export function DjCarlosArtistPage({
         window.localStorage.getItem(UPCOMING_FOLLOW_KEY) === "true",
       );
       const storedReaction = window.localStorage.getItem(UPCOMING_REACTION_KEY);
-      setSelectedUpcomingReaction(
-        UPCOMING_REACTIONS.some((reaction) => reaction.key === storedReaction)
-          ? storedReaction as DjCarlosUpcomingReactionKey
-          : null,
-      );
+      let storedReactions: unknown = [];
+      try {
+        storedReactions = JSON.parse(storedReaction || "[]");
+      } catch {
+        storedReactions = storedReaction;
+      }
+      if (Array.isArray(storedReactions)) {
+        setSelectedUpcomingReactions(
+          storedReactions.filter((value): value is DjCarlosUpcomingReactionKey =>
+            UPCOMING_REACTIONS.some((reaction) => reaction.key === value),
+          ),
+        );
+      } else if (
+        UPCOMING_REACTIONS.some((reaction) => reaction.key === storedReactions)
+      ) {
+        setSelectedUpcomingReactions([
+          storedReactions as DjCarlosUpcomingReactionKey,
+        ]);
+      }
     } catch {
       setFollowingUpcoming(false);
-      setSelectedUpcomingReaction(null);
+      setSelectedUpcomingReactions([]);
     }
   }, []);
 
@@ -422,17 +464,31 @@ export function DjCarlosArtistPage({
     }).catch(() => null);
     const data = await response?.json().catch(() => null);
     if (data?.signals) {
-      setConfig((current) => updateUpcomingSignals(current, data.signals));
+      setConfig((current) =>
+        updateUpcomingSignals(
+          current,
+          mergeUpcomingSignals(current.upcomingRelease.signals, data.signals),
+        ),
+      );
     }
   };
 
   const recordUpcomingReaction = async (
     reaction: DjCarlosUpcomingReactionKey,
   ) => {
-    if (selectedUpcomingReaction || !upcomingRelease.enabled) return;
-    setSelectedUpcomingReaction(reaction);
+    if (
+      selectedUpcomingReactions.includes(reaction) ||
+      !upcomingRelease.enabled
+    ) {
+      return;
+    }
+    const nextSelectedReactions = [...selectedUpcomingReactions, reaction];
+    setSelectedUpcomingReactions(nextSelectedReactions);
     try {
-      window.localStorage.setItem(UPCOMING_REACTION_KEY, reaction);
+      window.localStorage.setItem(
+        UPCOMING_REACTION_KEY,
+        JSON.stringify(nextSelectedReactions),
+      );
     } catch {
       // Local storage is only used to avoid repeated clicks on this device.
     }
@@ -453,7 +509,12 @@ export function DjCarlosArtistPage({
     }).catch(() => null);
     const data = await response?.json().catch(() => null);
     if (data?.signals) {
-      setConfig((current) => updateUpcomingSignals(current, data.signals));
+      setConfig((current) =>
+        updateUpcomingSignals(
+          current,
+          mergeUpcomingSignals(current.upcomingRelease.signals, data.signals),
+        ),
+      );
     }
   };
 
@@ -632,7 +693,7 @@ export function DjCarlosArtistPage({
           onFollow={() => void recordUpcomingFollow()}
           onReact={(reaction) => void recordUpcomingReaction(reaction)}
           release={upcomingRelease}
-          selectedReaction={selectedUpcomingReaction}
+          selectedReactions={selectedUpcomingReactions}
         />
       )}
 
@@ -702,16 +763,16 @@ function UpcomingReleaseCard({
   onFollow,
   onReact,
   release,
-  selectedReaction,
+  selectedReactions,
 }: {
   following: boolean;
   logoUrl: string;
   onFollow: () => void;
   onReact: (reaction: DjCarlosUpcomingReactionKey) => void;
   release: DjCarlosUpcomingRelease;
-  selectedReaction: DjCarlosUpcomingReactionKey | null;
+  selectedReactions: DjCarlosUpcomingReactionKey[];
 }) {
-  const tracks = release.tracks.slice(0, 8);
+  const tracks = release.tracks;
 
   return (
     <section className="djcx-upcoming-section" aria-label="Proximo lanzamiento">
@@ -758,25 +819,26 @@ function UpcomingReleaseCard({
           <small>{release.signals.followers} siguiendo este avance</small>
 
           <div className="djcx-upcoming-reactions">
-            {UPCOMING_REACTIONS.map((reaction) => (
-              <button
-                className={
-                  selectedReaction === reaction.key ? "is-active" : ""
-                }
-                disabled={Boolean(selectedReaction)}
-                key={reaction.key}
-                onClick={() => onReact(reaction.key)}
-                type="button"
-              >
-                {reaction.key === "favorite" ? (
-                  <Heart size={15} />
-                ) : (
-                  <MessageCircle size={15} />
-                )}
-                <span>{reaction.label}</span>
-                <strong>{release.signals.reactions[reaction.key]}</strong>
-              </button>
-            ))}
+            {UPCOMING_REACTIONS.map((reaction) => {
+              const reacted = selectedReactions.includes(reaction.key);
+              return (
+                <button
+                  className={reacted ? "is-active" : ""}
+                  disabled={reacted}
+                  key={reaction.key}
+                  onClick={() => onReact(reaction.key)}
+                  type="button"
+                >
+                  {reaction.key === "favorite" ? (
+                    <Heart size={15} />
+                  ) : (
+                    <MessageCircle size={15} />
+                  )}
+                  <span>{reaction.label}</span>
+                  <strong>{release.signals.reactions[reaction.key]}</strong>
+                </button>
+              );
+            })}
           </div>
         </div>
       </article>
