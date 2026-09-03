@@ -45,13 +45,21 @@ function albumsForConfig(config: DjCarlosPageConfig) {
   return config.albums?.length ? config.albums : [config.album];
 }
 
+function findAlbumBySlug(config: DjCarlosPageConfig, albumSlug?: string) {
+  const normalizedSlug = albumSlug?.trim().toLowerCase();
+  if (!normalizedSlug) return undefined;
+  return albumsForConfig(config).find(
+    (album) => album.slug.toLowerCase() === normalizedSlug,
+  );
+}
+
 function selectedAlbumForConfig(
   config: DjCarlosPageConfig,
   albumSlug?: string,
 ) {
   const albums = albumsForConfig(config);
   return (
-    albums.find((album) => album.slug === albumSlug) ??
+    findAlbumBySlug(config, albumSlug) ??
     albums[0] ??
     config.album
   );
@@ -89,12 +97,16 @@ export function DjCarlosArtistPage({
   const [playerPausedByUser, setPlayerPausedByUser] = useState(false);
   const [playerVersion, setPlayerVersion] = useState(0);
   const [snapshot, setSnapshot] = useState<ProviderTelemetrySnapshot | null>(null);
+  const [usingLocalDraft, setUsingLocalDraft] = useState(false);
 
   useEffect(() => {
     const loadLocalConfig = () => {
       try {
         const saved = window.localStorage.getItem(DJ_CARLOS_PAGE_STORAGE_KEY);
-        if (!saved) return;
+        if (!saved) {
+          setUsingLocalDraft(false);
+          return;
+        }
         const nextConfig = normalizeDjCarlosPageConfig(
           JSON.parse(saved),
           initialConfig,
@@ -105,15 +117,25 @@ export function DjCarlosArtistPage({
           Number.isFinite(serverAt) &&
           (!Number.isFinite(savedAt) || savedAt <= serverAt)
         ) {
+          setUsingLocalDraft(false);
           return;
         }
+        const routeNeedsLocalAlbum = Boolean(
+          initialAlbumSlug &&
+            !findAlbumBySlug(initialConfig, initialAlbumSlug) &&
+            findAlbumBySlug(nextConfig, initialAlbumSlug),
+        );
+        setUsingLocalDraft(true);
         setConfig(nextConfig);
         setActiveId(
           (current) =>
-            current || firstTrackIdForAlbum(nextConfig, initialAlbumSlug),
+            routeNeedsLocalAlbum
+              ? firstTrackIdForAlbum(nextConfig, initialAlbumSlug)
+              : current || firstTrackIdForAlbum(nextConfig, initialAlbumSlug),
         );
       } catch {
         window.localStorage.removeItem(DJ_CARLOS_PAGE_STORAGE_KEY);
+        setUsingLocalDraft(false);
       }
     };
 
@@ -160,6 +182,10 @@ export function DjCarlosArtistPage({
     });
     return counts;
   }, [tracks]);
+  const serverAlbumSlugs = useMemo(
+    () => new Set(albumsForConfig(initialConfig).map((item) => item.slug)),
+    [initialConfig],
+  );
   const albumPlayerTrack = useMemo<DjCarlosTrack | null>(() => {
     if (!isPlayableDjCarlosLink(album.link)) return null;
     return {
@@ -469,11 +495,13 @@ export function DjCarlosArtistPage({
         </article>
       </section>
 
-      <AlbumLibrary
-        activeAlbumId={album.id}
-        albums={albums}
-        trackCounts={albumTrackCounts}
-      />
+        <AlbumLibrary
+          activeAlbumId={album.id}
+          albums={albums}
+          serverAlbumSlugs={serverAlbumSlugs}
+          trackCounts={albumTrackCounts}
+          usingLocalDraft={usingLocalDraft}
+        />
 
       <TrackSection
         heading={isAlbumDetail ? album.title : "Album en orden"}
@@ -549,11 +577,15 @@ export function DjCarlosArtistPage({
 function AlbumLibrary({
   activeAlbumId,
   albums,
+  serverAlbumSlugs,
   trackCounts,
+  usingLocalDraft,
 }: {
   activeAlbumId: string;
   albums: DjCarlosAlbum[];
+  serverAlbumSlugs: Set<string>;
   trackCounts: Map<string, number>;
+  usingLocalDraft: boolean;
 }) {
   return (
     <section className="djcx-list-section djcx-album-library">
@@ -574,7 +606,11 @@ function AlbumLibrary({
                 ? "djcx-album-card is-active"
                 : "djcx-album-card"
             }
-            href={`/DJCarlosJimenez/album/${album.slug}`}
+            href={
+              usingLocalDraft && !serverAlbumSlugs.has(album.slug)
+                ? `/DJCarlosJimenez/album/${album.slug}?localPreview=1`
+                : `/DJCarlosJimenez/album/${album.slug}`
+            }
             key={album.id}
           >
             <AlbumCase album={album} compact />

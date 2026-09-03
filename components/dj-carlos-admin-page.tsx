@@ -627,7 +627,7 @@ export function DjCarlosAdminPage({
               </button>
 
               <div className="djcx-admin-album-actions">
-                <Link href={`/DJCarlosJimenez/album/${album.slug}`}>
+                <Link href={`/DJCarlosJimenez/album/${album.slug}?localPreview=1`}>
                   <ExternalLink size={15} />
                 </Link>
                 <button
