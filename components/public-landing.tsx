@@ -21,6 +21,7 @@ import {
   Star,
 } from "lucide-react";
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { LanguageSelector } from "@/components/language-selector";
 import { Logo } from "@/components/logo";
 import { PwaInstallButton } from "@/components/pwa-install-prompt";
@@ -83,7 +84,7 @@ export function PublicLanding({
           <a href="#features">{copy.landing.nav.features}</a>
           <a href="#founders">{copy.landing.nav.founder}</a>
           <a href="#faq">{copy.landing.nav.faq}</a>
-          <a href="/help">Need Help?</a>
+          <Link href="/help">Need Help?</Link>
         </nav>
         <div className="landing-actions">
           <LanguageSelector compact locale={locale} onChange={onLocaleChange} />
