@@ -98,6 +98,7 @@ export function DjCarlosArtistPage({
   const [playerVersion, setPlayerVersion] = useState(0);
   const [snapshot, setSnapshot] = useState<ProviderTelemetrySnapshot | null>(null);
   const [usingLocalDraft, setUsingLocalDraft] = useState(false);
+  const [showTopTenList, setShowTopTenList] = useState(false);
 
   useEffect(() => {
     const loadLocalConfig = () => {
@@ -495,6 +496,7 @@ export function DjCarlosArtistPage({
         </article>
       </section>
 
+      {!isAlbumDetail && (
         <AlbumLibrary
           activeAlbumId={album.id}
           albums={albums}
@@ -502,61 +504,41 @@ export function DjCarlosArtistPage({
           trackCounts={albumTrackCounts}
           usingLocalDraft={usingLocalDraft}
         />
+      )}
 
-      <TrackSection
-        heading={isAlbumDetail ? album.title : "Album en orden"}
-        kicker={isAlbumDetail ? "Canciones del album" : "Playlist oficial"}
-        onPlayAll={playAlbum}
-        onPlayTrack={playTrack}
-        tracks={albumTracks}
-      />
+      {isAlbumDetail && (
+        <TrackSection
+          heading={album.title}
+          kicker="Canciones del album"
+          onPlayAll={playAlbum}
+          onPlayTrack={playTrack}
+          tracks={albumTracks}
+        />
+      )}
 
-      <TrackSection
-        heading="Top Ten"
-        kicker="Favoritas para reproducir"
+      {!isAlbumDetail && (
+        <VideosSection
+          onPlayFirstVideo={playFirstVideo}
+          onPlayTrack={playTrack}
+          tracks={officialVideos}
+        />
+      )}
+
+      <TopTenSection
+        expanded={showTopTenList}
         onPlayAll={playFirstTopTen}
         onPlayTrack={playTrack}
+        onToggle={() => setShowTopTenList((current) => !current)}
         tracks={topTenTracks}
       />
 
-      <section className="djcx-list-section djcx-video-section" id="videos">
-        <div className="djcx-section-heading">
-          <div>
-            <span>
-              <Video size={14} /> YouTube
-            </span>
-            <h2>Videos musicales oficiales</h2>
-          </div>
-          <button onClick={playFirstVideo} type="button">
-            <Play fill="currentColor" size={16} />
-            Ver ahora
-          </button>
-        </div>
-
-        <div className="djcx-video-grid">
-          {officialVideos.map((track) => (
-            <button
-              className="djcx-video-card"
-              key={track.id}
-              onClick={() => playTrack(track.id)}
-              type="button"
-            >
-              <span>
-                <Image
-                  alt={`${track.title} cover`}
-                  fill
-                  sizes="(max-width: 700px) 92vw, 320px"
-                  src={track.coverUrl}
-                  unoptimized
-                />
-                <Play fill="currentColor" size={20} />
-              </span>
-              <strong>{track.title}</strong>
-              <small>{track.subtitle}</small>
-            </button>
-          ))}
-        </div>
-      </section>
+      {isAlbumDetail && (
+        <VideosSection
+          onPlayFirstVideo={playFirstVideo}
+          onPlayTrack={playTrack}
+          tracks={officialVideos}
+        />
+      )}
 
       <footer className="djcx-footer">
         {isAlbumDetail && <Link href="/DJCarlosJimenez">Volver a la pagina principal</Link>}
@@ -676,6 +658,137 @@ function ArtistInstallPanel({ logoUrl }: { logoUrl: string }) {
         />
       </div>
     </article>
+  );
+}
+
+function VideosSection({
+  onPlayFirstVideo,
+  onPlayTrack,
+  tracks,
+}: {
+  onPlayFirstVideo: () => void;
+  onPlayTrack: (trackId: string) => void;
+  tracks: DjCarlosTrack[];
+}) {
+  return (
+    <section className="djcx-list-section djcx-video-section" id="videos">
+      <div className="djcx-section-heading">
+        <div>
+          <span>
+            <Video size={14} /> YouTube
+          </span>
+          <h2>Videos musicales oficiales</h2>
+        </div>
+        <button onClick={onPlayFirstVideo} type="button">
+          <Play fill="currentColor" size={16} />
+          Ver ahora
+        </button>
+      </div>
+
+      <div className="djcx-video-grid">
+        {tracks.map((track) => (
+          <button
+            className="djcx-video-card"
+            key={track.id}
+            onClick={() => onPlayTrack(track.id)}
+            type="button"
+          >
+            <span>
+              <Image
+                alt={`${track.title} cover`}
+                fill
+                sizes="(max-width: 700px) 92vw, 320px"
+                src={track.coverUrl}
+                unoptimized
+              />
+              <Play fill="currentColor" size={20} />
+            </span>
+            <strong>{track.title}</strong>
+            <small>{track.subtitle}</small>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TopTenSection({
+  expanded,
+  onPlayAll,
+  onPlayTrack,
+  onToggle,
+  tracks,
+}: {
+  expanded: boolean;
+  onPlayAll: () => void;
+  onPlayTrack: (trackId: string) => void;
+  onToggle: () => void;
+  tracks: DjCarlosTrack[];
+}) {
+  const featuredTrack = tracks[0];
+
+  return (
+    <section className="djcx-list-section djcx-top-ten-section">
+      <div className="djcx-section-heading">
+        <div>
+          <span>
+            <ListMusic size={14} /> Favoritas para reproducir
+          </span>
+          <h2>Top Ten</h2>
+        </div>
+      </div>
+
+      <div
+        className={
+          featuredTrack
+            ? "djcx-top-ten-summary"
+            : "djcx-top-ten-summary is-empty"
+        }
+      >
+        {featuredTrack && (
+          <span>
+            <Image
+              alt={`${featuredTrack.title} cover`}
+              fill
+              sizes="72px"
+              src={featuredTrack.coverUrl}
+              unoptimized
+            />
+          </span>
+        )}
+        <div>
+          <strong>{tracks.length} canciones seleccionadas</strong>
+          <small>
+            {featuredTrack
+              ? `Empieza con ${featuredTrack.title} o abre la lista completa.`
+              : "Agrega canciones al Top Ten desde el panel."}
+          </small>
+        </div>
+        <div className="djcx-top-ten-actions">
+          <button onClick={onPlayAll} type="button">
+            <Play fill="currentColor" size={16} />
+            Reproducir
+          </button>
+          <button onClick={onToggle} type="button">
+            <ListMusic size={16} />
+            {expanded ? "Ocultar lista" : "Ver Top Ten"}
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="djcx-track-list">
+          {tracks.map((track, index) => (
+            <TrackRow
+              index={index + 1}
+              key={track.id}
+              onPlay={() => onPlayTrack(track.id)}
+              track={track}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
