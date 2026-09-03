@@ -27,6 +27,7 @@ import {
   type DjCarlosPageConfig,
   type DjCarlosTrack,
 } from "@/lib/dj-carlos-page";
+import { nextDjCarlosQueueTrackId } from "@/lib/dj-carlos-playback";
 import { dispatchWorkspaceV2PlaybackCommand } from "@/lib/workspace-v2";
 
 const PLAYER_CHANNEL = "dj-carlos-jimenez";
@@ -77,6 +78,7 @@ export function DjCarlosArtistPage({
   logoUrl: string;
 }) {
   const requestPlaybackRef = useRef<(() => void) | null>(null);
+  const lastAutoAdvanceKeyRef = useRef<string | null>(null);
   const [config, setConfig] = useState(() =>
     normalizeDjCarlosPageConfig(initialConfig),
   );
@@ -199,6 +201,41 @@ export function DjCarlosArtistPage({
     if (activeTrack || !playQueue[0]) return;
     setActiveId(playQueue[0].id);
   }, [activeTrack, playQueue]);
+
+  useEffect(() => {
+    if (
+      snapshot?.playbackState !== "completed" ||
+      playerPausedByUser ||
+      !autoPlayEnabled
+    ) {
+      return;
+    }
+
+    const activeTrackId = activeTrack?.id ?? null;
+    const nextTrackId = nextDjCarlosQueueTrackId(activeTrackId, playQueue);
+    if (!nextTrackId) return;
+
+    const completionKey = `${activeTrackId ?? "none"}:${playerVersion}`;
+    if (lastAutoAdvanceKeyRef.current === completionKey) return;
+    lastAutoAdvanceKeyRef.current = completionKey;
+
+    const advanceTimer = window.setTimeout(() => {
+      setSnapshot(null);
+      setAutoPlayEnabled(true);
+      setPlayerPausedByUser(false);
+      setActiveId(nextTrackId);
+      setPlayerVersion((version) => version + 1);
+    }, 700);
+
+    return () => window.clearTimeout(advanceTimer);
+  }, [
+    activeTrack?.id,
+    autoPlayEnabled,
+    playQueue,
+    playerPausedByUser,
+    playerVersion,
+    snapshot?.playbackState,
+  ]);
 
   const playTrack = (trackId: string) => {
     setSnapshot(null);
