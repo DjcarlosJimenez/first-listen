@@ -246,6 +246,20 @@ export function detectDjCarlosPlatform(link: string): DjCarlosPlayablePlatform {
   return link.includes("music.youtube.com") ? "YouTube Music" : "YouTube";
 }
 
+function cleanDjCarlosImageUrl(value: unknown, fallback: string) {
+  if (typeof value !== "string") return fallback;
+  const imageUrl = value.trim();
+  if (!imageUrl) return fallback;
+  if (imageUrl.startsWith("data:")) return fallback;
+  if (imageUrl.startsWith("/")) return imageUrl;
+  try {
+    const url = new URL(imageUrl);
+    return url.protocol === "https:" ? imageUrl : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function isPlayableDjCarlosLink(link: string) {
   try {
     const url = new URL(link.trim());
@@ -293,10 +307,7 @@ function cleanAlbum(value: unknown, fallback: DjCarlosAlbum): DjCarlosAlbum {
       typeof album.badge === "string" && album.badge.trim()
         ? album.badge.trim()
         : fallback.badge,
-    coverUrl:
-      typeof album.coverUrl === "string" && album.coverUrl.trim()
-        ? album.coverUrl.trim()
-        : fallback.coverUrl,
+    coverUrl: cleanDjCarlosImageUrl(album.coverUrl, fallback.coverUrl),
     description:
       typeof album.description === "string" && album.description.trim()
         ? album.description.trim()
@@ -313,6 +324,13 @@ function cleanAlbum(value: unknown, fallback: DjCarlosAlbum): DjCarlosAlbum {
       typeof album.title === "string" && album.title.trim()
         ? album.title.trim()
         : fallback.title,
+  };
+}
+
+function cleanTrack(track: DjCarlosTrack, fallbackCoverUrl: string): DjCarlosTrack {
+  return {
+    ...track,
+    coverUrl: cleanDjCarlosImageUrl(track.coverUrl, fallbackCoverUrl),
   };
 }
 
@@ -343,7 +361,7 @@ export function normalizeDjCarlosPageConfig(
     ...(albumTracks.length ? albumTracks : fallbackAlbumTracks),
     ...(topTenTracks.length ? topTenTracks : fallbackTopTenTracks),
     ...(videoTracks.length ? videoTracks : fallbackVideoTracks),
-  ];
+  ].map((track) => cleanTrack(track, fallback.album.coverUrl));
 
   return {
     album: cleanAlbum(config.album, fallback.album),

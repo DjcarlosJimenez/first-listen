@@ -20418,6 +20418,11 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   display: none;
 }
 
+.djcx-file-control.is-loading {
+  cursor: progress;
+  opacity: 0.72;
+}
+
 .djcx-admin-stats {
   display: grid;
   gap: 12px;

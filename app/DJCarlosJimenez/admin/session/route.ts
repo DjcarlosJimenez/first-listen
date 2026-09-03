@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({ authenticated: true });
   const cookieOptions = {
     httpOnly: true,
-    path: "/DJCarlosJimenez/admin",
+    path: "/DJCarlosJimenez",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     ...(remember ? { maxAge: DJ_CARLOS_ADMIN_SESSION_MAX_AGE_SECONDS } : {}),
@@ -62,6 +62,13 @@ export async function POST(request: NextRequest) {
 
 export function DELETE() {
   const response = NextResponse.json({ authenticated: false });
+  response.cookies.set(DJ_CARLOS_ADMIN_COOKIE_NAME, "", {
+    httpOnly: true,
+    maxAge: 0,
+    path: "/DJCarlosJimenez",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
   response.cookies.set(DJ_CARLOS_ADMIN_COOKIE_NAME, "", {
     httpOnly: true,
     maxAge: 0,

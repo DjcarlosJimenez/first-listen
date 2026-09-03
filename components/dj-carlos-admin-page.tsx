@@ -6,6 +6,7 @@ import {
   type ChangeEvent,
   type FormEvent,
   type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -67,7 +68,22 @@ export function DjCarlosAdminPage({
   const [config, setConfig] = useState(() => initialConfig);
   const [draft, setDraft] = useState(emptyDraft);
   const [saving, setSaving] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [status, setStatus] = useState("Panel listo para editar.");
+  const hasLocalChangesRef = useRef(false);
+
+  const persistLocalDraft = useCallback((nextConfig: DjCarlosPageConfig) => {
+    try {
+      window.localStorage.setItem(
+        DJ_CARLOS_PAGE_STORAGE_KEY,
+        JSON.stringify(nextConfig),
+      );
+      return true;
+    } catch {
+      window.localStorage.removeItem(DJ_CARLOS_PAGE_STORAGE_KEY);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -83,6 +99,7 @@ export function DjCarlosAdminPage({
           Number.isFinite(savedAt) &&
           (!Number.isFinite(serverAt) || savedAt > serverAt)
         ) {
+          hasLocalChangesRef.current = true;
           setConfig(savedConfig);
           setStatus("Hay un borrador local mas nuevo. Guarda para publicarlo.");
         }
@@ -95,13 +112,10 @@ export function DjCarlosAdminPage({
   }, [initialConfig]);
 
   useEffect(() => {
-    if (!storageReadyRef.current) return;
+    if (!storageReadyRef.current || !hasLocalChangesRef.current) return;
     const nextConfig = { ...config, updatedAt: new Date().toISOString() };
-    window.localStorage.setItem(
-      DJ_CARLOS_PAGE_STORAGE_KEY,
-      JSON.stringify(nextConfig),
-    );
-  }, [config]);
+    persistLocalDraft(nextConfig);
+  }, [config, persistLocalDraft]);
 
   const albumTracks = useMemo(
     () => config.tracks.filter((track) => track.section === "album"),
@@ -120,6 +134,7 @@ export function DjCarlosAdminPage({
     field: keyof DjCarlosPageConfig["album"],
     value: string,
   ) => {
+    hasLocalChangesRef.current = true;
     setConfig((current) => ({
       ...current,
       album: {
@@ -135,6 +150,7 @@ export function DjCarlosAdminPage({
     field: EditableTrackField,
     value: string,
   ) => {
+    hasLocalChangesRef.current = true;
     setConfig((current) => ({
       ...current,
       tracks: current.tracks.map((track) => {
@@ -168,6 +184,7 @@ export function DjCarlosAdminPage({
   };
 
   const moveTrack = (trackId: string, direction: 1 | -1) => {
+    hasLocalChangesRef.current = true;
     setConfig((current) => {
       const track = current.tracks.find((item) => item.id === trackId);
       if (!track) return current;
@@ -190,6 +207,7 @@ export function DjCarlosAdminPage({
   };
 
   const removeTrack = (trackId: string) => {
+    hasLocalChangesRef.current = true;
     setConfig((current) => ({
       ...current,
       tracks: current.tracks.filter((track) => track.id !== trackId),
@@ -210,6 +228,7 @@ export function DjCarlosAdminPage({
       return;
     }
 
+    hasLocalChangesRef.current = true;
     const track: DjCarlosTrack = {
       artist: "DJ Carlos Jimenez Compositor",
       badge: sectionBadge(draft.section),
@@ -237,19 +256,56 @@ export function DjCarlosAdminPage({
     setStatus("Cancion agregada. Toca Guardar cambios para publicarla.");
   };
 
-  const handleCoverFile = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleCoverFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result !== "string") return;
-      updateAlbum("coverUrl", reader.result);
-      setStatus("Portada cargada. Toca Guardar cambios para publicarla.");
-    });
-    reader.readAsDataURL(file);
+    if (!file.type.startsWith("image/")) {
+      setStatus("Selecciona una imagen para la portada.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setStatus("La portada debe pesar menos de 8 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    setUploadingCover(true);
+    setStatus("Subiendo portada...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/DJCarlosJimenez/assets", {
+        body: formData,
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || typeof data.coverUrl !== "string") {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "No se pudo subir la portada.",
+        );
+      }
+
+      updateAlbum("coverUrl", data.coverUrl);
+      setStatus("Portada subida. Toca Guardar cambios para publicarla.");
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "No se pudo subir la portada.",
+      );
+    } finally {
+      setUploadingCover(false);
+      event.target.value = "";
+    }
   };
 
   const resetConfig = () => {
+    hasLocalChangesRef.current = true;
     window.localStorage.removeItem(DJ_CARLOS_PAGE_STORAGE_KEY);
     setConfig(initialConfig);
     setStatus("Pagina restaurada en el editor. Toca Guardar cambios para publicarla.");
@@ -277,18 +333,14 @@ export function DjCarlosAdminPage({
         data.config ?? nextConfig,
         nextConfig,
       );
-      window.localStorage.setItem(
-        DJ_CARLOS_PAGE_STORAGE_KEY,
-        JSON.stringify(publishedConfig),
-      );
+      hasLocalChangesRef.current = false;
+      persistLocalDraft(publishedConfig);
       setConfig(publishedConfig);
       setStatus(nextStatus);
       return true;
     } catch {
-      window.localStorage.setItem(
-        DJ_CARLOS_PAGE_STORAGE_KEY,
-        JSON.stringify(nextConfig),
-      );
+      hasLocalChangesRef.current = true;
+      persistLocalDraft(nextConfig);
       setConfig(nextConfig);
       setStatus(
         "No se pudo publicar ahora. El borrador quedo guardado en este navegador.",
@@ -300,8 +352,8 @@ export function DjCarlosAdminPage({
   };
 
   const saveAndViewPage = async () => {
-    await saveConfig("Cambios publicados. Abriendo la pagina.");
-    window.location.href = "/DJCarlosJimenez";
+    const published = await saveConfig("Cambios publicados. Abriendo la pagina.");
+    if (published) window.location.href = "/DJCarlosJimenez";
   };
 
   const lockAdmin = async () => {
@@ -441,10 +493,17 @@ export function DjCarlosAdminPage({
                 value={config.album.coverUrl}
               />
             </label>
-            <label className="djcx-file-control">
+            <label
+              className={`djcx-file-control${uploadingCover ? " is-loading" : ""}`}
+            >
               <ImagePlus size={17} />
-              Cargar portada local
-              <input accept="image/*" onChange={handleCoverFile} type="file" />
+              {uploadingCover ? "Subiendo portada..." : "Cargar portada"}
+              <input
+                accept="image/jpeg,image/png,image/webp"
+                disabled={uploadingCover}
+                onChange={(event) => void handleCoverFile(event)}
+                type="file"
+              />
             </label>
           </div>
         </section>

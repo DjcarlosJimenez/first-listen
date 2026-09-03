@@ -8,7 +8,14 @@ import {
 } from "@/lib/dj-carlos-page";
 
 const DJ_CARLOS_STORAGE_BUCKET = "dj-carlos-page";
+const DJ_CARLOS_ASSETS_BUCKET = "dj-carlos-page-assets";
 const DJ_CARLOS_CONFIG_PATH = "config.json";
+const DJ_CARLOS_MAX_COVER_BYTES = 8 * 1024 * 1024;
+const DJ_CARLOS_COVER_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 async function ensureDjCarlosBucket() {
   const supabase = createAdminClient();
@@ -24,6 +31,30 @@ async function ensureDjCarlosBucket() {
       allowedMimeTypes: ["application/json"],
       fileSizeLimit: 1024 * 1024,
       public: false,
+    },
+  );
+
+  if (createError && !createError.message.toLowerCase().includes("already")) {
+    throw createError;
+  }
+
+  return supabase;
+}
+
+async function ensureDjCarlosAssetsBucket() {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.storage.getBucket(
+    DJ_CARLOS_ASSETS_BUCKET,
+  );
+
+  if (data && !error) return supabase;
+
+  const { error: createError } = await supabase.storage.createBucket(
+    DJ_CARLOS_ASSETS_BUCKET,
+    {
+      allowedMimeTypes: [...DJ_CARLOS_COVER_TYPES],
+      fileSizeLimit: DJ_CARLOS_MAX_COVER_BYTES,
+      public: true,
     },
   );
 
@@ -77,4 +108,36 @@ export async function writeDjCarlosPageConfig(
   if (error) throw error;
 
   return cleanConfig;
+}
+
+export async function writeDjCarlosCoverFile(file: File) {
+  if (!DJ_CARLOS_COVER_TYPES.has(file.type)) {
+    throw new Error("La portada debe ser JPG, PNG o WEBP.");
+  }
+  if (file.size > DJ_CARLOS_MAX_COVER_BYTES) {
+    throw new Error("La portada debe pesar menos de 8 MB.");
+  }
+
+  const extension = file.type === "image/png"
+    ? "png"
+    : file.type === "image/webp"
+      ? "webp"
+      : "jpg";
+  const supabase = await ensureDjCarlosAssetsBucket();
+  const path = `covers/album-${Date.now()}.${extension}`;
+  const { error } = await supabase.storage
+    .from(DJ_CARLOS_ASSETS_BUCKET)
+    .upload(path, file, {
+      cacheControl: "31536000",
+      contentType: file.type,
+      upsert: true,
+    });
+
+  if (error) throw error;
+
+  const { data } = supabase.storage
+    .from(DJ_CARLOS_ASSETS_BUCKET)
+    .getPublicUrl(path);
+
+  return data.publicUrl;
 }
