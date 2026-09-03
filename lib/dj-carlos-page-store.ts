@@ -14,12 +14,18 @@ const DJ_CARLOS_STORAGE_BUCKET = "dj-carlos-page";
 const DJ_CARLOS_ASSETS_BUCKET = "dj-carlos-page-assets";
 const DJ_CARLOS_CONFIG_PATH = "config.json";
 const DJ_CARLOS_UPCOMING_SIGNALS_PATH = "upcoming-signals.json";
-const DJ_CARLOS_MAX_COVER_BYTES = 8 * 1024 * 1024;
+const DJ_CARLOS_MAX_COVER_MB = 20;
+const DJ_CARLOS_MAX_COVER_BYTES = DJ_CARLOS_MAX_COVER_MB * 1024 * 1024;
 const DJ_CARLOS_COVER_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
 ]);
+const DJ_CARLOS_ASSET_BUCKET_OPTIONS = {
+  allowedMimeTypes: [...DJ_CARLOS_COVER_TYPES],
+  fileSizeLimit: DJ_CARLOS_MAX_COVER_BYTES,
+  public: true,
+};
 
 async function ensureDjCarlosBucket() {
   const supabase = createAdminClient();
@@ -51,15 +57,20 @@ async function ensureDjCarlosAssetsBucket() {
     DJ_CARLOS_ASSETS_BUCKET,
   );
 
-  if (data && !error) return supabase;
+  if (data && !error) {
+    const { error: updateError } = await supabase.storage.updateBucket(
+      DJ_CARLOS_ASSETS_BUCKET,
+      DJ_CARLOS_ASSET_BUCKET_OPTIONS,
+    );
+
+    if (updateError) throw updateError;
+
+    return supabase;
+  }
 
   const { error: createError } = await supabase.storage.createBucket(
     DJ_CARLOS_ASSETS_BUCKET,
-    {
-      allowedMimeTypes: [...DJ_CARLOS_COVER_TYPES],
-      fileSizeLimit: DJ_CARLOS_MAX_COVER_BYTES,
-      public: true,
-    },
+    DJ_CARLOS_ASSET_BUCKET_OPTIONS,
   );
 
   if (createError && !createError.message.toLowerCase().includes("already")) {
@@ -201,7 +212,7 @@ export async function writeDjCarlosCoverFile(file: File) {
     throw new Error("La portada debe ser JPG, PNG o WEBP.");
   }
   if (file.size > DJ_CARLOS_MAX_COVER_BYTES) {
-    throw new Error("La portada debe pesar menos de 8 MB.");
+    throw new Error(`La portada debe pesar menos de ${DJ_CARLOS_MAX_COVER_MB} MB.`);
   }
 
   const extension = file.type === "image/png"

@@ -81,6 +81,8 @@ const upcomingReactionLabels: Record<DjCarlosUpcomingReactionKey, string> = {
   video: "Quiero video",
   waiting: "La espero",
 };
+const DJ_CARLOS_COVER_MAX_MB = 20;
+const DJ_CARLOS_COVER_MAX_BYTES = DJ_CARLOS_COVER_MAX_MB * 1024 * 1024;
 
 function albumsForConfig(config: DjCarlosPageConfig) {
   return config.albums?.length ? config.albums : [config.album];
@@ -696,8 +698,8 @@ export function DjCarlosAdminPage({
       event.target.value = "";
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      setStatus("La portada debe pesar menos de 8 MB.");
+    if (file.size > DJ_CARLOS_COVER_MAX_BYTES) {
+      setStatus(`La portada debe pesar menos de ${DJ_CARLOS_COVER_MAX_MB} MB.`);
       event.target.value = "";
       return;
     }
@@ -746,8 +748,8 @@ export function DjCarlosAdminPage({
       event.target.value = "";
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      setStatus("La portada debe pesar menos de 8 MB.");
+    if (file.size > DJ_CARLOS_COVER_MAX_BYTES) {
+      setStatus(`La portada debe pesar menos de ${DJ_CARLOS_COVER_MAX_MB} MB.`);
       event.target.value = "";
       return;
     }

@@ -823,10 +823,15 @@ function UpcomingReleaseCard({
               const reacted = selectedReactions.includes(reaction.key);
               return (
                 <button
+                  aria-pressed={reacted}
                   className={reacted ? "is-active" : ""}
-                  disabled={reacted}
                   key={reaction.key}
                   onClick={() => onReact(reaction.key)}
+                  title={
+                    reacted
+                      ? `${reaction.label} ya contado en este dispositivo`
+                      : reaction.label
+                  }
                   type="button"
                 >
                   {reaction.key === "favorite" ? (
@@ -840,6 +845,9 @@ function UpcomingReleaseCard({
               );
             })}
           </div>
+          <small className="djcx-upcoming-reaction-note">
+            Cada opcion suma una vez por dispositivo.
+          </small>
         </div>
       </article>
     </section>

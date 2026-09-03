@@ -20097,6 +20097,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: var(--djcx-accent);
 }
 
+.djcx-upcoming-reactions button.is-active {
+  cursor: default;
+}
+
 .djcx-upcoming-engagement button:disabled {
   cursor: default;
 }
@@ -20124,6 +20128,11 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .djcx-upcoming-reactions button strong {
   color: var(--djcx-gold-strong);
   font-size: 12px;
+}
+
+.djcx-upcoming-reaction-note {
+  display: block;
+  margin-top: -2px;
 }
 
 .djcx-list-section {
