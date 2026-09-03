@@ -39,6 +39,9 @@ export async function generateMetadata({
   }
 
   return {
+    alternates: {
+      canonical: `https://www.firstlisten.net/DJCarlosJimenez/album/${album.slug}`,
+    },
     applicationName: "DJ Carlos Jimenez",
     appleWebApp: {
       capable: true,

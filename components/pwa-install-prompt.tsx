@@ -37,8 +37,12 @@ type PwaInstallContextValue = {
 const PwaInstallContext = createContext<PwaInstallContextValue | null>(null);
 
 const DISMISS_KEY = "first-listen-install-dismissed-at";
+const DJ_CARLOS_DISMISS_KEY = `${DISMISS_KEY}:dj-carlos`;
+const SESSION_PROMPT_KEY = "first-listen-install-shown-session";
+const DJ_CARLOS_SESSION_PROMPT_KEY = `${SESSION_PROMPT_KEY}:dj-carlos`;
 const DISMISS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const INSTALL_INSTRUCTION_DELAY_MS = 45000;
+const ARTIST_INSTALL_INSTRUCTION_DELAY_MS = 2500;
 const UPDATE_REMINDER_MS = 10 * 60 * 1000;
 const DJ_CARLOS_PATH_PREFIX = "/DJCarlosJimenez";
 const DJ_CARLOS_ICON_URL = "/artist/dj-carlos-jimenez/icon-192.png";
@@ -53,8 +57,16 @@ type InstallPromptBrand = {
   title: string;
 };
 
+function isDjCarlosPath(pathname: string | null) {
+  return (
+    pathname?.toLocaleLowerCase("en-US").startsWith(
+      DJ_CARLOS_PATH_PREFIX.toLocaleLowerCase("en-US"),
+    ) ?? false
+  );
+}
+
 function installPromptBrandFor(pathname: string | null, spanish: boolean): InstallPromptBrand {
-  const artistPage = pathname?.startsWith(DJ_CARLOS_PATH_PREFIX) ?? false;
+  const artistPage = isDjCarlosPath(pathname);
   if (artistPage) {
     return {
       actionLabel: spanish ? "Instalar DJ Carlos" : "Install DJ Carlos",
@@ -139,9 +151,9 @@ function isIosSafari() {
   return isiOS && isSafari;
 }
 
-function recentlyDismissed() {
+function recentlyDismissed(key = DISMISS_KEY) {
   try {
-    const value = window.localStorage.getItem(DISMISS_KEY);
+    const value = window.localStorage.getItem(key);
     if (!value) return false;
     const dismissedAt = Number(value);
     return Number.isFinite(dismissedAt) && Date.now() - dismissedAt < DISMISS_WINDOW_MS;
@@ -150,15 +162,32 @@ function recentlyDismissed() {
   }
 }
 
-function markDismissed() {
+function markDismissed(key = DISMISS_KEY) {
   try {
-    window.localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    window.localStorage.setItem(key, String(Date.now()));
   } catch {
     // Some private browsing modes can block localStorage. The prompt can still hide for this session.
   }
 }
 
+function alreadyShownThisSession(key: string) {
+  try {
+    return window.sessionStorage.getItem(key) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function markShownThisSession(key: string) {
+  try {
+    window.sessionStorage.setItem(key, "true");
+  } catch {
+    // sessionStorage can be blocked; the visible state still prevents repeated prompts.
+  }
+}
+
 export function PwaInstallProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [promptEvent, setPromptEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
@@ -284,12 +313,6 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     const media = window.matchMedia("(display-mode: standalone)");
     media.addEventListener("change", onDisplayModeChange);
 
-    const instructionTimer = window.setTimeout(() => {
-      if (!recentlyDismissed() && !isStandaloneMode()) {
-        setVisible(true);
-      }
-    }, INSTALL_INSTRUCTION_DELAY_MS);
-
     return () => {
       cancelled = true;
       clearUpdateReminder();
@@ -301,15 +324,42 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
         navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
       }
       media.removeEventListener("change", onDisplayModeChange);
-      window.clearTimeout(instructionTimer);
       removeUpdateListener?.();
     };
   }, [clearUpdateReminder, showUpdateAvailable]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || isStandaloneMode()) return;
+
+    const artistPage = isDjCarlosPath(pathname);
+    const dismissKey = artistPage ? DJ_CARLOS_DISMISS_KEY : DISMISS_KEY;
+    if (
+      recentlyDismissed(dismissKey) ||
+      (artistPage && alreadyShownThisSession(DJ_CARLOS_SESSION_PROMPT_KEY))
+    ) {
+      return;
+    }
+
+    if (artistPage) {
+      markShownThisSession(DJ_CARLOS_SESSION_PROMPT_KEY);
+    }
+
+    const delay = artistPage
+      ? ARTIST_INSTALL_INSTRUCTION_DELAY_MS
+      : INSTALL_INSTRUCTION_DELAY_MS;
+    const instructionTimer = window.setTimeout(() => {
+      if (!recentlyDismissed(dismissKey) && !isStandaloneMode()) {
+        setVisible(true);
+      }
+    }, delay);
+
+    return () => window.clearTimeout(instructionTimer);
+  }, [pathname]);
+
   const dismissInstructions = useCallback(() => {
-    markDismissed();
+    markDismissed(isDjCarlosPath(pathname) ? DJ_CARLOS_DISMISS_KEY : DISMISS_KEY);
     setVisible(false);
-  }, []);
+  }, [pathname]);
 
   const dismissUpdate = useCallback(() => {
     setUpdateAvailable(false);
@@ -407,9 +457,10 @@ export function PwaInstallButton({
 }) {
   const { installed, installing, nativePromptAvailable, requestInstall } =
     usePwaInstall();
+  const pathname = usePathname();
   if (installed) return null;
 
-  const spanish = locale === "es";
+  const spanish = locale === "es" || isDjCarlosPath(pathname);
   const buttonLabel = label ?? (spanish ? "Instalar First Listen" : "Install First Listen");
   const hint = nativePromptAvailable
     ? spanish
@@ -450,7 +501,7 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
   } = usePwaInstall();
   const locale = useInterfaceLocale();
   const pathname = usePathname();
-  const spanish = locale === "es";
+  const spanish = locale === "es" || isDjCarlosPath(pathname);
   const brand = installPromptBrandFor(pathname, spanish);
 
   if (installed || !visible) return null;

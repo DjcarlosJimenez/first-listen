@@ -8,6 +8,9 @@ import { readDjCarlosPageConfig } from "@/lib/dj-carlos-page-store";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  alternates: {
+    canonical: "https://www.firstlisten.net/DJCarlosJimenez",
+  },
   title: "DJ Carlos Jimenez | First Listen",
   description:
     "Pagina oficial de DJ Carlos Jimenez en First Listen, con reproductor, album, Top Ten y videos oficiales.",
