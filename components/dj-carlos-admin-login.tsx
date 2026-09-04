@@ -19,6 +19,8 @@ export function DjCarlosAdminLogin({ logoUrl }: { logoUrl: string }) {
     try {
       const response = await fetch("/DJCarlosJimenez/admin/session", {
         body: JSON.stringify({ password, remember }),
+        cache: "no-store",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });

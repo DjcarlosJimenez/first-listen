@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   DJ_CARLOS_ADMIN_COOKIE_NAME,
-  isDjCarlosAdminSession,
+  hasDjCarlosAdminSession,
 } from "@/lib/dj-carlos-admin-auth";
 import {
   defaultDjCarlosPageConfig,
@@ -22,8 +22,8 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   if (
-    !isDjCarlosAdminSession(
-      request.cookies.get(DJ_CARLOS_ADMIN_COOKIE_NAME)?.value,
+    !hasDjCarlosAdminSession(
+      request.cookies.getAll(DJ_CARLOS_ADMIN_COOKIE_NAME),
     )
   ) {
     return NextResponse.json(

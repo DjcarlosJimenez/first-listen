@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "crypto";
 
 export const DJ_CARLOS_ADMIN_COOKIE_NAME = "dj_carlos_admin_session";
+export const DJ_CARLOS_ADMIN_COOKIE_PATH = "/DJCarlosJimenez";
 export const DJ_CARLOS_ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 45;
 
 const DEVELOPMENT_PASSWORD = "DJCarlos2027!";
@@ -52,6 +53,12 @@ export function isDjCarlosAdminSession(value: string | undefined) {
   if (now - issuedAt > DJ_CARLOS_ADMIN_SESSION_MAX_AGE_SECONDS) return false;
 
   return safeEqual(signature, digest(`${issuedAt}:${secret}`));
+}
+
+export function hasDjCarlosAdminSession(
+  cookies: Array<{ value?: string }>,
+) {
+  return cookies.some((cookie) => isDjCarlosAdminSession(cookie.value));
 }
 
 export function isDjCarlosAdminPasswordReady() {

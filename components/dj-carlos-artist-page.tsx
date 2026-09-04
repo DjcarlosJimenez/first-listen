@@ -808,7 +808,6 @@ function UpcomingReleaseCard({
 
         <div className="djcx-upcoming-engagement">
           <button
-            className={following ? "is-active" : ""}
             disabled={following}
             onClick={onFollow}
             type="button"
@@ -823,8 +822,8 @@ function UpcomingReleaseCard({
               const reacted = selectedReactions.includes(reaction.key);
               return (
                 <button
-                  aria-pressed={reacted}
-                  className={reacted ? "is-active" : ""}
+                  aria-label={`${reaction.label}: ${release.signals.reactions[reaction.key]}`}
+                  data-counted={reacted ? "true" : "false"}
                   key={reaction.key}
                   onClick={() => onReact(reaction.key)}
                   title={

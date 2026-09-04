@@ -2,21 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createDjCarlosAdminSession,
   DJ_CARLOS_ADMIN_COOKIE_NAME,
+  DJ_CARLOS_ADMIN_COOKIE_PATH,
   DJ_CARLOS_ADMIN_SESSION_MAX_AGE_SECONDS,
+  hasDjCarlosAdminSession,
   isDjCarlosAdminPasswordReady,
-  isDjCarlosAdminSession,
   verifyDjCarlosAdminPassword,
 } from "@/lib/dj-carlos-admin-auth";
 
 export const runtime = "nodejs";
 
 export function GET(request: NextRequest) {
-  return NextResponse.json({
-    authenticated: isDjCarlosAdminSession(
-      request.cookies.get(DJ_CARLOS_ADMIN_COOKIE_NAME)?.value,
-    ),
+  const authenticated = hasDjCarlosAdminSession(
+    request.cookies.getAll(DJ_CARLOS_ADMIN_COOKIE_NAME),
+  );
+  const response = NextResponse.json({
+    authenticated,
     configured: isDjCarlosAdminPasswordReady(),
   });
+
+  if (authenticated) {
+    response.cookies.set(
+      DJ_CARLOS_ADMIN_COOKIE_NAME,
+      createDjCarlosAdminSession(),
+      {
+        httpOnly: true,
+        maxAge: DJ_CARLOS_ADMIN_SESSION_MAX_AGE_SECONDS,
+        path: DJ_CARLOS_ADMIN_COOKIE_PATH,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      },
+    );
+  }
+
+  return response;
 }
 
 export async function POST(request: NextRequest) {
@@ -47,7 +65,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({ authenticated: true });
   const cookieOptions = {
     httpOnly: true,
-    path: "/DJCarlosJimenez",
+    path: DJ_CARLOS_ADMIN_COOKIE_PATH,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     ...(remember ? { maxAge: DJ_CARLOS_ADMIN_SESSION_MAX_AGE_SECONDS } : {}),
@@ -65,7 +83,7 @@ export function DELETE() {
   response.cookies.set(DJ_CARLOS_ADMIN_COOKIE_NAME, "", {
     httpOnly: true,
     maxAge: 0,
-    path: "/DJCarlosJimenez",
+    path: DJ_CARLOS_ADMIN_COOKIE_PATH,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
@@ -73,6 +91,13 @@ export function DELETE() {
     httpOnly: true,
     maxAge: 0,
     path: "/DJCarlosJimenez/admin",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  response.cookies.set(DJ_CARLOS_ADMIN_COOKIE_NAME, "", {
+    httpOnly: true,
+    maxAge: 0,
+    path: "/",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });

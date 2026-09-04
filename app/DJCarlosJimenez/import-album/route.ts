@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   DJ_CARLOS_ADMIN_COOKIE_NAME,
-  isDjCarlosAdminSession,
+  hasDjCarlosAdminSession,
 } from "@/lib/dj-carlos-admin-auth";
 import {
   detectDjCarlosPlatform,
@@ -287,8 +287,8 @@ async function fetchYouTubeMusicAlbum(rawLink: string, albumId: string) {
 
 export async function POST(request: NextRequest) {
   if (
-    !isDjCarlosAdminSession(
-      request.cookies.get(DJ_CARLOS_ADMIN_COOKIE_NAME)?.value,
+    !hasDjCarlosAdminSession(
+      request.cookies.getAll(DJ_CARLOS_ADMIN_COOKIE_NAME),
     )
   ) {
     return NextResponse.json(

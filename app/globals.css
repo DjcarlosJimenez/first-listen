@@ -20090,14 +20090,9 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   width: 100%;
 }
 
-.djcx-upcoming-engagement > button.is-active,
-.djcx-upcoming-reactions button.is-active {
-  background: rgba(200, 255, 79, 0.16);
-  border-color: rgba(200, 255, 79, 0.45);
-  color: var(--djcx-accent);
-}
-
-.djcx-upcoming-reactions button.is-active {
+.djcx-upcoming-reactions button[data-counted="true"] {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(246, 200, 79, 0.36);
   cursor: default;
 }
 

@@ -9,7 +9,7 @@ import {
 import { readDjCarlosPageConfig } from "@/lib/dj-carlos-page-store";
 import {
   DJ_CARLOS_ADMIN_COOKIE_NAME,
-  isDjCarlosAdminSession,
+  hasDjCarlosAdminSession,
 } from "@/lib/dj-carlos-admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -46,8 +46,8 @@ export const metadata: Metadata = {
 
 export default async function DjCarlosJimenezAdminRoute() {
   const cookieStore = await cookies();
-  const authenticated = isDjCarlosAdminSession(
-    cookieStore.get(DJ_CARLOS_ADMIN_COOKIE_NAME)?.value,
+  const authenticated = hasDjCarlosAdminSession(
+    cookieStore.getAll(DJ_CARLOS_ADMIN_COOKIE_NAME),
   );
 
   if (!authenticated) {

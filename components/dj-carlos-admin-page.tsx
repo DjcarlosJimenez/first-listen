@@ -159,6 +159,7 @@ export function DjCarlosAdminPage({
   initialConfig: DjCarlosPageConfig;
   logoUrl: string;
 }) {
+  const sessionRedirectTimerRef = useRef<number | null>(null);
   const storageReadyRef = useRef(false);
   const [config, setConfig] = useState(() =>
     normalizeDjCarlosPageConfig(initialConfig),
@@ -177,6 +178,13 @@ export function DjCarlosAdminPage({
   const [status, setStatus] = useState("Panel listo para editar.");
   const hasLocalChangesRef = useRef(false);
 
+  const redirectToAdminLogin = useCallback(() => {
+    if (sessionRedirectTimerRef.current !== null) return;
+    sessionRedirectTimerRef.current = window.setTimeout(() => {
+      window.location.href = "/DJCarlosJimenez/admin";
+    }, 1200);
+  }, []);
+
   const persistLocalDraft = useCallback((nextConfig: DjCarlosPageConfig) => {
     try {
       window.localStorage.setItem(
@@ -189,6 +197,34 @@ export function DjCarlosAdminPage({
       return false;
     }
   }, []);
+
+  const ensureAdminSession = useCallback(async () => {
+    try {
+      const response = await fetch("/DJCarlosJimenez/admin/session", {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.authenticated === true) return true;
+    } catch {
+      // The visible status below explains the action the user needs.
+    }
+
+    setStatus(
+      "Tu sesion de administrador vencio. Entra otra vez; tu borrador queda guardado en este navegador.",
+    );
+    redirectToAdminLogin();
+    return false;
+  }, [redirectToAdminLogin]);
+
+  useEffect(() => {
+    void ensureAdminSession();
+    return () => {
+      if (sessionRedirectTimerRef.current !== null) {
+        window.clearTimeout(sessionRedirectTimerRef.current);
+      }
+    };
+  }, [ensureAdminSession]);
 
   useEffect(() => {
     try {
@@ -570,6 +606,8 @@ export function DjCarlosAdminPage({
       return;
     }
 
+    if (!(await ensureAdminSession())) return;
+
     setImportingAlbum(true);
     setStatus("Importando album desde YouTube Music...");
 
@@ -579,10 +617,20 @@ export function DjCarlosAdminPage({
           albumId: selectedAlbum.id,
           link,
         }),
+        cache: "no-store",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
       const data = (await response.json().catch(() => ({}))) as AlbumImportResponse;
+
+      if (response.status === 401) {
+        setStatus(
+          "Tu sesion de administrador vencio. Entra otra vez para importar; tu borrador queda guardado.",
+        );
+        redirectToAdminLogin();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -705,16 +753,29 @@ export function DjCarlosAdminPage({
     }
 
     setUploadingCover(true);
-    setStatus("Subiendo portada...");
+    setStatus("Revisando sesion...");
 
     try {
+      if (!(await ensureAdminSession())) return;
+
+      setStatus("Subiendo portada...");
       const formData = new FormData();
       formData.append("file", file);
       const response = await fetch("/DJCarlosJimenez/assets", {
         body: formData,
+        cache: "no-store",
+        credentials: "same-origin",
         method: "POST",
       });
       const data = await response.json().catch(() => ({}));
+
+      if (response.status === 401) {
+        setStatus(
+          "Tu sesion de administrador vencio. Entra otra vez para subir la portada; tu borrador queda guardado.",
+        );
+        redirectToAdminLogin();
+        return;
+      }
 
       if (!response.ok || typeof data.coverUrl !== "string") {
         throw new Error(
@@ -755,16 +816,29 @@ export function DjCarlosAdminPage({
     }
 
     setUploadingUpcomingCover(true);
-    setStatus("Subiendo portada del proximo lanzamiento...");
+    setStatus("Revisando sesion...");
 
     try {
+      if (!(await ensureAdminSession())) return;
+
+      setStatus("Subiendo portada del proximo lanzamiento...");
       const formData = new FormData();
       formData.append("file", file);
       const response = await fetch("/DJCarlosJimenez/assets", {
         body: formData,
+        cache: "no-store",
+        credentials: "same-origin",
         method: "POST",
       });
       const data = await response.json().catch(() => ({}));
+
+      if (response.status === 401) {
+        setStatus(
+          "Tu sesion de administrador vencio. Entra otra vez para subir la portada; tu borrador queda guardado.",
+        );
+        redirectToAdminLogin();
+        return;
+      }
 
       if (!response.ok || typeof data.coverUrl !== "string") {
         throw new Error(
@@ -823,15 +897,36 @@ export function DjCarlosAdminPage({
       { ...sourceConfig, updatedAt: new Date().toISOString() },
       sourceConfig,
     );
+
+    if (!(await ensureAdminSession())) {
+      hasLocalChangesRef.current = true;
+      persistLocalDraft(nextConfig);
+      setConfig(nextConfig);
+      return false;
+    }
+
     setSaving(true);
 
     try {
       const response = await fetch("/DJCarlosJimenez/config", {
         body: JSON.stringify(nextConfig),
+        cache: "no-store",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         method: "PUT",
       });
       const data = await response.json().catch(() => ({}));
+
+      if (response.status === 401) {
+        hasLocalChangesRef.current = true;
+        persistLocalDraft(nextConfig);
+        setConfig(nextConfig);
+        setStatus(
+          "Tu sesion de administrador vencio. Entra otra vez para guardar; tu borrador queda guardado.",
+        );
+        redirectToAdminLogin();
+        return false;
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -868,7 +963,11 @@ export function DjCarlosAdminPage({
 
   const lockAdmin = async () => {
     try {
-      await fetch("/DJCarlosJimenez/admin/session", { method: "DELETE" });
+      await fetch("/DJCarlosJimenez/admin/session", {
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "DELETE",
+      });
     } finally {
       window.location.reload();
     }
