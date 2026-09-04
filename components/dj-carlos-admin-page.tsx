@@ -176,6 +176,7 @@ export function DjCarlosAdminPage({
   const [uploadingUpcomingCover, setUploadingUpcomingCover] = useState(false);
   const [importingAlbum, setImportingAlbum] = useState(false);
   const [status, setStatus] = useState("Panel listo para editar.");
+  const [sessionExpired, setSessionExpired] = useState(false);
   const hasLocalChangesRef = useRef(false);
 
   const redirectToAdminLogin = useCallback(() => {
@@ -205,11 +206,15 @@ export function DjCarlosAdminPage({
         credentials: "same-origin",
       });
       const data = await response.json().catch(() => ({}));
-      if (response.ok && data.authenticated === true) return true;
+      if (response.ok && data.authenticated === true) {
+        setSessionExpired(false);
+        return true;
+      }
     } catch {
       // The visible status below explains the action the user needs.
     }
 
+    setSessionExpired(true);
     setStatus(
       "Tu sesion de administrador vencio. Entra otra vez; tu borrador queda guardado en este navegador.",
     );
@@ -1021,6 +1026,20 @@ export function DjCarlosAdminPage({
           />
         </nav>
       </header>
+
+      <div
+        className={
+          sessionExpired
+            ? "djcx-admin-status-bar is-warning"
+            : "djcx-admin-status-bar"
+        }
+        role={sessionExpired ? "alert" : "status"}
+      >
+        <span>{status}</span>
+        {sessionExpired && (
+          <Link href="/DJCarlosJimenez/admin">Entrar otra vez</Link>
+        )}
+      </div>
 
       <section className="djcx-admin-panel djcx-admin-albums-panel">
         <div className="djcx-admin-panel-heading">

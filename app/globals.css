@@ -20912,6 +20912,44 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: #fff !important;
 }
 
+.djcx-admin-status-bar {
+  align-items: center;
+  background: rgba(17, 17, 15, 0.78);
+  border: 1px solid rgba(246, 200, 79, 0.2);
+  border-radius: 8px;
+  color: var(--djcx-muted);
+  display: flex;
+  font-size: 12px;
+  font-weight: 850;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 12px auto 0;
+  max-width: 1180px;
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.djcx-admin-status-bar.is-warning {
+  background: rgba(255, 217, 94, 0.12);
+  border-color: rgba(255, 217, 94, 0.44);
+  color: #fff2be;
+}
+
+.djcx-admin-status-bar a {
+  align-items: center;
+  background: #ffd95e;
+  border-radius: 8px;
+  color: #10100e;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 950;
+  justify-content: center;
+  min-height: 32px;
+  padding: 7px 10px;
+  text-decoration: none;
+}
+
 .djcx-admin-grid {
   display: grid;
   gap: 16px;
@@ -21553,6 +21591,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .djcx-admin-header,
   .djcx-admin-header > div,
   .djcx-admin-header nav,
+  .djcx-admin-status-bar,
   .djcx-admin-grid,
   .djcx-admin-form-grid,
   .djcx-admin-add,
@@ -21573,6 +21612,15 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .djcx-admin-header nav {
     display: grid;
     justify-content: stretch;
+  }
+
+  .djcx-admin-status-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .djcx-admin-status-bar a {
+    width: 100%;
   }
 
   .djcx-admin-stats {
