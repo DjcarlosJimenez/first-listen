@@ -896,17 +896,22 @@ export function DjCarlosArtistPage({
                 <Play fill="currentColor" size={16} />
                 Empezar por el album
               </button>
-              <button onClick={() => void shareAlbum(album)} type="button">
+              <button
+                aria-label={`Compartir album ${album.title}`}
+                onClick={() => void shareAlbum(album)}
+                title="Compartir album"
+                type="button"
+              >
                 <Share2 size={16} />
-                Compartir album
               </button>
               {album.link && (
                 <button
+                  aria-label={`Compartir link original de ${album.title}`}
                   onClick={() => void shareOriginalAlbum(album)}
+                  title="Compartir link original"
                   type="button"
                 >
                   <Link2 size={16} />
-                  Link original
                 </button>
               )}
             </div>
@@ -1141,13 +1146,16 @@ function AlbumLibrary({
               : `/DJCarlosJimenez/album/${album.slug}`;
 
           return (
-            <article className="djcx-album-card-shell" key={album.id}>
+            <article
+              className={
+                album.id === activeAlbumId
+                  ? "djcx-album-card-shell is-active"
+                  : "djcx-album-card-shell"
+              }
+              key={album.id}
+            >
               <Link
-                className={
-                  album.id === activeAlbumId
-                    ? "djcx-album-card is-active"
-                    : "djcx-album-card"
-                }
+                className="djcx-album-card"
                 href={href}
               >
                 <AlbumCase album={album} compact />
@@ -1164,10 +1172,10 @@ function AlbumLibrary({
                 aria-label={`Compartir album ${album.title}`}
                 className="djcx-album-share"
                 onClick={() => onShareAlbum(album)}
+                title="Compartir album"
                 type="button"
               >
                 <Share2 size={15} />
-                Compartir
               </button>
             </article>
           );
@@ -1277,13 +1285,21 @@ function VideosSection({
               <small>{track.subtitle}</small>
             </button>
             <div className="djcx-video-actions">
-              <button onClick={() => onShareTrack(track)} type="button">
+              <button
+                aria-label={`Compartir ${track.title} desde la pagina DJ Carlos`}
+                onClick={() => onShareTrack(track)}
+                title="Compartir desde la pagina"
+                type="button"
+              >
                 <Share2 size={14} />
-                Compartir
               </button>
-              <button onClick={() => onShareOriginalTrack(track)} type="button">
+              <button
+                aria-label={`Compartir link original de ${track.title}`}
+                onClick={() => onShareOriginalTrack(track)}
+                title="Compartir link original"
+                type="button"
+              >
                 <Link2 size={14} />
-                Original
               </button>
             </div>
           </article>
@@ -1474,7 +1490,6 @@ function TrackRow({
           type="button"
         >
           <Share2 size={14} />
-          <span>Compartir</span>
         </button>
         <button
           aria-label={`Compartir link original de ${track.title}`}
@@ -1483,7 +1498,6 @@ function TrackRow({
           type="button"
         >
           <Link2 size={14} />
-          <span>Original</span>
         </button>
       </div>
     </article>

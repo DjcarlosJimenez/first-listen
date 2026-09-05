@@ -19915,6 +19915,9 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .djcx-panel-actions button:not(:first-child) {
   background: rgba(255, 255, 255, 0.06);
   color: var(--djcx-cream);
+  flex: 0 0 40px;
+  padding: 10px;
+  width: 40px;
 }
 
 .djcx-album-library-grid {
@@ -19924,11 +19927,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .djcx-album-card-shell {
-  align-items: stretch;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: minmax(0, 1fr) auto;
   min-width: 0;
+  position: relative;
 }
 
 .djcx-album-card {
@@ -19961,10 +19961,19 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .djcx-album-share {
-  align-self: stretch;
+  background: rgba(5, 5, 5, 0.74);
+  border-color: rgba(255, 217, 94, 0.44);
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 34px;
+  z-index: 3;
 }
 
-.djcx-album-card.is-active {
+.djcx-album-card-shell.is-active .djcx-album-card {
   border-color: rgba(255, 217, 94, 0.58);
   box-shadow: inset 0 0 0 1px rgba(255, 217, 94, 0.18);
 }
@@ -20284,12 +20293,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   font-size: 11px;
   font-weight: 900;
   gap: 6px;
-  padding: 0 10px;
-  width: auto;
-}
-
-.djcx-track-tools button span {
-  white-space: nowrap;
+  padding: 0;
+  width: 38px;
 }
 
 .djcx-track-play {
@@ -20360,6 +20365,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   gap: 10px;
   min-width: 0;
   padding: 10px;
+  position: relative;
   text-align: left;
 }
 
@@ -20410,9 +20416,21 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .djcx-video-actions {
-  display: grid;
+  display: flex;
   gap: 8px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  z-index: 3;
+}
+
+.djcx-video-actions button {
+  background: rgba(5, 5, 5, 0.72);
+  border-color: rgba(255, 217, 94, 0.4);
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  width: 34px;
 }
 
 .djcx-top-ten-summary {
@@ -20655,12 +20673,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   }
 
   .djcx-track-tools {
-    grid-column: 1 / -1;
     justify-content: flex-end;
-  }
-
-  .djcx-track-tools button span {
-    display: none;
   }
 
   .djcx-video-grid {
@@ -20668,7 +20681,6 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   }
 
   .djcx-album-library-grid,
-  .djcx-album-card-shell,
   .djcx-album-card {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -20678,7 +20690,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   }
 
   .djcx-album-share {
-    width: 100%;
+    right: 12px;
+    top: 12px;
   }
 }
 
