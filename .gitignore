@@ -23,6 +23,15 @@ next-env.d.ts
 # codex work files
 /work/
 /.browser-test/
+/.codex-remote-attachments/
+/backups/
+/outputs/
+*.rar
+
+# old local one-off scripts
+/scripts/apply-playback-earning-progress.mjs
+/scripts/create-production-data-backup.mjs
+/scripts/verify-playback-earning-progress.mjs
 
 # logs
 *.log
