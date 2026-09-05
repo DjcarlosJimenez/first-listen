@@ -119,6 +119,17 @@ function withTrackShareParam(path: string, trackId: string) {
   return `${path}${separator}track=${encodeURIComponent(trackId)}`;
 }
 
+function trackMatchesRhythm(
+  track: DjCarlosTrack,
+  rhythm: string,
+  albums: DjCarlosAlbum[],
+) {
+  if (sameDjCarlosRhythm(track.mood, rhythm)) return true;
+  if (track.section !== "album" || !track.albumId) return false;
+  const album = albums.find((item) => item.id === track.albumId);
+  return album ? sameDjCarlosRhythm(album.mood, rhythm) : false;
+}
+
 async function copyShareText(value: string) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(value);
@@ -343,6 +354,10 @@ export function DjCarlosArtistPage({
     () => tracks.filter((track) => track.section === "official-video"),
     [tracks],
   );
+  const allAlbumTracks = useMemo(
+    () => tracks.filter((track) => track.section === "album"),
+    [tracks],
+  );
   const upcomingRelease = config.upcomingRelease;
   const albumTrackCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -376,14 +391,18 @@ export function DjCarlosArtistPage({
     () => [...albumTracks, ...topTenTracks, ...officialVideos],
     [albumTracks, officialVideos, topTenTracks],
   );
+  const libraryPlayQueue = useMemo(
+    () => [...allAlbumTracks, ...topTenTracks, ...officialVideos],
+    [allAlbumTracks, officialVideos, topTenTracks],
+  );
   const playQueue = useMemo(
     () =>
       selectedRhythm
-        ? basePlayQueue.filter((track) =>
-            sameDjCarlosRhythm(track.mood, selectedRhythm),
+        ? libraryPlayQueue.filter((track) =>
+            trackMatchesRhythm(track, selectedRhythm, albums),
           )
         : basePlayQueue,
-    [basePlayQueue, selectedRhythm],
+    [albums, basePlayQueue, libraryPlayQueue, selectedRhythm],
   );
   const activeTrack = useMemo(() => {
     if (albumPlayerTrack?.id === activeId) return albumPlayerTrack;
@@ -426,28 +445,28 @@ export function DjCarlosArtistPage({
     () =>
       selectedRhythm
         ? albumTracks.filter((track) =>
-            sameDjCarlosRhythm(track.mood, selectedRhythm),
+            trackMatchesRhythm(track, selectedRhythm, albums),
           )
         : albumTracks,
-    [albumTracks, selectedRhythm],
+    [albumTracks, albums, selectedRhythm],
   );
   const visibleTopTenTracks = useMemo(
     () =>
       selectedRhythm
         ? topTenTracks.filter((track) =>
-            sameDjCarlosRhythm(track.mood, selectedRhythm),
+            trackMatchesRhythm(track, selectedRhythm, albums),
           )
         : topTenTracks,
-    [selectedRhythm, topTenTracks],
+    [albums, selectedRhythm, topTenTracks],
   );
   const visibleOfficialVideos = useMemo(
     () =>
       selectedRhythm
         ? officialVideos.filter((track) =>
-            sameDjCarlosRhythm(track.mood, selectedRhythm),
+            trackMatchesRhythm(track, selectedRhythm, albums),
           )
         : officialVideos,
-    [officialVideos, selectedRhythm],
+    [albums, officialVideos, selectedRhythm],
   );
 
   const showShareNotice = useCallback((message: string) => {
@@ -697,15 +716,15 @@ export function DjCarlosArtistPage({
   };
 
   const playFirstTopTen = () => {
-    if (topTenTracks[0]) {
-      playTrack(topTenTracks[0].id);
+    if (visibleTopTenTracks[0]) {
+      playTrack(visibleTopTenTracks[0].id);
       return;
     }
     playAlbum();
   };
 
   const playFirstVideo = () => {
-    if (officialVideos[0]) playTrack(officialVideos[0].id);
+    if (visibleOfficialVideos[0]) playTrack(visibleOfficialVideos[0].id);
   };
 
   const clearRhythmFilter = () => {
@@ -721,7 +740,9 @@ export function DjCarlosArtistPage({
     setSelectedRhythm(rhythm);
 
     const match =
-      basePlayQueue.find((track) => sameDjCarlosRhythm(track.mood, rhythm)) ??
+      libraryPlayQueue.find((track) =>
+        trackMatchesRhythm(track, rhythm, albums),
+      ) ??
       (sameDjCarlosRhythm(album.mood, rhythm) ? albumPlayerTrack : null);
     if (match) playTrack(match.id);
   };

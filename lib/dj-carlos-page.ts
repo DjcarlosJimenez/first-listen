@@ -7,8 +7,13 @@ export const DJ_CARLOS_DEFAULT_RHYTHMS = [
   "Regional mexicano",
   "Romantica",
   "Bachata",
+  "Pop",
+  "Rock",
   "Tribal",
   "Pop Rock",
+  "Reggaeton",
+  "Hip Hop",
+  "Hip Hop Mexicano",
   "Merengue",
   "Chilenas Zapateadas",
   "Video musical",
@@ -706,6 +711,7 @@ export function normalizeDjCarlosPageConfig(
     ? config.rhythms
     : fallback.rhythms;
   const rhythms = mergeDjCarlosRhythms(
+    fallback.rhythms,
     incomingRhythms,
     albums.map((album) => album.mood),
     tracks.map((track) => track.mood),
