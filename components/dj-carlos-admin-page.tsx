@@ -35,14 +35,19 @@ import {
 } from "lucide-react";
 import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import {
+  DJ_CARLOS_DEFAULT_RHYTHM,
   DJ_CARLOS_PAGE_STORAGE_KEY,
   detectDjCarlosPlatform,
   getDjCarlosTrackThumbnail,
   isDjCarlosTrack,
+  isDjCarlosPlaceholderRhythm,
   isPlayableDjCarlosLink,
   labelForDjCarlosTrackSection,
+  mergeDjCarlosRhythms,
   normalizeDjCarlosPageConfig,
+  normalizeDjCarlosRhythm,
   sectionBadge,
+  sameDjCarlosRhythm,
   slugifyDjCarlosAlbumTitle,
   type DjCarlosAlbum,
   type DjCarlosPageConfig,
@@ -71,7 +76,7 @@ type AlbumImportResponse = {
 
 const emptyDraft: TrackDraft = {
   link: "",
-  mood: "Cumbia Sonidera",
+  mood: DJ_CARLOS_DEFAULT_RHYTHM,
   section: "album",
   title: "",
 };
@@ -147,6 +152,7 @@ function newArtistAlbum(index: number, logoUrl: string): DjCarlosAlbum {
     coverUrl: logoUrl,
     description: "Agrega la descripcion de este album.",
     link: "",
+    mood: DJ_CARLOS_DEFAULT_RHYTHM,
     subtitle: "Canciones en el orden oficial del album.",
     title,
   };
@@ -176,6 +182,7 @@ export function DjCarlosAdminPage({
   const [uploadingUpcomingCover, setUploadingUpcomingCover] = useState(false);
   const [importingAlbum, setImportingAlbum] = useState(false);
   const [status, setStatus] = useState("Panel listo para editar.");
+  const [newRhythm, setNewRhythm] = useState("");
   const [sessionExpired, setSessionExpired] = useState(false);
   const hasLocalChangesRef = useRef(false);
 
@@ -298,6 +305,16 @@ export function DjCarlosAdminPage({
     });
     return counts;
   }, [config.tracks]);
+  const rhythmOptions = useMemo(
+    () =>
+      mergeDjCarlosRhythms(
+        config.rhythms,
+        albums.map((album) => album.mood),
+        config.tracks.map((track) => track.mood),
+        [selectedAlbum.mood, draft.mood],
+      ),
+    [albums, config.rhythms, config.tracks, draft.mood, selectedAlbum.mood],
+  );
 
   useEffect(() => {
     if (albums.some((album) => album.id === selectedAlbumId)) return;
@@ -309,6 +326,57 @@ export function DjCarlosAdminPage({
   const selectAlbum = (album: DjCarlosAlbum) => {
     setSelectedAlbumId(album.id);
     setAlbumImportLink(album.link);
+    setDraft((current) => ({
+      ...current,
+      mood: current.section === "album" ? album.mood : current.mood,
+    }));
+  };
+
+  const addRhythm = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const rhythm = newRhythm.trim().replace(/\s+/g, " ");
+    if (!rhythm || isDjCarlosPlaceholderRhythm(rhythm)) {
+      setStatus("Escribe un ritmo valido.");
+      return;
+    }
+    if (rhythmOptions.some((option) => sameDjCarlosRhythm(option, rhythm))) {
+      setStatus("Ese ritmo ya existe.");
+      setNewRhythm("");
+      return;
+    }
+
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      rhythms: mergeDjCarlosRhythms(current.rhythms, [rhythm]),
+    }));
+    setNewRhythm("");
+    setStatus("Ritmo agregado. Ya puedes usarlo en albumes y canciones.");
+  };
+
+  const removeRhythm = (rhythm: string) => {
+    const rhythmInUse =
+      albums.some((album) => sameDjCarlosRhythm(album.mood, rhythm)) ||
+      config.tracks.some((track) => sameDjCarlosRhythm(track.mood, rhythm));
+
+    if (rhythmInUse) {
+      setStatus("Ese ritmo esta en uso. Cambia primero los albumes o canciones que lo usan.");
+      return;
+    }
+
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      rhythms: current.rhythms.filter(
+        (option) => !sameDjCarlosRhythm(option, rhythm),
+      ),
+    }));
+    setDraft((current) =>
+      sameDjCarlosRhythm(current.mood, rhythm)
+        ? { ...current, mood: DJ_CARLOS_DEFAULT_RHYTHM }
+        : current,
+    );
+    setStatus("Ritmo quitado de las opciones.");
   };
 
   const updateAlbum = (
@@ -317,34 +385,63 @@ export function DjCarlosAdminPage({
   ) => {
     hasLocalChangesRef.current = true;
     setConfig((current) => {
+      const nextValue =
+        field === "mood"
+          ? normalizeDjCarlosRhythm(value, selectedAlbum.mood)
+          : value;
       const nextAlbums = albumsForConfig(current).map((album) =>
         album.id === selectedAlbum.id
           ? {
               ...album,
-              [field]: value,
+              [field]: nextValue,
               slug:
                 field === "title" &&
                 (album.slug === slugifyDjCarlosAlbumTitle(album.title) ||
                   album.slug.startsWith("nuevo-album"))
-                  ? slugifyDjCarlosAlbumTitle(value, album.slug)
+                  ? slugifyDjCarlosAlbumTitle(nextValue, album.slug)
                   : album.slug,
             }
           : album,
       );
-      const nextConfig = syncAlbums(current, nextAlbums);
-      if (field !== "title") return nextConfig;
+      const nextConfig = syncAlbums(
+        field === "mood"
+          ? {
+              ...current,
+              rhythms: mergeDjCarlosRhythms(current.rhythms, [nextValue]),
+            }
+          : current,
+        nextAlbums,
+      );
+      if (field !== "title" && field !== "mood") return nextConfig;
       return {
         ...nextConfig,
-        tracks: nextConfig.tracks.map((track) =>
-          track.section === "album" && track.albumId === selectedAlbum.id
-            ? {
-                ...track,
-                release: value,
-                subtitle:
-                  track.subtitle === selectedAlbum.title ? value : track.subtitle,
-              }
-            : track,
-        ),
+        tracks: nextConfig.tracks.map((track) => {
+          if (track.section !== "album" || track.albumId !== selectedAlbum.id) {
+            return track;
+          }
+
+          let nextTrack = track;
+          if (field === "title") {
+            nextTrack = {
+              ...nextTrack,
+              release: nextValue,
+              subtitle:
+                nextTrack.subtitle === selectedAlbum.title
+                  ? nextValue
+                  : nextTrack.subtitle,
+            };
+          }
+
+          if (
+            field === "mood" &&
+            (isDjCarlosPlaceholderRhythm(nextTrack.mood) ||
+              sameDjCarlosRhythm(nextTrack.mood, selectedAlbum.mood))
+          ) {
+            nextTrack = { ...nextTrack, mood: nextValue };
+          }
+
+          return nextTrack;
+        }),
       };
     });
     setStatus("Album actualizado. Toca Guardar cambios para publicarlo.");
@@ -480,48 +577,61 @@ export function DjCarlosAdminPage({
     value: string,
   ) => {
     hasLocalChangesRef.current = true;
-    setConfig((current) => ({
-      ...current,
-      tracks: current.tracks.map((track) => {
-        if (track.id !== trackId) return track;
-        if (field === "section") {
-          const section = value as DjCarlosTrackSection;
-          const thumbnailUrl = getDjCarlosTrackThumbnail(track.link);
+    setConfig((current) => {
+      const nextRhythm =
+        field === "mood" ? normalizeDjCarlosRhythm(value) : null;
+      return {
+        ...current,
+        rhythms: nextRhythm
+          ? mergeDjCarlosRhythms(current.rhythms, [nextRhythm])
+          : current.rhythms,
+        tracks: current.tracks.map((track) => {
+          if (track.id !== trackId) return track;
+          if (field === "section") {
+            const section = value as DjCarlosTrackSection;
+            const thumbnailUrl = getDjCarlosTrackThumbnail(track.link);
+            return {
+              ...track,
+              albumId: section === "album" ? selectedAlbum.id : undefined,
+              badge: sectionBadge(section),
+              coverUrl: thumbnailUrl ?? track.coverUrl,
+              platform:
+                section === "official-video"
+                  ? "YouTube"
+                  : detectDjCarlosPlatform(track.link),
+              release:
+                section === "album" ? selectedAlbum.title : "DJ Carlos Jimenez",
+              section,
+              subtitle:
+                section === "official-video"
+                  ? "Video en YouTube"
+                  : section === "top-ten"
+                    ? "Top Ten de DJ Carlos"
+                    : selectedAlbum.title,
+            };
+          }
+          if (field === "link") {
+            const thumbnailUrl = getDjCarlosTrackThumbnail(value);
+            return {
+              ...track,
+              coverUrl: thumbnailUrl ?? track.coverUrl,
+              link: value,
+              platform: detectDjCarlosPlatform(value),
+            };
+          }
+          if (field === "mood") {
+            return {
+              ...track,
+              mood: nextRhythm ?? track.mood,
+            };
+          }
           return {
             ...track,
-            albumId: section === "album" ? selectedAlbum.id : undefined,
-            badge: sectionBadge(section),
-            coverUrl: thumbnailUrl ?? track.coverUrl,
-            platform:
-              section === "official-video"
-                ? "YouTube"
-                : detectDjCarlosPlatform(track.link),
-            release:
-              section === "album" ? selectedAlbum.title : "DJ Carlos Jimenez",
-            section,
-            subtitle:
-              section === "official-video"
-                ? "Video en YouTube"
-                : section === "top-ten"
-                  ? "Top Ten de DJ Carlos"
-                  : selectedAlbum.title,
+            [field]: value,
           };
-        }
-        if (field === "link") {
-          const thumbnailUrl = getDjCarlosTrackThumbnail(value);
-          return {
-            ...track,
-            coverUrl: thumbnailUrl ?? track.coverUrl,
-            link: value,
-            platform: detectDjCarlosPlatform(value),
-          };
-        }
-        return {
-          ...track,
-          [field]: value,
-        };
-      }),
-    }));
+        }),
+      };
+    });
     setStatus("Cancion actualizada. Toca Guardar cambios para publicarla.");
   };
 
@@ -573,6 +683,10 @@ export function DjCarlosAdminPage({
     }
 
     hasLocalChangesRef.current = true;
+    const trackMood = normalizeDjCarlosRhythm(
+      draft.mood,
+      draft.section === "album" ? selectedAlbum.mood : DJ_CARLOS_DEFAULT_RHYTHM,
+    );
     const track: DjCarlosTrack = {
       albumId: draft.section === "album" ? selectedAlbum.id : undefined,
       artist: "DJ Carlos Jimenez Compositor",
@@ -580,7 +694,7 @@ export function DjCarlosAdminPage({
       coverUrl: getDjCarlosTrackThumbnail(link) ?? logoUrl,
       id: `dj-carlos-local-${Date.now()}`,
       link,
-      mood: draft.mood.trim() || "DJ Carlos",
+      mood: trackMood,
       platform: detectDjCarlosPlatform(link),
       release:
         draft.section === "album" ? selectedAlbum.title : "DJ Carlos Jimenez",
@@ -596,15 +710,17 @@ export function DjCarlosAdminPage({
 
     setConfig((current) => ({
       ...current,
+      rhythms: mergeDjCarlosRhythms(current.rhythms, [trackMood]),
       tracks: [...current.tracks, track],
     }));
-    setDraft(emptyDraft);
+    setDraft({ ...emptyDraft, mood: selectedAlbum.mood || DJ_CARLOS_DEFAULT_RHYTHM });
     setStatus("Cancion agregada. Toca Guardar cambios para publicarla.");
   };
 
   const importAlbumFromLink = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const link = albumImportLink.trim();
+    const albumMood = normalizeDjCarlosRhythm(selectedAlbum.mood);
 
     if (!hasYouTubePlaylistId(link)) {
       setStatus("Pega el link de compartir del album de YouTube Music.");
@@ -621,6 +737,7 @@ export function DjCarlosAdminPage({
         body: JSON.stringify({
           albumId: selectedAlbum.id,
           link,
+          mood: albumMood,
         }),
         cache: "no-store",
         credentials: "same-origin",
@@ -695,6 +812,10 @@ export function DjCarlosAdminPage({
             coverUrl: importedCoverUrl,
             description: importedDescription,
             link,
+            mood:
+              typeof importedAlbum.mood === "string" && importedAlbum.mood.trim()
+                ? normalizeDjCarlosRhythm(importedAlbum.mood, albumMood)
+                : albumMood,
             slug,
             subtitle: importedSubtitle,
             title: nextAlbumTitle,
@@ -709,7 +830,7 @@ export function DjCarlosAdminPage({
             getDjCarlosTrackThumbnail(track.link) ||
             importedCoverUrl,
           id: `dj-carlos-import-${selectedAlbum.id}-${stamp}-${index + 1}`,
-          mood: track.mood || "Album",
+          mood: normalizeDjCarlosRhythm(track.mood, albumMood),
           platform: detectDjCarlosPlatform(track.link),
           release: nextAlbumTitle,
           section: "album" as const,
@@ -726,7 +847,14 @@ export function DjCarlosAdminPage({
             ]
           : current.tracks;
 
-        return syncAlbums({ ...current, tracks }, nextAlbums);
+        return syncAlbums(
+          {
+            ...current,
+            rhythms: mergeDjCarlosRhythms(current.rhythms, [albumMood]),
+            tracks,
+          },
+          nextAlbums,
+        );
       });
       setStatus(
         data.warning ||
@@ -1041,6 +1169,45 @@ export function DjCarlosAdminPage({
         )}
       </div>
 
+      <section className="djcx-admin-panel djcx-admin-rhythms-panel">
+        <div className="djcx-admin-panel-heading">
+          <span>
+            <ListMusic size={15} /> Ritmos de la pagina
+          </span>
+          <strong>Estos botones aparecen cuando tienen musica asignada</strong>
+        </div>
+
+        <form className="djcx-admin-rhythm-add" onSubmit={addRhythm}>
+          <label>
+            Nuevo ritmo
+            <input
+              onChange={(event) => setNewRhythm(event.target.value)}
+              placeholder="Tribal, Pop Rock, Merengue..."
+              value={newRhythm}
+            />
+          </label>
+          <button type="submit">
+            <Plus size={15} />
+            Agregar ritmo
+          </button>
+        </form>
+
+        <div className="djcx-admin-rhythm-list" aria-label="Ritmos disponibles">
+          {rhythmOptions.map((rhythm) => (
+            <span key={rhythm}>
+              {rhythm}
+              <button
+                aria-label={`Quitar ritmo ${rhythm}`}
+                onClick={() => removeRhythm(rhythm)}
+                type="button"
+              >
+                <Trash2 size={13} />
+              </button>
+            </span>
+          ))}
+        </div>
+      </section>
+
       <section className="djcx-admin-panel djcx-admin-albums-panel">
         <div className="djcx-admin-panel-heading">
           <span>
@@ -1078,7 +1245,7 @@ export function DjCarlosAdminPage({
                 <div>
                   <strong>{album.title}</strong>
                   <small>
-                    {albumTrackCounts.get(album.id) ?? 0} canciones
+                    {album.mood} / {albumTrackCounts.get(album.id) ?? 0} canciones
                     {index === 0 ? " / principal" : ""}
                   </small>
                 </div>
@@ -1136,6 +1303,7 @@ export function DjCarlosAdminPage({
           <div>
             <span>{selectedAlbum.badge}</span>
             <h2>{selectedAlbum.title}</h2>
+            <strong className="djcx-admin-preview-rhythm">{selectedAlbum.mood}</strong>
             <p>{selectedAlbum.subtitle}</p>
           </div>
         </article>
@@ -1174,6 +1342,19 @@ export function DjCarlosAdminPage({
                 onChange={(event) => updateAlbum("badge", event.target.value)}
                 value={selectedAlbum.badge}
               />
+            </label>
+            <label>
+              Ritmo principal
+              <select
+                onChange={(event) => updateAlbum("mood", event.target.value)}
+                value={selectedAlbum.mood}
+              >
+                {rhythmOptions.map((rhythm) => (
+                  <option key={rhythm} value={rhythm}>
+                    {rhythm}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="djcx-admin-wide">
               Frase principal
@@ -1236,7 +1417,7 @@ export function DjCarlosAdminPage({
               {importingAlbum ? "Importando..." : "Importar album"}
             </button>
             <small>
-              Reemplaza solo las canciones del album seleccionado. Top Ten y videos no cambian.
+              Reemplaza solo las canciones del album seleccionado y usa su ritmo principal. Top Ten y videos no cambian.
             </small>
           </form>
         </section>
@@ -1424,22 +1605,30 @@ export function DjCarlosAdminPage({
           </label>
           <label>
             Estilo
-            <input
+            <select
               onChange={(event) =>
                 setDraft((current) => ({ ...current, mood: event.target.value }))
               }
               value={draft.mood}
-            />
+            >
+              {rhythmOptions.map((rhythm) => (
+                <option key={rhythm} value={rhythm}>
+                  {rhythm}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Lista
             <select
-              onChange={(event) =>
+              onChange={(event) => {
+                const section = event.target.value as DjCarlosTrackSection;
                 setDraft((current) => ({
                   ...current,
-                  section: event.target.value as DjCarlosTrackSection,
-                }))
-              }
+                  mood: section === "album" ? selectedAlbum.mood : current.mood,
+                  section,
+                }));
+              }}
               value={draft.section}
             >
               <option value="album">Album</option>
@@ -1461,6 +1650,7 @@ export function DjCarlosAdminPage({
         onMoveUp={(trackId) => moveTrack(trackId, -1)}
         onRemove={removeTrack}
         onUpdate={updateTrack}
+        rhythmOptions={rhythmOptions}
         title={`Orden del album: ${selectedAlbum.title}`}
         tracks={albumTracks}
       />
@@ -1471,6 +1661,7 @@ export function DjCarlosAdminPage({
         onMoveUp={(trackId) => moveTrack(trackId, -1)}
         onRemove={removeTrack}
         onUpdate={updateTrack}
+        rhythmOptions={rhythmOptions}
         title="Top Ten"
         tracks={topTenTracks}
       />
@@ -1481,6 +1672,7 @@ export function DjCarlosAdminPage({
         onMoveUp={(trackId) => moveTrack(trackId, -1)}
         onRemove={removeTrack}
         onUpdate={updateTrack}
+        rhythmOptions={rhythmOptions}
         title="Videos oficiales"
         tracks={videoTracks}
       />
@@ -1494,6 +1686,7 @@ function AdminTrackGroup({
   onMoveUp,
   onRemove,
   onUpdate,
+  rhythmOptions,
   title,
   tracks,
 }: {
@@ -1502,6 +1695,7 @@ function AdminTrackGroup({
   onMoveUp: (trackId: string) => void;
   onRemove: (trackId: string) => void;
   onUpdate: (trackId: string, field: EditableTrackField, value: string) => void;
+  rhythmOptions: string[];
   title: string;
   tracks: DjCarlosTrack[];
 }) {
@@ -1538,6 +1732,19 @@ function AdminTrackGroup({
                 onChange={(event) => onUpdate(track.id, "link", event.target.value)}
                 value={track.link}
               />
+            </label>
+            <label>
+              Ritmo
+              <select
+                onChange={(event) => onUpdate(track.id, "mood", event.target.value)}
+                value={track.mood}
+              >
+                {rhythmOptions.map((rhythm) => (
+                  <option key={rhythm} value={rhythm}>
+                    {rhythm}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Lista

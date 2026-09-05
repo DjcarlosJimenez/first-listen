@@ -27,8 +27,10 @@ import {
   detectDjCarlosPlatform,
   isPlayableDjCarlosLink,
   labelForDjCarlosTrackSection,
+  mergeDjCarlosRhythms,
   normalizeDjCarlosPageConfig,
   normalizeDjCarlosUpcomingSignals,
+  sameDjCarlosRhythm,
   type DjCarlosAlbum,
   type DjCarlosPageConfig,
   type DjCarlosTrack,
@@ -228,6 +230,7 @@ export function DjCarlosArtistPage({
   const [snapshot, setSnapshot] = useState<ProviderTelemetrySnapshot | null>(null);
   const [usingLocalDraft, setUsingLocalDraft] = useState(false);
   const [showTopTenList, setShowTopTenList] = useState(false);
+  const [selectedRhythm, setSelectedRhythm] = useState("");
   const [followingUpcoming, setFollowingUpcoming] = useState(false);
   const [selectedUpcomingReactions, setSelectedUpcomingReactions] = useState<
     DjCarlosUpcomingReactionKey[]
@@ -361,7 +364,7 @@ export function DjCarlosArtistPage({
       coverUrl: album.coverUrl || logoUrl,
       id: "dj-carlos-album-main-link",
       link: album.link,
-      mood: "Album",
+      mood: album.mood,
       platform: detectDjCarlosPlatform(album.link),
       release: album.title,
       section: "album",
@@ -369,9 +372,18 @@ export function DjCarlosArtistPage({
       title: album.title,
     };
   }, [album, logoUrl]);
-  const playQueue = useMemo(
+  const basePlayQueue = useMemo(
     () => [...albumTracks, ...topTenTracks, ...officialVideos],
     [albumTracks, officialVideos, topTenTracks],
+  );
+  const playQueue = useMemo(
+    () =>
+      selectedRhythm
+        ? basePlayQueue.filter((track) =>
+            sameDjCarlosRhythm(track.mood, selectedRhythm),
+          )
+        : basePlayQueue,
+    [basePlayQueue, selectedRhythm],
   );
   const activeTrack = useMemo(() => {
     if (albumPlayerTrack?.id === activeId) return albumPlayerTrack;
@@ -383,12 +395,60 @@ export function DjCarlosArtistPage({
     );
   }, [activeId, albumPlayerTrack, playQueue, tracks]);
   const moodFilters = useMemo(() => {
-    const moods = tracks
-      .map((track) => track.mood)
-      .filter(Boolean)
-      .filter((mood, index, all) => all.indexOf(mood) === index);
-    return moods.slice(0, 5);
-  }, [tracks]);
+    const usedRhythms = mergeDjCarlosRhythms(
+      albums.map((item) => item.mood),
+      tracks.map((track) => track.mood),
+    );
+    return mergeDjCarlosRhythms(
+      config.rhythms.filter((rhythm) =>
+        usedRhythms.some((used) => sameDjCarlosRhythm(used, rhythm)),
+      ),
+      usedRhythms,
+    );
+  }, [albums, config.rhythms, tracks]);
+  const visibleAlbums = useMemo(
+    () =>
+      selectedRhythm
+        ? albums.filter(
+            (item) =>
+              sameDjCarlosRhythm(item.mood, selectedRhythm) ||
+              tracks.some(
+                (track) =>
+                  track.section === "album" &&
+                  track.albumId === item.id &&
+                  sameDjCarlosRhythm(track.mood, selectedRhythm),
+              ),
+          )
+        : albums,
+    [albums, selectedRhythm, tracks],
+  );
+  const visibleAlbumTracks = useMemo(
+    () =>
+      selectedRhythm
+        ? albumTracks.filter((track) =>
+            sameDjCarlosRhythm(track.mood, selectedRhythm),
+          )
+        : albumTracks,
+    [albumTracks, selectedRhythm],
+  );
+  const visibleTopTenTracks = useMemo(
+    () =>
+      selectedRhythm
+        ? topTenTracks.filter((track) =>
+            sameDjCarlosRhythm(track.mood, selectedRhythm),
+          )
+        : topTenTracks,
+    [selectedRhythm, topTenTracks],
+  );
+  const visibleOfficialVideos = useMemo(
+    () =>
+      selectedRhythm
+        ? officialVideos.filter((track) =>
+            sameDjCarlosRhythm(track.mood, selectedRhythm),
+          )
+        : officialVideos,
+    [officialVideos, selectedRhythm],
+  );
 
   const showShareNotice = useCallback((message: string) => {
     setShareNotice(message);
@@ -648,6 +708,24 @@ export function DjCarlosArtistPage({
     if (officialVideos[0]) playTrack(officialVideos[0].id);
   };
 
+  const clearRhythmFilter = () => {
+    setSelectedRhythm("");
+  };
+
+  const selectRhythm = (rhythm: string) => {
+    if (selectedRhythm && sameDjCarlosRhythm(selectedRhythm, rhythm)) {
+      setSelectedRhythm("");
+      return;
+    }
+
+    setSelectedRhythm(rhythm);
+
+    const match =
+      basePlayQueue.find((track) => sameDjCarlosRhythm(track.mood, rhythm)) ??
+      (sameDjCarlosRhythm(album.mood, rhythm) ? albumPlayerTrack : null);
+    if (match) playTrack(match.id);
+  };
+
   const recordUpcomingFollow = async () => {
     if (followingUpcoming || !upcomingRelease.enabled) return;
     setFollowingUpcoming(true);
@@ -869,13 +947,28 @@ export function DjCarlosArtistPage({
       <section className="djcx-taste-bar" aria-label="Explorar por gusto">
         <span>Que quieres escuchar?</span>
         <div>
+          <button
+            aria-pressed={!selectedRhythm}
+            className={!selectedRhythm ? "is-active" : ""}
+            onClick={clearRhythmFilter}
+            type="button"
+          >
+            Todos
+          </button>
           {moodFilters.map((mood) => (
             <button
+              aria-pressed={
+                selectedRhythm
+                  ? sameDjCarlosRhythm(selectedRhythm, mood)
+                  : false
+              }
+              className={
+                selectedRhythm && sameDjCarlosRhythm(selectedRhythm, mood)
+                  ? "is-active"
+                  : ""
+              }
               key={mood}
-              onClick={() => {
-                const match = tracks.find((track) => track.mood === mood);
-                if (match) playTrack(match.id);
-              }}
+              onClick={() => selectRhythm(mood)}
               type="button"
             >
               {mood}
@@ -950,7 +1043,7 @@ export function DjCarlosArtistPage({
       {!isAlbumDetail && (
         <AlbumLibrary
           activeAlbumId={album.id}
-          albums={albums}
+          albums={visibleAlbums}
           onShareAlbum={(targetAlbum) => void shareAlbum(targetAlbum)}
           serverAlbumSlugs={serverAlbumSlugs}
           trackCounts={albumTrackCounts}
@@ -966,7 +1059,7 @@ export function DjCarlosArtistPage({
           onPlayTrack={playTrack}
           onShareOriginalTrack={(track) => void shareOriginalTrack(track)}
           onShareTrack={(track) => void shareTrack(track)}
-          tracks={albumTracks}
+          tracks={visibleAlbumTracks}
         />
       )}
 
@@ -976,7 +1069,7 @@ export function DjCarlosArtistPage({
           onPlayTrack={playTrack}
           onShareOriginalTrack={(track) => void shareOriginalTrack(track)}
           onShareTrack={(track) => void shareTrack(track)}
-          tracks={officialVideos}
+          tracks={visibleOfficialVideos}
         />
       )}
 
@@ -987,7 +1080,7 @@ export function DjCarlosArtistPage({
         onShareOriginalTrack={(track) => void shareOriginalTrack(track)}
         onShareTrack={(track) => void shareTrack(track)}
         onToggle={() => setShowTopTenList((current) => !current)}
-        tracks={topTenTracks}
+        tracks={visibleTopTenTracks}
       />
 
       {isAlbumDetail && (
@@ -996,7 +1089,7 @@ export function DjCarlosArtistPage({
           onPlayTrack={playTrack}
           onShareOriginalTrack={(track) => void shareOriginalTrack(track)}
           onShareTrack={(track) => void shareTrack(track)}
-          tracks={officialVideos}
+          tracks={visibleOfficialVideos}
         />
       )}
 
@@ -1162,7 +1255,7 @@ function AlbumLibrary({
                 <div>
                   <span>{album.badge}</span>
                   <strong>{album.title}</strong>
-                  <small>{trackCounts.get(album.id) ?? 0} canciones</small>
+                  <small>{album.mood} / {trackCounts.get(album.id) ?? 0} canciones</small>
                 </div>
                 <em>
                   Abrir album <ExternalLink size={13} />
@@ -1180,6 +1273,9 @@ function AlbumLibrary({
             </article>
           );
         })}
+        {!albums.length && (
+          <p className="djcx-empty">No hay albumes con este ritmo todavia.</p>
+        )}
       </div>
     </section>
   );
@@ -1304,6 +1400,9 @@ function VideosSection({
             </div>
           </article>
         ))}
+        {!tracks.length && (
+          <p className="djcx-empty">No hay videos con este ritmo todavia.</p>
+        )}
       </div>
     </section>
   );
@@ -1362,7 +1461,7 @@ function TopTenSection({
           <small>
             {featuredTrack
               ? `Empieza con ${featuredTrack.title} o abre la lista completa.`
-              : "Agrega canciones al Top Ten desde el panel."}
+              : "No hay canciones en esta seleccion todavia."}
           </small>
         </div>
         <div className="djcx-top-ten-actions">
@@ -1438,6 +1537,9 @@ function TrackSection({
             track={track}
           />
         ))}
+        {!tracks.length && (
+          <p className="djcx-empty">No hay canciones con este ritmo todavia.</p>
+        )}
       </div>
     </section>
   );
@@ -1478,7 +1580,7 @@ function TrackRow({
       <div className="djcx-track-copy">
         <strong>{track.title}</strong>
         <small>
-          {labelForDjCarlosTrackSection(track.section)} / {track.subtitle}
+          {labelForDjCarlosTrackSection(track.section)} / {track.subtitle} / {track.mood}
         </small>
       </div>
       <span className="djcx-track-badge">{track.badge}</span>

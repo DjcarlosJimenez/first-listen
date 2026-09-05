@@ -19861,6 +19861,12 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   padding: 9px 11px;
 }
 
+.djcx-taste-bar button.is-active {
+  background: linear-gradient(180deg, #ffd95e, #f6c84f);
+  border-color: rgba(255, 237, 164, 0.82);
+  color: #10100e;
+}
+
 .djcx-feature-grid {
   display: grid;
   gap: 16px;
@@ -19999,6 +20005,18 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   display: block;
   font-size: 12px;
   margin-top: 5px;
+}
+
+.djcx-empty {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px dashed rgba(246, 200, 79, 0.22);
+  border-radius: 8px;
+  color: var(--djcx-muted);
+  font-size: 13px;
+  font-weight: 850;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 16px;
 }
 
 .djcx-album-card em {
@@ -20623,6 +20641,23 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     padding: 14px;
   }
 
+  .djcx-taste-bar div {
+    flex-wrap: nowrap;
+    margin-inline: -14px;
+    overflow-x: auto;
+    padding: 0 14px 3px;
+    scrollbar-width: none;
+  }
+
+  .djcx-taste-bar div::-webkit-scrollbar {
+    display: none;
+  }
+
+  .djcx-taste-bar button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
   .djcx-feature-grid,
   .djcx-list-section {
     padding-left: 14px;
@@ -20870,6 +20905,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .djcx-admin-panel-heading button,
 .djcx-admin-import button,
 .djcx-admin-add button,
+.djcx-admin-rhythm-add button,
+.djcx-admin-rhythm-list button,
 .djcx-admin-track-row button {
   align-items: center;
   background: linear-gradient(180deg, #ffd95e, #f6c84f);
@@ -21089,6 +21126,14 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   margin: 9px 0;
 }
 
+.djcx-admin-preview-rhythm {
+  color: var(--djcx-gold-strong);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
 .djcx-admin-preview p {
   color: var(--djcx-muted);
   font-size: 13px;
@@ -21208,6 +21253,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .djcx-admin-form-grid,
 .djcx-admin-import,
+.djcx-admin-rhythm-add,
 .djcx-admin-add {
   display: grid;
   gap: 12px;
@@ -21220,6 +21266,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .djcx-admin-form-grid label,
 .djcx-admin-import label,
+.djcx-admin-rhythm-add label,
 .djcx-admin-add label,
 .djcx-admin-track-row label {
   color: var(--djcx-muted);
@@ -21232,8 +21279,10 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .djcx-admin-form-grid input,
+.djcx-admin-form-grid select,
 .djcx-admin-form-grid textarea,
 .djcx-admin-import input,
+.djcx-admin-rhythm-add input,
 .djcx-admin-add input,
 .djcx-admin-add select,
 .djcx-admin-track-row input,
@@ -21251,6 +21300,45 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .djcx-admin-form-grid textarea {
   resize: vertical;
+}
+
+.djcx-admin-rhythms-panel {
+  margin-top: 16px;
+}
+
+.djcx-admin-rhythm-add {
+  align-items: end;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.djcx-admin-rhythm-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.djcx-admin-rhythm-list span {
+  align-items: center;
+  background: rgba(246, 200, 79, 0.1);
+  border: 1px solid rgba(246, 200, 79, 0.24);
+  border-radius: 8px;
+  color: var(--djcx-cream);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 7px;
+  min-height: 34px;
+  padding: 5px 6px 5px 10px;
+}
+
+.djcx-admin-rhythm-list button {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  min-height: 26px;
+  padding: 0;
+  width: 26px;
 }
 
 .djcx-admin-import {
@@ -21463,7 +21551,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   border-radius: 8px;
   display: grid;
   gap: 10px;
-  grid-template-columns: 38px 38px minmax(130px, 0.95fr) minmax(180px, 1.35fr) 160px auto auto;
+  grid-template-columns: 38px 38px minmax(130px, 0.9fr) minmax(180px, 1.25fr) minmax(120px, 0.7fr) 160px auto auto;
   padding: 10px;
 }
 
@@ -21677,6 +21765,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .djcx-admin-track-row,
   .djcx-admin-add,
   .djcx-admin-import,
+  .djcx-admin-rhythm-add,
   .djcx-admin-album-list,
   .djcx-admin-upcoming-signals {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -21703,6 +21792,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .djcx-admin-form-grid,
   .djcx-admin-add,
   .djcx-admin-import,
+  .djcx-admin-rhythm-add,
   .djcx-admin-album-list,
   .djcx-admin-upcoming-layout,
   .djcx-admin-upcoming-signals,

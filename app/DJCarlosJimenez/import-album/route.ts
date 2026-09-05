@@ -4,8 +4,10 @@ import {
   hasDjCarlosAdminSession,
 } from "@/lib/dj-carlos-admin-auth";
 import {
+  DJ_CARLOS_DEFAULT_RHYTHM,
   detectDjCarlosPlatform,
   getDjCarlosTrackThumbnail,
+  normalizeDjCarlosRhythm,
   slugifyDjCarlosAlbumTitle,
   type DjCarlosTrack,
 } from "@/lib/dj-carlos-page";
@@ -15,6 +17,7 @@ type ImportedAlbum = {
   coverUrl: string;
   description: string;
   link: string;
+  mood: string;
   slug: string;
   subtitle: string;
   title: string;
@@ -184,16 +187,19 @@ function videoIdForItem(item: Record<string, unknown>, playlistId: string) {
 function importedAlbumTracks({
   albumId,
   albumTitle,
+  albumMood,
   entries,
   playlistId,
 }: {
   albumId: string;
   albumTitle: string;
+  albumMood: string;
   entries: unknown[];
   playlistId: string;
 }) {
   const seenVideoIds = new Set<string>();
   const safeAlbumId = slugifyDjCarlosAlbumTitle(albumId, "album");
+  const mood = normalizeDjCarlosRhythm(albumMood);
 
   return collectMusicItems(entries)
     .map((item) => {
@@ -212,7 +218,7 @@ function importedAlbumTracks({
         coverUrl: getDjCarlosTrackThumbnail(link) ?? "",
         id: `dj-carlos-import-${safeAlbumId}-${videoId}`,
         link,
-        mood: "Album",
+        mood,
         platform: detectDjCarlosPlatform(link),
         release: albumTitle,
         section: "album",
@@ -225,7 +231,11 @@ function importedAlbumTracks({
     .filter((track): track is DjCarlosTrack => Boolean(track));
 }
 
-async function fetchYouTubeMusicAlbum(rawLink: string, albumId: string) {
+async function fetchYouTubeMusicAlbum(
+  rawLink: string,
+  albumId: string,
+  albumMood = DJ_CARLOS_DEFAULT_RHYTHM,
+) {
   const playlistId = getPlaylistId(rawLink);
   if (!playlistId) {
     throw new Error("Pega un link de album o playlist de YouTube Music.");
@@ -258,6 +268,7 @@ async function fetchYouTubeMusicAlbum(rawLink: string, albumId: string) {
   const tracks = importedAlbumTracks({
     albumId,
     albumTitle,
+    albumMood,
     entries,
     playlistId,
   });
@@ -269,6 +280,7 @@ async function fetchYouTubeMusicAlbum(rawLink: string, albumId: string) {
       description ||
       `Album importado desde YouTube Music con ${tracks.length} canciones.`,
     link: rawLink.trim(),
+    mood: normalizeDjCarlosRhythm(albumMood),
     slug: slugifyDjCarlosAlbumTitle(albumTitle),
     subtitle: tracks.length
       ? `${tracks.length} canciones importadas desde YouTube Music.`
@@ -304,6 +316,9 @@ export async function POST(request: NextRequest) {
   const albumId = isRecord(body) && typeof body.albumId === "string"
     ? body.albumId.trim()
     : "album";
+  const albumMood = isRecord(body) && typeof body.mood === "string"
+    ? body.mood.trim()
+    : DJ_CARLOS_DEFAULT_RHYTHM;
 
   if (!link) {
     return NextResponse.json(
@@ -313,7 +328,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    return NextResponse.json(await fetchYouTubeMusicAlbum(link, albumId));
+    return NextResponse.json(
+      await fetchYouTubeMusicAlbum(link, albumId, albumMood),
+    );
   } catch (error) {
     return NextResponse.json(
       {

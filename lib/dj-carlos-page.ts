@@ -1,6 +1,18 @@
 export const DJ_CARLOS_LOGO_URL = "/artist/dj-carlos-jimenez/logo.png";
 export const DJ_CARLOS_PAGE_STORAGE_KEY =
   "first-listen:dj-carlos-jimenez-page-v2";
+export const DJ_CARLOS_DEFAULT_RHYTHM = "Cumbia Sonidera";
+export const DJ_CARLOS_DEFAULT_RHYTHMS = [
+  DJ_CARLOS_DEFAULT_RHYTHM,
+  "Regional mexicano",
+  "Romantica",
+  "Bachata",
+  "Tribal",
+  "Pop Rock",
+  "Merengue",
+  "Chilenas Zapateadas",
+  "Video musical",
+] as const;
 
 export type DjCarlosTrackSection = "album" | "top-ten" | "official-video";
 export type DjCarlosPlayablePlatform = "YouTube" | "YouTube Music";
@@ -27,6 +39,7 @@ export type DjCarlosAlbum = {
   coverUrl: string;
   description: string;
   link: string;
+  mood: string;
   subtitle: string;
   title: string;
 };
@@ -52,6 +65,7 @@ export type DjCarlosUpcomingRelease = {
 export type DjCarlosPageConfig = {
   album: DjCarlosAlbum;
   albums: DjCarlosAlbum[];
+  rhythms: string[];
   tracks: DjCarlosTrack[];
   upcomingRelease: DjCarlosUpcomingRelease;
   updatedAt: string;
@@ -66,6 +80,72 @@ type DefaultSongSeed = {
   title: string;
 };
 
+const DJ_CARLOS_PLACEHOLDER_RHYTHMS = new Set(["", "album", "dj carlos"]);
+
+export function djCarlosRhythmKey(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+export function isDjCarlosPlaceholderRhythm(value: unknown) {
+  if (typeof value !== "string") return true;
+  return DJ_CARLOS_PLACEHOLDER_RHYTHMS.has(djCarlosRhythmKey(value));
+}
+
+export function normalizeDjCarlosRhythm(
+  value: unknown,
+  fallback = DJ_CARLOS_DEFAULT_RHYTHM,
+) {
+  const fallbackText =
+    typeof fallback === "string" && fallback.trim()
+      ? fallback.trim().replace(/\s+/g, " ")
+      : DJ_CARLOS_DEFAULT_RHYTHM;
+  const safeFallback = isDjCarlosPlaceholderRhythm(fallbackText)
+    ? DJ_CARLOS_DEFAULT_RHYTHM
+    : fallbackText;
+
+  if (typeof value !== "string") return safeFallback;
+
+  const text = value.trim().replace(/\s+/g, " ");
+  return isDjCarlosPlaceholderRhythm(text) ? safeFallback : text;
+}
+
+export function sameDjCarlosRhythm(left: string, right: string) {
+  return djCarlosRhythmKey(left) === djCarlosRhythmKey(right);
+}
+
+export function uniqueDjCarlosRhythms(
+  values: readonly unknown[],
+  fallback: readonly string[] = [],
+) {
+  const rhythms: string[] = [];
+  const keys = new Set<string>();
+
+  values.forEach((value) => {
+    if (isDjCarlosPlaceholderRhythm(value)) return;
+    const rhythm = normalizeDjCarlosRhythm(value);
+    const key = djCarlosRhythmKey(rhythm);
+    if (keys.has(key)) return;
+    keys.add(key);
+    rhythms.push(rhythm);
+  });
+
+  if (rhythms.length) return rhythms;
+  return fallback.map((rhythm) => normalizeDjCarlosRhythm(rhythm));
+}
+
+export function mergeDjCarlosRhythms(...groups: Array<readonly unknown[]>) {
+  const values: unknown[] = [];
+  groups.forEach((group) => {
+    group.forEach((value) => values.push(value));
+  });
+  return uniqueDjCarlosRhythms(values, DJ_CARLOS_DEFAULT_RHYTHMS);
+}
+
 export const defaultDjCarlosAlbum: DjCarlosAlbum = {
   id: "sonidero-2027",
   slug: "sonidero-2027",
@@ -74,6 +154,7 @@ export const defaultDjCarlosAlbum: DjCarlosAlbum = {
   description:
     "Cumbia sonidera con identidad de DJ, compositor y pista: una entrada directa para que el publico llegue a reproducir sin friccion.",
   link: "https://music.youtube.com/watch?v=EUUVIce6lO0",
+  mood: DJ_CARLOS_DEFAULT_RHYTHM,
   subtitle:
     "Reproductor arriba, album en orden y videos oficiales en una pagina propia.",
   title: "SONIDERO 2027",
@@ -134,7 +215,7 @@ function fallbackTrack({
   coverUrl,
   id,
   link,
-  mood = "Cumbia Sonidera",
+  mood = DJ_CARLOS_DEFAULT_RHYTHM,
   platform = "YouTube",
   release = "Destacadas por First Listen",
   section = "top-ten",
@@ -310,6 +391,7 @@ export const defaultDjCarlosTracks: DjCarlosTrack[] = [
 export const defaultDjCarlosPageConfig: DjCarlosPageConfig = {
   album: defaultDjCarlosAlbum,
   albums: [defaultDjCarlosAlbum],
+  rhythms: [...DJ_CARLOS_DEFAULT_RHYTHMS],
   tracks: defaultDjCarlosTracks,
   upcomingRelease: {
     badge: "Exclusivo aqui",
@@ -439,6 +521,7 @@ function cleanAlbum(value: unknown, fallback: DjCarlosAlbum): DjCarlosAlbum {
       typeof album.link === "string"
         ? album.link.trim()
         : fallback.link,
+    mood: normalizeDjCarlosRhythm(album.mood, fallback.mood),
     subtitle:
       typeof album.subtitle === "string" && album.subtitle.trim()
         ? album.subtitle.trim()
@@ -579,12 +662,16 @@ function cleanTrack(
   track: DjCarlosTrack,
   fallbackCoverUrl: string,
   albumId?: string,
+  fallbackMood = DJ_CARLOS_DEFAULT_RHYTHM,
 ): DjCarlosTrack {
   const thumbnailUrl = getDjCarlosTrackThumbnail(track.link);
+  const sectionFallbackMood =
+    track.section === "official-video" ? "Video musical" : fallbackMood;
   return {
     ...track,
     albumId: track.section === "album" ? albumId : undefined,
     coverUrl: thumbnailUrl ?? cleanDjCarlosImageUrl(track.coverUrl, fallbackCoverUrl),
+    mood: normalizeDjCarlosRhythm(track.mood, sectionFallbackMood),
     platform:
       track.section === "official-video"
         ? "YouTube"
@@ -613,12 +700,21 @@ export function normalizeDjCarlosPageConfig(
       ? requestedAlbumId
       : primaryAlbum.id;
     const album = albums.find((item) => item.id === albumId) ?? primaryAlbum;
-    return cleanTrack(track, album.coverUrl, albumId);
+    return cleanTrack(track, album.coverUrl, albumId, album.mood);
   });
+  const incomingRhythms = Array.isArray(config.rhythms)
+    ? config.rhythms
+    : fallback.rhythms;
+  const rhythms = mergeDjCarlosRhythms(
+    incomingRhythms,
+    albums.map((album) => album.mood),
+    tracks.map((track) => track.mood),
+  );
 
   return {
     album: primaryAlbum,
     albums,
+    rhythms,
     tracks: tracks.length ? tracks : fallback.tracks,
     upcomingRelease: cleanUpcomingRelease(
       config.upcomingRelease,
