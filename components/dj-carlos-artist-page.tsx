@@ -2,16 +2,18 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
   Disc3,
   ExternalLink,
   Heart,
+  Link2,
   ListMusic,
   MessageCircle,
   Pause,
   Play,
+  Share2,
   SkipBack,
   SkipForward,
   Smartphone,
@@ -48,6 +50,13 @@ const UPCOMING_REACTIONS: {
   { key: "video", label: "Quiero video" },
   { key: "favorite", label: "Mi favorita" },
 ];
+
+type DjCarlosShareTarget = {
+  notice: string;
+  text: string;
+  title: string;
+  url: string;
+};
 
 function playbackLabel(snapshot: ProviderTelemetrySnapshot | null) {
   if (!snapshot) return "LISTO";
@@ -91,6 +100,44 @@ function firstTrackIdForAlbum(config: DjCarlosPageConfig, albumSlug?: string) {
     config.tracks[0]?.id ??
     ""
   );
+}
+
+function absoluteShareUrl(url: string) {
+  if (/^https?:\/\//i.test(url)) return url;
+  if (typeof window === "undefined") return url;
+  return new URL(url, window.location.origin).toString();
+}
+
+function albumSharePath(album: DjCarlosAlbum) {
+  return `/DJCarlosJimenez/album/${album.slug}`;
+}
+
+function withTrackShareParam(path: string, trackId: string) {
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}track=${encodeURIComponent(trackId)}`;
+}
+
+async function copyShareText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return true;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.left = "-9999px";
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  document.body.append(textarea);
+  textarea.focus();
+  textarea.select();
+
+  try {
+    return document.execCommand("copy");
+  } finally {
+    textarea.remove();
+  }
 }
 
 function updateUpcomingSignals(
@@ -165,6 +212,10 @@ export function DjCarlosArtistPage({
 }) {
   const requestPlaybackRef = useRef<(() => void) | null>(null);
   const lastAutoAdvanceKeyRef = useRef<string | null>(null);
+  const lastTelemetryStateRef =
+    useRef<ProviderTelemetrySnapshot["playbackState"]>("loading");
+  const deepLinkTrackAppliedRef = useRef<string | null>(null);
+  const shareNoticeTimerRef = useRef<number | null>(null);
   const [config, setConfig] = useState(() =>
     normalizeDjCarlosPageConfig(initialConfig),
   );
@@ -181,6 +232,7 @@ export function DjCarlosArtistPage({
   const [selectedUpcomingReactions, setSelectedUpcomingReactions] = useState<
     DjCarlosUpcomingReactionKey[]
   >([]);
+  const [shareNotice, setShareNotice] = useState("");
 
   useEffect(() => {
     const loadLocalConfig = () => {
@@ -338,10 +390,165 @@ export function DjCarlosArtistPage({
     return moods.slice(0, 5);
   }, [tracks]);
 
+  const showShareNotice = useCallback((message: string) => {
+    setShareNotice(message);
+    if (shareNoticeTimerRef.current !== null) {
+      window.clearTimeout(shareNoticeTimerRef.current);
+    }
+    shareNoticeTimerRef.current = window.setTimeout(() => {
+      setShareNotice("");
+      shareNoticeTimerRef.current = null;
+    }, 2600);
+  }, []);
+
+  const shareTarget = useCallback(
+    async ({ notice, text, title, url }: DjCarlosShareTarget) => {
+      const finalUrl = absoluteShareUrl(url);
+
+      try {
+        if (navigator.share) {
+          await navigator.share({ text, title, url: finalUrl });
+        } else {
+          const copied = await copyShareText(finalUrl);
+          if (!copied) throw new Error("copy failed");
+        }
+        showShareNotice(notice);
+      } catch (error) {
+        const errorName =
+          error && typeof error === "object" && "name" in error
+            ? String(error.name)
+            : "";
+        if (errorName === "AbortError") {
+          return;
+        }
+        showShareNotice("No se pudo compartir. Intenta otra vez.");
+      }
+    },
+    [showShareNotice],
+  );
+
+  const pageSharePath = isAlbumDetail ? albumSharePath(album) : "/DJCarlosJimenez";
+
+  const sharePage = () =>
+    shareTarget({
+      notice: isAlbumDetail ? "Link del album listo." : "Link de la pagina listo.",
+      text: isAlbumDetail
+        ? `Escucha ${album.title} de DJ Carlos Jimenez.`
+        : "Escucha la pagina oficial de DJ Carlos Jimenez.",
+      title: isAlbumDetail
+        ? `${album.title} | DJ Carlos Jimenez`
+        : "DJ Carlos Jimenez",
+      url: pageSharePath,
+    });
+
+  const shareAlbum = (targetAlbum: DjCarlosAlbum) =>
+    shareTarget({
+      notice: "Link del album listo.",
+      text: `Escucha ${targetAlbum.title} de DJ Carlos Jimenez.`,
+      title: `${targetAlbum.title} | DJ Carlos Jimenez`,
+      url: albumSharePath(targetAlbum),
+    });
+
+  const shareOriginalAlbum = (targetAlbum: DjCarlosAlbum) =>
+    shareTarget({
+      notice: "Link original del album listo.",
+      text: `Escucha ${targetAlbum.title} en la plataforma original.`,
+      title: targetAlbum.title,
+      url: targetAlbum.link || albumSharePath(targetAlbum),
+    });
+
+  const trackSharePath = (track: DjCarlosTrack) => {
+    const trackAlbum = track.albumId
+      ? albums.find((item) => item.id === track.albumId)
+      : null;
+    const basePath =
+      trackAlbum && track.section === "album"
+        ? albumSharePath(trackAlbum)
+        : "/DJCarlosJimenez";
+    return withTrackShareParam(basePath, track.id);
+  };
+
+  const shareTrack = (track: DjCarlosTrack) =>
+    shareTarget({
+      notice: "Link de la cancion listo.",
+      text: `Escucha ${track.title} de DJ Carlos Jimenez.`,
+      title: `${track.title} | DJ Carlos Jimenez`,
+      url: trackSharePath(track),
+    });
+
+  const shareOriginalTrack = (track: DjCarlosTrack) =>
+    shareTarget({
+      notice: "Link original listo.",
+      text: `Escucha ${track.title} en ${track.platform}.`,
+      title: track.title,
+      url: track.link,
+    });
+
+  const shareActiveTrack = () => {
+    if (!activeTrack) return Promise.resolve();
+    if (activeTrack.id === albumPlayerTrack?.id) return shareAlbum(album);
+    return shareTrack(activeTrack);
+  };
+
+  const handlePlayerTelemetry = useCallback((nextSnapshot: ProviderTelemetrySnapshot) => {
+    const previousState = lastTelemetryStateRef.current;
+    setSnapshot(nextSnapshot);
+
+    if (
+      nextSnapshot.playbackState === "paused" &&
+      previousState === "playing"
+    ) {
+      setAutoPlayEnabled(false);
+      setPlayerPausedByUser(true);
+    }
+
+    if (nextSnapshot.playbackState === "playing") {
+      setPlayerPausedByUser(false);
+    }
+
+    lastTelemetryStateRef.current = nextSnapshot.playbackState;
+  }, []);
+
   useEffect(() => {
     if (activeTrack || !playQueue[0]) return;
     setActiveId(playQueue[0].id);
   }, [activeTrack, playQueue]);
+
+  useEffect(() => {
+    return () => {
+      if (shareNoticeTimerRef.current !== null) {
+        window.clearTimeout(shareNoticeTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const requestedTrackId = new URLSearchParams(window.location.search).get(
+        "track",
+      );
+      if (
+        !requestedTrackId ||
+        deepLinkTrackAppliedRef.current === requestedTrackId
+      ) {
+        return;
+      }
+      const hasTrack =
+        tracks.some((track) => track.id === requestedTrackId) ||
+        albumPlayerTrack?.id === requestedTrackId;
+      if (!hasTrack) return;
+
+      deepLinkTrackAppliedRef.current = requestedTrackId;
+      lastTelemetryStateRef.current = "loading";
+      setSnapshot(null);
+      setAutoPlayEnabled(true);
+      setPlayerPausedByUser(false);
+      setActiveId(requestedTrackId);
+      setPlayerVersion((version) => version + 1);
+    } catch {
+      // Deep links are optional; the page still plays the normal queue.
+    }
+  }, [albumPlayerTrack?.id, tracks]);
 
   useEffect(() => {
     if (
@@ -379,6 +586,7 @@ export function DjCarlosArtistPage({
   ]);
 
   const playTrack = (trackId: string) => {
+    lastTelemetryStateRef.current = "loading";
     setSnapshot(null);
     setAutoPlayEnabled(true);
     setPlayerPausedByUser(false);
@@ -403,7 +611,6 @@ export function DjCarlosArtistPage({
       channel: PLAYER_CHANNEL,
       source: "user-click",
     });
-    setPlayerVersion((version) => version + 1);
   };
 
   const pauseCurrent = () => {
@@ -419,7 +626,6 @@ export function DjCarlosArtistPage({
       channel: PLAYER_CHANNEL,
       source: "user-click",
     });
-    setPlayerVersion((version) => version + 1);
   };
 
   const jumpTrack = (direction: 1 | -1) => {
@@ -538,17 +744,23 @@ export function DjCarlosArtistPage({
             </div>
           </div>
 
-          <div className="djcx-player-frame">
-            {activeTrack && !playerPausedByUser && (
+          <div
+            className={
+              playerPausedByUser
+                ? "djcx-player-frame is-paused"
+                : "djcx-player-frame"
+            }
+          >
+            {activeTrack && (
               <ProviderPlayer
                 artist={activeTrack.artist}
-                autoPlay={autoPlayEnabled}
+                autoPlay={autoPlayEnabled && !playerPausedByUser}
                 controlChannel={PLAYER_CHANNEL}
                 coverUrl={activeTrack.coverUrl}
                 key={`${activeTrack.id}-${playerVersion}`}
                 link={activeTrack.link}
                 locale="es"
-                onTelemetry={setSnapshot}
+                onTelemetry={handlePlayerTelemetry}
                 onTrustedPlaybackRequestReady={(requestPlayback) => {
                   requestPlaybackRef.current = requestPlayback;
                 }}
@@ -593,6 +805,15 @@ export function DjCarlosArtistPage({
               <SkipForward size={17} />
             </button>
             {activeTrack && (
+              <button
+                aria-label="Compartir cancion activa"
+                onClick={() => void shareActiveTrack()}
+                type="button"
+              >
+                <Share2 size={16} />
+              </button>
+            )}
+            {activeTrack && (
               <a
                 aria-label="Abrir en la plataforma"
                 href={activeTrack.link}
@@ -603,6 +824,11 @@ export function DjCarlosArtistPage({
               </a>
             )}
           </div>
+          {shareNotice && (
+            <div className="djcx-share-notice" role="status">
+              {shareNotice}
+            </div>
+          )}
         </div>
       </section>
 
@@ -621,6 +847,10 @@ export function DjCarlosArtistPage({
             <button onClick={playFirstVideo} type="button">
               <Video size={17} />
               Videos oficiales
+            </button>
+            <button onClick={() => void sharePage()} type="button">
+              <Share2 size={17} />
+              {isAlbumDetail ? "Compartir album" : "Compartir pagina"}
             </button>
           </div>
         </div>
@@ -661,10 +891,25 @@ export function DjCarlosArtistPage({
             <span>{album.badge}</span>
             <h2>{album.title}</h2>
             <p>{album.description}</p>
-            <button onClick={playAlbum} type="button">
-              <Play fill="currentColor" size={16} />
-              Empezar por el album
-            </button>
+            <div className="djcx-panel-actions">
+              <button onClick={playAlbum} type="button">
+                <Play fill="currentColor" size={16} />
+                Empezar por el album
+              </button>
+              <button onClick={() => void shareAlbum(album)} type="button">
+                <Share2 size={16} />
+                Compartir album
+              </button>
+              {album.link && (
+                <button
+                  onClick={() => void shareOriginalAlbum(album)}
+                  type="button"
+                >
+                  <Link2 size={16} />
+                  Link original
+                </button>
+              )}
+            </div>
           </div>
         </article>
 
@@ -701,6 +946,7 @@ export function DjCarlosArtistPage({
         <AlbumLibrary
           activeAlbumId={album.id}
           albums={albums}
+          onShareAlbum={(targetAlbum) => void shareAlbum(targetAlbum)}
           serverAlbumSlugs={serverAlbumSlugs}
           trackCounts={albumTrackCounts}
           usingLocalDraft={usingLocalDraft}
@@ -713,6 +959,8 @@ export function DjCarlosArtistPage({
           kicker="Canciones del album"
           onPlayAll={playAlbum}
           onPlayTrack={playTrack}
+          onShareOriginalTrack={(track) => void shareOriginalTrack(track)}
+          onShareTrack={(track) => void shareTrack(track)}
           tracks={albumTracks}
         />
       )}
@@ -721,6 +969,8 @@ export function DjCarlosArtistPage({
         <VideosSection
           onPlayFirstVideo={playFirstVideo}
           onPlayTrack={playTrack}
+          onShareOriginalTrack={(track) => void shareOriginalTrack(track)}
+          onShareTrack={(track) => void shareTrack(track)}
           tracks={officialVideos}
         />
       )}
@@ -729,6 +979,8 @@ export function DjCarlosArtistPage({
         expanded={showTopTenList}
         onPlayAll={playFirstTopTen}
         onPlayTrack={playTrack}
+        onShareOriginalTrack={(track) => void shareOriginalTrack(track)}
+        onShareTrack={(track) => void shareTrack(track)}
         onToggle={() => setShowTopTenList((current) => !current)}
         tracks={topTenTracks}
       />
@@ -737,6 +989,8 @@ export function DjCarlosArtistPage({
         <VideosSection
           onPlayFirstVideo={playFirstVideo}
           onPlayTrack={playTrack}
+          onShareOriginalTrack={(track) => void shareOriginalTrack(track)}
+          onShareTrack={(track) => void shareTrack(track)}
           tracks={officialVideos}
         />
       )}
@@ -856,12 +1110,14 @@ function UpcomingReleaseCard({
 function AlbumLibrary({
   activeAlbumId,
   albums,
+  onShareAlbum,
   serverAlbumSlugs,
   trackCounts,
   usingLocalDraft,
 }: {
   activeAlbumId: string;
   albums: DjCarlosAlbum[];
+  onShareAlbum: (album: DjCarlosAlbum) => void;
   serverAlbumSlugs: Set<string>;
   trackCounts: Map<string, number>;
   usingLocalDraft: boolean;
@@ -878,31 +1134,44 @@ function AlbumLibrary({
       </div>
 
       <div className="djcx-album-library-grid">
-        {albums.map((album) => (
-          <Link
-            className={
-              album.id === activeAlbumId
-                ? "djcx-album-card is-active"
-                : "djcx-album-card"
-            }
-            href={
-              usingLocalDraft && !serverAlbumSlugs.has(album.slug)
-                ? `/DJCarlosJimenez/album/${album.slug}?localPreview=1`
-                : `/DJCarlosJimenez/album/${album.slug}`
-            }
-            key={album.id}
-          >
-            <AlbumCase album={album} compact />
-            <div>
-              <span>{album.badge}</span>
-              <strong>{album.title}</strong>
-              <small>{trackCounts.get(album.id) ?? 0} canciones</small>
-            </div>
-            <em>
-              Abrir album <ExternalLink size={13} />
-            </em>
-          </Link>
-        ))}
+        {albums.map((album) => {
+          const href =
+            usingLocalDraft && !serverAlbumSlugs.has(album.slug)
+              ? `/DJCarlosJimenez/album/${album.slug}?localPreview=1`
+              : `/DJCarlosJimenez/album/${album.slug}`;
+
+          return (
+            <article className="djcx-album-card-shell" key={album.id}>
+              <Link
+                className={
+                  album.id === activeAlbumId
+                    ? "djcx-album-card is-active"
+                    : "djcx-album-card"
+                }
+                href={href}
+              >
+                <AlbumCase album={album} compact />
+                <div>
+                  <span>{album.badge}</span>
+                  <strong>{album.title}</strong>
+                  <small>{trackCounts.get(album.id) ?? 0} canciones</small>
+                </div>
+                <em>
+                  Abrir album <ExternalLink size={13} />
+                </em>
+              </Link>
+              <button
+                aria-label={`Compartir album ${album.title}`}
+                className="djcx-album-share"
+                onClick={() => onShareAlbum(album)}
+                type="button"
+              >
+                <Share2 size={15} />
+                Compartir
+              </button>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -961,10 +1230,14 @@ function ArtistInstallPanel({ logoUrl }: { logoUrl: string }) {
 function VideosSection({
   onPlayFirstVideo,
   onPlayTrack,
+  onShareOriginalTrack,
+  onShareTrack,
   tracks,
 }: {
   onPlayFirstVideo: () => void;
   onPlayTrack: (trackId: string) => void;
+  onShareOriginalTrack: (track: DjCarlosTrack) => void;
+  onShareTrack: (track: DjCarlosTrack) => void;
   tracks: DjCarlosTrack[];
 }) {
   return (
@@ -984,25 +1257,36 @@ function VideosSection({
 
       <div className="djcx-video-grid">
         {tracks.map((track) => (
-          <button
-            className="djcx-video-card"
-            key={track.id}
-            onClick={() => onPlayTrack(track.id)}
-            type="button"
-          >
-            <span>
-              <Image
-                alt={`${track.title} cover`}
-                fill
-                sizes="(max-width: 700px) 92vw, 320px"
-                src={track.coverUrl}
-                unoptimized
-              />
-              <Play fill="currentColor" size={20} />
-            </span>
-            <strong>{track.title}</strong>
-            <small>{track.subtitle}</small>
-          </button>
+          <article className="djcx-video-card" key={track.id}>
+            <button
+              className="djcx-video-card-main"
+              onClick={() => onPlayTrack(track.id)}
+              type="button"
+            >
+              <span>
+                <Image
+                  alt={`${track.title} cover`}
+                  fill
+                  sizes="(max-width: 700px) 92vw, 320px"
+                  src={track.coverUrl}
+                  unoptimized
+                />
+                <Play fill="currentColor" size={20} />
+              </span>
+              <strong>{track.title}</strong>
+              <small>{track.subtitle}</small>
+            </button>
+            <div className="djcx-video-actions">
+              <button onClick={() => onShareTrack(track)} type="button">
+                <Share2 size={14} />
+                Compartir
+              </button>
+              <button onClick={() => onShareOriginalTrack(track)} type="button">
+                <Link2 size={14} />
+                Original
+              </button>
+            </div>
+          </article>
         ))}
       </div>
     </section>
@@ -1013,12 +1297,16 @@ function TopTenSection({
   expanded,
   onPlayAll,
   onPlayTrack,
+  onShareOriginalTrack,
+  onShareTrack,
   onToggle,
   tracks,
 }: {
   expanded: boolean;
   onPlayAll: () => void;
   onPlayTrack: (trackId: string) => void;
+  onShareOriginalTrack: (track: DjCarlosTrack) => void;
+  onShareTrack: (track: DjCarlosTrack) => void;
   onToggle: () => void;
   tracks: DjCarlosTrack[];
 }) {
@@ -1080,6 +1368,8 @@ function TopTenSection({
               index={index + 1}
               key={track.id}
               onPlay={() => onPlayTrack(track.id)}
+              onShare={() => onShareTrack(track)}
+              onShareOriginal={() => onShareOriginalTrack(track)}
               track={track}
             />
           ))}
@@ -1094,12 +1384,16 @@ function TrackSection({
   kicker,
   onPlayAll,
   onPlayTrack,
+  onShareOriginalTrack,
+  onShareTrack,
   tracks,
 }: {
   heading: string;
   kicker: string;
   onPlayAll: () => void;
   onPlayTrack: (trackId: string) => void;
+  onShareOriginalTrack: (track: DjCarlosTrack) => void;
+  onShareTrack: (track: DjCarlosTrack) => void;
   tracks: DjCarlosTrack[];
 }) {
   return (
@@ -1123,6 +1417,8 @@ function TrackSection({
             index={index + 1}
             key={track.id}
             onPlay={() => onPlayTrack(track.id)}
+            onShare={() => onShareTrack(track)}
+            onShareOriginal={() => onShareOriginalTrack(track)}
             track={track}
           />
         ))}
@@ -1134,10 +1430,14 @@ function TrackSection({
 function TrackRow({
   index,
   onPlay,
+  onShare,
+  onShareOriginal,
   track,
 }: {
   index: number;
   onPlay: () => void;
+  onShare: () => void;
+  onShareOriginal: () => void;
   track: DjCarlosTrack;
 }) {
   return (
@@ -1166,6 +1466,26 @@ function TrackRow({
         </small>
       </div>
       <span className="djcx-track-badge">{track.badge}</span>
+      <div className="djcx-track-tools">
+        <button
+          aria-label={`Compartir ${track.title} desde la pagina DJ Carlos`}
+          onClick={onShare}
+          title="Compartir desde la pagina"
+          type="button"
+        >
+          <Share2 size={14} />
+          <span>Compartir</span>
+        </button>
+        <button
+          aria-label={`Compartir link original de ${track.title}`}
+          onClick={onShareOriginal}
+          title="Compartir link original"
+          type="button"
+        >
+          <Link2 size={14} />
+          <span>Original</span>
+        </button>
+      </div>
     </article>
   );
 }

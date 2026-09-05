@@ -739,6 +739,13 @@ export function ProviderPlayer({
       nextVolume: number | null,
       supported: boolean,
     ) => {
+      const previousState = previousPlaybackStateRef.current;
+      if (nextState === "paused" && previousState === "playing") {
+        manualPauseRef.current = true;
+        clearAutoplayRetryTimers();
+        setShowAutoplayFallback(false);
+      }
+
       if (manualPauseRef.current && nextState === "playing") {
         try {
           youtubePlayerRef.current?.pauseVideo();
@@ -885,6 +892,10 @@ export function ProviderPlayer({
   }, [onLifecycleDebug]);
 
   useEffect(() => {
+    clearAutoplayRetryTimers();
+    manualPauseRef.current = false;
+    previousPlaybackStateRef.current = "loading";
+
     const previous = previousPlaybackTargetRef.current;
     const keepExistingYouTubePlayer =
       Boolean(youtubePlayerRef.current) &&
@@ -915,7 +926,7 @@ export function ProviderPlayer({
     setInitializationAttempt(1);
     setShowAutoplayFallback(false);
     setYoutubeFrameSrc(null);
-  }, [link, platform]);
+  }, [clearAutoplayRetryTimers, link, platform]);
 
   useEffect(() => {
     if (!embed || embed.telemetry !== "youtube_iframe_api") {
