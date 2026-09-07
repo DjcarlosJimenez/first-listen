@@ -884,7 +884,6 @@ export function DjCarlosArtistPage({
                 autoPlay={autoPlayEnabled && !playerPausedByUser}
                 controlChannel={PLAYER_CHANNEL}
                 coverUrl={activeTrack.coverUrl}
-                key={`${activeTrack.id}-${playerVersion}`}
                 link={activeTrack.link}
                 locale="es"
                 onTelemetry={handlePlayerTelemetry}
@@ -892,6 +891,7 @@ export function DjCarlosArtistPage({
                   requestPlaybackRef.current = requestPlayback;
                 }}
                 platform={activeTrack.platform}
+                preserveAutoPlayOnProviderPause
                 songLoadedAt={new Date().toISOString()}
                 title={activeTrack.title}
               />

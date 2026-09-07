@@ -369,6 +369,7 @@ export function ProviderPlayer({
   onTrustedPlaybackRequestReady,
   autoPlay = false,
   controlChannel,
+  preserveAutoPlayOnProviderPause = false,
   skipExternalRedirectWarning = false,
   onExternalRedirectPreferenceChange,
 }: {
@@ -385,6 +386,7 @@ export function ProviderPlayer({
   onTrustedPlaybackRequestReady?: (requestPlayback: (() => void) | null) => void;
   autoPlay?: boolean;
   controlChannel?: string;
+  preserveAutoPlayOnProviderPause?: boolean;
   skipExternalRedirectWarning?: boolean;
   onExternalRedirectPreferenceChange?: (disabled: boolean) => void;
 }) {
@@ -740,7 +742,11 @@ export function ProviderPlayer({
       supported: boolean,
     ) => {
       const previousState = previousPlaybackStateRef.current;
-      if (nextState === "paused" && previousState === "playing") {
+      if (
+        nextState === "paused" &&
+        previousState === "playing" &&
+        !preserveAutoPlayOnProviderPause
+      ) {
         manualPauseRef.current = true;
         clearAutoplayRetryTimers();
         setShowAutoplayFallback(false);
@@ -795,7 +801,12 @@ export function ProviderPlayer({
         lastInteractionAt: lastInteractionAtRef.current,
       });
     },
-    [clearAutoplayRetryTimers, normalizeTelemetrySnapshot, playbackInstanceId],
+    [
+      clearAutoplayRetryTimers,
+      normalizeTelemetrySnapshot,
+      playbackInstanceId,
+      preserveAutoPlayOnProviderPause,
+    ],
   );
 
   const readYouTubeTelemetry = useCallback(
