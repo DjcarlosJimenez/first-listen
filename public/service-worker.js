@@ -1,11 +1,15 @@
-const CACHE_VERSION = "first-listen-pwa-v8-spotify-metadata";
+const CACHE_VERSION = "first-listen-pwa-v9-dj-carlos-install";
 const OFFLINE_URL = "/offline";
 const APP_SHELL = [
   OFFLINE_URL,
   "/manifest.webmanifest",
+  "/DJCarlosJimenez/manifest.webmanifest",
   "/icons/first-listen-180x180.png",
   "/icons/first-listen-192x192.png",
   "/icons/first-listen-512x512.png",
+  "/artist/dj-carlos-jimenez/icon-192.png",
+  "/artist/dj-carlos-jimenez/icon-512.png",
+  "/artist/dj-carlos-jimenez/logo.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -64,7 +68,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.pathname.startsWith("/icons/") || url.pathname === "/manifest.webmanifest") {
+  if (
+    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/artist/dj-carlos-jimenez/") ||
+    url.pathname === "/manifest.webmanifest" ||
+    url.pathname === "/DJCarlosJimenez/manifest.webmanifest"
+  ) {
     event.respondWith(
       caches.match(request).then((cached) => {
         const network = fetch(request)

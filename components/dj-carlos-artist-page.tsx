@@ -52,6 +52,7 @@ const UPCOMING_REACTIONS: {
   { key: "video", label: "Quiero video" },
   { key: "favorite", label: "Mi favorita" },
 ];
+const AUTO_ADVANCE_COMPLETION_MARGIN_SECONDS = 1.5;
 
 type DjCarlosShareTarget = {
   notice: string;
@@ -227,6 +228,8 @@ export function DjCarlosArtistPage({
   const lastAutoAdvanceKeyRef = useRef<string | null>(null);
   const lastTelemetryStateRef =
     useRef<ProviderTelemetrySnapshot["playbackState"]>("loading");
+  const autoPlayEnabledRef = useRef(true);
+  const playerPausedByUserRef = useRef(false);
   const deepLinkTrackAppliedRef = useRef<string | null>(null);
   const shareNoticeTimerRef = useRef<number | null>(null);
   const [config, setConfig] = useState(() =>
@@ -571,22 +574,45 @@ export function DjCarlosArtistPage({
 
   const handlePlayerTelemetry = useCallback((nextSnapshot: ProviderTelemetrySnapshot) => {
     const previousState = lastTelemetryStateRef.current;
-    setSnapshot(nextSnapshot);
+    let normalizedSnapshot = nextSnapshot;
 
     if (
       nextSnapshot.playbackState === "paused" &&
       previousState === "playing"
     ) {
-      setAutoPlayEnabled(false);
-      setPlayerPausedByUser(true);
+      const pausedAtEnd =
+        nextSnapshot.duration > 0 &&
+        nextSnapshot.currentTime >=
+          Math.max(0, nextSnapshot.duration - AUTO_ADVANCE_COMPLETION_MARGIN_SECONDS);
+
+      if (autoPlayEnabledRef.current && !playerPausedByUserRef.current && pausedAtEnd) {
+        normalizedSnapshot = {
+          ...nextSnapshot,
+          currentTime: nextSnapshot.duration,
+          playbackState: "completed",
+        };
+      } else {
+        setAutoPlayEnabled(false);
+        setPlayerPausedByUser(true);
+      }
     }
 
-    if (nextSnapshot.playbackState === "playing") {
+    setSnapshot(normalizedSnapshot);
+
+    if (normalizedSnapshot.playbackState === "playing") {
       setPlayerPausedByUser(false);
     }
 
-    lastTelemetryStateRef.current = nextSnapshot.playbackState;
+    lastTelemetryStateRef.current = normalizedSnapshot.playbackState;
   }, []);
+
+  useEffect(() => {
+    autoPlayEnabledRef.current = autoPlayEnabled;
+  }, [autoPlayEnabled]);
+
+  useEffect(() => {
+    playerPausedByUserRef.current = playerPausedByUser;
+  }, [playerPausedByUser]);
 
   useEffect(() => {
     if (activeTrack || !playQueue[0]) return;
@@ -647,6 +673,7 @@ export function DjCarlosArtistPage({
     lastAutoAdvanceKeyRef.current = completionKey;
 
     const advanceTimer = window.setTimeout(() => {
+      lastTelemetryStateRef.current = "loading";
       setSnapshot(null);
       setAutoPlayEnabled(true);
       setPlayerPausedByUser(false);
@@ -665,6 +692,7 @@ export function DjCarlosArtistPage({
   ]);
 
   const playTrack = (trackId: string) => {
+    lastAutoAdvanceKeyRef.current = null;
     lastTelemetryStateRef.current = "loading";
     setSnapshot(null);
     setAutoPlayEnabled(true);
@@ -674,11 +702,11 @@ export function DjCarlosArtistPage({
   };
 
   const playAlbum = () => {
-    if (albumPlayerTrack) {
-      playTrack(albumPlayerTrack.id);
+    if (albumTracks[0]) {
+      playTrack(albumTracks[0].id);
       return;
     }
-    if (albumTracks[0]) playTrack(albumTracks[0].id);
+    if (albumPlayerTrack) playTrack(albumPlayerTrack.id);
   };
 
   const playCurrent = () => {

@@ -504,13 +504,13 @@ export function PwaInstallButton({
 function PwaInstallPrompt({ visible }: { visible: boolean }) {
   const {
     dismissInstructions,
-    hideInstructionsForSession,
     installed,
     installing,
     iosSafari,
     nativePromptAvailable,
     requestInstall,
   } = usePwaInstall();
+  const [manualHelpVisible, setManualHelpVisible] = useState(false);
   const locale = useInterfaceLocale();
   const pathname = usePathname();
   const spanish = locale === "es" || isDjCarlosPath(pathname);
@@ -523,7 +523,7 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
       void requestInstall();
       return;
     }
-    hideInstructionsForSession();
+    setManualHelpVisible(true);
   };
 
   return (
@@ -543,6 +543,17 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
           <span>{brand.iosInstruction}</span>
         ) : (
           <span>{brand.manualInstruction}</span>
+        )}
+        {!nativePromptAvailable && manualHelpVisible && (
+          <span>
+            {spanish
+              ? iosSafari
+                ? "No se puede abrir el menu automaticamente en iPhone. Usa Compartir y Agregar a inicio."
+                : "Si el navegador no abre la instalacion, usa el menu del navegador y elige Instalar app o Agregar a pantalla de inicio."
+              : iosSafari
+                ? "The iPhone menu cannot be opened automatically. Use Share, then Add to Home Screen."
+                : "If the browser does not open installation, use the browser menu and choose Install app or Add to Home screen."}
+          </span>
         )}
       </div>
       <div className="pwa-install-actions">

@@ -50,9 +50,11 @@ export function getProviderEmbed(
     if (isExternalPlatform(platform)) return null;
 
     if (platform === "YouTube" || platform === "YouTube Music") {
-      const playlistId =
-        detection.resourceType === "playlist" ? detection.resourceId : null;
       const videoId = youtubeVideoId(url);
+      const playlistId =
+        !videoId && detection.resourceType === "playlist"
+          ? detection.resourceId
+          : null;
       if (
         (!videoId || !/^[A-Za-z0-9_-]{6,}$/.test(videoId)) &&
         (!playlistId || !/^[A-Za-z0-9_-]{6,}$/.test(playlistId))
