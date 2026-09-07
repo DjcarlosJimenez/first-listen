@@ -22,8 +22,12 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 type PwaInstallContextValue = {
+  androidDevice: boolean;
+  inAppBrowser: boolean;
+  installPromptChecked: boolean;
   installed: boolean;
   installing: boolean;
+  iosDevice: boolean;
   iosSafari: boolean;
   nativePromptAvailable: boolean;
   refreshing: boolean;
@@ -138,18 +142,47 @@ function isStandaloneMode() {
   );
 }
 
-function isIosSafari() {
+function isIosDevice() {
   if (typeof window === "undefined") return false;
   const userAgent = window.navigator.userAgent;
   const platform = window.navigator.platform;
   const touchPoints = window.navigator.maxTouchPoints;
-  const isiOS =
+  return (
     /iPad|iPhone|iPod/.test(userAgent) ||
-    (platform === "MacIntel" && touchPoints > 1);
+    (platform === "MacIntel" && touchPoints > 1)
+  );
+}
+
+function isAndroidDevice() {
+  if (typeof window === "undefined") return false;
+  return /Android/i.test(window.navigator.userAgent);
+}
+
+function isLikelyInAppBrowser() {
+  if (typeof window === "undefined") return false;
+  return /FBAN|FBAV|Instagram|Line\/|TikTok|Twitter|LinkedInApp|WhatsApp/i.test(
+    window.navigator.userAgent,
+  );
+}
+
+function isIosSafari() {
+  if (typeof window === "undefined") return false;
+  const userAgent = window.navigator.userAgent;
   const isSafari =
     /Safari/.test(userAgent) &&
     !/CriOS|FxiOS|EdgiOS|OPiOS/.test(userAgent);
-  return isiOS && isSafari;
+  return isIosDevice() && isSafari;
+}
+
+function canRegisterServiceWorkerHere() {
+  if (typeof window === "undefined") return false;
+  const { hostname, protocol } = window.location;
+  return (
+    protocol === "https:" ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]"
+  );
 }
 
 function recentlyDismissed(key = DISMISS_KEY) {
@@ -192,6 +225,10 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [promptEvent, setPromptEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
+  const [installPromptChecked, setInstallPromptChecked] = useState(false);
+  const [androidDevice, setAndroidDevice] = useState(false);
+  const [inAppBrowser, setInAppBrowser] = useState(false);
+  const [iosDevice, setIosDevice] = useState(false);
   const [visible, setVisible] = useState(false);
   const [iosSafari, setIosSafari] = useState(false);
   const [installed, setInstalled] = useState(false);
@@ -259,12 +296,17 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
 
     setInstalled(standalone);
     document.documentElement.dataset.pwaStandalone = String(standalone);
+    setAndroidDevice(isAndroidDevice());
+    setInAppBrowser(isLikelyInAppBrowser());
+    setIosDevice(isIosDevice());
     setIosSafari(isIosSafari());
+    const installCheckTimer = window.setTimeout(() => {
+      setInstallPromptChecked(true);
+    }, 3000);
 
     if (
       serviceWorkerSupported &&
-      (window.location.protocol === "https:" ||
-        window.location.hostname === "localhost")
+      canRegisterServiceWorkerHere()
     ) {
       const register = () => {
         navigator.serviceWorker
@@ -284,6 +326,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       setPromptEvent(event as BeforeInstallPromptEvent);
+      setInstallPromptChecked(true);
     };
     const onInstalled = () => {
       setInstalled(true);
@@ -317,6 +360,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(installCheckTimer);
       clearUpdateReminder();
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
@@ -388,6 +432,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const requestInstall = useCallback(async () => {
     if (installed) return;
     if (!promptEvent) {
+      setInstallPromptChecked(true);
       setVisible(true);
       return;
     }
@@ -407,8 +452,12 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<PwaInstallContextValue>(
     () => ({
+      androidDevice,
+      inAppBrowser,
+      installPromptChecked,
       installed,
       installing,
+      iosDevice,
       iosSafari,
       nativePromptAvailable: Boolean(promptEvent),
       refreshing,
@@ -420,11 +469,15 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       refreshApp,
     }),
     [
+      androidDevice,
       dismissInstructions,
       dismissUpdate,
       hideInstructionsForSession,
+      inAppBrowser,
+      installPromptChecked,
       installed,
       installing,
+      iosDevice,
       iosSafari,
       promptEvent,
       refreshApp,
@@ -466,17 +519,34 @@ export function PwaInstallButton({
   locale?: InterfaceLocale;
   onAfterRequest?: () => void;
 }) {
-  const { installed, installing, nativePromptAvailable, requestInstall } =
+  const {
+    installed,
+    installPromptChecked,
+    installing,
+    nativePromptAvailable,
+    requestInstall,
+  } =
     usePwaInstall();
   const pathname = usePathname();
   if (installed) return null;
 
   const spanish = locale === "es" || isDjCarlosPath(pathname);
-  const buttonLabel = label ?? (spanish ? "Instalar First Listen" : "Install First Listen");
+  const manualInstallMode = installPromptChecked && !nativePromptAvailable;
+  const baseLabel = label ?? (spanish ? "Instalar First Listen" : "Install First Listen");
+  const buttonLabel =
+    manualInstallMode
+      ? spanish
+        ? "Ver pasos"
+        : "How to install"
+      : baseLabel;
   const hint = nativePromptAvailable
     ? spanish
       ? "Abrir instalación de la app"
       : "Open app install prompt"
+    : manualInstallMode
+      ? spanish
+        ? "Ver pasos para instalar este acceso directo"
+        : "Show steps to install this shortcut"
     : spanish
       ? "Mostrar instrucciones para instalar"
       : "Show install instructions";
@@ -495,7 +565,13 @@ export function PwaInstallButton({
     >
       <Smartphone size={compact ? 15 : 16} />
       {!iconOnly && (
-        <span>{installing ? (spanish ? "Instalando..." : "Installing...") : buttonLabel}</span>
+        <span>
+          {installing
+            ? spanish
+              ? "Instalando..."
+              : "Installing..."
+            : buttonLabel}
+        </span>
       )}
     </button>
   );
@@ -503,9 +579,14 @@ export function PwaInstallButton({
 
 function PwaInstallPrompt({ visible }: { visible: boolean }) {
   const {
+    androidDevice,
     dismissInstructions,
+    hideInstructionsForSession,
+    inAppBrowser,
+    installPromptChecked,
     installed,
     installing,
+    iosDevice,
     iosSafari,
     nativePromptAvailable,
     requestInstall,
@@ -515,6 +596,7 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
   const pathname = usePathname();
   const spanish = locale === "es" || isDjCarlosPath(pathname);
   const brand = installPromptBrandFor(pathname, spanish);
+  const manualInstallMode = installPromptChecked && !nativePromptAvailable;
 
   if (installed || !visible) return null;
 
@@ -523,8 +605,45 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
       void requestInstall();
       return;
     }
+    if (manualInstallMode && manualHelpVisible) {
+      hideInstructionsForSession();
+      return;
+    }
+    if (!manualInstallMode) {
+      void requestInstall();
+    }
     setManualHelpVisible(true);
   };
+
+  const manualSteps = (() => {
+    if (!spanish) {
+      if (inAppBrowser) {
+        return "Open this page in Safari, Chrome, or Edge. In-app browsers usually cannot install shortcuts.";
+      }
+      if (iosSafari) return "Tap Share, then Add to Home Screen.";
+      if (iosDevice) return "Open this page in Safari, then tap Share and Add to Home Screen.";
+      if (androidDevice) return "Open the browser menu and choose Install app or Add to Home screen.";
+      return "Use the install icon in the browser address bar, or open the browser menu and choose Install app.";
+    }
+    if (inAppBrowser) {
+      return "Abre esta pagina en Safari, Chrome o Edge. Los navegadores internos normalmente no permiten instalar accesos directos.";
+    }
+    if (iosSafari) return "Toca Compartir y luego Agregar a pantalla de inicio.";
+    if (iosDevice) {
+      return "Abre esta pagina en Safari. Luego toca Compartir y Agregar a pantalla de inicio.";
+    }
+    if (androidDevice) {
+      return "Abre el menu del navegador y elige Instalar app o Agregar a pantalla de inicio.";
+    }
+    return "Usa el icono de instalar en la barra del navegador, o abre el menu del navegador y elige Instalar app.";
+  })();
+
+  const primaryLabel = (() => {
+    if (installing) return spanish ? "Instalando..." : "Installing...";
+    if (nativePromptAvailable) return spanish ? "Instalar" : "Install";
+    if (manualInstallMode && manualHelpVisible) return spanish ? "Entendido" : "Got it";
+    return spanish ? "Ver pasos" : "Show steps";
+  })();
 
   return (
     <aside className={brand.cardClassName} aria-live="polite">
@@ -539,6 +658,8 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
         <strong>{brand.title}</strong>
         {nativePromptAvailable ? (
           <span>{brand.nativeInstruction}</span>
+        ) : manualInstallMode ? (
+          <span>{manualSteps}</span>
         ) : iosSafari ? (
           <span>{brand.iosInstruction}</span>
         ) : (
@@ -549,10 +670,10 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
             {spanish
               ? iosSafari
                 ? "No se puede abrir el menu automaticamente en iPhone. Usa Compartir y Agregar a inicio."
-                : "Si el navegador no abre la instalacion, usa el menu del navegador y elige Instalar app o Agregar a pantalla de inicio."
+                : "Si no aparece el boton Instalar, el navegador no dio permiso para abrirlo automaticamente."
               : iosSafari
                 ? "The iPhone menu cannot be opened automatically. Use Share, then Add to Home Screen."
-                : "If the browser does not open installation, use the browser menu and choose Install app or Add to Home screen."}
+                : "If the Install button does not appear, this browser did not allow opening it automatically."}
           </span>
         )}
       </div>
@@ -564,7 +685,7 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
           type="button"
         >
           <Download size={14} />{" "}
-          {installing ? (spanish ? "Instalando..." : "Installing...") : spanish ? "Instalar" : "Install"}
+          {primaryLabel}
         </button>
         <button
           className="pwa-install-secondary"
