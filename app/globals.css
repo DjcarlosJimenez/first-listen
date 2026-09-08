@@ -267,6 +267,11 @@
   padding: 14px;
 }
 
+.pwa-install-card > div:nth-child(2),
+.pwa-update-card > div:nth-child(2) {
+  min-width: 0;
+}
+
 .pwa-update-card {
   z-index: 82;
   width: min(540px, calc(100vw - 36px));
@@ -304,6 +309,7 @@
   color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.45;
+  max-width: 42ch;
 }
 
 .pwa-install-card svg,
@@ -446,6 +452,7 @@ html[data-pwa-standalone="true"] body {
     align-items: center;
     border-radius: 18px;
     gap: 8px;
+    grid-template-columns: auto minmax(0, 1fr);
     padding: 10px;
   }
 
@@ -462,10 +469,12 @@ html[data-pwa-standalone="true"] body {
   .pwa-install-card span {
     font-size: 0.76rem;
     line-height: 1.25;
+    max-width: none;
   }
 
   .pwa-install-actions {
     gap: 6px;
+    grid-column: 1 / -1;
   }
 
   .pwa-install-actions button {

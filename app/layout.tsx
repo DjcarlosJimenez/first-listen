@@ -10,6 +10,19 @@ import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 import "./unified.css";
 
+const installPromptCaptureScript = `
+(function () {
+  if (window.__firstListenInstallPromptCaptureReady) return;
+  window.__firstListenInstallPromptCaptureReady = true;
+  window.__firstListenInstallPromptEvent = null;
+  window.addEventListener("beforeinstallprompt", function (event) {
+    event.preventDefault();
+    window.__firstListenInstallPromptEvent = event;
+    window.dispatchEvent(new Event("first-listen:install-prompt-captured"));
+  });
+})();
+`;
+
 export const metadata: Metadata = {
   title: "First Listen - Real Listeners. Real Viewers. Real Reactions.",
   description:
@@ -87,6 +100,9 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: installPromptCaptureScript }} />
+      </head>
       <body>
         <PwaInstallProvider>
           <PlatformRuntime initialState={initialState} />

@@ -21,6 +21,13 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
+declare global {
+  interface Window {
+    __firstListenInstallPromptCaptureReady?: boolean;
+    __firstListenInstallPromptEvent?: BeforeInstallPromptEvent | null;
+  }
+}
+
 type PwaInstallContextValue = {
   androidDevice: boolean;
   inAppBrowser: boolean;
@@ -51,6 +58,7 @@ const ARTIST_INSTALL_INSTRUCTION_DELAY_MS = 2500;
 const UPDATE_REMINDER_MS = 10 * 60 * 1000;
 const DJ_CARLOS_PATH_PREFIX = "/DJCarlosJimenez";
 const DJ_CARLOS_ICON_URL = "/artist/dj-carlos-jimenez/icon-192.png";
+const INSTALL_PROMPT_CAPTURED_EVENT = "first-listen:install-prompt-captured";
 
 type InstallPromptBrand = {
   actionLabel: string;
@@ -323,15 +331,26 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       else window.addEventListener("load", register, { once: true });
     }
 
-    const onBeforeInstallPrompt = (event: Event) => {
+    const storeInstallPrompt = (event: BeforeInstallPromptEvent) => {
       event.preventDefault();
-      setPromptEvent(event as BeforeInstallPromptEvent);
+      window.__firstListenInstallPromptEvent = event;
+      setPromptEvent(event);
       setInstallPromptChecked(true);
+    };
+    const applyCapturedInstallPrompt = () => {
+      const capturedEvent = window.__firstListenInstallPromptEvent;
+      if (!capturedEvent) return;
+      setPromptEvent(capturedEvent);
+      setInstallPromptChecked(true);
+    };
+    const onBeforeInstallPrompt = (event: Event) => {
+      storeInstallPrompt(event as BeforeInstallPromptEvent);
     };
     const onInstalled = () => {
       setInstalled(true);
       setVisible(false);
       setPromptEvent(null);
+      window.__firstListenInstallPromptEvent = null;
       document.documentElement.dataset.pwaStandalone = "true";
     };
     const onDisplayModeChange = (event: MediaQueryListEvent) => {
@@ -348,7 +367,9 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    applyCapturedInstallPrompt();
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener(INSTALL_PROMPT_CAPTURED_EVENT, applyCapturedInstallPrompt);
     window.addEventListener("appinstalled", onInstalled);
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
@@ -363,6 +384,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(installCheckTimer);
       clearUpdateReminder();
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener(INSTALL_PROMPT_CAPTURED_EVENT, applyCapturedInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
@@ -441,6 +463,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     const choice = await promptEvent.userChoice;
     setInstalling(false);
     setPromptEvent(null);
+    window.__firstListenInstallPromptEvent = null;
     if (choice.outcome === "accepted") {
       setInstalled(true);
       setVisible(false);

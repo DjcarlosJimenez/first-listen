@@ -44,6 +44,7 @@ import { dispatchWorkspaceV2PlaybackCommand } from "@/lib/workspace-v2";
 const PLAYER_CHANNEL = "dj-carlos-jimenez";
 const UPCOMING_FOLLOW_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:upcoming-follow`;
 const UPCOMING_REACTION_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:upcoming-reaction`;
+const ALBUM_PLAYER_TRACK_ID = "dj-carlos-album-main-link";
 const UPCOMING_REACTIONS: {
   key: DjCarlosUpcomingReactionKey;
   label: string;
@@ -96,6 +97,7 @@ function selectedAlbumForConfig(
 
 function firstTrackIdForAlbum(config: DjCarlosPageConfig, albumSlug?: string) {
   const album = selectedAlbumForConfig(config, albumSlug);
+  if (isPlayableDjCarlosLink(album.link)) return ALBUM_PLAYER_TRACK_ID;
   return (
     config.tracks.find(
       (track) => track.section === "album" && track.albumId === album.id,
@@ -380,7 +382,7 @@ export function DjCarlosArtistPage({
       artist: "DJ Carlos Jimenez Compositor",
       badge: album.badge,
       coverUrl: album.coverUrl || logoUrl,
-      id: "dj-carlos-album-main-link",
+      id: ALBUM_PLAYER_TRACK_ID,
       link: album.link,
       mood: album.mood,
       platform: detectDjCarlosPlatform(album.link),
@@ -663,6 +665,7 @@ export function DjCarlosArtistPage({
     ) {
       return;
     }
+    if (activeTrack?.id === albumPlayerTrack?.id) return;
 
     const activeTrackId = activeTrack?.id ?? null;
     const nextTrackId = nextDjCarlosQueueTrackId(activeTrackId, playQueue);
@@ -684,6 +687,7 @@ export function DjCarlosArtistPage({
     return () => window.clearTimeout(advanceTimer);
   }, [
     activeTrack?.id,
+    albumPlayerTrack?.id,
     autoPlayEnabled,
     playQueue,
     playerPausedByUser,
@@ -702,11 +706,14 @@ export function DjCarlosArtistPage({
   };
 
   const playAlbum = () => {
+    if (albumPlayerTrack) {
+      playTrack(albumPlayerTrack.id);
+      return;
+    }
     if (albumTracks[0]) {
       playTrack(albumTracks[0].id);
       return;
     }
-    if (albumPlayerTrack) playTrack(albumPlayerTrack.id);
   };
 
   const playCurrent = () => {
