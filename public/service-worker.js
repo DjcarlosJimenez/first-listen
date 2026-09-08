@@ -1,4 +1,4 @@
-const CACHE_VERSION = "first-listen-pwa-v9-dj-carlos-install";
+const CACHE_VERSION = "first-listen-pwa-v10-artist-subdomains";
 const OFFLINE_URL = "/offline";
 const APP_SHELL = [
   OFFLINE_URL,

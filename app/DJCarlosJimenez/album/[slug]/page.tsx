@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { DjCarlosArtistPage } from "@/components/dj-carlos-artist-page";
 import { DJ_CARLOS_LOGO_URL } from "@/lib/dj-carlos-page";
 import { readDjCarlosPageConfig } from "@/lib/dj-carlos-page-store";
+import {
+  findPublicArtistPageByHost,
+  PUBLIC_ARTIST_HOST_HEADER,
+  publicArtistUrlFor,
+} from "@/lib/public-artist-pages";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -46,9 +52,17 @@ export async function generateMetadata({
     };
   }
 
+  const headerStore = await headers();
+  const artistRoute = findPublicArtistPageByHost(
+    headerStore.get(PUBLIC_ARTIST_HOST_HEADER) ?? headerStore.get("host"),
+  );
+  const onArtistHost = artistRoute?.kind === "dj-carlos";
+
   return {
     alternates: {
-      canonical: `https://www.firstlisten.net/DJCarlosJimenez/album/${album.slug}`,
+      canonical: onArtistHost
+        ? publicArtistUrlFor(artistRoute, ["album", album.slug])
+        : `https://www.firstlisten.net/DJCarlosJimenez/album/${album.slug}`,
     },
     applicationName: "DJ Carlos Jimenez",
     appleWebApp: {
@@ -58,7 +72,7 @@ export async function generateMetadata({
     },
     description: album.description,
     icons: artistIcons,
-    manifest: "/DJCarlosJimenez/manifest.webmanifest",
+    manifest: onArtistHost ? "/manifest.webmanifest" : "/DJCarlosJimenez/manifest.webmanifest",
     title: `${album.title} | DJ Carlos Jimenez`,
   };
 }

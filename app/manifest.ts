@@ -1,6 +1,17 @@
 import type { MetadataRoute } from "next";
+import { headers } from "next/headers";
+import { createDjCarlosManifest } from "@/lib/dj-carlos-manifest";
+import { findPublicArtistPageByHost } from "@/lib/public-artist-pages";
 
-export default function manifest(): MetadataRoute.Manifest {
+export const dynamic = "force-dynamic";
+
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const headerStore = await headers();
+  const artistRoute = findPublicArtistPageByHost(headerStore.get("host"));
+  if (artistRoute?.kind === "dj-carlos") {
+    return createDjCarlosManifest({ rootScope: true });
+  }
+
   return {
     id: "/",
     name: "First Listen",

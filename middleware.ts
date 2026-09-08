@@ -1,6 +1,11 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { canAccessAdminRoute, hasOwnerAccess } from "@/lib/admin-access";
+import {
+  findPublicArtistPageByHost,
+  PUBLIC_ARTIST_HOST_HEADER,
+  publicArtistSlugKey,
+} from "@/lib/public-artist-pages";
 
 const privatePaths = [
   "/dashboard",
@@ -12,11 +17,67 @@ const privatePaths = [
 ];
 const authPaths = ["/login", "/signup"];
 
+const passThroughArtistHostPaths = [
+  "/_next",
+  "/artist",
+  "/icons",
+  "/apple-icon.png",
+  "/favicon.ico",
+  "/icon.png",
+  "/manifest.webmanifest",
+  "/offline",
+  "/service-worker.js",
+];
+
+function rewriteArtistHostRequest(request: NextRequest) {
+  const route = findPublicArtistPageByHost(request.headers.get("host"));
+  if (!route) return null;
+
+  const path = request.nextUrl.pathname;
+  if (passThroughArtistHostPaths.some((prefix) => path.startsWith(prefix))) {
+    return null;
+  }
+
+  const segments = path.split("/").filter(Boolean);
+  if (segments[0] && publicArtistSlugKey(segments[0]) === publicArtistSlugKey(route.slug)) {
+    const redirectUrl = request.nextUrl.clone();
+    const host = request.headers.get("host");
+    if (host) redirectUrl.host = host;
+    redirectUrl.pathname = `/${segments.slice(1).join("/")}`;
+    if (redirectUrl.pathname === "/") {
+      redirectUrl.pathname = "/";
+    }
+    return NextResponse.redirect(redirectUrl, 308);
+  }
+
+  const rewriteUrl = request.nextUrl.clone();
+  rewriteUrl.pathname =
+    path === "/" ? `/${route.slug}` : `/${route.slug}${path}`;
+  const requestHeaders = new Headers(request.headers);
+  const host = request.headers.get("host");
+  if (host) requestHeaders.set(PUBLIC_ARTIST_HOST_HEADER, host);
+  return NextResponse.rewrite(rewriteUrl, {
+    request: {
+      headers: requestHeaders,
+    },
+  });
+}
+
 export async function middleware(request: NextRequest) {
+  const artistHostResponse = rewriteArtistHostRequest(request);
+  if (artistHostResponse) return artistHostResponse;
+
   let response = NextResponse.next({ request });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const path = request.nextUrl.pathname;
+  const authRelevantPath =
+    privatePaths.some((prefix) => path.startsWith(prefix)) ||
+    authPaths.includes(path) ||
+    path === "/change-password" ||
+    path === "/reset-password";
+
+  if (!authRelevantPath) return response;
 
   if (!url || !anonKey) {
     if (privatePaths.some((prefix) => path.startsWith(prefix))) {
@@ -104,6 +165,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/((?!_next/static|_next/image|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map|txt|xml|json)$).*)",
     "/dashboard/:path*",
     "/review/:path*",
     "/submit/:path*",

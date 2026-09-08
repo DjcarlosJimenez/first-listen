@@ -57,6 +57,7 @@ const INSTALL_INSTRUCTION_DELAY_MS = 45000;
 const ARTIST_INSTALL_INSTRUCTION_DELAY_MS = 2500;
 const UPDATE_REMINDER_MS = 10 * 60 * 1000;
 const DJ_CARLOS_PATH_PREFIX = "/DJCarlosJimenez";
+const DJ_CARLOS_HOST = "djcarlosjimenez.firstlisten.net";
 const DJ_CARLOS_ICON_URL = "/artist/dj-carlos-jimenez/icon-192.png";
 const INSTALL_PROMPT_CAPTURED_EVENT = "first-listen:install-prompt-captured";
 
@@ -78,8 +79,17 @@ function isDjCarlosPath(pathname: string | null) {
   );
 }
 
+function isDjCarlosHost() {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname.toLocaleLowerCase("en-US") === DJ_CARLOS_HOST;
+}
+
+function isDjCarlosExperience(pathname: string | null) {
+  return isDjCarlosPath(pathname) || isDjCarlosHost();
+}
+
 function installPromptBrandFor(pathname: string | null, spanish: boolean): InstallPromptBrand {
-  const artistPage = isDjCarlosPath(pathname);
+  const artistPage = isDjCarlosExperience(pathname);
   if (artistPage) {
     return {
       actionLabel: spanish ? "Instalar DJ Carlos" : "Install DJ Carlos",
@@ -399,7 +409,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined" || isStandaloneMode()) return;
 
-    const artistPage = isDjCarlosPath(pathname);
+    const artistPage = isDjCarlosExperience(pathname);
     const dismissKey = artistPage ? DJ_CARLOS_DISMISS_KEY : DISMISS_KEY;
     if (
       recentlyDismissed(dismissKey) ||
@@ -426,7 +436,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
 
   const dismissInstructions = useCallback(() => {
     markDismissed(
-      isDjCarlosPath(pathname) ? DJ_CARLOS_DISMISS_KEY : DISMISS_KEY,
+      isDjCarlosExperience(pathname) ? DJ_CARLOS_DISMISS_KEY : DISMISS_KEY,
       true,
     );
     setVisible(false);
@@ -553,7 +563,7 @@ export function PwaInstallButton({
   const pathname = usePathname();
   if (installed) return null;
 
-  const spanish = locale === "es" || isDjCarlosPath(pathname);
+  const spanish = locale === "es" || isDjCarlosExperience(pathname);
   const manualInstallMode = installPromptChecked && !nativePromptAvailable;
   const baseLabel = label ?? (spanish ? "Instalar First Listen" : "Install First Listen");
   const buttonLabel =
@@ -617,7 +627,7 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
   const [manualHelpVisible, setManualHelpVisible] = useState(false);
   const locale = useInterfaceLocale();
   const pathname = usePathname();
-  const spanish = locale === "es" || isDjCarlosPath(pathname);
+  const spanish = locale === "es" || isDjCarlosExperience(pathname);
   const brand = installPromptBrandFor(pathname, spanish);
   const manualInstallMode = installPromptChecked && !nativePromptAvailable;
 

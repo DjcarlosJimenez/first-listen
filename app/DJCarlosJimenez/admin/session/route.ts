@@ -8,8 +8,14 @@ import {
   isDjCarlosAdminPasswordReady,
   verifyDjCarlosAdminPassword,
 } from "@/lib/dj-carlos-admin-auth";
+import { findPublicArtistPageByHost } from "@/lib/public-artist-pages";
 
 export const runtime = "nodejs";
+
+function cookiePathForRequest(request: NextRequest) {
+  const artistRoute = findPublicArtistPageByHost(request.headers.get("host"));
+  return artistRoute?.kind === "dj-carlos" ? "/" : DJ_CARLOS_ADMIN_COOKIE_PATH;
+}
 
 export function GET(request: NextRequest) {
   const authenticated = hasDjCarlosAdminSession(
@@ -27,7 +33,7 @@ export function GET(request: NextRequest) {
       {
         httpOnly: true,
         maxAge: DJ_CARLOS_ADMIN_SESSION_MAX_AGE_SECONDS,
-        path: DJ_CARLOS_ADMIN_COOKIE_PATH,
+        path: cookiePathForRequest(request),
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
       },
@@ -65,7 +71,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({ authenticated: true });
   const cookieOptions = {
     httpOnly: true,
-    path: DJ_CARLOS_ADMIN_COOKIE_PATH,
+    path: cookiePathForRequest(request),
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     ...(remember ? { maxAge: DJ_CARLOS_ADMIN_SESSION_MAX_AGE_SECONDS } : {}),

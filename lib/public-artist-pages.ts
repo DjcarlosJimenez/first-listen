@@ -2,6 +2,7 @@ export type PublicArtistPageRoute = {
   kind: "dj-carlos";
   name: string;
   slug: string;
+  subdomain: string;
 };
 
 const RESERVED_ROOT_SEGMENTS = new Set([
@@ -41,11 +42,46 @@ export const publicArtistPageRoutes = [
     kind: "dj-carlos",
     name: "DJ Carlos Jimenez",
     slug: "DJCarlosJimenez",
+    subdomain: "djcarlosjimenez",
   },
 ] satisfies PublicArtistPageRoute[];
 
+const FIRST_LISTEN_BASE_DOMAIN = "firstlisten.net";
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+export const PUBLIC_ARTIST_HOST_HEADER = "x-first-listen-artist-host";
+
 export function publicArtistSlugKey(slug: string) {
   return slug.trim().toLocaleLowerCase("en-US");
+}
+
+export function normalizePublicHost(host: string | null | undefined) {
+  return (host ?? "").split(":")[0]?.trim().toLocaleLowerCase("en-US") ?? "";
+}
+
+export function publicArtistHostFor(route: PublicArtistPageRoute) {
+  return `${route.subdomain}.${FIRST_LISTEN_BASE_DOMAIN}`;
+}
+
+export function publicArtistUrlFor(
+  route: PublicArtistPageRoute,
+  pathSegments: readonly string[] = [],
+) {
+  const encodedSegments = pathSegments.map((segment) =>
+    encodeURIComponent(segment),
+  );
+  const path = encodedSegments.length ? `/${encodedSegments.join("/")}` : "/";
+  return `https://${publicArtistHostFor(route)}${path}`;
+}
+
+export function findPublicArtistPageByHost(host: string | null | undefined) {
+  const normalizedHost = normalizePublicHost(host);
+  if (!normalizedHost || LOCAL_HOSTS.has(normalizedHost)) return null;
+
+  return (
+    publicArtistPageRoutes.find(
+      (route) => normalizedHost === publicArtistHostFor(route),
+    ) ?? null
+  );
 }
 
 export function publicArtistPathFor(
