@@ -207,12 +207,15 @@ export async function recordDjCarlosUpcomingSignal({
   return writeDjCarlosUpcomingSignals(next);
 }
 
-export async function writeDjCarlosCoverFile(file: File) {
+export async function writeDjCarlosImageFile(
+  file: File,
+  folder: "covers" | "identity" = "covers",
+) {
   if (!DJ_CARLOS_COVER_TYPES.has(file.type)) {
-    throw new Error("La portada debe ser JPG, PNG o WEBP.");
+    throw new Error("La imagen debe ser JPG, PNG o WEBP.");
   }
   if (file.size > DJ_CARLOS_MAX_COVER_BYTES) {
-    throw new Error(`La portada debe pesar menos de ${DJ_CARLOS_MAX_COVER_MB} MB.`);
+    throw new Error(`La imagen debe pesar menos de ${DJ_CARLOS_MAX_COVER_MB} MB.`);
   }
 
   const extension = file.type === "image/png"
@@ -221,7 +224,7 @@ export async function writeDjCarlosCoverFile(file: File) {
       ? "webp"
       : "jpg";
   const supabase = await ensureDjCarlosAssetsBucket();
-  const path = `covers/album-${Date.now()}.${extension}`;
+  const path = `${folder}/image-${Date.now()}.${extension}`;
   const { error } = await supabase.storage
     .from(DJ_CARLOS_ASSETS_BUCKET)
     .upload(path, file, {
@@ -237,4 +240,8 @@ export async function writeDjCarlosCoverFile(file: File) {
     .getPublicUrl(path);
 
   return data.publicUrl;
+}
+
+export function writeDjCarlosCoverFile(file: File) {
+  return writeDjCarlosImageFile(file, "covers");
 }

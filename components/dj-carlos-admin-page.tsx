@@ -65,6 +65,8 @@ type TrackDraft = {
 
 type EditableTrackField = "link" | "mood" | "section" | "subtitle" | "title";
 
+type EditableIdentityField = "logoUrl" | "portraitUrl";
+
 type EditableUpcomingField = "badge" | "coverUrl" | "note" | "status" | "title";
 
 type AlbumImportResponse = {
@@ -179,6 +181,8 @@ export function DjCarlosAdminPage({
   );
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingPortrait, setUploadingPortrait] = useState(false);
   const [uploadingUpcomingCover, setUploadingUpcomingCover] = useState(false);
   const [importingAlbum, setImportingAlbum] = useState(false);
   const [status, setStatus] = useState("Panel listo para editar.");
@@ -273,6 +277,8 @@ export function DjCarlosAdminPage({
   }, [config, persistLocalDraft]);
 
   const albums = useMemo(() => albumsForConfig(config), [config]);
+  const artistLogoUrl = config.identity.logoUrl || logoUrl;
+  const artistPortraitUrl = config.identity.portraitUrl;
   const selectedAlbum = useMemo(
     () =>
       albums.find((album) => album.id === selectedAlbumId) ??
@@ -447,6 +453,36 @@ export function DjCarlosAdminPage({
     setStatus("Album actualizado. Toca Guardar cambios para publicarlo.");
   };
 
+  const updateIdentity = (field: EditableIdentityField, value: string) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      identity: {
+        ...current.identity,
+        [field]: value,
+      },
+      updatedAt: new Date().toISOString(),
+    }));
+    setStatus("Identidad visual actualizada. Toca Guardar cambios.");
+  };
+
+  const updatePortraitVisible = (showPortrait: boolean) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      identity: {
+        ...current.identity,
+        showPortrait,
+      },
+      updatedAt: new Date().toISOString(),
+    }));
+    setStatus(
+      showPortrait
+        ? "Foto personal visible. Toca Guardar cambios."
+        : "Foto personal oculta. Toca Guardar cambios.",
+    );
+  };
+
   const updateUpcomingRelease = (
     field: EditableUpcomingField,
     value: string,
@@ -510,7 +546,7 @@ export function DjCarlosAdminPage({
 
   const addAlbum = () => {
     hasLocalChangesRef.current = true;
-    const nextAlbum = newArtistAlbum(albums.length + 1, logoUrl);
+    const nextAlbum = newArtistAlbum(albums.length + 1, artistLogoUrl);
     setSelectedAlbumId(nextAlbum.id);
     setAlbumImportLink(nextAlbum.link);
     setConfig((current) => {
@@ -691,7 +727,7 @@ export function DjCarlosAdminPage({
       albumId: draft.section === "album" ? selectedAlbum.id : undefined,
       artist: "DJ Carlos Jimenez Compositor",
       badge: sectionBadge(draft.section),
-      coverUrl: getDjCarlosTrackThumbnail(link) ?? logoUrl,
+      coverUrl: getDjCarlosTrackThumbnail(link) ?? artistLogoUrl,
       id: `dj-carlos-local-${Date.now()}`,
       link,
       mood: trackMood,
@@ -777,7 +813,7 @@ export function DjCarlosAdminPage({
       const importedCoverUrl =
         typeof importedAlbum.coverUrl === "string" && importedAlbum.coverUrl.trim()
           ? importedAlbum.coverUrl.trim()
-          : selectedAlbum.coverUrl || logoUrl;
+          : selectedAlbum.coverUrl || artistLogoUrl;
       const importedSubtitle =
         typeof importedAlbum.subtitle === "string" && importedAlbum.subtitle.trim()
           ? importedAlbum.subtitle.trim()
@@ -995,6 +1031,83 @@ export function DjCarlosAdminPage({
     }
   };
 
+  const handleIdentityImageFile = async (
+    event: ChangeEvent<HTMLInputElement>,
+    field: EditableIdentityField,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const isLogo = field === "logoUrl";
+    const label = isLogo ? "logo" : "foto personal";
+    const setUploading = isLogo ? setUploadingLogo : setUploadingPortrait;
+    if (!file.type.startsWith("image/")) {
+      setStatus(`Selecciona una imagen para el ${label}.`);
+      event.target.value = "";
+      return;
+    }
+    if (file.size > DJ_CARLOS_COVER_MAX_BYTES) {
+      setStatus(`La imagen debe pesar menos de ${DJ_CARLOS_COVER_MAX_MB} MB.`);
+      event.target.value = "";
+      return;
+    }
+
+    setUploading(true);
+    setStatus("Revisando sesion...");
+
+    try {
+      if (!(await ensureAdminSession())) return;
+
+      setStatus(`Subiendo ${label}...`);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("kind", "identity");
+      const response = await fetch("/DJCarlosJimenez/assets", {
+        body: formData,
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 401) {
+        setStatus(
+          "Tu sesion de administrador vencio. Entra otra vez para subir la imagen; tu borrador queda guardado.",
+        );
+        redirectToAdminLogin();
+        return;
+      }
+
+      const assetUrl =
+        typeof data.assetUrl === "string"
+          ? data.assetUrl
+          : typeof data.coverUrl === "string"
+            ? data.coverUrl
+            : "";
+
+      if (!response.ok || !assetUrl) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "No se pudo subir la imagen.",
+        );
+      }
+
+      updateIdentity(field, assetUrl);
+      setStatus(
+        `${isLogo ? "Logo" : "Foto personal"} subido. Toca Guardar cambios para publicarlo.`,
+      );
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "No se pudo subir la imagen.",
+      );
+    } finally {
+      setUploading(false);
+      event.target.value = "";
+    }
+  };
+
   const resetConfig = () => {
     hasLocalChangesRef.current = true;
     window.localStorage.removeItem(DJ_CARLOS_PAGE_STORAGE_KEY);
@@ -1114,7 +1227,7 @@ export function DjCarlosAdminPage({
             alt="DJ Carlos Jimenez logo"
             height={58}
             priority
-            src={logoUrl}
+            src={artistLogoUrl}
             width={58}
           />
           <div>
@@ -1168,6 +1281,105 @@ export function DjCarlosAdminPage({
           <Link href="/DJCarlosJimenez/admin">Entrar otra vez</Link>
         )}
       </div>
+
+      <section className="djcx-admin-panel djcx-admin-identity-panel">
+        <div className="djcx-admin-panel-heading">
+          <span>
+            <ImagePlus size={15} /> Identidad visual
+          </span>
+          <strong>Logo y foto personal de tu pagina</strong>
+        </div>
+
+        <div className="djcx-admin-identity-layout">
+          <article className="djcx-admin-identity-preview">
+            <div className="djcx-admin-identity-logo">
+              <Image
+                alt="Logo actual de DJ Carlos Jimenez"
+                fill
+                sizes="220px"
+                src={artistLogoUrl}
+                unoptimized
+              />
+            </div>
+            {config.identity.showPortrait && artistPortraitUrl ? (
+              <div className="djcx-admin-identity-portrait">
+                <Image
+                  alt="Foto personal actual de DJ Carlos Jimenez"
+                  fill
+                  sizes="220px"
+                  src={artistPortraitUrl}
+                  unoptimized
+                />
+              </div>
+            ) : (
+              <p>La foto personal esta oculta en la pagina publica.</p>
+            )}
+          </article>
+
+          <div className="djcx-admin-form-grid">
+            <label className="djcx-admin-toggle djcx-admin-wide">
+              <input
+                checked={config.identity.showPortrait}
+                onChange={(event) => updatePortraitVisible(event.target.checked)}
+                type="checkbox"
+              />
+              Mostrar foto personal junto al logo en mi pagina
+            </label>
+            <label>
+              URL del logo
+              <input
+                onChange={(event) =>
+                  updateIdentity("logoUrl", event.target.value)
+                }
+                placeholder="/artist/dj-carlos-jimenez/logo.png"
+                value={config.identity.logoUrl}
+              />
+            </label>
+            <label>
+              URL de foto personal
+              <input
+                onChange={(event) =>
+                  updateIdentity("portraitUrl", event.target.value)
+                }
+                placeholder="/artist/dj-carlos-jimenez/portrait.png"
+                value={config.identity.portraitUrl}
+              />
+            </label>
+            <label
+              className={`djcx-file-control${
+                uploadingLogo ? " is-loading" : ""
+              }`}
+            >
+              <ImagePlus size={17} />
+              {uploadingLogo ? "Subiendo logo..." : "Cargar logo PNG"}
+              <input
+                accept="image/jpeg,image/png,image/webp"
+                disabled={uploadingLogo}
+                onChange={(event) =>
+                  void handleIdentityImageFile(event, "logoUrl")
+                }
+                type="file"
+              />
+            </label>
+            <label
+              className={`djcx-file-control${
+                uploadingPortrait ? " is-loading" : ""
+              }`}
+            >
+              <ImagePlus size={17} />
+              {uploadingPortrait ? "Subiendo foto..." : "Cargar foto personal"}
+              <input
+                accept="image/jpeg,image/png,image/webp"
+                disabled={uploadingPortrait}
+                onChange={(event) =>
+                  void handleIdentityImageFile(event, "portraitUrl")
+                }
+                type="file"
+              />
+            </label>
+          </div>
+        </div>
+      </section>
 
       <section className="djcx-admin-panel djcx-admin-rhythms-panel">
         <div className="djcx-admin-panel-heading">
@@ -1237,7 +1449,7 @@ export function DjCarlosAdminPage({
                 <Image
                   alt={`Portada de ${album.title}`}
                   height={52}
-                  src={album.coverUrl || logoUrl}
+                  src={album.coverUrl || artistLogoUrl}
                   unoptimized
                   width={52}
                 />
@@ -1292,7 +1504,7 @@ export function DjCarlosAdminPage({
                 fill
                 priority
                 sizes="(max-width: 900px) 70vw, 260px"
-                src={selectedAlbum.coverUrl || logoUrl}
+                src={selectedAlbum.coverUrl || artistLogoUrl}
                 unoptimized
               />
             </div>
@@ -1461,7 +1673,7 @@ export function DjCarlosAdminPage({
                 alt={`Portada de ${upcomingRelease.title}`}
                 fill
                 sizes="(max-width: 760px) 82vw, 190px"
-                src={upcomingRelease.coverUrl || logoUrl}
+                src={upcomingRelease.coverUrl || artistLogoUrl}
                 unoptimized
               />
               <span>{upcomingRelease.status}</span>

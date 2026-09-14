@@ -220,7 +220,7 @@ function bumpUpcomingSignal(
 export function DjCarlosArtistPage({
   initialConfig,
   initialAlbumSlug,
-  logoUrl,
+  logoUrl: fallbackLogoUrl,
 }: {
   initialConfig: DjCarlosPageConfig;
   initialAlbumSlug?: string;
@@ -338,6 +338,10 @@ export function DjCarlosArtistPage({
   }, []);
 
   const { tracks } = config;
+  const artistLogoUrl = config.identity.logoUrl || fallbackLogoUrl;
+  const artistPortraitUrl = config.identity.portraitUrl;
+  const showArtistPortrait =
+    config.identity.showPortrait && Boolean(artistPortraitUrl);
   const albums = useMemo(() => albumsForConfig(config), [config]);
   const album = useMemo(
     () => selectedAlbumForConfig(config, initialAlbumSlug),
@@ -381,7 +385,7 @@ export function DjCarlosArtistPage({
     return {
       artist: "DJ Carlos Jimenez Compositor",
       badge: album.badge,
-      coverUrl: album.coverUrl || logoUrl,
+      coverUrl: album.coverUrl || artistLogoUrl,
       id: ALBUM_PLAYER_TRACK_ID,
       link: album.link,
       mood: album.mood,
@@ -391,7 +395,7 @@ export function DjCarlosArtistPage({
       subtitle: album.subtitle,
       title: album.title,
     };
-  }, [album, logoUrl]);
+  }, [album, artistLogoUrl]);
   const basePlayQueue = useMemo(
     () => [...albumTracks, ...topTenTracks, ...officialVideos],
     [albumTracks, officialVideos, topTenTracks],
@@ -868,7 +872,7 @@ export function DjCarlosArtistPage({
               className="djcx-now-logo"
               height={54}
               priority
-              src={logoUrl}
+              src={artistLogoUrl}
               width={82}
             />
             <div>
@@ -989,14 +993,29 @@ export function DjCarlosArtistPage({
           </div>
         </div>
 
-        <div className="djcx-logo-stage" aria-hidden="true">
-          <Image
-            alt=""
-            fill
-            priority
-            sizes="(max-width: 900px) 92vw, 520px"
-            src={logoUrl}
-          />
+        <div className="djcx-identity-stage" aria-hidden="true">
+          <div className="djcx-logo-stage">
+            <Image
+              alt=""
+              fill
+              priority
+              sizes="(max-width: 900px) 82vw, 460px"
+              src={artistLogoUrl}
+              unoptimized
+            />
+          </div>
+          {showArtistPortrait && (
+            <div className="djcx-portrait-stage">
+              <Image
+                alt=""
+                fill
+                priority
+                sizes="(max-width: 900px) 52vw, 210px"
+                src={artistPortraitUrl}
+                unoptimized
+              />
+            </div>
+          )}
         </div>
       </section>
 
@@ -1067,7 +1086,7 @@ export function DjCarlosArtistPage({
           </div>
         </article>
 
-        <ArtistInstallPanel logoUrl={logoUrl} />
+        <ArtistInstallPanel logoUrl={artistLogoUrl} />
 
         <article className="djcx-quick-stats">
           <div>
@@ -1088,7 +1107,7 @@ export function DjCarlosArtistPage({
       {!isAlbumDetail && upcomingRelease.enabled && (
         <UpcomingReleaseCard
           following={followingUpcoming}
-          logoUrl={logoUrl}
+          logoUrl={artistLogoUrl}
           onFollow={() => void recordUpcomingFollow()}
           onReact={(reaction) => void recordUpcomingReaction(reaction)}
           release={upcomingRelease}

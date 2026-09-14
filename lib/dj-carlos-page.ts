@@ -1,4 +1,6 @@
 export const DJ_CARLOS_LOGO_URL = "/artist/dj-carlos-jimenez/logo.png";
+export const DJ_CARLOS_PORTRAIT_URL =
+  "/artist/dj-carlos-jimenez/portrait.png";
 export const DJ_CARLOS_PAGE_STORAGE_KEY =
   "first-listen:dj-carlos-jimenez-page-v2";
 export const DJ_CARLOS_DEFAULT_RHYTHM = "Cumbia Sonidera";
@@ -67,9 +69,16 @@ export type DjCarlosUpcomingRelease = {
   tracks: string[];
 };
 
+export type DjCarlosIdentity = {
+  logoUrl: string;
+  portraitUrl: string;
+  showPortrait: boolean;
+};
+
 export type DjCarlosPageConfig = {
   album: DjCarlosAlbum;
   albums: DjCarlosAlbum[];
+  identity: DjCarlosIdentity;
   rhythms: string[];
   tracks: DjCarlosTrack[];
   upcomingRelease: DjCarlosUpcomingRelease;
@@ -396,6 +405,11 @@ export const defaultDjCarlosTracks: DjCarlosTrack[] = [
 export const defaultDjCarlosPageConfig: DjCarlosPageConfig = {
   album: defaultDjCarlosAlbum,
   albums: [defaultDjCarlosAlbum],
+  identity: {
+    logoUrl: DJ_CARLOS_LOGO_URL,
+    portraitUrl: DJ_CARLOS_PORTRAIT_URL,
+    showPortrait: true,
+  },
   rhythms: [...DJ_CARLOS_DEFAULT_RHYTHMS],
   tracks: defaultDjCarlosTracks,
   upcomingRelease: {
@@ -605,6 +619,26 @@ function cleanUpcomingRelease(
   };
 }
 
+function cleanIdentity(
+  value: unknown,
+  fallback: DjCarlosIdentity,
+): DjCarlosIdentity {
+  const identity =
+    value && typeof value === "object" ? value as Record<string, unknown> : {};
+
+  return {
+    logoUrl: cleanDjCarlosImageUrl(identity.logoUrl, fallback.logoUrl),
+    portraitUrl: cleanDjCarlosImageUrl(
+      identity.portraitUrl,
+      fallback.portraitUrl,
+    ),
+    showPortrait:
+      typeof identity.showPortrait === "boolean"
+        ? identity.showPortrait
+        : fallback.showPortrait,
+  };
+}
+
 function uniqueAlbumSlug(baseSlug: string, usedSlugs: Set<string>) {
   let slug = baseSlug;
   let index = 2;
@@ -720,6 +754,7 @@ export function normalizeDjCarlosPageConfig(
   return {
     album: primaryAlbum,
     albums,
+    identity: cleanIdentity(config.identity, fallback.identity),
     rhythms,
     tracks: tracks.length ? tracks : fallback.tracks,
     upcomingRelease: cleanUpcomingRelease(
