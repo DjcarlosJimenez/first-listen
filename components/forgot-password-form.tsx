@@ -34,16 +34,16 @@ export function ForgotPasswordForm() {
       });
       if (error?.status === 429) {
         setMessage(spanish
-          ? "Espera un minuto antes de solicitar otro correo. Usa únicamente el enlace del correo más reciente."
-          : "Wait a minute before requesting another email. Use only the link in the most recent email.");
+          ? "Espera un minuto antes de solicitar otro correo. Revisa también la carpeta de correo no deseado (spam) y usa únicamente el enlace del correo más reciente."
+          : "Wait a minute before requesting another email. Check your spam folder too, and use only the link in the most recent email.");
       } else if (error) {
         setMessage(spanish
           ? "No pudimos enviar el correo ahora. Inténtalo de nuevo más tarde."
           : "We could not send the email right now. Try again later.");
       } else {
         setMessage(spanish
-          ? "Si existe una cuenta con este correo, enviaremos un enlace para restablecer la contraseña. Usa únicamente el enlace del correo más reciente."
-          : "If an account exists for this address, a password reset email has been sent. Use only the link in the most recent email.");
+          ? "Si existe una cuenta con este correo, enviaremos un enlace para restablecer la contraseña. Revisa tu bandeja de entrada y la carpeta de correo no deseado (spam). Usa únicamente el enlace del correo más reciente."
+          : "If an account exists for this address, a password reset email has been sent. Check your inbox and spam folder. Use only the link in the most recent email.");
       }
     } catch {
       setMessage(
