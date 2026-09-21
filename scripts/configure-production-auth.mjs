@@ -52,6 +52,7 @@ const response = await fetch(
       smtp_max_frequency: 60,
       rate_limit_email_sent: 30,
       mailer_autoconfirm: false,
+      mailer_otp_exp: 3600,
       mailer_allow_unverified_email_sign_ins: false,
       password_min_length: 8,
       password_required_characters:

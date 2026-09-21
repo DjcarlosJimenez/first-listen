@@ -33,6 +33,17 @@ The first command configures `smtp.resend.com` and the First Listen sender.
 The second installs branded verification, password recovery, email change,
 invitation, magic-link, and security notification templates.
 
+For an existing production project, update only password recovery with:
+
+```powershell
+npm run auth:recovery -- --apply
+```
+
+This preserves the other email templates, changes the recovery link to open
+the password form without verifying the token on GET, and sets email-link
+validity to 3600 seconds (60 minutes). It requires a current Supabase
+Management API token with Auth configuration access.
+
 ## Verify
 
 Create a disposable signup at `https://www.firstlisten.net/signup`, then
@@ -44,3 +55,9 @@ confirm:
 - Confirmation returns to `https://www.firstlisten.net/auth/callback`.
 - Forgot-password email returns to
   `https://www.firstlisten.net/reset-password`.
+- Opening the newest recovery email shows the new-password fields immediately.
+  Simply opening or previewing the link does not verify its token.
+- Saving a new password succeeds, signs out the recovery session, and returns
+  the user to login. The new password must then work at login.
+- A second reset request replaces the previous email link. Use only the newest
+  recovery email.

@@ -73,8 +73,8 @@ const payload = {
   mailer_subjects_recovery: "Reset Your First Listen Password",
   mailer_templates_recovery_content: emailShell(
     "Reset Your First Listen Password",
-    paragraph("We received a request to reset your First Listen password."),
-    "{{ .ConfirmationURL }}",
+    paragraph("We received a request to reset your First Listen password. Use only the link in the most recent email."),
+    "{{ .RedirectTo }}?token_hash={{ .TokenHash }}&amp;type=recovery",
     "Reset Password",
     footer(paragraph("If you did not request this change, ignore this email and your password will remain unchanged.")),
   ),

@@ -74,8 +74,7 @@ export async function middleware(request: NextRequest) {
   const authRelevantPath =
     privatePaths.some((prefix) => path.startsWith(prefix)) ||
     authPaths.includes(path) ||
-    path === "/change-password" ||
-    path === "/reset-password";
+    path === "/change-password";
 
   if (!authRelevantPath) return response;
 

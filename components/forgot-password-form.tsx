@@ -28,15 +28,32 @@ export function ForgotPasswordForm() {
     }
 
     setLoading(true);
-    await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setLoading(false);
-    setMessage(
-      spanish
-        ? "Si existe una cuenta con este correo, enviaremos un enlace para restablecer la contraseña."
-        : "If an account exists for this address, a password reset email has been sent.",
-    );
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error?.status === 429) {
+        setMessage(spanish
+          ? "Espera un minuto antes de solicitar otro correo. Usa únicamente el enlace del correo más reciente."
+          : "Wait a minute before requesting another email. Use only the link in the most recent email.");
+      } else if (error) {
+        setMessage(spanish
+          ? "No pudimos enviar el correo ahora. Inténtalo de nuevo más tarde."
+          : "We could not send the email right now. Try again later.");
+      } else {
+        setMessage(spanish
+          ? "Si existe una cuenta con este correo, enviaremos un enlace para restablecer la contraseña. Usa únicamente el enlace del correo más reciente."
+          : "If an account exists for this address, a password reset email has been sent. Use only the link in the most recent email.");
+      }
+    } catch {
+      setMessage(
+        spanish
+          ? "No pudimos conectar con el servicio de correo. Inténtalo de nuevo."
+          : "We could not connect to the email service. Try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
