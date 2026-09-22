@@ -80,6 +80,16 @@ export default async function PublicArtistSlugRoute({
     notFound();
   }
 
+  const isAdminRoute = artistPath.length === 1 && artistPath[0] === "admin";
+  if (isAdminRoute) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      const requestedAdminPath = publicArtistPathFor(artistSlug, ["admin"]);
+      redirect(`/login?next=${encodeURIComponent(requestedAdminPath)}`);
+    }
+  }
+
   const site = await findArtistSite(artistSlug);
   if (!site) notFound();
   const config = normalizeArtistSiteConfig(site.config);
@@ -105,7 +115,7 @@ export default async function PublicArtistSlugRoute({
     permanentRedirect(`${canonicalPath}${serializeSearchParams(await searchParams)}`);
   }
 
-  if (artistPath[0] === "admin") {
+  if (isAdminRoute) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) redirect(`/login?next=${encodeURIComponent(canonicalPath)}`);
@@ -113,7 +123,9 @@ export default async function PublicArtistSlugRoute({
       supabase.from("profiles").select("role, founder_number, account_status, force_password_change").eq("id", user.id).maybeSingle(),
       supabase.from("artist_sites").select("owner_user_id").eq("id", site.id).maybeSingle(),
     ]);
-    if (profile?.force_password_change) redirect("/change-password");
+    if (profile?.force_password_change) {
+      redirect(`/change-password?next=${encodeURIComponent(canonicalPath)}`);
+    }
     if (
       profile?.account_status !== "active" ||
       (assignment?.owner_user_id !== user.id && !hasOwnerAccess(profile, user.email))

@@ -12,7 +12,7 @@ import {
 } from "@/lib/password-policy";
 import { createClient } from "@/lib/supabase/client";
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({ nextPath }: { nextPath: string }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,7 +38,7 @@ export function ChangePasswordForm() {
     if (!passwordError) {
       const { error: profileError } = await supabase.rpc("complete_forced_password_change");
       if (!profileError) {
-        router.replace("/dashboard");
+        router.replace(nextPath);
         router.refresh();
         return;
       }
