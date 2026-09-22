@@ -295,6 +295,9 @@ export function ArtistSiteEditor({ site }: { site: EditorSite }) {
               <label>Frase principal
                 <input maxLength={240} onChange={(event) => change({ ...config, tagline: event.target.value })} value={config.tagline} />
               </label>
+              <label>Canal oficial
+                <input onChange={(event) => change({ ...config, channelUrl: event.target.value })} placeholder="https://www.youtube.com/@canal" type="url" value={config.channelUrl} />
+              </label>
               <label>Color principal
                 <input onChange={(event) => change({ ...config, accentColor: event.target.value })} type="color" value={config.accentColor} />
               </label>

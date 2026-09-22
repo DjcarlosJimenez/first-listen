@@ -23,6 +23,7 @@ export type ArtistSiteAlbum = {
 
 export type ArtistSiteConfig = {
   tagline: string;
+  channelUrl: string;
   logoUrl: string;
   portraitUrl: string;
   accentColor: string;
@@ -89,6 +90,7 @@ function cleanTrack(value: unknown, fallbackId: string): ArtistSiteTrack {
 export function emptyArtistSiteConfig(): ArtistSiteConfig {
   return {
     tagline: "",
+    channelUrl: "",
     logoUrl: "",
     portraitUrl: "",
     accentColor: "#FFD565",
@@ -172,6 +174,7 @@ export function normalizeArtistSiteConfig(value: unknown): ArtistSiteConfig {
 
   return {
     tagline: cleanText(source.tagline, 240),
+    channelUrl: cleanExternalUrl(source.channelUrl),
     logoUrl: cleanImageUrl(source.logoUrl),
     portraitUrl: cleanImageUrl(source.portraitUrl),
     accentColor: /^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : "#FFD565",
@@ -189,6 +192,31 @@ export function normalizeArtistSiteConfig(value: unknown): ArtistSiteConfig {
         .slice(0, 40),
     },
   };
+}
+
+function cleanExternalUrl(value: unknown) {
+  const url = cleanText(value, 2048);
+  try {
+    return new URL(url).protocol === "https:" ? url : "";
+  } catch {
+    return "";
+  }
+}
+
+export function normalizeArtistSiteSlug(value: string, name: string) {
+  let candidate = value.trim();
+
+  try {
+    const url = new URL(candidate);
+    candidate = url.pathname.split("/").filter(Boolean).at(-1) ?? "";
+  } catch {
+    candidate = candidate.replace(/^\/+|\/+$/g, "");
+  }
+
+  return slugifyDjCarlosAlbumTitle(
+    candidate.replace(/^@/, "") || name,
+    "artista",
+  ).slice(0, 62);
 }
 
 export function artistSiteThumbnail(link: string) {

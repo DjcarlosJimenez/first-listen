@@ -274,6 +274,7 @@ export function ArtistSitePage({
           <div className="artist-template-hero-actions">
             {(album ? selectedAlbumSongs.length > 0 : albumSongs.length > 0) && <button onClick={() => selectTrack((album ? selectedAlbumSongs : albumSongs)[0].id, "album")} type="button"><Disc3 size={17} /> Reproducir album</button>}
             {videoTracks.length > 0 && <button onClick={() => selectTrack(videoTracks[0].id, "videos")} type="button"><Video size={17} /> Videos oficiales</button>}
+            {config.channelUrl && <a href={config.channelUrl} rel="noreferrer" target="_blank"><ExternalLink size={17} /> Canal oficial</a>}
             <button aria-label="Compartir" onClick={() => void share(pagePath, site.name)} title="Compartir" type="button"><Share2 size={17} /></button>
           </div>
         </div>
@@ -299,7 +300,7 @@ export function ArtistSitePage({
             {!selectedAlbumSongs.length && <p className="artist-template-empty">Aun no hay canciones para este album.</p>}
           </div>
         </section>
-      ) : (
+      ) : config.albums.length > 0 ? (
         <section className="artist-template-section">
           <div className="artist-template-section-head"><div><span>BIBLIOTECA</span><h2>Albumes principales</h2></div><strong>{visibleAlbums.length} albumes</strong></div>
           <div className="artist-template-album-grid">
@@ -315,7 +316,7 @@ export function ArtistSitePage({
             ))}
           </div>
         </section>
-      )}
+      ) : null}
 
       {config.upcoming.enabled && !album && (
         <section className="artist-template-upcoming">
@@ -326,7 +327,7 @@ export function ArtistSitePage({
         </section>
       )}
 
-      <section className="artist-template-section">
+      {videoTracks.length > 0 && <section className="artist-template-section">
         <div className="artist-template-section-head"><div><span>VIDEOS OFICIALES</span><h2>Videos</h2></div>{visibleVideos.length > 6 && <button onClick={() => setShowAllVideos((value) => !value)} type="button">{showAllVideos ? "Ver menos" : "Ver todos"}</button>}</div>
         <div className="artist-template-video-grid">
           {visibleVideos.slice(0, showAllVideos ? undefined : 6).map((track) => (
@@ -338,15 +339,15 @@ export function ArtistSitePage({
           ))}
           {!visibleVideos.length && <p className="artist-template-empty">Aun no hay videos publicados.</p>}
         </div>
-      </section>
+      </section>}
 
-      <section className="artist-template-section">
+      {topTenTracks.length > 0 && <section className="artist-template-section">
         <div className="artist-template-section-head"><div><span>FAVORITAS PARA REPRODUCIR</span><h2>Top Ten</h2></div>{visibleTopTen.length > 0 && <button onClick={() => setShowTopTen((value) => !value)} type="button"><ListMusic size={16} /> {showTopTen ? "Cerrar lista" : "Ver lista"}</button>}</div>
         {showTopTen && <div className="artist-template-track-list">
           {visibleTopTen.map((track, index) => <TrackRow index={index} key={track.id} onPlay={() => selectTrack(track.id, "top-ten")} onShare={() => void share(`${rootPath}?track=${encodeURIComponent(track.id)}`, track.title)} track={track} />)}
         </div>}
         {!visibleTopTen.length && <p className="artist-template-empty">Pronto habra canciones destacadas.</p>}
-      </section>
+      </section>}
 
       <footer className="artist-template-footer">
         <Link href="/paginas-de-artistas">Mas artistas</Link>

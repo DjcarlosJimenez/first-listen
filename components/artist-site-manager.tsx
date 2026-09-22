@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { ArrowDown, ArrowUp, ExternalLink, Plus, Save } from "lucide-react";
-import { slugifyDjCarlosAlbumTitle } from "@/lib/dj-carlos-page";
+import { ArrowDown, ArrowUp, Copy, ExternalLink, Plus, Save } from "lucide-react";
+import { normalizeArtistSiteSlug } from "@/lib/artist-sites";
 import { createClient } from "@/lib/supabase/client";
 
 type ManagedSite = {
@@ -25,6 +25,9 @@ export function ArtistSiteManager({ initialSites }: { initialSites: ManagedSite[
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
+  const [channelUrl, setChannelUrl] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -42,25 +45,42 @@ export function ArtistSiteManager({ initialSites }: { initialSites: ManagedSite[
 
   const createSite = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const client = createClient();
-    if (!client || busy) return;
+    if (busy) return;
     setBusy(true);
     setMessage("");
-    const { error } = await client.rpc("admin_create_artist_site", {
-      site_name: name.trim(),
-      site_slug: slug.trim() || slugifyDjCarlosAlbumTitle(name),
-      owner_email: ownerEmail.trim() || null,
-    });
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setName("");
-      setSlug("");
-      setOwnerEmail("");
-      setMessage("Pagina creada como borrador. Ya puedes editarla.");
-      await reload();
+    setCredentials(null);
+    try {
+      const response = await fetch("/api/owner/artist-sites", {
+        body: JSON.stringify({ channelUrl, name, ownerEmail, slug, tagline }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const result = await response.json().catch(() => ({})) as {
+        error?: string;
+        existingAccount?: boolean;
+        temporaryPassword?: string | null;
+      };
+      if (!response.ok) {
+        setMessage(result.error ?? "No se pudo crear la pagina.");
+      } else {
+        setName("");
+        setSlug("");
+        setOwnerEmail("");
+        setChannelUrl("");
+        setTagline("");
+        if (result.temporaryPassword && ownerEmail.trim()) {
+          setCredentials({ email: ownerEmail.trim(), password: result.temporaryPassword });
+        }
+        setMessage(result.existingAccount
+          ? "Pagina creada y asignada a la cuenta existente. Usa su contrasena actual."
+          : "Pagina creada como borrador. Ya puedes editarla.");
+        await reload();
+      }
+    } catch {
+      setMessage("No hubo conexion con el servidor. Intenta nuevamente.");
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   };
 
   const updateSite = (id: string, update: Partial<ManagedSite>) => {
@@ -121,21 +141,31 @@ export function ArtistSiteManager({ initialSites }: { initialSites: ManagedSite[
         <label>Nombre del artista
           <input required maxLength={120} onChange={(event) => setName(event.target.value)} value={name} />
         </label>
-        <label>Enlace publico
+        <label>Canal de YouTube
+          <input
+            onChange={(event) => setChannelUrl(event.target.value)}
+            placeholder="https://www.youtube.com/@canal"
+            type="url"
+            value={channelUrl}
+          />
+        </label>
+        <label>Direccion en First Listen
           <input
             aria-describedby="artist-site-slug-help"
-            maxLength={62}
             onChange={(event) => setSlug(event.target.value)}
-            placeholder={slugifyDjCarlosAlbumTitle(name || "nombre-artista")}
+            placeholder={normalizeArtistSiteSlug(channelUrl, name || "nombre-artista")}
             value={slug}
           />
-          <small id="artist-site-slug-help">firstlisten.net/{slug || slugifyDjCarlosAlbumTitle(name || "nombre-artista")}</small>
+          <small id="artist-site-slug-help">firstlisten.net/{normalizeArtistSiteSlug(slug || channelUrl, name || "nombre-artista")}</small>
         </label>
-        <label>Correo del artista (opcional)
+        <label>Descripcion breve
+          <input maxLength={240} onChange={(event) => setTagline(event.target.value)} value={tagline} />
+        </label>
+        <label>Correo para administrar (opcional)
           <input
             autoComplete="off"
             onChange={(event) => setOwnerEmail(event.target.value)}
-            placeholder="Debe tener una cuenta verificada"
+            placeholder="Si no existe, se creara una cuenta"
             type="email"
             value={ownerEmail}
           />
@@ -144,6 +174,14 @@ export function ArtistSiteManager({ initialSites }: { initialSites: ManagedSite[
       </form>
 
       {message && <p className="artist-site-manager-message" role="status">{message}</p>}
+      {credentials && (
+        <div className="artist-site-credentials" role="status">
+          <div><strong>Acceso temporal creado</strong><span>Comparte estos datos de forma privada. Al entrar debera cambiar la contrasena.</span></div>
+          <code>{credentials.email}</code>
+          <code>{credentials.password}</code>
+          <button onClick={() => void navigator.clipboard.writeText(`Correo: ${credentials.email}\nContrasena temporal: ${credentials.password}`)} type="button"><Copy size={16} /> Copiar acceso</button>
+        </div>
+      )}
 
       <div className="artist-site-manager-list">
         {sites.map((site) => (

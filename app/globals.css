@@ -22879,6 +22879,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .artist-site-manager-message,
+.artist-site-credentials,
 .artist-site-editor-status,
 .artist-site-editor-draft,
 .artist-site-manager-error {
@@ -22888,6 +22889,37 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: #253322;
   margin-block: 16px;
   padding: 11px 14px;
+}
+
+.artist-site-credentials {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1fr) auto auto auto;
+}
+
+.artist-site-credentials div,
+.artist-site-credentials span {
+  display: grid;
+}
+
+.artist-site-credentials code {
+  background: #fff;
+  border: 1px solid #cbd6c3;
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+.artist-site-credentials button {
+  align-items: center;
+  background: #19231a;
+  border: 0;
+  border-radius: 5px;
+  color: #d5fb66;
+  display: inline-flex;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 12px;
 }
 
 .artist-site-manager-list {
@@ -23291,6 +23323,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     flex-wrap: wrap;
   }
   .artist-site-create,
+  .artist-site-credentials,
   .artist-site-manager-fields,
   .artist-site-editor-header,
   .artist-site-editor-identity,

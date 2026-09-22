@@ -1,6 +1,7 @@
 import type { ArtistSiteConfig } from "@/lib/artist-sites";
 
 export const preview: ArtistSiteConfig = {
+  channelUrl: "",
   tagline: "Cumbia sonidera, musica nueva y videos oficiales.",
   logoUrl: "/artist/dj-carlos-jimenez/logo.png",
   portraitUrl: "/artist/dj-carlos-jimenez/portrait.png",
