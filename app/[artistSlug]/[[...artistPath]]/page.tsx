@@ -1,13 +1,22 @@
-import { notFound, permanentRedirect } from "next/navigation";
+import type { Metadata } from "next";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
+import { ArtistSiteEditor } from "@/components/artist-site-editor";
+import { ArtistSitePage } from "@/components/artist-site-page";
+import { normalizeArtistSiteConfig } from "@/lib/artist-sites";
+import { hasOwnerAccess } from "@/lib/admin-access";
 import {
   findPublicArtistPageBySlug,
   publicArtistPathFor,
 } from "@/lib/public-artist-pages";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+type RouteParams = { artistSlug: string; artistPath?: string[] };
+type RouteSearchParams = Record<string, string | string[] | undefined>;
+
 function serializeSearchParams(
-  searchParams: Record<string, string | string[] | undefined>,
+  searchParams: RouteSearchParams,
 ) {
   const params = new URLSearchParams();
 
@@ -23,25 +32,94 @@ function serializeSearchParams(
   return query ? `?${query}` : "";
 }
 
+async function findArtistSite(slug: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("artist_sites")
+    .select("id,slug,name,published,config,updated_at")
+    .eq("slug_key", slug.trim().toLowerCase())
+    .maybeSingle();
+  return error ? null : data;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<RouteParams>;
+}): Promise<Metadata> {
+  const { artistSlug, artistPath = [] } = await params;
+  const site = await findArtistSite(artistSlug);
+  if (!site) return {};
+  const config = normalizeArtistSiteConfig(site.config);
+  const canonicalPath = `/${site.slug}${artistPath.length ? `/${artistPath.map(encodeURIComponent).join("/")}` : ""}`;
+  return {
+    title: `${site.name} | First Listen`,
+    description: config.tagline || `Pagina oficial de ${site.name} en First Listen.`,
+    alternates: { canonical: `https://www.firstlisten.net${canonicalPath}` },
+    openGraph: config.logoUrl ? { images: [{ url: config.logoUrl }] } : undefined,
+    robots: { index: site.published && artistPath[0] !== "admin" },
+  };
+}
+
 export default async function PublicArtistSlugRoute({
   params,
   searchParams,
 }: {
-  params: Promise<{ artistSlug: string; artistPath?: string[] }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  params: Promise<RouteParams>;
+  searchParams: Promise<RouteSearchParams>;
 }) {
   const { artistSlug, artistPath = [] } = await params;
-  const route = findPublicArtistPageBySlug(artistSlug);
+  const djCarlosRoute = findPublicArtistPageBySlug(artistSlug);
 
-  if (!route) notFound();
-
-  const requestedPath = publicArtistPathFor(artistSlug, artistPath);
-  const canonicalPath = publicArtistPathFor(route.slug, artistPath);
-
-  if (requestedPath !== canonicalPath) {
-    const queryString = serializeSearchParams(await searchParams);
-    permanentRedirect(`${canonicalPath}${queryString}`);
+  if (djCarlosRoute) {
+    const requestedPath = publicArtistPathFor(artistSlug, artistPath);
+    const canonicalPath = publicArtistPathFor(djCarlosRoute.slug, artistPath);
+    if (requestedPath !== canonicalPath) {
+      permanentRedirect(`${canonicalPath}${serializeSearchParams(await searchParams)}`);
+    }
+    notFound();
   }
 
-  notFound();
+  const site = await findArtistSite(artistSlug);
+  if (!site) notFound();
+  const config = normalizeArtistSiteConfig(site.config);
+
+  let canonicalPath = `/${site.slug}`;
+  let albumSlug: string | undefined;
+  if (artistPath.length === 1 && artistPath[0] === "admin") {
+    canonicalPath += "/admin";
+  } else if (artistPath.length === 2 && artistPath[0] === "album") {
+    const album = config.albums.find((item) =>
+      item.slug.toLowerCase() === artistPath[1].toLowerCase(),
+    );
+    if (!album) notFound();
+    albumSlug = album.slug;
+    canonicalPath += `/album/${album.slug}`;
+  } else if (artistPath.length) {
+    notFound();
+  }
+
+  const requestedPath = publicArtistPathFor(artistSlug, artistPath);
+
+  if (requestedPath !== canonicalPath) {
+    permanentRedirect(`${canonicalPath}${serializeSearchParams(await searchParams)}`);
+  }
+
+  if (artistPath[0] === "admin") {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) redirect(`/login?next=${encodeURIComponent(canonicalPath)}`);
+    const [{ data: profile }, { data: assignment }] = await Promise.all([
+      supabase.from("profiles").select("role, founder_number, account_status, force_password_change").eq("id", user.id).maybeSingle(),
+      supabase.from("artist_sites").select("owner_user_id").eq("id", site.id).maybeSingle(),
+    ]);
+    if (profile?.force_password_change) redirect("/change-password");
+    if (
+      profile?.account_status !== "active" ||
+      (assignment?.owner_user_id !== user.id && !hasOwnerAccess(profile, user.email))
+    ) notFound();
+    return <ArtistSiteEditor site={{ ...site, config }} />;
+  }
+
+  return <ArtistSitePage albumSlug={albumSlug} config={config} site={site} />;
 }

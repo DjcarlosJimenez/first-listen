@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft, PanelsTopLeft, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/logo";
 import {
   SuperAdminControlCenter,
@@ -128,6 +128,9 @@ export default async function OwnerControlCenterPage() {
       <header className="account-header">
         <Logo />
         <div className="owner-header-actions">
+          <Link href="/owner/artist-pages">
+            <PanelsTopLeft size={16} /> Paginas de artistas
+          </Link>
           <Link href="/admin">
             <ShieldCheck size={16} /> Admin Panel
           </Link>

@@ -98,9 +98,9 @@ export function ArtistPagesPromo({
       </Link>
 
       <div className="artist-pages-promo-actions">
-        <Link href={DJ_CARLOS_PAGE_PATH}>
+        <Link href="/paginas-de-artistas">
           <Music2 size={15} />
-          {spanish ? "Ver ejemplo" : "View example"}
+          {spanish ? "Ver artistas" : "Browse artists"}
         </Link>
         <a href={ARTIST_PAGES_WHATSAPP_URL} rel="noreferrer" target="_blank">
           <MessageCircle size={15} />

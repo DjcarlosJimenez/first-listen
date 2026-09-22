@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { Download, Share2, Smartphone } from "lucide-react";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { useInterfaceLocale } from "@/lib/use-interface-locale";
@@ -241,6 +241,9 @@ function markShownThisSession(key: string) {
 
 export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const params = useParams();
+  const artistTemplatePage = Boolean(params?.artistSlug) ||
+    pathname?.startsWith("/artist-template-preview") === true;
   const [promptEvent, setPromptEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [installPromptChecked, setInstallPromptChecked] = useState(false);
@@ -407,7 +410,12 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   }, [clearUpdateReminder, showUpdateAvailable]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || isStandaloneMode()) return;
+    if (typeof window === "undefined") return;
+    if (artistTemplatePage) {
+      setVisible(false);
+      return;
+    }
+    if (isStandaloneMode()) return;
 
     const artistPage = isDjCarlosExperience(pathname);
     const dismissKey = artistPage ? DJ_CARLOS_DISMISS_KEY : DISMISS_KEY;
@@ -432,7 +440,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     }, delay);
 
     return () => window.clearTimeout(instructionTimer);
-  }, [pathname]);
+  }, [artistTemplatePage, pathname]);
 
   const dismissInstructions = useCallback(() => {
     markDismissed(
@@ -523,8 +531,8 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   return (
     <PwaInstallContext.Provider value={value}>
       {children}
-      <PwaInstallPrompt visible={visible} />
-      <PwaUpdatePrompt visible={installed && updateAvailable} />
+      <PwaInstallPrompt visible={visible && !artistTemplatePage} />
+      <PwaUpdatePrompt visible={installed && updateAvailable && !artistTemplatePage} />
     </PwaInstallContext.Provider>
   );
 }
