@@ -21074,6 +21074,38 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: #fff;
 }
 
+.pwa-install-card.artist-pwa-install-card {
+  background: color-mix(in srgb, #fff 92%, var(--pwa-artist-accent, #ffd565) 8%);
+  border-color: color-mix(in srgb, var(--pwa-artist-accent, #ffd565) 62%, #25251f);
+  width: min(620px, calc(100vw - 36px));
+}
+
+.pwa-install-card.artist-pwa-install-card .pwa-install-icon {
+  background: #10100e;
+  border: 1px solid color-mix(in srgb, var(--pwa-artist-accent, #ffd565) 68%, #fff);
+  overflow: hidden;
+}
+
+.pwa-install-card.artist-pwa-install-card .pwa-install-icon img {
+  display: block;
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.pwa-install-card.artist-pwa-install-card strong {
+  color: #111;
+}
+
+.pwa-install-card.artist-pwa-install-card span {
+  color: #4a4639;
+}
+
+.pwa-install-card.artist-pwa-install-card .pwa-install-actions button:first-child {
+  background: #111;
+  color: #fff;
+}
+
 .djcx-admin-page {
   --djcx-black: #050505;
   --djcx-panel: #11110f;

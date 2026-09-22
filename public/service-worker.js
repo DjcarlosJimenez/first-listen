@@ -1,4 +1,4 @@
-const CACHE_VERSION = "first-listen-pwa-v10-artist-subdomains";
+const CACHE_VERSION = "first-listen-pwa-v11-artist-pages";
 const OFFLINE_URL = "/offline";
 const APP_SHELL = [
   OFFLINE_URL,
@@ -72,7 +72,8 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/icons/") ||
     url.pathname.startsWith("/artist/dj-carlos-jimenez/") ||
     url.pathname === "/manifest.webmanifest" ||
-    url.pathname === "/DJCarlosJimenez/manifest.webmanifest"
+    url.pathname.endsWith("/manifest.webmanifest") ||
+    /\/pwa-icon\/(192|512)$/.test(url.pathname)
   ) {
     event.respondWith(
       caches.match(request).then((cached) => {

@@ -7,6 +7,7 @@ import {
   ArrowLeft, ArrowUpRight, Disc3, ExternalLink, ListMusic,
   Pause, Play, Share2, SkipBack, SkipForward, Video,
 } from "lucide-react";
+import { ArtistPwaInstallBrand } from "@/components/pwa-install-prompt";
 import { ProviderPlayer, type ProviderTelemetrySnapshot } from "@/components/provider-player";
 import {
   artistSiteThumbnail,
@@ -217,7 +218,14 @@ export function ArtistSitePage({
   const accentStyle = { "--artist-accent": config.accentColor } as CSSProperties;
 
   return (
-    <main className="artist-template" style={accentStyle}>
+    <>
+      <ArtistPwaInstallBrand
+        accentColor={config.accentColor}
+        logoUrl={config.logoUrl}
+        name={site.name}
+        slug={site.slug}
+      />
+      <main className="artist-template" style={accentStyle}>
       <div className="artist-template-topline">
         <Link href="/paginas-de-artistas"><ArrowLeft size={15} /> Artistas</Link>
         <span>FIRST LISTEN</span>
@@ -353,7 +361,8 @@ export function ArtistSitePage({
         <Link href="/paginas-de-artistas">Mas artistas</Link>
         {site.id !== "preview" && <Link href={`${rootPath}/admin`}>Panel del artista</Link>}
       </footer>
-    </main>
+      </main>
+    </>
   );
 }
 

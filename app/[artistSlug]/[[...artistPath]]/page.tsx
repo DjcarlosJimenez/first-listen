@@ -52,10 +52,25 @@ export async function generateMetadata({
   if (!site) return {};
   const config = normalizeArtistSiteConfig(site.config);
   const canonicalPath = `/${site.slug}${artistPath.length ? `/${artistPath.map(encodeURIComponent).join("/")}` : ""}`;
+  const pwaIconPath = `/${site.slug}/pwa-icon`;
   return {
     title: `${site.name} | First Listen`,
     description: config.tagline || `Pagina oficial de ${site.name} en First Listen.`,
+    applicationName: site.name,
     alternates: { canonical: `https://www.firstlisten.net${canonicalPath}` },
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "black-translucent",
+      title: site.name,
+    },
+    icons: {
+      apple: [{ url: `${pwaIconPath}/192`, sizes: "192x192", type: "image/png" }],
+      icon: [
+        { url: `${pwaIconPath}/192`, sizes: "192x192", type: "image/png" },
+        { url: `${pwaIconPath}/512`, sizes: "512x512", type: "image/png" },
+      ],
+    },
+    manifest: `/${site.slug}/manifest.webmanifest`,
     openGraph: config.logoUrl ? { images: [{ url: config.logoUrl }] } : undefined,
     robots: { index: site.published && artistPath[0] !== "admin" },
   };

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import {
   createContext,
+  type CSSProperties,
   type ReactNode,
   useCallback,
   useContext,
@@ -39,7 +40,9 @@ type PwaInstallContextValue = {
   nativePromptAvailable: boolean;
   refreshing: boolean;
   updateAvailable: boolean;
+  artistInstallBrand: ArtistInstallBrand | null;
   requestInstall: () => Promise<void>;
+  registerArtistInstallBrand: (brand: ArtistInstallBrand | null) => void;
   dismissInstructions: () => void;
   hideInstructionsForSession: () => void;
   dismissUpdate: () => void;
@@ -50,8 +53,10 @@ const PwaInstallContext = createContext<PwaInstallContextValue | null>(null);
 
 const DISMISS_KEY = "first-listen-install-dismissed-at";
 const DJ_CARLOS_DISMISS_KEY = `${DISMISS_KEY}:dj-carlos`;
+const ARTIST_DISMISS_KEY_PREFIX = `${DISMISS_KEY}:artist:`;
 const SESSION_PROMPT_KEY = "first-listen-install-shown-session";
 const DJ_CARLOS_SESSION_PROMPT_KEY = `${SESSION_PROMPT_KEY}:dj-carlos`;
+const ARTIST_SESSION_PROMPT_KEY_PREFIX = `${SESSION_PROMPT_KEY}:artist:`;
 const DISMISS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const INSTALL_INSTRUCTION_DELAY_MS = 45000;
 const ARTIST_INSTALL_INSTRUCTION_DELAY_MS = 2500;
@@ -61,6 +66,13 @@ const DJ_CARLOS_HOST = "djcarlosjimenez.firstlisten.net";
 const DJ_CARLOS_ICON_URL = "/artist/dj-carlos-jimenez/icon-192.png";
 const INSTALL_PROMPT_CAPTURED_EVENT = "first-listen:install-prompt-captured";
 
+export type ArtistInstallBrand = {
+  accentColor: string;
+  logoUrl: string;
+  name: string;
+  slug: string;
+};
+
 type InstallPromptBrand = {
   actionLabel: string;
   cardClassName: string;
@@ -68,6 +80,7 @@ type InstallPromptBrand = {
   iosInstruction: ReactNode;
   manualInstruction: string;
   nativeInstruction: string;
+  style?: CSSProperties;
   title: string;
 };
 
@@ -88,7 +101,39 @@ function isDjCarlosExperience(pathname: string | null) {
   return isDjCarlosPath(pathname) || isDjCarlosHost();
 }
 
-function installPromptBrandFor(pathname: string | null, spanish: boolean): InstallPromptBrand {
+function installPromptBrandFor(
+  pathname: string | null,
+  spanish: boolean,
+  artistBrand: ArtistInstallBrand | null,
+): InstallPromptBrand {
+  if (artistBrand) {
+    const artistName = artistBrand.name;
+    return {
+      actionLabel: spanish ? `Instalar ${artistName}` : `Install ${artistName}`,
+      cardClassName: "pwa-install-card artist-pwa-install-card",
+      iconUrl: artistBrand.logoUrl || null,
+      iosInstruction: (
+        <>
+          {spanish ? "En iPhone o iPad, toca Compartir" : "On iPhone or iPad, tap Share"}{" "}
+          <Share2 size={13} />{" "}
+          {spanish
+            ? `y luego Agregar a inicio para entrar directamente a ${artistName}.`
+            : `then Add to Home Screen for direct access to ${artistName}.`}
+        </>
+      ),
+      manualInstruction: spanish
+        ? `Instala la pagina de ${artistName} para tenerla en tu pantalla de inicio.`
+        : `Install ${artistName}'s page on your home screen.`,
+      nativeInstruction: spanish
+        ? `Agrega ${artistName} a tu pantalla de inicio con su propio logo.`
+        : `Add ${artistName} to your home screen with its own logo.`,
+      style: {
+        "--pwa-artist-accent": artistBrand.accentColor,
+      } as CSSProperties,
+      title: spanish ? `Instalar ${artistName}` : `Install ${artistName}`,
+    };
+  }
+
   const artistPage = isDjCarlosExperience(pathname);
   if (artistPage) {
     return {
@@ -242,10 +287,13 @@ function markShownThisSession(key: string) {
 export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const params = useParams();
-  const artistTemplatePage = Boolean(params?.artistSlug) ||
-    pathname?.startsWith("/artist-template-preview") === true;
+  const dynamicArtistPage = Boolean(params?.artistSlug);
+  const artistPreviewPage = pathname?.startsWith("/artist-template-preview") === true;
+  const artistAdminPage = dynamicArtistPage && pathname?.toLowerCase().endsWith("/admin");
   const [promptEvent, setPromptEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
+  const [artistInstallBrand, setArtistInstallBrand] =
+    useState<ArtistInstallBrand | null>(null);
   const [installPromptChecked, setInstallPromptChecked] = useState(false);
   const [androidDevice, setAndroidDevice] = useState(false);
   const [inAppBrowser, setInAppBrowser] = useState(false);
@@ -258,6 +306,13 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const updateVersionRef = useRef<string | null>(null);
   const updateReminderTimerRef = useRef<number | null>(null);
+  const artistPromptSuppressed = artistPreviewPage || artistAdminPage ||
+    (dynamicArtistPage && !artistInstallBrand);
+
+  const registerArtistInstallBrand = useCallback(
+    (brand: ArtistInstallBrand | null) => setArtistInstallBrand(brand),
+    [],
+  );
 
   const clearUpdateReminder = useCallback(() => {
     if (updateReminderTimerRef.current === null) return;
@@ -411,23 +466,32 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (artistTemplatePage) {
+    if (artistPromptSuppressed) {
       setVisible(false);
       return;
     }
     if (isStandaloneMode()) return;
 
-    const artistPage = isDjCarlosExperience(pathname);
-    const dismissKey = artistPage ? DJ_CARLOS_DISMISS_KEY : DISMISS_KEY;
+    const brandedArtistPage = Boolean(artistInstallBrand);
+    const artistPage = brandedArtistPage || isDjCarlosExperience(pathname);
+    const artistKey = artistInstallBrand?.slug.toLocaleLowerCase("en-US") ?? "";
+    const dismissKey = brandedArtistPage
+      ? `${ARTIST_DISMISS_KEY_PREFIX}${artistKey}`
+      : artistPage
+        ? DJ_CARLOS_DISMISS_KEY
+        : DISMISS_KEY;
+    const sessionPromptKey = brandedArtistPage
+      ? `${ARTIST_SESSION_PROMPT_KEY_PREFIX}${artistKey}`
+      : DJ_CARLOS_SESSION_PROMPT_KEY;
     if (
       recentlyDismissed(dismissKey) ||
-      (artistPage && alreadyShownThisSession(DJ_CARLOS_SESSION_PROMPT_KEY))
+      (artistPage && alreadyShownThisSession(sessionPromptKey))
     ) {
       return;
     }
 
     if (artistPage) {
-      markShownThisSession(DJ_CARLOS_SESSION_PROMPT_KEY);
+      markShownThisSession(sessionPromptKey);
     }
 
     const delay = artistPage
@@ -440,15 +504,18 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     }, delay);
 
     return () => window.clearTimeout(instructionTimer);
-  }, [artistTemplatePage, pathname]);
+  }, [artistInstallBrand, artistPromptSuppressed, pathname]);
 
   const dismissInstructions = useCallback(() => {
-    markDismissed(
-      isDjCarlosExperience(pathname) ? DJ_CARLOS_DISMISS_KEY : DISMISS_KEY,
-      true,
-    );
+    const artistKey = artistInstallBrand?.slug.toLocaleLowerCase("en-US");
+    const dismissKey = artistKey
+      ? `${ARTIST_DISMISS_KEY_PREFIX}${artistKey}`
+      : isDjCarlosExperience(pathname)
+        ? DJ_CARLOS_DISMISS_KEY
+        : DISMISS_KEY;
+    markDismissed(dismissKey, true);
     setVisible(false);
-  }, [pathname]);
+  }, [artistInstallBrand, pathname]);
 
   const hideInstructionsForSession = useCallback(() => {
     setVisible(false);
@@ -494,6 +561,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const value = useMemo<PwaInstallContextValue>(
     () => ({
       androidDevice,
+      artistInstallBrand,
       inAppBrowser,
       installPromptChecked,
       installed,
@@ -504,6 +572,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       refreshing,
       updateAvailable,
       requestInstall,
+      registerArtistInstallBrand,
       dismissInstructions,
       hideInstructionsForSession,
       dismissUpdate,
@@ -511,6 +580,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     }),
     [
       androidDevice,
+      artistInstallBrand,
       dismissInstructions,
       dismissUpdate,
       hideInstructionsForSession,
@@ -523,6 +593,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       promptEvent,
       refreshApp,
       refreshing,
+      registerArtistInstallBrand,
       requestInstall,
       updateAvailable,
     ],
@@ -531,8 +602,8 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   return (
     <PwaInstallContext.Provider value={value}>
       {children}
-      <PwaInstallPrompt visible={visible && !artistTemplatePage} />
-      <PwaUpdatePrompt visible={installed && updateAvailable && !artistTemplatePage} />
+      <PwaInstallPrompt visible={visible && !artistPromptSuppressed} />
+      <PwaUpdatePrompt visible={installed && updateAvailable && !artistPromptSuppressed} />
     </PwaInstallContext.Provider>
   );
 }
@@ -543,6 +614,22 @@ function usePwaInstall() {
     throw new Error("PwaInstall components must be used inside PwaInstallProvider.");
   }
   return value;
+}
+
+export function ArtistPwaInstallBrand({
+  accentColor,
+  logoUrl,
+  name,
+  slug,
+}: ArtistInstallBrand) {
+  const { registerArtistInstallBrand } = usePwaInstall();
+
+  useEffect(() => {
+    registerArtistInstallBrand({ accentColor, logoUrl, name, slug });
+    return () => registerArtistInstallBrand(null);
+  }, [accentColor, logoUrl, name, registerArtistInstallBrand, slug]);
+
+  return null;
 }
 
 export function PwaInstallButton({
@@ -561,6 +648,7 @@ export function PwaInstallButton({
   onAfterRequest?: () => void;
 }) {
   const {
+    artistInstallBrand,
     installed,
     installPromptChecked,
     installing,
@@ -571,7 +659,7 @@ export function PwaInstallButton({
   const pathname = usePathname();
   if (installed) return null;
 
-  const spanish = locale === "es" || isDjCarlosExperience(pathname);
+  const spanish = locale === "es" || isDjCarlosExperience(pathname) || Boolean(artistInstallBrand);
   const manualInstallMode = installPromptChecked && !nativePromptAvailable;
   const baseLabel = label ?? (spanish ? "Instalar First Listen" : "Install First Listen");
   const buttonLabel =
@@ -621,6 +709,7 @@ export function PwaInstallButton({
 function PwaInstallPrompt({ visible }: { visible: boolean }) {
   const {
     androidDevice,
+    artistInstallBrand,
     dismissInstructions,
     hideInstructionsForSession,
     inAppBrowser,
@@ -635,8 +724,8 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
   const [manualHelpVisible, setManualHelpVisible] = useState(false);
   const locale = useInterfaceLocale();
   const pathname = usePathname();
-  const spanish = locale === "es" || isDjCarlosExperience(pathname);
-  const brand = installPromptBrandFor(pathname, spanish);
+  const spanish = locale === "es" || isDjCarlosExperience(pathname) || Boolean(artistInstallBrand);
+  const brand = installPromptBrandFor(pathname, spanish, artistInstallBrand);
   const manualInstallMode = installPromptChecked && !nativePromptAvailable;
 
   if (installed || !visible) return null;
@@ -681,13 +770,13 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
 
   const primaryLabel = (() => {
     if (installing) return spanish ? "Instalando..." : "Installing...";
-    if (nativePromptAvailable) return spanish ? "Instalar" : "Install";
+    if (nativePromptAvailable) return brand.actionLabel;
     if (manualInstallMode && manualHelpVisible) return spanish ? "Entendido" : "Got it";
     return spanish ? "Ver pasos" : "Show steps";
   })();
 
   return (
-    <aside className={brand.cardClassName} aria-live="polite">
+    <aside className={brand.cardClassName} aria-live="polite" style={brand.style}>
       <div className="pwa-install-icon" aria-hidden="true">
         {brand.iconUrl ? (
           <Image alt="" height={40} src={brand.iconUrl} unoptimized width={40} />
