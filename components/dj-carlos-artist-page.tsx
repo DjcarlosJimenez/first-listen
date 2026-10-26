@@ -30,13 +30,18 @@ import {
   mergeDjCarlosRhythms,
   normalizeDjCarlosPageConfig,
   normalizeDjCarlosUpcomingSignals,
+  normalizeDjCarlosVideoPlayCounts,
   sameDjCarlosRhythm,
+  sortDjCarlosOfficialVideos,
+  uniqueDjCarlosRhythms,
   type DjCarlosAlbum,
   type DjCarlosPageConfig,
   type DjCarlosTrack,
   type DjCarlosUpcomingReactionKey,
   type DjCarlosUpcomingRelease,
   type DjCarlosUpcomingSignals,
+  type DjCarlosVideoPlayCounts,
+  type DjCarlosVideoSortMode,
 } from "@/lib/dj-carlos-page";
 import { nextDjCarlosQueueTrackId } from "@/lib/dj-carlos-playback";
 import { dispatchWorkspaceV2PlaybackCommand } from "@/lib/workspace-v2";
@@ -44,6 +49,8 @@ import { dispatchWorkspaceV2PlaybackCommand } from "@/lib/workspace-v2";
 const PLAYER_CHANNEL = "dj-carlos-jimenez";
 const UPCOMING_FOLLOW_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:upcoming-follow`;
 const UPCOMING_REACTION_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:upcoming-reaction`;
+const VIDEO_VISITOR_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:video-visitor`;
+const VIDEO_PLAY_DAY_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:video-play-day`;
 const ALBUM_PLAYER_TRACK_ID = "dj-carlos-album-main-link";
 const UPCOMING_REACTIONS: {
   key: DjCarlosUpcomingReactionKey;
@@ -69,6 +76,22 @@ function playbackLabel(snapshot: ProviderTelemetrySnapshot | null) {
   if (snapshot.playbackState === "completed") return "TERMINADO";
   if (snapshot.playbackState === "error") return "REVISAR LINK";
   return "CARGANDO";
+}
+
+function getVideoVisitorId() {
+  const existing = window.localStorage.getItem(VIDEO_VISITOR_KEY);
+  if (existing && /^[a-zA-Z0-9_-]{16,80}$/.test(existing)) return existing;
+
+  const visitorId = typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID().replace(/-/g, "")
+    : `${Date.now()}${Math.random().toString(36).slice(2)}`;
+  window.localStorage.setItem(VIDEO_VISITOR_KEY, visitorId);
+  return visitorId;
+}
+
+function videoPlayThreshold(duration: number) {
+  if (!Number.isFinite(duration) || duration <= 0) return Number.POSITIVE_INFINITY;
+  return Math.min(30, Math.max(10, duration * 0.25));
 }
 
 function albumsForConfig(config: DjCarlosPageConfig) {
@@ -220,10 +243,12 @@ function bumpUpcomingSignal(
 export function DjCarlosArtistPage({
   initialConfig,
   initialAlbumSlug,
+  initialVideoPlayCounts = {},
   logoUrl: fallbackLogoUrl,
 }: {
   initialConfig: DjCarlosPageConfig;
   initialAlbumSlug?: string;
+  initialVideoPlayCounts?: DjCarlosVideoPlayCounts;
   logoUrl: string;
 }) {
   const requestPlaybackRef = useRef<(() => void) | null>(null);
@@ -233,6 +258,8 @@ export function DjCarlosArtistPage({
   const autoPlayEnabledRef = useRef(true);
   const playerPausedByUserRef = useRef(false);
   const deepLinkTrackAppliedRef = useRef<string | null>(null);
+  const countedVideoPlayRef = useRef(new Set<string>());
+  const pendingVideoPlayRef = useRef(new Set<string>());
   const shareNoticeTimerRef = useRef<number | null>(null);
   const [config, setConfig] = useState(() =>
     normalizeDjCarlosPageConfig(initialConfig),
@@ -247,6 +274,13 @@ export function DjCarlosArtistPage({
   const [usingLocalDraft, setUsingLocalDraft] = useState(false);
   const [showTopTenList, setShowTopTenList] = useState(false);
   const [selectedRhythm, setSelectedRhythm] = useState("");
+  const [selectedVideoRhythm, setSelectedVideoRhythm] = useState("");
+  const [videoQueueActive, setVideoQueueActive] = useState(false);
+  const [videoSortMode, setVideoSortMode] =
+    useState<DjCarlosVideoSortMode>("official");
+  const [videoPlayCounts, setVideoPlayCounts] = useState(() =>
+    normalizeDjCarlosVideoPlayCounts(initialVideoPlayCounts),
+  );
   const [followingUpcoming, setFollowingUpcoming] = useState(false);
   const [selectedUpcomingReactions, setSelectedUpcomingReactions] = useState<
     DjCarlosUpcomingReactionKey[]
@@ -363,6 +397,26 @@ export function DjCarlosArtistPage({
     () => tracks.filter((track) => track.section === "official-video"),
     [tracks],
   );
+  const videoRhythms = useMemo(
+    () => uniqueDjCarlosRhythms(officialVideos.map((track) => track.mood)),
+    [officialVideos],
+  );
+  const filteredOfficialVideos = useMemo(
+    () => selectedVideoRhythm
+      ? officialVideos.filter((track) =>
+          sameDjCarlosRhythm(track.mood, selectedVideoRhythm),
+        )
+      : officialVideos,
+    [officialVideos, selectedVideoRhythm],
+  );
+  const orderedOfficialVideos = useMemo(
+    () => sortDjCarlosOfficialVideos(
+      filteredOfficialVideos,
+      videoPlayCounts,
+      videoSortMode,
+    ),
+    [filteredOfficialVideos, videoPlayCounts, videoSortMode],
+  );
   const allAlbumTracks = useMemo(
     () => tracks.filter((track) => track.section === "album"),
     [tracks],
@@ -405,13 +459,27 @@ export function DjCarlosArtistPage({
     [allAlbumTracks, officialVideos, topTenTracks],
   );
   const playQueue = useMemo(
-    () =>
-      selectedRhythm
-        ? libraryPlayQueue.filter((track) =>
-            trackMatchesRhythm(track, selectedRhythm, albums),
-          )
+    () => videoQueueActive
+      ? orderedOfficialVideos
+      : selectedRhythm
+        ? [
+            ...libraryPlayQueue.filter(
+              (track) =>
+                track.section !== "official-video" &&
+                trackMatchesRhythm(track, selectedRhythm, albums),
+            ),
+            ...officialVideos,
+          ]
         : basePlayQueue,
-    [albums, basePlayQueue, libraryPlayQueue, selectedRhythm],
+    [
+      albums,
+      basePlayQueue,
+      libraryPlayQueue,
+      officialVideos,
+      orderedOfficialVideos,
+      selectedRhythm,
+      videoQueueActive,
+    ],
   );
   const activeTrack = useMemo(() => {
     if (albumPlayerTrack?.id === activeId) return albumPlayerTrack;
@@ -468,16 +536,6 @@ export function DjCarlosArtistPage({
         : topTenTracks,
     [albums, selectedRhythm, topTenTracks],
   );
-  const visibleOfficialVideos = useMemo(
-    () =>
-      selectedRhythm
-        ? officialVideos.filter((track) =>
-            trackMatchesRhythm(track, selectedRhythm, albums),
-          )
-        : officialVideos,
-    [albums, officialVideos, selectedRhythm],
-  );
-
   const showShareNotice = useCallback((message: string) => {
     setShareNotice(message);
     if (shareNoticeTimerRef.current !== null) {
@@ -626,6 +684,81 @@ export function DjCarlosArtistPage({
   }, [activeTrack, playQueue]);
 
   useEffect(() => {
+    if (
+      selectedVideoRhythm &&
+      !videoRhythms.some((rhythm) =>
+        sameDjCarlosRhythm(rhythm, selectedVideoRhythm),
+      )
+    ) {
+      setSelectedVideoRhythm("");
+    }
+  }, [selectedVideoRhythm, videoRhythms]);
+
+  useEffect(() => {
+    if (
+      activeTrack?.section !== "official-video" ||
+      snapshot?.playbackState !== "playing" ||
+      !snapshot.pageVisible ||
+      !snapshot.pageFocused ||
+      snapshot.currentTime < videoPlayThreshold(snapshot.duration)
+    ) {
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const dailyKey = `${VIDEO_PLAY_DAY_KEY}:${today}:${activeTrack.id}`;
+    if (countedVideoPlayRef.current.has(dailyKey)) return;
+    try {
+      if (window.localStorage.getItem(dailyKey) === "counted") {
+        countedVideoPlayRef.current.add(dailyKey);
+        return;
+      }
+    } catch {
+      // El servidor tambien evita conteos repetidos durante la misma sesion.
+    }
+    if (pendingVideoPlayRef.current.has(dailyKey)) return;
+
+    pendingVideoPlayRef.current.add(dailyKey);
+    let visitorId = "";
+    try {
+      visitorId = getVideoVisitorId();
+    } catch {
+      visitorId = `${Date.now()}${Math.random().toString(36).slice(2)}`;
+    }
+
+    void fetch("/DJCarlosJimenez/video-plays", {
+      body: JSON.stringify({ trackId: activeTrack.id, visitorId }),
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      method: "POST",
+    })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = await response.json().catch(() => null);
+        if (data?.counts) {
+          setVideoPlayCounts(normalizeDjCarlosVideoPlayCounts(data.counts));
+        }
+        countedVideoPlayRef.current.add(dailyKey);
+        try {
+          window.localStorage.setItem(dailyKey, "counted");
+        } catch {
+          // El conteo ya quedo guardado en el servidor.
+        }
+      })
+      .finally(() => {
+        pendingVideoPlayRef.current.delete(dailyKey);
+      });
+  }, [
+    activeTrack?.id,
+    activeTrack?.section,
+    snapshot?.currentTime,
+    snapshot?.duration,
+    snapshot?.pageFocused,
+    snapshot?.pageVisible,
+    snapshot?.playbackState,
+  ]);
+
+  useEffect(() => {
     return () => {
       if (shareNoticeTimerRef.current !== null) {
         window.clearTimeout(shareNoticeTimerRef.current);
@@ -654,6 +787,12 @@ export function DjCarlosArtistPage({
       setSnapshot(null);
       setAutoPlayEnabled(true);
       setPlayerPausedByUser(false);
+      setVideoQueueActive(
+        tracks.some(
+          (track) =>
+            track.id === requestedTrackId && track.section === "official-video",
+        ),
+      );
       setActiveId(requestedTrackId);
       setPlayerVersion((version) => version + 1);
     } catch {
@@ -700,6 +839,11 @@ export function DjCarlosArtistPage({
   ]);
 
   const playTrack = (trackId: string) => {
+    setVideoQueueActive(
+      tracks.some(
+        (track) => track.id === trackId && track.section === "official-video",
+      ),
+    );
     lastAutoAdvanceKeyRef.current = null;
     lastTelemetryStateRef.current = "loading";
     setSnapshot(null);
@@ -763,7 +907,11 @@ export function DjCarlosArtistPage({
   };
 
   const playFirstVideo = () => {
-    if (visibleOfficialVideos[0]) playTrack(visibleOfficialVideos[0].id);
+    if (orderedOfficialVideos[0]) playTrack(orderedOfficialVideos[0].id);
+  };
+
+  const selectVideoRhythm = (rhythm: string) => {
+    setSelectedVideoRhythm(rhythm);
   };
 
   const clearRhythmFilter = () => {
@@ -982,10 +1130,10 @@ export function DjCarlosArtistPage({
               <Disc3 size={17} />
               {isAlbumDetail ? "Reproducir este album" : "Reproducir album"}
             </button>
-            <button onClick={playFirstVideo} type="button">
+            <a href="#videos">
               <Video size={17} />
               Videos oficiales
-            </button>
+            </a>
             <button onClick={() => void sharePage()} type="button">
               <Share2 size={17} />
               {isAlbumDetail ? "Compartir album" : "Compartir pagina"}
@@ -1140,11 +1288,18 @@ export function DjCarlosArtistPage({
 
       {!isAlbumDetail && (
         <VideosSection
+          allTracksCount={officialVideos.length}
           onPlayFirstVideo={playFirstVideo}
           onPlayTrack={playTrack}
+          onSelectRhythm={selectVideoRhythm}
+          onSortMode={setVideoSortMode}
           onShareOriginalTrack={(track) => void shareOriginalTrack(track)}
           onShareTrack={(track) => void shareTrack(track)}
-          tracks={visibleOfficialVideos}
+          playCounts={videoPlayCounts}
+          rhythms={videoRhythms}
+          selectedRhythm={selectedVideoRhythm}
+          sortMode={videoSortMode}
+          tracks={orderedOfficialVideos}
         />
       )}
 
@@ -1160,11 +1315,18 @@ export function DjCarlosArtistPage({
 
       {isAlbumDetail && (
         <VideosSection
+          allTracksCount={officialVideos.length}
           onPlayFirstVideo={playFirstVideo}
           onPlayTrack={playTrack}
+          onSelectRhythm={selectVideoRhythm}
+          onSortMode={setVideoSortMode}
           onShareOriginalTrack={(track) => void shareOriginalTrack(track)}
           onShareTrack={(track) => void shareTrack(track)}
-          tracks={visibleOfficialVideos}
+          playCounts={videoPlayCounts}
+          rhythms={videoRhythms}
+          selectedRhythm={selectedVideoRhythm}
+          sortMode={videoSortMode}
+          tracks={orderedOfficialVideos}
         />
       )}
 
@@ -1407,16 +1569,30 @@ function ArtistInstallPanel({ logoUrl }: { logoUrl: string }) {
 }
 
 function VideosSection({
+  allTracksCount,
   onPlayFirstVideo,
   onPlayTrack,
+  onSelectRhythm,
+  onSortMode,
   onShareOriginalTrack,
   onShareTrack,
+  playCounts,
+  rhythms,
+  selectedRhythm,
+  sortMode,
   tracks,
 }: {
+  allTracksCount: number;
   onPlayFirstVideo: () => void;
   onPlayTrack: (trackId: string) => void;
+  onSelectRhythm: (rhythm: string) => void;
+  onSortMode: (mode: DjCarlosVideoSortMode) => void;
   onShareOriginalTrack: (track: DjCarlosTrack) => void;
   onShareTrack: (track: DjCarlosTrack) => void;
+  playCounts: DjCarlosVideoPlayCounts;
+  rhythms: string[];
+  selectedRhythm: string;
+  sortMode: DjCarlosVideoSortMode;
   tracks: DjCarlosTrack[];
 }) {
   return (
@@ -1424,14 +1600,69 @@ function VideosSection({
       <div className="djcx-section-heading">
         <div>
           <span>
-            <Video size={14} /> YouTube
+            <Video size={14} /> Videos oficiales
           </span>
           <h2>Videos musicales oficiales</h2>
+          <p className="djcx-video-count">
+            {tracks.length} {tracks.length === 1 ? "video disponible" : "videos disponibles"}
+            {selectedRhythm ? ` de ${allTracksCount} en total` : ""}
+          </p>
         </div>
-        <button onClick={onPlayFirstVideo} type="button">
+        <button disabled={!tracks.length} onClick={onPlayFirstVideo} type="button">
           <Play fill="currentColor" size={16} />
-          Ver ahora
+          Reproducir seleccion
         </button>
+      </div>
+
+      <div className="djcx-video-toolbar" aria-label="Filtros de videos oficiales">
+        <div className="djcx-video-filters">
+          <span>Estilo</span>
+          <div>
+            <button
+              aria-pressed={!selectedRhythm}
+              className={!selectedRhythm ? "is-active" : ""}
+              onClick={() => onSelectRhythm("")}
+              type="button"
+            >
+              Todos
+            </button>
+            {rhythms.map((rhythm) => {
+              const active = sameDjCarlosRhythm(selectedRhythm, rhythm);
+              return (
+                <button
+                  aria-pressed={active}
+                  className={active ? "is-active" : ""}
+                  key={rhythm}
+                  onClick={() => onSelectRhythm(rhythm)}
+                  type="button"
+                >
+                  {rhythm}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="djcx-video-sort" aria-label="Ordenar videos">
+          <span>Orden</span>
+          <div>
+            <button
+              aria-pressed={sortMode === "official"}
+              className={sortMode === "official" ? "is-active" : ""}
+              onClick={() => onSortMode("official")}
+              type="button"
+            >
+              Orden oficial
+            </button>
+            <button
+              aria-pressed={sortMode === "popular"}
+              className={sortMode === "popular" ? "is-active" : ""}
+              onClick={() => onSortMode("popular")}
+              type="button"
+            >
+              Mas reproducidos
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="djcx-video-grid">
@@ -1453,7 +1684,14 @@ function VideosSection({
                 <Play fill="currentColor" size={20} />
               </span>
               <strong>{track.title}</strong>
-              <small>{track.subtitle}</small>
+              <small className="djcx-video-card-meta">
+                <span>{track.mood}</span>
+                {sortMode === "popular" && (
+                  <span>
+                    {playCounts[track.id]?.recent ?? 0} reproducciones recientes
+                  </span>
+                )}
+              </small>
             </button>
             <div className="djcx-video-actions">
               <button
@@ -1476,7 +1714,9 @@ function VideosSection({
           </article>
         ))}
         {!tracks.length && (
-          <p className="djcx-empty">No hay videos con este ritmo todavia.</p>
+          <p className="djcx-empty">
+            No hay videos disponibles en este estilo todavia.
+          </p>
         )}
       </div>
     </section>

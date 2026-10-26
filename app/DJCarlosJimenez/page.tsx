@@ -3,8 +3,13 @@ import { headers } from "next/headers";
 import { DjCarlosArtistPage } from "@/components/dj-carlos-artist-page";
 import {
   DJ_CARLOS_LOGO_URL,
+  normalizeDjCarlosPageConfig,
 } from "@/lib/dj-carlos-page";
-import { readDjCarlosPageConfig } from "@/lib/dj-carlos-page-store";
+import djCarlosProductionSnapshot from "@/lib/dj-carlos-page-production-snapshot.json";
+import {
+  readDjCarlosPageConfig,
+  readDjCarlosVideoPlayCounts,
+} from "@/lib/dj-carlos-page-store";
 import {
   findPublicArtistPageByHost,
   PUBLIC_ARTIST_HOST_HEADER,
@@ -55,12 +60,34 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function DjCarlosJimenezPage() {
-  const initialConfig = await readDjCarlosPageConfig();
+type DjCarlosJimenezPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function DjCarlosJimenezPage({
+  searchParams,
+}: DjCarlosJimenezPageProps) {
+  const headerStore = await headers();
+  const params: Record<string, string | string[] | undefined> = searchParams
+    ? await searchParams
+    : {};
+  const host = (headerStore.get("host") ?? "").toLowerCase();
+  const localPreview = params.localPreview;
+  const useProductionSnapshot =
+    (host.startsWith("127.0.0.1") || host.startsWith("localhost")) &&
+    (localPreview === "1" ||
+      (Array.isArray(localPreview) && localPreview.includes("1")));
+  const [initialConfig, initialVideoPlayCounts] = await Promise.all([
+    useProductionSnapshot
+      ? Promise.resolve(normalizeDjCarlosPageConfig(djCarlosProductionSnapshot))
+      : readDjCarlosPageConfig(),
+    readDjCarlosVideoPlayCounts(),
+  ]);
 
   return (
     <DjCarlosArtistPage
       initialConfig={initialConfig}
+      initialVideoPlayCounts={initialVideoPlayCounts}
       logoUrl={DJ_CARLOS_LOGO_URL}
     />
   );

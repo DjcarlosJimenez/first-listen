@@ -39,6 +39,7 @@ import {
   DJ_CARLOS_PAGE_STORAGE_KEY,
   detectDjCarlosPlatform,
   getDjCarlosTrackThumbnail,
+  getDjCarlosYouTubeVideoId,
   isDjCarlosTrack,
   isDjCarlosPlaceholderRhythm,
   isPlayableDjCarlosLink,
@@ -679,7 +680,9 @@ export function DjCarlosAdminPage({
       const groupTracks = current.tracks.filter(
         (item) =>
           item.section === track.section &&
-          (track.section !== "album" || item.albumId === track.albumId),
+          (track.section !== "album" || item.albumId === track.albumId) &&
+          (track.section !== "official-video" ||
+            sameDjCarlosRhythm(item.mood, track.mood)),
       );
       const groupIndex = groupTracks.findIndex((item) => item.id === trackId);
       const swapTrack = groupTracks[groupIndex + direction];
@@ -705,7 +708,7 @@ export function DjCarlosAdminPage({
     setStatus("Cancion quitada. Toca Guardar cambios para publicarlo.");
   };
 
-  const addTrack = (event: FormEvent<HTMLFormElement>) => {
+  const addTrack = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const title = draft.title.trim();
     const link = draft.link.trim();
@@ -718,6 +721,21 @@ export function DjCarlosAdminPage({
       return;
     }
 
+    if (draft.section === "official-video") {
+      const videoId = getDjCarlosYouTubeVideoId(link);
+      const duplicate = config.tracks.some(
+        (track) =>
+          track.section === "official-video" &&
+          videoId !== null &&
+          getDjCarlosYouTubeVideoId(track.link) === videoId,
+      );
+      if (duplicate) {
+        setStatus("Este video ya esta publicado en Videos oficiales.");
+        return;
+      }
+    }
+
+    const platform = detectDjCarlosPlatform(link);
     hasLocalChangesRef.current = true;
     const trackMood = normalizeDjCarlosRhythm(
       draft.mood,
@@ -731,7 +749,7 @@ export function DjCarlosAdminPage({
       id: `dj-carlos-local-${Date.now()}`,
       link,
       mood: trackMood,
-      platform: detectDjCarlosPlatform(link),
+      platform,
       release:
         draft.section === "album" ? selectedAlbum.title : "DJ Carlos Jimenez",
       section: draft.section,
@@ -744,12 +762,20 @@ export function DjCarlosAdminPage({
       title,
     };
 
-    setConfig((current) => ({
-      ...current,
-      rhythms: mergeDjCarlosRhythms(current.rhythms, [trackMood]),
-      tracks: [...current.tracks, track],
-    }));
+    const nextConfig: DjCarlosPageConfig = {
+      ...config,
+      rhythms: mergeDjCarlosRhythms(config.rhythms, [trackMood]),
+      tracks: [...config.tracks, track],
+    };
+    setConfig(nextConfig);
     setDraft({ ...emptyDraft, mood: selectedAlbum.mood || DJ_CARLOS_DEFAULT_RHYTHM });
+
+    if (draft.section === "official-video") {
+      setStatus("Publicando video...");
+      await saveConfig("Video publicado.", nextConfig);
+      return;
+    }
+
     setStatus("Cancion agregada. Toca Guardar cambios para publicarla.");
   };
 
@@ -1117,26 +1143,31 @@ export function DjCarlosAdminPage({
     setStatus("Pagina restaurada en el editor. Toca Guardar cambios para publicarla.");
   };
 
-  const saveConfig = async (nextStatus = "Cambios publicados.") => {
-    let sourceConfig = config;
-    try {
-      const saved = window.localStorage.getItem(DJ_CARLOS_PAGE_STORAGE_KEY);
-      if (saved) {
-        const savedConfig = normalizeDjCarlosPageConfig(
-          JSON.parse(saved),
-          config,
-        );
-        const savedAt = Date.parse(savedConfig.updatedAt);
-        const currentAt = Date.parse(config.updatedAt);
-        if (
-          Number.isFinite(savedAt) &&
-          (!Number.isFinite(currentAt) || savedAt >= currentAt)
-        ) {
-          sourceConfig = savedConfig;
+  async function saveConfig(
+    nextStatus = "Cambios publicados.",
+    configOverride?: DjCarlosPageConfig,
+  ) {
+    let sourceConfig = configOverride ?? config;
+    if (!configOverride) {
+      try {
+        const saved = window.localStorage.getItem(DJ_CARLOS_PAGE_STORAGE_KEY);
+        if (saved) {
+          const savedConfig = normalizeDjCarlosPageConfig(
+            JSON.parse(saved),
+            config,
+          );
+          const savedAt = Date.parse(savedConfig.updatedAt);
+          const currentAt = Date.parse(config.updatedAt);
+          if (
+            Number.isFinite(savedAt) &&
+            (!Number.isFinite(currentAt) || savedAt >= currentAt)
+          ) {
+            sourceConfig = savedConfig;
+          }
         }
+      } catch {
+        sourceConfig = config;
       }
-    } catch {
-      sourceConfig = config;
     }
 
     const nextConfig = normalizeDjCarlosPageConfig(
@@ -1187,7 +1218,12 @@ export function DjCarlosAdminPage({
       hasLocalChangesRef.current = false;
       persistLocalDraft(publishedConfig);
       setConfig(publishedConfig);
-      setStatus(nextStatus);
+      const publishedVideoCount = publishedConfig.tracks.filter(
+        (track) => track.section === "official-video",
+      ).length;
+      setStatus(
+        `${nextStatus} ${publishedVideoCount} videos oficiales disponibles.`,
+      );
       return true;
     } catch {
       hasLocalChangesRef.current = true;
@@ -1200,7 +1236,7 @@ export function DjCarlosAdminPage({
     } finally {
       setSaving(false);
     }
-  };
+  }
 
   const saveAndViewPage = async () => {
     const published = await saveConfig("Cambios publicados. Abriendo la pagina.");
@@ -1848,9 +1884,13 @@ export function DjCarlosAdminPage({
               <option value="official-video">Videos oficiales</option>
             </select>
           </label>
-          <button type="submit">
+          <button disabled={saving} type="submit">
             <Save size={16} />
-            Agregar
+            {saving
+              ? "Publicando..."
+              : draft.section === "official-video"
+                ? "Agregar y publicar"
+                : "Agregar"}
           </button>
         </form>
         <p className="djcx-admin-add-status" role="status">{status}</p>
@@ -1885,7 +1925,7 @@ export function DjCarlosAdminPage({
         onRemove={removeTrack}
         onUpdate={updateTrack}
         rhythmOptions={rhythmOptions}
-        title="Videos oficiales"
+        title={`Videos oficiales (${videoTracks.length}) · orden por estilo`}
         tracks={videoTracks}
       />
     </main>

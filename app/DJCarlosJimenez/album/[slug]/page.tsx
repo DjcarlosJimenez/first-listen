@@ -3,7 +3,10 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { DjCarlosArtistPage } from "@/components/dj-carlos-artist-page";
 import { DJ_CARLOS_LOGO_URL } from "@/lib/dj-carlos-page";
-import { readDjCarlosPageConfig } from "@/lib/dj-carlos-page-store";
+import {
+  readDjCarlosPageConfig,
+  readDjCarlosVideoPlayCounts,
+} from "@/lib/dj-carlos-page-store";
 import {
   findPublicArtistPageByHost,
   PUBLIC_ARTIST_HOST_HEADER,
@@ -86,7 +89,10 @@ export default async function DjCarlosAlbumPage({
 }) {
   const { slug } = await params;
   const query = await searchParams;
-  const initialConfig = await readDjCarlosPageConfig();
+  const [initialConfig, initialVideoPlayCounts] = await Promise.all([
+    readDjCarlosPageConfig(),
+    readDjCarlosVideoPlayCounts(),
+  ]);
   const album = initialConfig.albums.find((item) => item.slug === slug);
 
   if (!album && !wantsLocalPreview(query)) notFound();
@@ -95,6 +101,7 @@ export default async function DjCarlosAlbumPage({
     <DjCarlosArtistPage
       initialAlbumSlug={slug}
       initialConfig={initialConfig}
+      initialVideoPlayCounts={initialVideoPlayCounts}
       logoUrl={DJ_CARLOS_LOGO_URL}
     />
   );

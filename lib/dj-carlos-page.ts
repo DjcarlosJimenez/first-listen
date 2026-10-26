@@ -23,6 +23,14 @@ export const DJ_CARLOS_DEFAULT_RHYTHMS = [
 
 export type DjCarlosTrackSection = "album" | "top-ten" | "official-video";
 export type DjCarlosPlayablePlatform = "YouTube" | "YouTube Music";
+export type DjCarlosVideoSortMode = "official" | "popular";
+
+export type DjCarlosVideoPlayCount = {
+  recent: number;
+  total: number;
+};
+
+export type DjCarlosVideoPlayCounts = Record<string, DjCarlosVideoPlayCount>;
 
 export type DjCarlosTrack = {
   albumId?: string;
@@ -84,6 +92,54 @@ export type DjCarlosPageConfig = {
   upcomingRelease: DjCarlosUpcomingRelease;
   updatedAt: string;
 };
+
+function cleanDjCarlosVideoPlayNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : 0;
+}
+
+export function normalizeDjCarlosVideoPlayCounts(
+  value: unknown,
+): DjCarlosVideoPlayCounts {
+  if (!value || typeof value !== "object") return {};
+
+  return Object.entries(value as Record<string, unknown>).reduce<DjCarlosVideoPlayCounts>(
+    (counts, [trackId, rawCount]) => {
+      if (!trackId.trim() || !rawCount || typeof rawCount !== "object") {
+        return counts;
+      }
+      const count = rawCount as Record<string, unknown>;
+      counts[trackId] = {
+        recent: cleanDjCarlosVideoPlayNumber(count.recent),
+        total: cleanDjCarlosVideoPlayNumber(count.total),
+      };
+      return counts;
+    },
+    {},
+  );
+}
+
+export function sortDjCarlosOfficialVideos(
+  tracks: readonly DjCarlosTrack[],
+  counts: DjCarlosVideoPlayCounts,
+  mode: DjCarlosVideoSortMode,
+) {
+  if (mode === "official") return [...tracks];
+
+  return tracks
+    .map((track, index) => ({ index, track }))
+    .sort((left, right) => {
+      const leftCount = counts[left.track.id] ?? { recent: 0, total: 0 };
+      const rightCount = counts[right.track.id] ?? { recent: 0, total: 0 };
+      return (
+        rightCount.recent - leftCount.recent ||
+        rightCount.total - leftCount.total ||
+        left.index - right.index
+      );
+    })
+    .map(({ track }) => track);
+}
 
 type DefaultSongSeed = {
   id: string;

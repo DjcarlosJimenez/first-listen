@@ -19728,6 +19728,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
 .djcx-player-controls button,
 .djcx-player-controls a,
+.djcx-hero-actions a,
 .djcx-hero-actions button,
 .djcx-album-panel button,
 .djcx-section-heading button,
@@ -19818,7 +19819,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   margin-top: 20px;
 }
 
-.djcx-hero-actions button {
+.djcx-hero-actions button,
+.djcx-hero-actions a {
   background: rgba(255, 255, 255, 0.07);
   color: var(--djcx-cream);
   font-size: 11px;
@@ -20282,6 +20284,19 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: #fff;
 }
 
+.djcx-section-heading button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.djcx-video-count {
+  color: var(--djcx-muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+  margin: 7px 0 0;
+}
+
 .djcx-editor {
   display: grid;
   gap: 12px;
@@ -20422,6 +20437,69 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.djcx-video-toolbar {
+  align-items: flex-end;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(246, 200, 79, 0.17);
+  border-radius: 8px;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 12px;
+}
+
+.djcx-video-filters,
+.djcx-video-sort {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.djcx-video-filters {
+  flex: 1;
+}
+
+.djcx-video-filters > span,
+.djcx-video-sort > span {
+  color: var(--djcx-gold);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.djcx-video-filters > div,
+.djcx-video-sort > div {
+  display: flex;
+  gap: 7px;
+}
+
+.djcx-video-filters > div {
+  flex-wrap: wrap;
+}
+
+.djcx-video-toolbar button {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.djcx-video-toolbar button:hover,
+.djcx-video-toolbar button.is-active {
+  background: var(--djcx-gold);
+  border-color: var(--djcx-gold);
+  color: #0e0e0c;
+}
+
 .djcx-video-card {
   color: #fff;
   display: grid;
@@ -20476,6 +20554,17 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .djcx-video-card-main small {
   color: var(--djcx-muted);
   font-size: 12px;
+}
+
+.djcx-video-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+}
+
+.djcx-video-card-meta span:first-child {
+  color: var(--djcx-gold);
+  font-weight: 800;
 }
 
 .djcx-video-actions {
@@ -20714,13 +20803,15 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     margin-top: 16px;
   }
 
-  .djcx-hero-actions button {
+  .djcx-hero-actions button,
+  .djcx-hero-actions a {
     font-size: 11px;
     min-height: 38px;
     padding: 9px 11px;
   }
 
   .djcx-hero-actions button,
+  .djcx-hero-actions a,
   .djcx-section-heading button,
   .djcx-album-panel button,
   .djcx-top-ten-actions button {
@@ -20762,6 +20853,40 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .djcx-album-panel h2,
   .djcx-section-heading h2 {
     font-size: 24px;
+  }
+
+  .djcx-video-section .djcx-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .djcx-video-section .djcx-section-heading button {
+    width: 100%;
+  }
+
+  .djcx-video-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .djcx-video-filters > div,
+  .djcx-video-sort > div {
+    flex-wrap: nowrap;
+    margin-right: -12px;
+    overflow-x: auto;
+    padding-bottom: 3px;
+    padding-right: 12px;
+    scrollbar-width: none;
+  }
+
+  .djcx-video-filters > div::-webkit-scrollbar,
+  .djcx-video-sort > div::-webkit-scrollbar {
+    display: none;
+  }
+
+  .djcx-video-toolbar button {
+    flex: 0 0 auto;
   }
 
   .djcx-quick-stats {
