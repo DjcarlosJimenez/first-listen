@@ -20,10 +20,13 @@ import {
   Download,
   ExternalLink,
   Heart,
+  Eye,
+  EyeOff,
   ImagePlus,
   ListMusic,
   LogOut,
   MessageCircle,
+  Music2,
   Play,
   Plus,
   RotateCcw,
@@ -37,6 +40,8 @@ import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import {
   DJ_CARLOS_DEFAULT_RHYTHM,
   DJ_CARLOS_PAGE_STORAGE_KEY,
+  DJ_CARLOS_PREVIEW_CLIP_MAX_MB,
+  DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS,
   detectDjCarlosPlatform,
   getDjCarlosTrackThumbnail,
   getDjCarlosYouTubeVideoId,
@@ -54,6 +59,7 @@ import {
   type DjCarlosPageConfig,
   type DjCarlosTrack,
   type DjCarlosTrackSection,
+  type DjCarlosUpcomingPreviewClip,
   type DjCarlosUpcomingReactionKey,
 } from "@/lib/dj-carlos-page";
 
@@ -69,6 +75,9 @@ type EditableTrackField = "link" | "mood" | "section" | "subtitle" | "title";
 type EditableIdentityField = "logoUrl" | "portraitUrl";
 
 type EditableUpcomingField = "badge" | "coverUrl" | "note" | "status" | "title";
+type EditableUpcomingBooleanField =
+  | "hidePreviewClipsWhenAvailable"
+  | "showPreviewClips";
 
 type AlbumImportResponse = {
   album?: Partial<DjCarlosAlbum>;
@@ -91,6 +100,39 @@ const upcomingReactionLabels: Record<DjCarlosUpcomingReactionKey, string> = {
 };
 const DJ_CARLOS_COVER_MAX_MB = 20;
 const DJ_CARLOS_COVER_MAX_BYTES = DJ_CARLOS_COVER_MAX_MB * 1024 * 1024;
+const DJ_CARLOS_PREVIEW_CLIP_MAX_BYTES =
+  DJ_CARLOS_PREVIEW_CLIP_MAX_MB * 1024 * 1024;
+
+function previewTitleKey(value: string) {
+  return value.trim().toLocaleLowerCase("es");
+}
+
+function readAudioDuration(file: File) {
+  return new Promise<number>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const audio = document.createElement("audio");
+    const cleanup = () => {
+      audio.removeAttribute("src");
+      audio.load();
+      URL.revokeObjectURL(objectUrl);
+    };
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      const duration = audio.duration;
+      cleanup();
+      if (!Number.isFinite(duration) || duration <= 0) {
+        reject(new Error("No se pudo leer la duracion del audio."));
+        return;
+      }
+      resolve(duration);
+    };
+    audio.onerror = () => {
+      cleanup();
+      reject(new Error("No se pudo abrir este archivo de audio."));
+    };
+    audio.src = objectUrl;
+  });
+}
 
 function albumsForConfig(config: DjCarlosPageConfig) {
   return config.albums?.length ? config.albums : [config.album];
@@ -185,6 +227,7 @@ export function DjCarlosAdminPage({
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingPortrait, setUploadingPortrait] = useState(false);
   const [uploadingUpcomingCover, setUploadingUpcomingCover] = useState(false);
+  const [uploadingPreviewTitle, setUploadingPreviewTitle] = useState("");
   const [importingAlbum, setImportingAlbum] = useState(false);
   const [status, setStatus] = useState("Panel listo para editar.");
   const [newRhythm, setNewRhythm] = useState("");
@@ -304,6 +347,21 @@ export function DjCarlosAdminPage({
     [config.tracks],
   );
   const upcomingRelease = config.upcomingRelease;
+  const upcomingPreviewByTitle = useMemo(
+    () => new Map(
+      upcomingRelease.previewClips.map((clip) => [
+        previewTitleKey(clip.title),
+        clip,
+      ]),
+    ),
+    [upcomingRelease.previewClips],
+  );
+  const unassignedUpcomingPreviews = useMemo(() => {
+    const trackTitles = new Set(upcomingRelease.tracks.map(previewTitleKey));
+    return upcomingRelease.previewClips.filter(
+      (clip) => !trackTitles.has(previewTitleKey(clip.title)),
+    );
+  }, [upcomingRelease.previewClips, upcomingRelease.tracks]);
   const albumTrackCounts = useMemo(() => {
     const counts = new Map<string, number>();
     config.tracks.forEach((track) => {
@@ -543,6 +601,206 @@ export function DjCarlosAdminPage({
       return nextConfig;
     });
     setStatus("Lista tentativa actualizada. Toca Guardar cambios.");
+  };
+
+  const updateUpcomingBoolean = (
+    field: EditableUpcomingBooleanField,
+    value: boolean,
+  ) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => {
+      const nextConfig = {
+        ...current,
+        upcomingRelease: {
+          ...current.upcomingRelease,
+          [field]: value,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      persistLocalDraft(nextConfig);
+      return nextConfig;
+    });
+    setStatus("Visibilidad de adelantos actualizada. Toca Guardar cambios.");
+  };
+
+  const publishUpcomingPreviews = async (
+    previewClips: DjCarlosUpcomingPreviewClip[],
+    successMessage: string,
+  ) => {
+    const nextConfig: DjCarlosPageConfig = {
+      ...config,
+      upcomingRelease: {
+        ...config.upcomingRelease,
+        previewClips,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    hasLocalChangesRef.current = true;
+    persistLocalDraft(nextConfig);
+    setConfig(nextConfig);
+    return saveConfig(successMessage, nextConfig);
+  };
+
+  const deleteStoredPreviewFile = async (storagePath: string) => {
+    const response = await fetch("/DJCarlosJimenez/preview-clips", {
+      body: JSON.stringify({ storagePath }),
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      method: "DELETE",
+    }).catch(() => null);
+    return response?.ok === true;
+  };
+
+  const handleUpcomingPreviewFile = async (
+    event: ChangeEvent<HTMLInputElement>,
+    trackTitle: string,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const validType = [
+      "audio/aac",
+      "audio/mp3",
+      "audio/mp4",
+      "audio/mpeg",
+      "audio/x-aac",
+      "audio/x-m4a",
+    ].includes(file.type);
+    if (!validType) {
+      setStatus("Selecciona un audio MP3, M4A o AAC.");
+      return;
+    }
+    if (file.size > DJ_CARLOS_PREVIEW_CLIP_MAX_BYTES) {
+      setStatus(
+        `El adelanto debe pesar menos de ${DJ_CARLOS_PREVIEW_CLIP_MAX_MB} MB.`,
+      );
+      return;
+    }
+
+    const titleKey = previewTitleKey(trackTitle);
+    setUploadingPreviewTitle(titleKey);
+    setStatus("Revisando la duracion del adelanto...");
+
+    try {
+      const durationSeconds = await readAudioDuration(file);
+      if (durationSeconds > DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS + 0.5) {
+        throw new Error(
+          `El adelanto dura ${Math.ceil(durationSeconds)} segundos. Recortalo a ${DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS} segundos o menos.`,
+        );
+      }
+      if (!(await ensureAdminSession())) return;
+
+      const existingClip = upcomingPreviewByTitle.get(titleKey);
+      const formData = new FormData();
+      formData.append("durationSeconds", String(durationSeconds));
+      formData.append("file", file);
+      formData.append("title", trackTitle);
+      if (existingClip) formData.append("clipId", existingClip.id);
+
+      setStatus(
+        existingClip ? "Reemplazando adelanto..." : "Subiendo adelanto privado...",
+      );
+      const response = await fetch("/DJCarlosJimenez/preview-clips", {
+        body: formData,
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        setStatus(
+          "Tu sesion vencio. Entra otra vez para subir el adelanto.",
+        );
+        redirectToAdminLogin();
+        return;
+      }
+      if (!response.ok || !data.clip) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "No se pudo subir el adelanto.",
+        );
+      }
+
+      const nextClip = data.clip as DjCarlosUpcomingPreviewClip;
+      const nextClips = existingClip
+        ? upcomingRelease.previewClips.map((clip) =>
+            clip.id === existingClip.id ? nextClip : clip,
+          )
+        : [...upcomingRelease.previewClips, nextClip];
+      const published = await publishUpcomingPreviews(
+        nextClips,
+        existingClip ? "Adelanto reemplazado y publicado." : "Adelanto publicado.",
+      );
+      if (
+        published &&
+        existingClip &&
+        existingClip.storagePath !== nextClip.storagePath
+      ) {
+        await deleteStoredPreviewFile(existingClip.storagePath);
+      }
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "No se pudo subir el adelanto.",
+      );
+    } finally {
+      setUploadingPreviewTitle("");
+    }
+  };
+
+  const toggleUpcomingPreview = async (
+    clip: DjCarlosUpcomingPreviewClip,
+  ) => {
+    await publishUpcomingPreviews(
+      upcomingRelease.previewClips.map((item) =>
+        item.id === clip.id ? { ...item, enabled: !item.enabled } : item,
+      ),
+      clip.enabled ? "Adelanto ocultado." : "Adelanto publicado.",
+    );
+  };
+
+  const removeUpcomingPreview = async (
+    clip: DjCarlosUpcomingPreviewClip,
+  ) => {
+    if (!window.confirm(`Quitar el adelanto de ${clip.title}?`)) return;
+    const published = await publishUpcomingPreviews(
+      upcomingRelease.previewClips.filter((item) => item.id !== clip.id),
+      "Adelanto quitado de la pagina.",
+    );
+    if (published) {
+      const deleted = await deleteStoredPreviewFile(clip.storagePath);
+      if (!deleted) {
+        setStatus(
+          "El adelanto se quito de la pagina, pero el archivo privado no pudo limpiarse ahora.",
+        );
+      }
+    }
+  };
+
+  const reassignUpcomingPreview = async (
+    clip: DjCarlosUpcomingPreviewClip,
+    title: string,
+  ) => {
+    if (!title || title === clip.title) return;
+    const titleKey = previewTitleKey(title);
+    if (
+      upcomingRelease.previewClips.some(
+        (item) =>
+          item.id !== clip.id && previewTitleKey(item.title) === titleKey,
+      )
+    ) {
+      setStatus("Esa cancion ya tiene un adelanto.");
+      return;
+    }
+    await publishUpcomingPreviews(
+      upcomingRelease.previewClips.map((item) =>
+        item.id === clip.id ? { ...item, title } : item,
+      ),
+      "Adelanto reasignado.",
+    );
   };
 
   const addAlbum = () => {
@@ -1222,7 +1480,9 @@ export function DjCarlosAdminPage({
         (track) => track.section === "official-video",
       ).length;
       setStatus(
-        `${nextStatus} ${publishedVideoCount} videos oficiales disponibles.`,
+        nextStatus.toLocaleLowerCase("es").includes("video")
+          ? `${nextStatus} ${publishedVideoCount} videos oficiales disponibles.`
+          : nextStatus,
       );
       return true;
     } catch {
@@ -1795,6 +2055,162 @@ export function DjCarlosAdminPage({
               />
             </label>
           </div>
+        </div>
+
+        <div className="djcx-admin-preview-clips">
+          <div className="djcx-admin-preview-heading">
+            <div>
+              <span><Music2 size={16} /> Adelantos exclusivos</span>
+              <strong>Clips privados de hasta 30 segundos</strong>
+            </div>
+            <small>
+              MP3, M4A o AAC · maximo {DJ_CARLOS_PREVIEW_CLIP_MAX_MB} MB
+            </small>
+          </div>
+
+          <div className="djcx-admin-preview-settings">
+            <label className="djcx-admin-toggle">
+              <input
+                checked={upcomingRelease.showPreviewClips}
+                onChange={(event) =>
+                  updateUpcomingBoolean("showPreviewClips", event.target.checked)
+                }
+                type="checkbox"
+              />
+              Mostrar adelantos en mi pagina
+            </label>
+            <label className="djcx-admin-toggle">
+              <input
+                checked={upcomingRelease.hidePreviewClipsWhenAvailable}
+                onChange={(event) =>
+                  updateUpcomingBoolean(
+                    "hidePreviewClipsWhenAvailable",
+                    event.target.checked,
+                  )
+                }
+                type="checkbox"
+              />
+              Ocultarlos cuando el estado diga Disponible
+            </label>
+          </div>
+
+          <p className="djcx-admin-preview-note">
+            Cada archivo se guarda de forma privada y la pagina usa un enlace temporal.
+            Subir o reemplazar un clip lo publica inmediatamente.
+          </p>
+
+          <div className="djcx-admin-preview-list">
+            {upcomingRelease.tracks.map((trackTitle, index) => {
+              const clip = upcomingPreviewByTitle.get(previewTitleKey(trackTitle));
+              const uploading =
+                uploadingPreviewTitle === previewTitleKey(trackTitle);
+              return (
+                <article key={`${trackTitle}-${index}`}>
+                  <div className="djcx-admin-preview-title">
+                    <Music2 size={16} />
+                    <div>
+                      <strong>{trackTitle}</strong>
+                      <small>
+                        {clip
+                          ? `${clip.durationSeconds.toFixed(1)} segundos · ${clip.enabled ? "Visible" : "Oculto"}`
+                          : "Sin adelanto"}
+                      </small>
+                    </div>
+                  </div>
+
+                  {clip && (
+                    <audio
+                      controls
+                      controlsList="nodownload noplaybackrate"
+                      onContextMenu={(event) => event.preventDefault()}
+                      preload="none"
+                      src={`/DJCarlosJimenez/preview-clips/${encodeURIComponent(clip.id)}`}
+                    />
+                  )}
+
+                  <div className="djcx-admin-preview-actions">
+                    <label
+                      className={`djcx-file-control${uploading ? " is-loading" : ""}`}
+                    >
+                      <Save size={15} />
+                      {uploading
+                        ? "Subiendo..."
+                        : clip
+                          ? "Reemplazar"
+                          : "Agregar MP3"}
+                      <input
+                        accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/aac,audio/x-aac"
+                        disabled={Boolean(uploadingPreviewTitle) || saving}
+                        onChange={(event) =>
+                          void handleUpcomingPreviewFile(event, trackTitle)
+                        }
+                        type="file"
+                      />
+                    </label>
+                    {clip && (
+                      <>
+                        <button
+                          disabled={saving || Boolean(uploadingPreviewTitle)}
+                          onClick={() => void toggleUpcomingPreview(clip)}
+                          type="button"
+                        >
+                          {clip.enabled ? <EyeOff size={15} /> : <Eye size={15} />}
+                          {clip.enabled ? "Ocultar" : "Mostrar"}
+                        </button>
+                        <button
+                          className="is-danger"
+                          disabled={saving || Boolean(uploadingPreviewTitle)}
+                          onClick={() => void removeUpcomingPreview(clip)}
+                          type="button"
+                        >
+                          <Trash2 size={15} /> Quitar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+
+            {!upcomingRelease.tracks.length && (
+              <p className="djcx-admin-preview-empty">
+                Agrega primero los posibles nombres de las canciones.
+              </p>
+            )}
+          </div>
+
+          {unassignedUpcomingPreviews.length > 0 && (
+            <div className="djcx-admin-preview-unassigned">
+              <strong>Adelantos sin una cancion actual</strong>
+              {unassignedUpcomingPreviews.map((clip) => (
+                <article key={clip.id}>
+                  <span>{clip.title}</span>
+                  <select
+                    defaultValue=""
+                    disabled={saving}
+                    onChange={(event) =>
+                      void reassignUpcomingPreview(clip, event.target.value)
+                    }
+                  >
+                    <option value="">Reasignar a...</option>
+                    {upcomingRelease.tracks.map((trackTitle) => (
+                      <option key={trackTitle} value={trackTitle}>
+                        {trackTitle}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="is-danger"
+                    disabled={saving}
+                    onClick={() => void removeUpcomingPreview(clip)}
+                    type="button"
+                  >
+                    <Trash2 size={15} /> Quitar
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="djcx-admin-upcoming-signals">

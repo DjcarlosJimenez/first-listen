@@ -20,6 +20,8 @@ export const DJ_CARLOS_DEFAULT_RHYTHMS = [
   "Chilenas Zapateadas",
   "Video musical",
 ] as const;
+export const DJ_CARLOS_PREVIEW_CLIP_MAX_MB = 5;
+export const DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS = 30;
 
 export type DjCarlosTrackSection = "album" | "top-ten" | "official-video";
 export type DjCarlosPlayablePlatform = "YouTube" | "YouTube Music";
@@ -66,11 +68,23 @@ export type DjCarlosUpcomingSignals = {
   reactions: Record<DjCarlosUpcomingReactionKey, number>;
 };
 
+export type DjCarlosUpcomingPreviewClip = {
+  durationSeconds: number;
+  enabled: boolean;
+  id: string;
+  storagePath: string;
+  title: string;
+  uploadedAt: string;
+};
+
 export type DjCarlosUpcomingRelease = {
   enabled: boolean;
   badge: string;
   coverUrl: string;
+  hidePreviewClipsWhenAvailable: boolean;
   note: string;
+  previewClips: DjCarlosUpcomingPreviewClip[];
+  showPreviewClips: boolean;
   signals: DjCarlosUpcomingSignals;
   status: string;
   title: string;
@@ -472,8 +486,11 @@ export const defaultDjCarlosPageConfig: DjCarlosPageConfig = {
     badge: "Exclusivo aqui",
     coverUrl: DJ_CARLOS_LOGO_URL,
     enabled: true,
+    hidePreviewClipsWhenAvailable: false,
     note:
       "Sigue el progreso del proximo album antes de que la musica salga oficialmente.",
+    previewClips: [],
+    showPreviewClips: true,
     signals: {
       followers: 0,
       reactions: {
@@ -633,6 +650,58 @@ export function normalizeDjCarlosUpcomingSignals(
   };
 }
 
+function cleanUpcomingPreviewClips(
+  value: unknown,
+  fallback: DjCarlosUpcomingPreviewClip[] = [],
+) {
+  const rawClips = Array.isArray(value) ? value : fallback;
+  const ids = new Set<string>();
+  const titles = new Set<string>();
+
+  return rawClips.reduce<DjCarlosUpcomingPreviewClip[]>((clips, rawClip) => {
+    if (!rawClip || typeof rawClip !== "object") return clips;
+    const clip = rawClip as Record<string, unknown>;
+    const id = typeof clip.id === "string" ? clip.id.trim() : "";
+    const title = typeof clip.title === "string" ? clip.title.trim() : "";
+    const storagePath =
+      typeof clip.storagePath === "string" ? clip.storagePath.trim() : "";
+    const duration = Number(clip.durationSeconds);
+    const titleKey = title.toLocaleLowerCase("es");
+
+    if (
+      !/^[a-zA-Z0-9_-]{8,80}$/.test(id) ||
+      !title ||
+      !storagePath.startsWith("previews/") ||
+      storagePath.includes("..") ||
+      !Number.isFinite(duration) ||
+      duration <= 0 ||
+      duration > DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS + 0.5 ||
+      ids.has(id) ||
+      titles.has(titleKey)
+    ) {
+      return clips;
+    }
+
+    ids.add(id);
+    titles.add(titleKey);
+    clips.push({
+      durationSeconds: Math.min(
+        DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS,
+        Math.round(duration * 10) / 10,
+      ),
+      enabled: typeof clip.enabled === "boolean" ? clip.enabled : true,
+      id,
+      storagePath,
+      title: title.slice(0, 160),
+      uploadedAt:
+        typeof clip.uploadedAt === "string" && clip.uploadedAt.trim()
+          ? clip.uploadedAt
+          : new Date(0).toISOString(),
+    });
+    return clips;
+  }, []);
+}
+
 function cleanUpcomingRelease(
   value: unknown,
   fallback: DjCarlosUpcomingRelease,
@@ -658,10 +727,22 @@ function cleanUpcomingRelease(
       typeof release.enabled === "boolean"
         ? release.enabled
         : fallback.enabled,
+    hidePreviewClipsWhenAvailable:
+      typeof release.hidePreviewClipsWhenAvailable === "boolean"
+        ? release.hidePreviewClipsWhenAvailable
+        : fallback.hidePreviewClipsWhenAvailable,
     note:
       typeof release.note === "string" && release.note.trim()
         ? release.note.trim()
         : fallback.note,
+    previewClips: cleanUpcomingPreviewClips(
+      release.previewClips,
+      fallback.previewClips,
+    ),
+    showPreviewClips:
+      typeof release.showPreviewClips === "boolean"
+        ? release.showPreviewClips
+        : fallback.showPreviewClips,
     signals: normalizeDjCarlosUpcomingSignals(release.signals, fallback.signals),
     status:
       typeof release.status === "string" && release.status.trim()

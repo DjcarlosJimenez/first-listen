@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import {
+  defaultDjCarlosPageConfig,
+  normalizeDjCarlosPageConfig,
   normalizeDjCarlosVideoPlayCounts,
   sameDjCarlosRhythm,
   sortDjCarlosOfficialVideos,
@@ -52,4 +54,50 @@ assert.deepEqual(uniqueDjCarlosRhythms(videos.map(({ mood }) => mood)), [
 ]);
 assert.equal(sameDjCarlosRhythm(" bachata ", "Bachata"), true);
 
-console.log("DJ Carlos video library verification passed.");
+const previewConfig = normalizeDjCarlosPageConfig({
+  ...defaultDjCarlosPageConfig,
+  upcomingRelease: {
+    ...defaultDjCarlosPageConfig.upcomingRelease,
+    previewClips: [
+      {
+        durationSeconds: 29.8,
+        enabled: true,
+        id: "preview-valid-1",
+        storagePath: "previews/preview-valid-1.mp3",
+        title: "Cancion nueva",
+        uploadedAt: "2026-10-26T00:00:00.000Z",
+      },
+      {
+        durationSeconds: 10,
+        enabled: true,
+        id: "preview-duplicate-title",
+        storagePath: "previews/duplicate.mp3",
+        title: "cancion NUEVA",
+        uploadedAt: "2026-10-26T00:00:00.000Z",
+      },
+      {
+        durationSeconds: 45,
+        enabled: true,
+        id: "preview-too-long",
+        storagePath: "previews/too-long.mp3",
+        title: "Demasiado larga",
+        uploadedAt: "2026-10-26T00:00:00.000Z",
+      },
+      {
+        durationSeconds: 12,
+        enabled: true,
+        id: "preview-public-path",
+        storagePath: "https://example.com/public.mp3",
+        title: "Ruta publica",
+        uploadedAt: "2026-10-26T00:00:00.000Z",
+      },
+    ],
+  },
+});
+assert.equal(previewConfig.upcomingRelease.previewClips.length, 1);
+assert.equal(
+  previewConfig.upcomingRelease.previewClips[0].id,
+  "preview-valid-1",
+);
+
+console.log("DJ Carlos media library verification passed.");

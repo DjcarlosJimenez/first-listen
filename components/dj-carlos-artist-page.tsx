@@ -38,6 +38,7 @@ import {
   type DjCarlosPageConfig,
   type DjCarlosTrack,
   type DjCarlosUpcomingReactionKey,
+  type DjCarlosUpcomingPreviewClip,
   type DjCarlosUpcomingRelease,
   type DjCarlosUpcomingSignals,
   type DjCarlosVideoPlayCounts,
@@ -92,6 +93,25 @@ function getVideoVisitorId() {
 function videoPlayThreshold(duration: number) {
   if (!Number.isFinite(duration) || duration <= 0) return Number.POSITIVE_INFINITY;
   return Math.min(30, Math.max(10, duration * 0.25));
+}
+
+function upcomingPreviewTitleKey(value: string) {
+  return value.trim().toLocaleLowerCase("es");
+}
+
+function upcomingReleaseLooksAvailable(status: string) {
+  const value = status.toLocaleLowerCase("es");
+  return value.includes("disponible") || value.includes("publicado");
+}
+
+function previewClipUrl(clipId: string) {
+  return `/DJCarlosJimenez/preview-clips/${encodeURIComponent(clipId)}`;
+}
+
+function formatPreviewTime(seconds: number) {
+  const safeSeconds = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+  const wholeSeconds = Math.floor(safeSeconds);
+  return `${Math.floor(wholeSeconds / 60)}:${String(wholeSeconds % 60).padStart(2, "0")}`;
 }
 
 function albumsForConfig(config: DjCarlosPageConfig) {
@@ -1362,6 +1382,78 @@ function UpcomingReleaseCard({
   selectedReactions: DjCarlosUpcomingReactionKey[];
 }) {
   const tracks = release.tracks;
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [activePreviewId, setActivePreviewId] = useState("");
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
+  const previewsVisible =
+    release.showPreviewClips &&
+    !(
+      release.hidePreviewClipsWhenAvailable &&
+      upcomingReleaseLooksAvailable(release.status)
+    );
+  const previewByTitle = useMemo(
+    () => new Map(
+      release.previewClips
+        .filter((clip) => clip.enabled)
+        .map((clip) => [upcomingPreviewTitleKey(clip.title), clip]),
+    ),
+    [release.previewClips],
+  );
+  const activePreview = release.previewClips.find(
+    (clip) => clip.id === activePreviewId,
+  );
+
+  useEffect(() => {
+    const audio = previewAudioRef.current;
+    return () => {
+      audio?.pause();
+    };
+  }, []);
+
+  const togglePreview = async (clip: DjCarlosUpcomingPreviewClip) => {
+    const audio = previewAudioRef.current;
+    if (!audio) return;
+
+    if (activePreviewId === clip.id) {
+      if (!audio.paused) {
+        audio.pause();
+        setPreviewPlaying(false);
+        return;
+      }
+      if (audio.currentTime >= clip.durationSeconds - 0.1) {
+        audio.currentTime = 0;
+        setPreviewCurrentTime(0);
+      }
+    } else {
+      audio.pause();
+      audio.src = previewClipUrl(clip.id);
+      audio.currentTime = 0;
+      setActivePreviewId(clip.id);
+      setPreviewCurrentTime(0);
+    }
+
+    try {
+      await audio.play();
+      setPreviewPlaying(true);
+    } catch {
+      setPreviewPlaying(false);
+    }
+  };
+
+  const updatePreviewTime = () => {
+    const audio = previewAudioRef.current;
+    if (!audio || !activePreview) return;
+    const limit = activePreview.durationSeconds;
+    if (audio.currentTime >= limit) {
+      audio.pause();
+      audio.currentTime = limit;
+      setPreviewCurrentTime(limit);
+      setPreviewPlaying(false);
+      return;
+    }
+    setPreviewCurrentTime(audio.currentTime);
+  };
 
   return (
     <section className="djcx-upcoming-section" aria-label="Proximo lanzamiento">
@@ -1385,12 +1477,59 @@ function UpcomingReleaseCard({
           <p>{release.note}</p>
           {tracks.length > 0 && (
             <div className="djcx-upcoming-tracks">
-              <strong>Posibles canciones</strong>
+              <strong>
+                {previewsVisible && release.previewClips.some((clip) => clip.enabled)
+                  ? "Posibles canciones · adelantos exclusivos"
+                  : "Posibles canciones"}
+              </strong>
               <ol>
-                {tracks.map((track, index) => (
-                  <li key={`${track}-${index}`}>{track}</li>
-                ))}
+                {tracks.map((track, index) => {
+                  const clip = previewsVisible
+                    ? previewByTitle.get(upcomingPreviewTitleKey(track))
+                    : undefined;
+                  const active = clip?.id === activePreviewId;
+                  const currentTime = active ? previewCurrentTime : 0;
+                  const progress = clip
+                    ? Math.min(100, (currentTime / clip.durationSeconds) * 100)
+                    : 0;
+                  return (
+                    <li
+                      className={clip ? "has-preview" : undefined}
+                      key={`${track}-${index}`}
+                    >
+                      <span>{track}</span>
+                      {clip && (
+                        <button
+                          aria-label={`${active && previewPlaying ? "Pausar" : "Escuchar"} adelanto de ${track}`}
+                          onClick={() => void togglePreview(clip)}
+                          type="button"
+                        >
+                          {active && previewPlaying ? (
+                            <Pause fill="currentColor" size={13} />
+                          ) : (
+                            <Play fill="currentColor" size={13} />
+                          )}
+                          <span>{active && previewPlaying ? "Pausar" : "Adelanto"}</span>
+                          <small>
+                            {formatPreviewTime(currentTime)} / {formatPreviewTime(clip.durationSeconds)}
+                          </small>
+                          <i aria-hidden="true">
+                            <b style={{ width: `${progress}%` }} />
+                          </i>
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
               </ol>
+              <audio
+                onEnded={() => setPreviewPlaying(false)}
+                onPause={() => setPreviewPlaying(false)}
+                onPlay={() => setPreviewPlaying(true)}
+                onTimeUpdate={updatePreviewTime}
+                preload="none"
+                ref={previewAudioRef}
+              />
             </div>
           )}
         </div>

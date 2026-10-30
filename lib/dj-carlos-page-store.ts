@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  DJ_CARLOS_PREVIEW_CLIP_MAX_MB,
   defaultDjCarlosPageConfig,
   normalizeDjCarlosPageConfig,
   normalizeDjCarlosUpcomingSignals,
@@ -14,6 +15,7 @@ import {
 
 const DJ_CARLOS_STORAGE_BUCKET = "dj-carlos-page";
 const DJ_CARLOS_ASSETS_BUCKET = "dj-carlos-page-assets";
+const DJ_CARLOS_PREVIEW_CLIPS_BUCKET = "dj-carlos-preview-clips";
 const DJ_CARLOS_CONFIG_PATH = "config.json";
 const DJ_CARLOS_UPCOMING_SIGNALS_PATH = "upcoming-signals.json";
 const DJ_CARLOS_VIDEO_PLAYS_PATH = "video-plays.json";
@@ -30,6 +32,21 @@ const DJ_CARLOS_ASSET_BUCKET_OPTIONS = {
   allowedMimeTypes: [...DJ_CARLOS_COVER_TYPES],
   fileSizeLimit: DJ_CARLOS_MAX_COVER_BYTES,
   public: true,
+};
+const DJ_CARLOS_PREVIEW_CLIP_MAX_BYTES =
+  DJ_CARLOS_PREVIEW_CLIP_MAX_MB * 1024 * 1024;
+const DJ_CARLOS_PREVIEW_CLIP_TYPES = new Set([
+  "audio/aac",
+  "audio/mp3",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/x-aac",
+  "audio/x-m4a",
+]);
+const DJ_CARLOS_PREVIEW_BUCKET_OPTIONS = {
+  allowedMimeTypes: [...DJ_CARLOS_PREVIEW_CLIP_TYPES],
+  fileSizeLimit: DJ_CARLOS_PREVIEW_CLIP_MAX_BYTES,
+  public: false,
 };
 
 type DjCarlosVideoPlayHistory = {
@@ -169,6 +186,31 @@ async function ensureDjCarlosAssetsBucket() {
     throw createError;
   }
 
+  return supabase;
+}
+
+async function ensureDjCarlosPreviewClipsBucket() {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.storage.getBucket(
+    DJ_CARLOS_PREVIEW_CLIPS_BUCKET,
+  );
+
+  if (data && !error) {
+    const { error: updateError } = await supabase.storage.updateBucket(
+      DJ_CARLOS_PREVIEW_CLIPS_BUCKET,
+      DJ_CARLOS_PREVIEW_BUCKET_OPTIONS,
+    );
+    if (updateError) throw updateError;
+    return supabase;
+  }
+
+  const { error: createError } = await supabase.storage.createBucket(
+    DJ_CARLOS_PREVIEW_CLIPS_BUCKET,
+    DJ_CARLOS_PREVIEW_BUCKET_OPTIONS,
+  );
+  if (createError && !createError.message.toLowerCase().includes("already")) {
+    throw createError;
+  }
   return supabase;
 }
 
@@ -404,4 +446,64 @@ export async function writeDjCarlosImageFile(
 
 export function writeDjCarlosCoverFile(file: File) {
   return writeDjCarlosImageFile(file, "covers");
+}
+
+export async function writeDjCarlosPreviewClipFile(
+  file: File,
+  clipId: string,
+) {
+  if (!DJ_CARLOS_PREVIEW_CLIP_TYPES.has(file.type)) {
+    throw new Error("El adelanto debe ser MP3, M4A o AAC.");
+  }
+  if (file.size > DJ_CARLOS_PREVIEW_CLIP_MAX_BYTES) {
+    throw new Error(
+      `El adelanto debe pesar menos de ${DJ_CARLOS_PREVIEW_CLIP_MAX_MB} MB.`,
+    );
+  }
+
+  const safeId = clipId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
+  if (safeId.length < 8) throw new Error("Identificador de adelanto no valido.");
+  const extension = file.type === "audio/mpeg" || file.type === "audio/mp3"
+    ? "mp3"
+    : file.type === "audio/aac" || file.type === "audio/x-aac"
+      ? "aac"
+      : "m4a";
+  const storagePath = `previews/${safeId}-${Date.now()}.${extension}`;
+  const supabase = await ensureDjCarlosPreviewClipsBucket();
+  const { error } = await supabase.storage
+    .from(DJ_CARLOS_PREVIEW_CLIPS_BUCKET)
+    .upload(storagePath, file, {
+      cacheControl: "0",
+      contentType: file.type,
+      upsert: false,
+    });
+  if (error) throw error;
+  return storagePath;
+}
+
+export async function createDjCarlosPreviewClipSignedUrl(
+  storagePath: string,
+) {
+  if (!storagePath.startsWith("previews/") || storagePath.includes("..")) {
+    throw new Error("Ruta de adelanto no valida.");
+  }
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.storage
+    .from(DJ_CARLOS_PREVIEW_CLIPS_BUCKET)
+    .createSignedUrl(storagePath, 10 * 60);
+  if (error || !data?.signedUrl) {
+    throw error ?? new Error("Enlace no disponible.");
+  }
+  return data.signedUrl;
+}
+
+export async function deleteDjCarlosPreviewClipFile(storagePath: string) {
+  if (!storagePath.startsWith("previews/") || storagePath.includes("..")) {
+    throw new Error("Ruta de adelanto no valida.");
+  }
+  const supabase = createAdminClient();
+  const { error } = await supabase.storage
+    .from(DJ_CARLOS_PREVIEW_CLIPS_BUCKET)
+    .remove([storagePath]);
+  if (error) throw error;
 }
