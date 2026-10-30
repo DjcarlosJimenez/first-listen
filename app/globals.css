@@ -19759,6 +19759,11 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   padding: 10px;
 }
 
+.djcx-player-controls .djcx-admin-entry {
+  border-color: rgba(255, 217, 94, 0.5);
+  color: var(--djcx-gold-strong);
+}
+
 .djcx-player-controls .djcx-play-button,
 .djcx-hero-actions button:first-child,
 .djcx-album-panel button,
@@ -22273,6 +22278,26 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .djcx-login-card a {
   border: 1px solid rgba(255, 255, 255, 0.16);
   color: #fff;
+}
+
+.djcx-login-owner-access {
+  border-top: 1px solid rgba(246, 200, 79, 0.2);
+  display: grid;
+  gap: 8px;
+  padding-top: 15px;
+  width: 100%;
+}
+
+.djcx-login-owner-access > span {
+  color: var(--djcx-gold-strong);
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.djcx-login-owner-access a:first-of-type {
+  background: rgba(246, 200, 79, 0.12);
+  border-color: rgba(246, 200, 79, 0.42);
 }
 
 .djcx-login-error {

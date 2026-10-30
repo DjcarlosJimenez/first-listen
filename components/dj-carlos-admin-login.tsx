@@ -3,9 +3,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
-import { ExternalLink, LockKeyhole, ShieldCheck } from "lucide-react";
+import {
+  CircleUserRound,
+  ExternalLink,
+  KeyRound,
+  LockKeyhole,
+  ShieldCheck,
+} from "lucide-react";
 
-export function DjCarlosAdminLogin({ logoUrl }: { logoUrl: string }) {
+export function DjCarlosAdminLogin({
+  logoUrl,
+  ownerAccessDenied = false,
+}: {
+  logoUrl: string;
+  ownerAccessDenied?: boolean;
+}) {
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [status, setStatus] = useState("");
@@ -83,7 +95,20 @@ export function DjCarlosAdminLogin({ logoUrl }: { logoUrl: string }) {
             {loading ? "Revisando..." : "Entrar al panel"}
           </button>
         </form>
-        {status && <div className="djcx-login-error" role="alert">{status}</div>}
+        {(status || ownerAccessDenied) && (
+          <div className="djcx-login-error" role="alert">
+            {status || "La cuenta abierta no tiene acceso de propietario."}
+          </div>
+        )}
+        <div className="djcx-login-owner-access">
+          <span>Acceso del propietario</span>
+          <Link href="/DJCarlosJimenez/admin/owner-session">
+            <CircleUserRound size={17} /> Entrar con cuenta Owner
+          </Link>
+          <a href="https://www.firstlisten.net/forgot-password">
+            <KeyRound size={17} /> Olvide mi contrasena
+          </a>
+        </div>
         <Link href="/DJCarlosJimenez">
           Ver pagina publica <ExternalLink size={14} />
         </Link>

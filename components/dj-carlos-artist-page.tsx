@@ -18,6 +18,7 @@ import {
   SkipForward,
   Smartphone,
   Sparkles,
+  Settings,
   Video,
 } from "lucide-react";
 import { ProviderPlayer, type ProviderTelemetrySnapshot } from "@/components/provider-player";
@@ -1129,6 +1130,14 @@ export function DjCarlosArtistPage({
                 <ExternalLink size={16} />
               </a>
             )}
+            <Link
+              aria-label="Administrar pagina de DJ Carlos"
+              className="djcx-admin-entry"
+              href="/DJCarlosJimenez/admin"
+              title="Administrar pagina"
+            >
+              <Settings size={17} />
+            </Link>
           </div>
           {shareNotice && (
             <div className="djcx-share-notice" role="status">
