@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LockKeyhole } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { WorkspaceV2PreviewErrorBoundary } from "@/components/workspace-v2/workspace-v2-preview-error-boundary";
+import { FirstListenSimplePreview } from "@/components/workspace-v2/first-listen-simple-preview";
 import { WorkspaceV2Shell } from "@/components/workspace-v2/workspace-v2-shell";
 import type { InterfaceLocale } from "@/lib/catalog";
 import {
@@ -215,7 +216,11 @@ function buildGuestQueue(rows: GuestQueueRow[], locale: InterfaceLocale): Worksp
   };
 }
 
-export function WorkspaceV2GuestEntry() {
+export function WorkspaceV2GuestEntry({
+  experience = "workspace",
+}: {
+  experience?: "workspace" | "simple-preview";
+}) {
   const [fatalError, setFatalError] = useState("");
   const [guest, setGuest] = useState<GuestSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -341,8 +346,16 @@ export function WorkspaceV2GuestEntry() {
     return (
       <main className="workspace-v2-preview-page">
         <section className="workspace-v2-empty">
-          <h2>{spanish ? "Preparando Workspace invitado" : "Preparing guest Workspace"}</h2>
-          <p>{spanish ? "Cargando musica para descubrir." : "Loading music to discover."}</p>
+          <h2>
+            {experience === "simple-preview"
+              ? spanish
+                ? "Preparando música nueva"
+                : "Preparing new music"
+              : spanish
+                ? "Preparando Workspace invitado"
+                : "Preparing guest Workspace"}
+          </h2>
+          <p>{spanish ? "Cargando música para descubrir." : "Loading music to discover."}</p>
         </section>
       </main>
     );
@@ -354,12 +367,16 @@ export function WorkspaceV2GuestEntry() {
         <section className="workspace-v2-empty">
           <h2>{spanish ? "No pudimos abrir el Workspace" : "We could not open the Workspace"}</h2>
           <p>{fatalError || "Guest access is unavailable."}</p>
-          <Link href="/workspace-v2/guest">
+          <Link href={experience === "simple-preview" ? "/guest" : "/workspace-v2/guest"}>
             {spanish ? "Intentar de nuevo" : "Try again"}
           </Link>
         </section>
       </main>
     );
+  }
+
+  if (experience === "simple-preview") {
+    return <FirstListenSimplePreview locale={locale} queue={queue} />;
   }
 
   return (

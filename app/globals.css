@@ -24676,3 +24676,436 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Simplified public guest experience: /guest */
+.first-listen-simple-preview {
+  background:
+    radial-gradient(circle at 50% -10%, rgba(185, 255, 47, 0.22), transparent 32%),
+    linear-gradient(180deg, #f8faf3 0%, #f1f5e9 100%);
+  color: #101510;
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  padding: 0 18px 36px;
+  width: 100%;
+}
+
+.first-listen-simple-header {
+  align-items: center;
+  background: rgba(248, 250, 243, 0.92);
+  border-bottom: 1px solid rgba(34, 56, 28, 0.12);
+  display: flex;
+  justify-content: space-between;
+  margin: 0 -18px;
+  padding: 13px 18px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.first-listen-simple-header .logo {
+  transform: scale(0.9);
+  transform-origin: left center;
+}
+
+.first-listen-simple-header > a {
+  align-items: center;
+  background: #151a15;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 900;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 14px;
+  text-decoration: none;
+}
+
+.first-listen-simple-intro,
+.first-listen-simple-player-card,
+.first-listen-simple-styles,
+.first-listen-simple-artist-link,
+.first-listen-simple-footer {
+  margin-inline: auto;
+  max-width: 760px;
+  min-width: 0;
+  width: 100%;
+}
+
+.first-listen-simple-intro {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.first-listen-simple-preview-badge {
+  color: #557044;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.first-listen-simple-intro .eyebrow,
+.first-listen-simple-styles .eyebrow {
+  align-items: center;
+  color: #47720d;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 950;
+  gap: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.first-listen-simple-intro h1 {
+  font-size: clamp(36px, 10vw, 66px);
+  letter-spacing: -0.055em;
+  line-height: 0.94;
+  margin: 0;
+  max-width: 690px;
+  overflow-wrap: anywhere;
+}
+
+.first-listen-simple-intro p {
+  color: #465044;
+  font-size: clamp(16px, 4vw, 19px);
+  font-weight: 650;
+  line-height: 1.42;
+  margin: 0;
+  max-width: 650px;
+  overflow-wrap: anywhere;
+}
+
+.first-listen-simple-player-card {
+  background: #fff;
+  border: 1px solid rgba(50, 82, 34, 0.2);
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(51, 78, 38, 0.12);
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.first-listen-simple-song-heading {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.first-listen-simple-song-heading span {
+  color: #608631;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.first-listen-simple-song-heading strong {
+  font-size: clamp(22px, 6vw, 32px);
+  line-height: 1.05;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.first-listen-simple-song-heading small {
+  color: #5c6559;
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.first-listen-simple-player-frame {
+  aspect-ratio: 16 / 9;
+  background: #0d130f;
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.first-listen-simple-player-frame .provider-player {
+  aspect-ratio: 16 / 9;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+
+.first-listen-simple-cover-action {
+  align-items: center;
+  background-color: rgba(5, 11, 6, 0.58);
+  background-position: center;
+  background-size: cover;
+  background-blend-mode: multiply;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.72);
+  z-index: 5;
+}
+
+.first-listen-simple-cover-action span {
+  align-items: center;
+  background: #b9ff2f;
+  border-radius: 999px;
+  color: #101510;
+  display: inline-flex;
+  height: 62px;
+  justify-content: center;
+  width: 62px;
+}
+
+.first-listen-simple-cover-action strong {
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.first-listen-simple-controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
+}
+
+.first-listen-simple-controls button {
+  align-items: center;
+  background: #f3f5ef;
+  border: 1px solid #d9dfd1;
+  border-radius: 13px;
+  color: #171c17;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 900;
+  gap: 7px;
+  justify-content: center;
+  min-height: 46px;
+  padding: 9px 10px;
+}
+
+.first-listen-simple-controls button.primary {
+  background: #b9ff2f;
+  border-color: #a5ed18;
+}
+
+.first-listen-simple-next-song {
+  align-items: center;
+  background: #f5f8ef;
+  border-radius: 13px;
+  color: #5a6555;
+  display: flex;
+  font-size: 12px;
+  gap: 9px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.first-listen-simple-next-song span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.first-listen-simple-next-song strong {
+  color: #182017;
+}
+
+.first-listen-simple-styles {
+  display: grid;
+  gap: 12px;
+}
+
+.first-listen-simple-styles p {
+  color: #626d5d;
+  font-size: 13px;
+  line-height: 1.35;
+  margin: 5px 0 0;
+}
+
+.first-listen-simple-style-row {
+  display: flex;
+  gap: 8px;
+  margin-inline: -18px;
+  overflow-x: auto;
+  padding: 0 18px 6px;
+  scrollbar-width: none;
+}
+
+.first-listen-simple-style-row::-webkit-scrollbar {
+  display: none;
+}
+
+.first-listen-simple-style-row button {
+  background: #fff;
+  border: 1px solid #d3dcc9;
+  border-radius: 999px;
+  color: #34402f;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 850;
+  min-height: 40px;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+.first-listen-simple-style-row button.active {
+  background: #18330e;
+  border-color: #18330e;
+  color: #fff;
+}
+
+.first-listen-simple-artist-link {
+  align-items: center;
+  background: #142114;
+  border-radius: 20px;
+  color: #fff;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.first-listen-simple-artist-link div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.first-listen-simple-artist-link span {
+  color: #b9ff2f;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.first-listen-simple-artist-link strong {
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.first-listen-simple-artist-link a {
+  align-items: center;
+  background: #b9ff2f;
+  border-radius: 999px;
+  color: #101510;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 950;
+  gap: 6px;
+  min-height: 38px;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.first-listen-simple-footer {
+  align-items: flex-start;
+  color: #65705f;
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
+  line-height: 1.4;
+  padding-bottom: 12px;
+}
+
+.first-listen-simple-footer svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+@media (min-width: 820px) {
+  .first-listen-simple-preview {
+    gap: 28px;
+    padding-inline: 32px;
+  }
+
+  .first-listen-simple-header {
+    margin-inline: -32px;
+    padding-inline: max(32px, calc((100vw - 1120px) / 2));
+  }
+
+  .first-listen-simple-intro {
+    padding-top: 30px;
+    text-align: center;
+  }
+
+  .first-listen-simple-intro .eyebrow,
+  .first-listen-simple-intro .first-listen-simple-preview-badge {
+    justify-self: center;
+  }
+
+  .first-listen-simple-intro h1,
+  .first-listen-simple-intro p {
+    margin-inline: auto;
+  }
+
+  .first-listen-simple-player-card {
+    padding: 18px;
+  }
+
+  .first-listen-simple-style-row {
+    flex-wrap: wrap;
+    margin-inline: 0;
+    overflow: visible;
+    padding-inline: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .first-listen-simple-preview {
+    gap: 18px;
+    padding-inline: 14px;
+  }
+
+  .first-listen-simple-header {
+    margin-inline: -14px;
+    padding-inline: 14px;
+  }
+
+  .first-listen-simple-intro h1 {
+    font-size: clamp(34px, 12vw, 48px);
+  }
+
+  .first-listen-simple-player-card {
+    border-radius: 20px;
+    padding: 11px;
+  }
+
+  .first-listen-simple-controls {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .first-listen-simple-controls button {
+    font-size: 11px;
+    gap: 5px;
+    padding-inline: 6px;
+  }
+
+  .first-listen-simple-style-row {
+    margin-inline: -14px;
+    padding-inline: 14px;
+  }
+
+  .first-listen-simple-artist-link {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .first-listen-simple-artist-link a {
+    justify-content: center;
+  }
+}
