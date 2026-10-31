@@ -50,7 +50,9 @@ function matchesStyle(song: WorkspaceV2Song, style: string) {
 
 function displayStyleLabel(style: string, spanish: boolean) {
   if (!spanish) return style;
-  if (style.toLocaleLowerCase() === "other") return "Otro";
+  const normalizedStyle = style.toLocaleLowerCase();
+  if (normalizedStyle === "other") return "Otro";
+  if (normalizedStyle === "regional mexican") return "Regional mexicano";
   return style;
 }
 
