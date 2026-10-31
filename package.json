@@ -54,6 +54,8 @@
     "feedback-engine:dry-run": "node scripts/apply-feedback-engine-migration.mjs",
     "feedback-engine:apply": "node scripts/apply-feedback-engine-migration.mjs --apply",
     "feedback-engine:verify": "node scripts/verify-feedback-engine-production.mjs",
+    "analytics:dry-run": "node scripts/apply-site-analytics.mjs",
+    "analytics:apply": "node scripts/apply-site-analytics.mjs --apply",
     "db:verify": "node scripts/verify-database.mjs"
   },
   "dependencies": {
@@ -71,6 +73,7 @@
     "@types/react-dom": "^19.0.2",
     "eslint": "^9.17.0",
     "eslint-config-next": "^15.3.3",
+    "pg": "^8.23.1",
     "typescript": "^5.7.2"
   },
   "overrides": {

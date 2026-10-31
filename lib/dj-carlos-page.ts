@@ -20,7 +20,7 @@ export const DJ_CARLOS_DEFAULT_RHYTHMS = [
   "Chilenas Zapateadas",
   "Video musical",
 ] as const;
-export const DJ_CARLOS_PREVIEW_CLIP_MAX_MB = 5;
+export const DJ_CARLOS_PREVIEW_CLIP_MAX_MB = 4;
 export const DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS = 30;
 
 export type DjCarlosTrackSection = "album" | "top-ten" | "official-video";
@@ -58,6 +58,16 @@ export type DjCarlosAlbum = {
   link: string;
   mood: string;
   subtitle: string;
+  title: string;
+};
+
+export type DjCarlosCompilation = {
+  coverUrl: string;
+  description: string;
+  enabled: boolean;
+  id: string;
+  link: string;
+  mood: string;
   title: string;
 };
 
@@ -100,6 +110,7 @@ export type DjCarlosIdentity = {
 export type DjCarlosPageConfig = {
   album: DjCarlosAlbum;
   albums: DjCarlosAlbum[];
+  compilations: DjCarlosCompilation[];
   identity: DjCarlosIdentity;
   rhythms: string[];
   tracks: DjCarlosTrack[];
@@ -475,6 +486,7 @@ export const defaultDjCarlosTracks: DjCarlosTrack[] = [
 export const defaultDjCarlosPageConfig: DjCarlosPageConfig = {
   album: defaultDjCarlosAlbum,
   albums: [defaultDjCarlosAlbum],
+  compilations: [],
   identity: {
     logoUrl: DJ_CARLOS_LOGO_URL,
     portraitUrl: DJ_CARLOS_PORTRAIT_URL,
@@ -776,6 +788,47 @@ function cleanIdentity(
   };
 }
 
+function cleanCompilations(
+  value: unknown,
+  fallback: DjCarlosCompilation[] = [],
+) {
+  const rawCompilations = Array.isArray(value) ? value : fallback;
+  const usedIds = new Set<string>();
+
+  return rawCompilations.reduce<DjCarlosCompilation[]>((items, rawItem, index) => {
+    if (!rawItem || typeof rawItem !== "object") return items;
+    const item = rawItem as Record<string, unknown>;
+    const title = typeof item.title === "string" && item.title.trim()
+      ? item.title.trim().slice(0, 120)
+      : `Compilacion ${index + 1}`;
+    const baseId = slugifyDjCarlosAlbumTitle(
+      typeof item.id === "string" && item.id.trim() ? item.id : title,
+      `compilacion-${index + 1}`,
+    );
+    let id = baseId;
+    let suffix = 2;
+    while (usedIds.has(id)) {
+      id = `${baseId}-${suffix}`;
+      suffix += 1;
+    }
+    usedIds.add(id);
+
+    items.push({
+      coverUrl: cleanDjCarlosImageUrl(item.coverUrl, DJ_CARLOS_LOGO_URL),
+      description:
+        typeof item.description === "string"
+          ? item.description.trim().slice(0, 360)
+          : "",
+      enabled: typeof item.enabled === "boolean" ? item.enabled : true,
+      id,
+      link: typeof item.link === "string" ? item.link.trim() : "",
+      mood: normalizeDjCarlosRhythm(item.mood, DJ_CARLOS_DEFAULT_RHYTHM),
+      title,
+    });
+    return items;
+  }, []).slice(0, 24);
+}
+
 function uniqueAlbumSlug(baseSlug: string, usedSlugs: Set<string>) {
   let slug = baseSlug;
   let index = 2;
@@ -891,6 +944,7 @@ export function normalizeDjCarlosPageConfig(
   return {
     album: primaryAlbum,
     albums,
+    compilations: cleanCompilations(config.compilations, fallback.compilations),
     identity: cleanIdentity(config.identity, fallback.identity),
     rhythms,
     tracks: tracks.length ? tracks : fallback.tracks,

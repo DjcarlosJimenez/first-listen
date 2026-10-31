@@ -195,14 +195,7 @@ async function ensureDjCarlosPreviewClipsBucket() {
     DJ_CARLOS_PREVIEW_CLIPS_BUCKET,
   );
 
-  if (data && !error) {
-    const { error: updateError } = await supabase.storage.updateBucket(
-      DJ_CARLOS_PREVIEW_CLIPS_BUCKET,
-      DJ_CARLOS_PREVIEW_BUCKET_OPTIONS,
-    );
-    if (updateError) throw updateError;
-    return supabase;
-  }
+  if (data && !error) return supabase;
 
   const { error: createError } = await supabase.storage.createBucket(
     DJ_CARLOS_PREVIEW_CLIPS_BUCKET,
@@ -452,7 +445,20 @@ export async function writeDjCarlosPreviewClipFile(
   file: File,
   clipId: string,
 ) {
-  if (!DJ_CARLOS_PREVIEW_CLIP_TYPES.has(file.type)) {
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const inferredType = extension === "mp3"
+    ? "audio/mpeg"
+    : extension === "aac"
+      ? "audio/aac"
+      : extension === "m4a"
+        ? "audio/mp4"
+        : "";
+  const reportedType = file.type.trim().toLowerCase();
+  const contentType = DJ_CARLOS_PREVIEW_CLIP_TYPES.has(reportedType)
+    ? reportedType
+    : inferredType;
+
+  if (!contentType) {
     throw new Error("El adelanto debe ser MP3, M4A o AAC.");
   }
   if (file.size > DJ_CARLOS_PREVIEW_CLIP_MAX_BYTES) {
@@ -463,18 +469,18 @@ export async function writeDjCarlosPreviewClipFile(
 
   const safeId = clipId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
   if (safeId.length < 8) throw new Error("Identificador de adelanto no valido.");
-  const extension = file.type === "audio/mpeg" || file.type === "audio/mp3"
+  const storageExtension = contentType === "audio/mpeg" || contentType === "audio/mp3"
     ? "mp3"
-    : file.type === "audio/aac" || file.type === "audio/x-aac"
+    : contentType === "audio/aac" || contentType === "audio/x-aac"
       ? "aac"
       : "m4a";
-  const storagePath = `previews/${safeId}-${Date.now()}.${extension}`;
+  const storagePath = `previews/${safeId}-${Date.now()}.${storageExtension}`;
   const supabase = await ensureDjCarlosPreviewClipsBucket();
   const { error } = await supabase.storage
     .from(DJ_CARLOS_PREVIEW_CLIPS_BUCKET)
     .upload(storagePath, file, {
       cacheControl: "0",
-      contentType: file.type,
+      contentType,
       upsert: false,
     });
   if (error) throw error;

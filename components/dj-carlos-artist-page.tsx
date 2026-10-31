@@ -36,6 +36,7 @@ import {
   sortDjCarlosOfficialVideos,
   uniqueDjCarlosRhythms,
   type DjCarlosAlbum,
+  type DjCarlosCompilation,
   type DjCarlosPageConfig,
   type DjCarlosTrack,
   type DjCarlosUpcomingReactionKey,
@@ -418,6 +419,28 @@ export function DjCarlosArtistPage({
     () => tracks.filter((track) => track.section === "official-video"),
     [tracks],
   );
+  const compilations = useMemo(
+    () => config.compilations.filter(
+      (compilation) => compilation.enabled && isPlayableDjCarlosLink(compilation.link),
+    ),
+    [config.compilations],
+  );
+  const compilationPlayerTracks = useMemo<DjCarlosTrack[]>(
+    () => compilations.map((compilation) => ({
+      artist: "DJ Carlos Jimenez Compositor",
+      badge: "Compilacion",
+      coverUrl: compilation.coverUrl || artistLogoUrl,
+      id: `dj-carlos-compilation-${compilation.id}`,
+      link: compilation.link,
+      mood: compilation.mood,
+      platform: detectDjCarlosPlatform(compilation.link),
+      release: compilation.title,
+      section: "top-ten",
+      subtitle: compilation.description || "Lista especial",
+      title: compilation.title,
+    })),
+    [artistLogoUrl, compilations],
+  );
   const videoRhythms = useMemo(
     () => uniqueDjCarlosRhythms(officialVideos.map((track) => track.mood)),
     [officialVideos],
@@ -505,12 +528,13 @@ export function DjCarlosArtistPage({
   const activeTrack = useMemo(() => {
     if (albumPlayerTrack?.id === activeId) return albumPlayerTrack;
     return (
+      compilationPlayerTracks.find((track) => track.id === activeId) ??
       tracks.find((track) => track.id === activeId) ??
       playQueue[0] ??
       tracks[0] ??
       null
     );
-  }, [activeId, albumPlayerTrack, playQueue, tracks]);
+  }, [activeId, albumPlayerTrack, compilationPlayerTracks, playQueue, tracks]);
   const moodFilters = useMemo(() => {
     const usedRhythms = mergeDjCarlosRhythms(
       albums.map((item) => item.mood),
@@ -622,6 +646,14 @@ export function DjCarlosArtistPage({
       text: `Escucha ${targetAlbum.title} en la plataforma original.`,
       title: targetAlbum.title,
       url: targetAlbum.link || albumSharePath(targetAlbum),
+    });
+
+  const shareCompilation = (compilation: DjCarlosCompilation) =>
+    shareTarget({
+      notice: "Link de la compilacion listo.",
+      text: `Escucha ${compilation.title} de DJ Carlos Jimenez.`,
+      title: `${compilation.title} | DJ Carlos Jimenez`,
+      url: compilation.link,
     });
 
   const trackSharePath = (track: DjCarlosTrack) => {
@@ -1303,6 +1335,16 @@ export function DjCarlosArtistPage({
         />
       )}
 
+      {!isAlbumDetail && compilations.length > 0 && (
+        <CompilationsSection
+          compilations={compilations}
+          onPlay={(compilation) =>
+            playTrack(`dj-carlos-compilation-${compilation.id}`)
+          }
+          onShare={(compilation) => void shareCompilation(compilation)}
+        />
+      )}
+
       {isAlbumDetail && (
         <TrackSection
           heading={album.title}
@@ -1866,6 +1908,73 @@ function VideosSection({
             No hay videos disponibles en este estilo todavia.
           </p>
         )}
+      </div>
+    </section>
+  );
+}
+
+function CompilationsSection({
+  compilations,
+  onPlay,
+  onShare,
+}: {
+  compilations: DjCarlosCompilation[];
+  onPlay: (compilation: DjCarlosCompilation) => void;
+  onShare: (compilation: DjCarlosCompilation) => void;
+}) {
+  return (
+    <section className="djcx-list-section djcx-compilations-section">
+      <div className="djcx-section-heading">
+        <div>
+          <span><ListMusic size={14} /> Selecciones especiales</span>
+          <h2>Listas y compilaciones</h2>
+          <p className="djcx-video-count">
+            Colecciones completas para reproducir sin cambiar Top Ten.
+          </p>
+        </div>
+      </div>
+      <div className="djcx-compilation-grid">
+        {compilations.map((compilation) => (
+          <article className="djcx-compilation-card" key={compilation.id}>
+            <div className="djcx-compilation-art">
+              <Image
+                alt={`Portada de ${compilation.title}`}
+                fill
+                sizes="(max-width: 760px) 86vw, 220px"
+                src={compilation.coverUrl}
+                unoptimized
+              />
+              <span>{compilation.mood}</span>
+            </div>
+            <div className="djcx-compilation-copy">
+              <small>Compilacion</small>
+              <h3>{compilation.title}</h3>
+              {compilation.description && <p>{compilation.description}</p>}
+              <div>
+                <button onClick={() => onPlay(compilation)} type="button">
+                  <Play fill="currentColor" size={15} /> Reproducir lista
+                </button>
+                <button
+                  aria-label={`Compartir ${compilation.title}`}
+                  onClick={() => onShare(compilation)}
+                  title="Compartir compilacion"
+                  type="button"
+                >
+                  <Share2 size={15} />
+                </button>
+                <a
+                  aria-label={`Abrir ${compilation.title} en la plataforma`}
+                  href={compilation.link}
+                  rel="noreferrer"
+                  target="_blank"
+                  title="Abrir enlace original"
+                >
+                  <ExternalLink size={15} />
+                </a>
+              </div>
+            </div>
+          </article>
+        ))}
       </div>
     </section>
   );
