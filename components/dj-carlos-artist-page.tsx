@@ -274,6 +274,7 @@ export function DjCarlosArtistPage({
   logoUrl: string;
 }) {
   const requestPlaybackRef = useRef<(() => void) | null>(null);
+  const pendingCompilationPlaybackRef = useRef<string | null>(null);
   const lastAutoAdvanceKeyRef = useRef<string | null>(null);
   const lastTelemetryStateRef =
     useRef<ProviderTelemetrySnapshot["playbackState"]>("loading");
@@ -944,6 +945,17 @@ export function DjCarlosArtistPage({
     snapshot?.playbackState,
   ]);
 
+  useEffect(() => {
+    const pendingTrackId = pendingCompilationPlaybackRef.current;
+    if (!pendingTrackId || activeTrack?.id !== pendingTrackId) return;
+    const timer = window.setTimeout(() => {
+      if (pendingCompilationPlaybackRef.current !== pendingTrackId) return;
+      requestPlaybackRef.current?.();
+      pendingCompilationPlaybackRef.current = null;
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [activeTrack?.id, playerVersion]);
+
   const playTrack = (trackId: string) => {
     const compilationId = compilationIdByTrackId.get(trackId) ?? "";
     setActiveCompilationId(compilationId);
@@ -973,7 +985,11 @@ export function DjCarlosArtistPage({
         item.compilationId === compilation.id &&
         (!requestedPlayerId || item.track.id === requestedPlayerId),
     );
-    if (match) playTrack(match.track.id);
+    if (match) {
+      pendingCompilationPlaybackRef.current = match.track.id;
+      requestPlaybackRef.current?.();
+      playTrack(match.track.id);
+    }
   };
 
   const playAlbum = () => {
@@ -1502,6 +1518,7 @@ function UpcomingReleaseCard({
 }) {
   const tracks = release.tracks;
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const advancedPreviewIdRef = useRef("");
   const [activePreviewId, setActivePreviewId] = useState("");
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
@@ -1519,6 +1536,12 @@ function UpcomingReleaseCard({
     ),
     [release.previewClips],
   );
+  const orderedPreviews = useMemo(
+    () => tracks
+      .map((track) => previewByTitle.get(upcomingPreviewTitleKey(track)))
+      .filter((clip): clip is DjCarlosUpcomingPreviewClip => Boolean(clip)),
+    [previewByTitle, tracks],
+  );
   const activePreview = release.previewClips.find(
     (clip) => clip.id === activePreviewId,
   );
@@ -1529,6 +1552,28 @@ function UpcomingReleaseCard({
       audio?.pause();
     };
   }, []);
+
+  const playPreview = async (
+    clip: DjCarlosUpcomingPreviewClip,
+    resetAdvanceGuard = true,
+  ) => {
+    const audio = previewAudioRef.current;
+    if (!audio) return;
+    if (resetAdvanceGuard) advancedPreviewIdRef.current = "";
+
+    audio.pause();
+    audio.src = previewClipUrl(clip.id);
+    audio.currentTime = 0;
+    audio.load();
+    setActivePreviewId(clip.id);
+    setPreviewCurrentTime(0);
+    try {
+      await audio.play();
+      setPreviewPlaying(true);
+    } catch {
+      setPreviewPlaying(false);
+    }
+  };
 
   const togglePreview = async (clip: DjCarlosUpcomingPreviewClip) => {
     const audio = previewAudioRef.current;
@@ -1544,20 +1589,32 @@ function UpcomingReleaseCard({
         audio.currentTime = 0;
         setPreviewCurrentTime(0);
       }
-    } else {
-      audio.pause();
-      audio.src = previewClipUrl(clip.id);
-      audio.currentTime = 0;
-      setActivePreviewId(clip.id);
-      setPreviewCurrentTime(0);
+      advancedPreviewIdRef.current = "";
+      try {
+        await audio.play();
+        setPreviewPlaying(true);
+      } catch {
+        setPreviewPlaying(false);
+      }
+      return;
     }
 
-    try {
-      await audio.play();
-      setPreviewPlaying(true);
-    } catch {
-      setPreviewPlaying(false);
+    await playPreview(clip);
+  };
+
+  const playNextPreview = () => {
+    if (!activePreviewId) return;
+    if (advancedPreviewIdRef.current === activePreviewId) return;
+    advancedPreviewIdRef.current = activePreviewId;
+    const index = orderedPreviews.findIndex(
+      (clip) => clip.id === activePreviewId,
+    );
+    const nextClip = index >= 0 ? orderedPreviews[index + 1] : undefined;
+    if (nextClip) {
+      void playPreview(nextClip, false);
+      return;
     }
+    setPreviewPlaying(false);
   };
 
   const updatePreviewTime = () => {
@@ -1569,6 +1626,7 @@ function UpcomingReleaseCard({
       audio.currentTime = limit;
       setPreviewCurrentTime(limit);
       setPreviewPlaying(false);
+      playNextPreview();
       return;
     }
     setPreviewCurrentTime(audio.currentTime);
@@ -1642,11 +1700,11 @@ function UpcomingReleaseCard({
                 })}
               </ol>
               <audio
-                onEnded={() => setPreviewPlaying(false)}
+                onEnded={playNextPreview}
                 onPause={() => setPreviewPlaying(false)}
                 onPlay={() => setPreviewPlaying(true)}
                 onTimeUpdate={updatePreviewTime}
-                preload="none"
+                preload="metadata"
                 ref={previewAudioRef}
               />
             </div>

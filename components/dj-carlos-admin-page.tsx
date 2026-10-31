@@ -310,6 +310,8 @@ export function DjCarlosAdminPage({
   const [uploadingUpcomingCover, setUploadingUpcomingCover] = useState(false);
   const [uploadingCompilationCoverId, setUploadingCompilationCoverId] =
     useState("");
+  const [importingCompilationTrackId, setImportingCompilationTrackId] =
+    useState("");
   const [uploadingPreviewTitle, setUploadingPreviewTitle] = useState("");
   const [importingAlbum, setImportingAlbum] = useState(false);
   const [status, setStatus] = useState("Panel listo para editar.");
@@ -980,6 +982,54 @@ export function DjCarlosAdminPage({
       updatedAt: new Date().toISOString(),
     }));
     setStatus("Cancion de la compilacion actualizada. Toca Guardar cambios.");
+  };
+
+  const importCompilationTrackMetadata = async (
+    compilationId: string,
+    trackId: string,
+    link: string,
+  ) => {
+    const cleanLink = link.trim();
+    if (!cleanLink) return;
+    if (!isPlayableDjCarlosLink(cleanLink)) {
+      setStatus("Usa un enlace valido de YouTube o YouTube Music.");
+      return;
+    }
+
+    setImportingCompilationTrackId(trackId);
+    setStatus("Leyendo la informacion del sencillo...");
+    try {
+      const response = await fetch(
+        `/api/music-metadata?url=${encodeURIComponent(cleanLink)}`,
+        { cache: "no-store" },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "No se pudo leer la informacion del enlace.",
+        );
+      }
+      const title = typeof data.title === "string" ? data.title.trim() : "";
+      if (!title) {
+        throw new Error(
+          "El enlace funciona, pero la plataforma no entrego el titulo. Puedes escribirlo manualmente.",
+        );
+      }
+      updateCompilationTrack(compilationId, trackId, "title", title);
+      setStatus(
+        "Datos del sencillo cargados. La portada general de la compilacion no cambio.",
+      );
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "No se pudo leer la informacion del sencillo.",
+      );
+    } finally {
+      setImportingCompilationTrackId("");
+    }
   };
 
   const moveCompilationTrack = (
@@ -2443,7 +2493,7 @@ export function DjCarlosAdminPage({
                       controls
                       controlsList="nodownload noplaybackrate"
                       onContextMenu={(event) => event.preventDefault()}
-                      preload="none"
+                      preload="metadata"
                       src={`/DJCarlosJimenez/preview-clips/${encodeURIComponent(clip.id)}`}
                     />
                   )}
@@ -2557,9 +2607,11 @@ export function DjCarlosAdminPage({
 
       <AdminCompilations
         compilations={config.compilations}
+        importingTrackId={importingCompilationTrackId}
         onAdd={addCompilation}
         onAddTrack={addCompilationTrack}
         onCoverFile={handleCompilationCoverFile}
+        onImportTrack={importCompilationTrackMetadata}
         onMove={moveCompilation}
         onMoveTrack={moveCompilationTrack}
         onRemove={removeCompilation}
@@ -2685,9 +2737,11 @@ export function DjCarlosAdminPage({
 
 function AdminCompilations({
   compilations,
+  importingTrackId,
   onAdd,
   onAddTrack,
   onCoverFile,
+  onImportTrack,
   onMove,
   onMoveTrack,
   onRemove,
@@ -2698,11 +2752,17 @@ function AdminCompilations({
   uploadingCoverId,
 }: {
   compilations: DjCarlosCompilation[];
+  importingTrackId: string;
   onAdd: () => void;
   onAddTrack: (compilationId: string) => void;
   onCoverFile: (
     event: ChangeEvent<HTMLInputElement>,
     compilationId: string,
+  ) => void;
+  onImportTrack: (
+    compilationId: string,
+    trackId: string,
+    link: string,
   ) => void;
   onMove: (compilationId: string, direction: -1 | 1) => void;
   onMoveTrack: (
@@ -2738,7 +2798,9 @@ function AdminCompilations({
       </div>
       <p className="djcx-admin-compilation-help">
         Son independientes de Top Ten. Sube una portada propia y agrega cada
-        sencillo con su enlace y ritmo. El enlace general de playlist es opcional.
+        sencillo con su enlace y ritmo. Al salir del campo del enlace se cargara
+        el titulo automaticamente. Todas las canciones usan una sola portada: la
+        portada general de esta compilacion.
       </p>
       <div className="djcx-admin-compilation-list">
         {compilations.map((compilation, index) => (
@@ -2796,7 +2858,7 @@ function AdminCompilations({
                 </select>
               </label>
               <label>
-                URL de portada
+                Portada unica de toda la compilacion
                 <input
                   onChange={(event) =>
                     onUpdate(compilation.id, "coverUrl", event.target.value)
@@ -2843,9 +2905,11 @@ function AdminCompilations({
                 {compilation.tracks.map((track, trackIndex) => (
                   <CompilationTrackEditor
                     compilationId={compilation.id}
+                    importing={importingTrackId === track.id}
                     index={trackIndex}
                     key={track.id}
                     onMove={onMoveTrack}
+                    onImport={onImportTrack}
                     onRemove={onRemoveTrack}
                     onUpdate={onUpdateTrack}
                     rhythmOptions={rhythmOptions}
@@ -2899,7 +2963,9 @@ function AdminCompilations({
 
 function CompilationTrackEditor({
   compilationId,
+  importing,
   index,
+  onImport,
   onMove,
   onRemove,
   onUpdate,
@@ -2908,7 +2974,13 @@ function CompilationTrackEditor({
   track,
 }: {
   compilationId: string;
+  importing: boolean;
   index: number;
+  onImport: (
+    compilationId: string,
+    trackId: string,
+    link: string,
+  ) => void;
   onMove: (
     compilationId: string,
     trackId: string,
@@ -2940,12 +3012,21 @@ function CompilationTrackEditor({
       <label>
         Enlace de la cancion
         <input
+          disabled={importing}
+          onBlur={(event) =>
+            onImport(compilationId, track.id, event.currentTarget.value)
+          }
           onChange={(event) =>
             onUpdate(compilationId, track.id, "link", event.target.value)
           }
           placeholder="YouTube o YouTube Music"
           value={track.link}
         />
+        <small>
+          {importing
+            ? "Leyendo titulo..."
+            : "Pega el enlace y sal del campo para completar el titulo."}
+        </small>
       </label>
       <label>
         Ritmo de esta cancion

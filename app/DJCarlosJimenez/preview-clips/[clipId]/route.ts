@@ -36,6 +36,17 @@ export async function GET(
       releaseLooksAvailable(release.status)
     );
 
+  if (!clip && process.env.NODE_ENV !== "production") {
+    const productionUrl = new URL(
+      `/DJCarlosJimenez/preview-clips/${encodeURIComponent(clipId)}`,
+      "https://www.firstlisten.net",
+    );
+    const response = NextResponse.redirect(productionUrl, 307);
+    response.headers.set("Cache-Control", "private, no-store");
+    response.headers.set("Referrer-Policy", "no-referrer");
+    return response;
+  }
+
   if (!clip || (!isAdmin && !publiclyAvailable)) {
     return NextResponse.json(
       { error: "Adelanto no encontrado." },
