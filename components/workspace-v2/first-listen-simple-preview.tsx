@@ -293,10 +293,15 @@ export function FirstListenSimplePreview({
           <strong>
             {spanish ? "Publica tu música en FirstListen" : "Share your music on FirstListen"}
           </strong>
+          <small>
+            {spanish
+              ? "Primera canción sin contraseña ni tarjeta"
+              : "First song with no password or card"}
+          </small>
         </div>
-        <Link href="/signup">
+        <Link href="/first-publish">
           <Upload size={16} />
-          {spanish ? "Publicar música" : "Submit music"}
+          {spanish ? "Publicar gratis" : "Publish free"}
         </Link>
       </section>
 

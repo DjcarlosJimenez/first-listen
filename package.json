@@ -56,6 +56,9 @@
     "feedback-engine:verify": "node scripts/verify-feedback-engine-production.mjs",
     "analytics:dry-run": "node scripts/apply-site-analytics.mjs",
     "analytics:apply": "node scripts/apply-site-analytics.mjs --apply",
+    "first-publish:dry-run": "node scripts/apply-first-publish-trial.mjs",
+    "first-publish:apply": "node scripts/apply-first-publish-trial.mjs --apply",
+    "first-publish:verify": "node scripts/verify-first-publish-trial.mjs",
     "db:verify": "node scripts/verify-database.mjs"
   },
   "dependencies": {
