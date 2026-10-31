@@ -64,6 +64,7 @@ const UPCOMING_REACTIONS: {
   { key: "favorite", label: "Mi favorita" },
 ];
 const AUTO_ADVANCE_COMPLETION_MARGIN_SECONDS = 1.5;
+const COMPILATION_AUTO_ADVANCE_MARGIN_SECONDS = 5;
 
 type DjCarlosShareTarget = {
   notice: string;
@@ -754,7 +755,13 @@ export function DjCarlosArtistPage({
       const pausedAtEnd =
         nextSnapshot.duration > 0 &&
         nextSnapshot.currentTime >=
-          Math.max(0, nextSnapshot.duration - AUTO_ADVANCE_COMPLETION_MARGIN_SECONDS);
+          Math.max(
+            0,
+            nextSnapshot.duration -
+              (activeCompilationId
+                ? COMPILATION_AUTO_ADVANCE_MARGIN_SECONDS
+                : AUTO_ADVANCE_COMPLETION_MARGIN_SECONDS),
+          );
 
       if (autoPlayEnabledRef.current && !playerPausedByUserRef.current && pausedAtEnd) {
         normalizedSnapshot = {
@@ -775,7 +782,7 @@ export function DjCarlosArtistPage({
     }
 
     lastTelemetryStateRef.current = normalizedSnapshot.playbackState;
-  }, []);
+  }, [activeCompilationId]);
 
   useEffect(() => {
     autoPlayEnabledRef.current = autoPlayEnabled;
@@ -908,10 +915,15 @@ export function DjCarlosArtistPage({
   }, [albumPlayerTrack?.id, tracks]);
 
   useEffect(() => {
+    const compilationQueueActive = Boolean(
+      activeCompilationId && activeCompilationQueue.length,
+    );
     if (
       snapshot?.playbackState !== "completed" ||
-      playerPausedByUser ||
-      !autoPlayEnabled
+      (
+        !compilationQueueActive &&
+        (playerPausedByUser || !autoPlayEnabled)
+      )
     ) {
       return;
     }
@@ -926,6 +938,9 @@ export function DjCarlosArtistPage({
     lastAutoAdvanceKeyRef.current = completionKey;
 
     const advanceTimer = window.setTimeout(() => {
+      if (compilationQueueActive) {
+        pendingCompilationPlaybackRef.current = nextTrackId;
+      }
       lastTelemetryStateRef.current = "loading";
       setSnapshot(null);
       setAutoPlayEnabled(true);
@@ -936,6 +951,8 @@ export function DjCarlosArtistPage({
 
     return () => window.clearTimeout(advanceTimer);
   }, [
+    activeCompilationId,
+    activeCompilationQueue.length,
     activeTrack?.id,
     albumPlayerTrack?.id,
     autoPlayEnabled,
