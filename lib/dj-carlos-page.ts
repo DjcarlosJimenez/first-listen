@@ -61,6 +61,13 @@ export type DjCarlosAlbum = {
   title: string;
 };
 
+export type DjCarlosCompilationTrack = {
+  id: string;
+  link: string;
+  mood: string;
+  title: string;
+};
+
 export type DjCarlosCompilation = {
   coverUrl: string;
   description: string;
@@ -69,6 +76,7 @@ export type DjCarlosCompilation = {
   link: string;
   mood: string;
   title: string;
+  tracks: DjCarlosCompilationTrack[];
 };
 
 export type DjCarlosUpcomingReactionKey = "waiting" | "video" | "favorite";
@@ -813,6 +821,43 @@ function cleanCompilations(
     }
     usedIds.add(id);
 
+    const rawTracks = Array.isArray(item.tracks) ? item.tracks : [];
+    const usedTrackIds = new Set<string>();
+    const tracks = rawTracks.reduce<DjCarlosCompilationTrack[]>(
+      (trackItems, rawTrack, trackIndex) => {
+        if (!rawTrack || typeof rawTrack !== "object") return trackItems;
+        const track = rawTrack as Record<string, unknown>;
+        const trackTitle =
+          typeof track.title === "string" && track.title.trim()
+            ? track.title.trim().slice(0, 160)
+            : `Cancion ${trackIndex + 1}`;
+        const baseTrackId = slugifyDjCarlosAlbumTitle(
+          typeof track.id === "string" && track.id.trim()
+            ? track.id
+            : trackTitle,
+          `cancion-${trackIndex + 1}`,
+        );
+        let trackId = baseTrackId;
+        let trackSuffix = 2;
+        while (usedTrackIds.has(trackId)) {
+          trackId = `${baseTrackId}-${trackSuffix}`;
+          trackSuffix += 1;
+        }
+        usedTrackIds.add(trackId);
+        trackItems.push({
+          id: trackId,
+          link: typeof track.link === "string" ? track.link.trim() : "",
+          mood: normalizeDjCarlosRhythm(
+            track.mood,
+            normalizeDjCarlosRhythm(item.mood, DJ_CARLOS_DEFAULT_RHYTHM),
+          ),
+          title: trackTitle,
+        });
+        return trackItems;
+      },
+      [],
+    ).slice(0, 60);
+
     items.push({
       coverUrl: cleanDjCarlosImageUrl(item.coverUrl, DJ_CARLOS_LOGO_URL),
       description:
@@ -824,6 +869,7 @@ function cleanCompilations(
       link: typeof item.link === "string" ? item.link.trim() : "",
       mood: normalizeDjCarlosRhythm(item.mood, DJ_CARLOS_DEFAULT_RHYTHM),
       title,
+      tracks,
     });
     return items;
   }, []).slice(0, 24);

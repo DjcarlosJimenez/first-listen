@@ -44,11 +44,10 @@ export async function POST(request: NextRequest) {
   }
   if (
     !Number.isFinite(durationSeconds) ||
-    durationSeconds <= 0 ||
-    durationSeconds > DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS + 0.5
+    durationSeconds <= 0
   ) {
     return NextResponse.json(
-      { error: "El adelanto debe durar 30 segundos o menos." },
+      { error: "No se pudo confirmar la duracion del adelanto." },
       { status: 400 },
     );
   }

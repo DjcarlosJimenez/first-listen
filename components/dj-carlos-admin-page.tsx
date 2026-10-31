@@ -58,6 +58,7 @@ import {
   slugifyDjCarlosAlbumTitle,
   type DjCarlosAlbum,
   type DjCarlosCompilation,
+  type DjCarlosCompilationTrack,
   type DjCarlosPageConfig,
   type DjCarlosTrack,
   type DjCarlosTrackSection,
@@ -88,6 +89,8 @@ type EditableCompilationField =
   | "link"
   | "mood"
   | "title";
+
+type EditableCompilationTrackField = "link" | "mood" | "title";
 
 type AlbumImportResponse = {
   album?: Partial<DjCarlosAlbum>;
@@ -131,31 +134,85 @@ function isAcceptedPreviewAudio(file: File) {
     ["aac", "m4a", "mp3"].includes(extension);
 }
 
-function readAudioDuration(file: File) {
+function readAudioElementDuration(file: File) {
   return new Promise<number>((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
     const audio = document.createElement("audio");
+    let settled = false;
+    const finish = (duration?: number, error?: Error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      cleanup();
+      if (duration && Number.isFinite(duration) && duration > 0) {
+        resolve(duration);
+        return;
+      }
+      reject(error ?? new Error("No se pudo leer la duracion del audio."));
+    };
     const cleanup = () => {
+      audio.onloadedmetadata = null;
+      audio.ondurationchange = null;
+      audio.ontimeupdate = null;
+      audio.onerror = null;
       audio.removeAttribute("src");
       audio.load();
       URL.revokeObjectURL(objectUrl);
     };
+    const readKnownDuration = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        finish(audio.duration);
+        return true;
+      }
+      return false;
+    };
+    const timeoutId = window.setTimeout(() => {
+      finish(undefined, new Error("El navegador no pudo leer este MP3."));
+    }, 9000);
     audio.preload = "metadata";
     audio.onloadedmetadata = () => {
-      const duration = audio.duration;
-      cleanup();
-      if (!Number.isFinite(duration) || duration <= 0) {
-        reject(new Error("No se pudo leer la duracion del audio."));
-        return;
+      if (readKnownDuration()) return;
+      // Algunos MP3 VBR informan Infinity hasta que el navegador busca el final.
+      audio.ondurationchange = () => void readKnownDuration();
+      audio.ontimeupdate = () => void readKnownDuration();
+      try {
+        audio.currentTime = Number.MAX_SAFE_INTEGER;
+      } catch {
+        finish(undefined, new Error("No se pudo leer la duracion del MP3."));
       }
-      resolve(duration);
     };
     audio.onerror = () => {
-      cleanup();
-      reject(new Error("No se pudo abrir este archivo de audio."));
+      finish(undefined, new Error("No se pudo abrir este archivo de audio."));
     };
     audio.src = objectUrl;
   });
+}
+
+async function readAudioDuration(file: File) {
+  try {
+    return await readAudioElementDuration(file);
+  } catch {
+    const AudioContextConstructor = window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioContextConstructor) {
+      throw new Error("El navegador no pudo leer este MP3.");
+    }
+    const context = new AudioContextConstructor();
+    try {
+      const decoded = await context.decodeAudioData(await file.arrayBuffer());
+      if (!Number.isFinite(decoded.duration) || decoded.duration <= 0) {
+        throw new Error("No se pudo leer la duracion del MP3.");
+      }
+      return decoded.duration;
+    } catch {
+      throw new Error(
+        "No se pudo abrir el MP3. Comprueba que el archivo no este danado.",
+      );
+    } finally {
+      await context.close().catch(() => undefined);
+    }
+  }
 }
 
 function albumsForConfig(config: DjCarlosPageConfig) {
@@ -251,6 +308,8 @@ export function DjCarlosAdminPage({
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingPortrait, setUploadingPortrait] = useState(false);
   const [uploadingUpcomingCover, setUploadingUpcomingCover] = useState(false);
+  const [uploadingCompilationCoverId, setUploadingCompilationCoverId] =
+    useState("");
   const [uploadingPreviewTitle, setUploadingPreviewTitle] = useState("");
   const [importingAlbum, setImportingAlbum] = useState(false);
   const [status, setStatus] = useState("Panel listo para editar.");
@@ -700,22 +759,25 @@ export function DjCarlosAdminPage({
 
     try {
       const durationSeconds = await readAudioDuration(file);
-      if (durationSeconds > DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS + 0.5) {
-        throw new Error(
-          `El adelanto dura ${Math.ceil(durationSeconds)} segundos. Recortalo a ${DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS} segundos o menos.`,
-        );
-      }
+      const publishedDuration = Math.min(
+        DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS,
+        durationSeconds,
+      );
       if (!(await ensureAdminSession())) return;
 
       const existingClip = upcomingPreviewByTitle.get(titleKey);
       const formData = new FormData();
-      formData.append("durationSeconds", String(durationSeconds));
+      formData.append("durationSeconds", String(publishedDuration));
       formData.append("file", file);
       formData.append("title", trackTitle);
       if (existingClip) formData.append("clipId", existingClip.id);
 
       setStatus(
-        existingClip ? "Reemplazando adelanto..." : "Subiendo adelanto privado...",
+        durationSeconds > DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS + 0.5
+          ? `El archivo dura ${Math.ceil(durationSeconds)} segundos; se publicaran solamente los primeros ${DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS}.`
+          : existingClip
+            ? "Reemplazando adelanto..."
+            : "Subiendo adelanto privado...",
       );
       const response = await fetch("/DJCarlosJimenez/preview-clips", {
         body: formData,
@@ -830,6 +892,7 @@ export function DjCarlosAdminPage({
       link: "",
       mood: DJ_CARLOS_DEFAULT_RHYTHM,
       title: `Nueva compilacion ${config.compilations.length + 1}`,
+      tracks: [],
     };
     setConfig((current) => ({
       ...current,
@@ -860,6 +923,104 @@ export function DjCarlosAdminPage({
       updatedAt: new Date().toISOString(),
     }));
     setStatus("Compilacion actualizada. Toca Guardar cambios.");
+  };
+
+  const addCompilationTrack = (compilationId: string) => {
+    hasLocalChangesRef.current = true;
+    const stamp = `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 6)}`;
+    setConfig((current) => ({
+      ...current,
+      compilations: current.compilations.map((compilation) =>
+        compilation.id === compilationId
+          ? {
+              ...compilation,
+              tracks: [
+                ...compilation.tracks,
+                {
+                  id: `single-${stamp}`,
+                  link: "",
+                  mood: compilation.mood || DJ_CARLOS_DEFAULT_RHYTHM,
+                  title: `Nueva cancion ${compilation.tracks.length + 1}`,
+                },
+              ],
+            }
+          : compilation,
+      ),
+      updatedAt: new Date().toISOString(),
+    }));
+    setStatus("Cancion agregada a la compilacion. Completa sus datos y guarda.");
+  };
+
+  const updateCompilationTrack = (
+    compilationId: string,
+    trackId: string,
+    field: EditableCompilationTrackField,
+    value: string,
+  ) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      compilations: current.compilations.map((compilation) =>
+        compilation.id === compilationId
+          ? {
+              ...compilation,
+              tracks: compilation.tracks.map((track) =>
+                track.id === trackId
+                  ? {
+                      ...track,
+                      [field]: field === "mood"
+                        ? normalizeDjCarlosRhythm(value, track.mood)
+                        : value,
+                    }
+                  : track,
+              ),
+            }
+          : compilation,
+      ),
+      updatedAt: new Date().toISOString(),
+    }));
+    setStatus("Cancion de la compilacion actualizada. Toca Guardar cambios.");
+  };
+
+  const moveCompilationTrack = (
+    compilationId: string,
+    trackId: string,
+    direction: -1 | 1,
+  ) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      compilations: current.compilations.map((compilation) => {
+        if (compilation.id !== compilationId) return compilation;
+        const tracks = [...compilation.tracks];
+        const index = tracks.findIndex((track) => track.id === trackId);
+        const target = index + direction;
+        if (index < 0 || target < 0 || target >= tracks.length) {
+          return compilation;
+        }
+        [tracks[index], tracks[target]] = [tracks[target], tracks[index]];
+        return { ...compilation, tracks };
+      }),
+      updatedAt: new Date().toISOString(),
+    }));
+    setStatus("Orden de canciones actualizado. Toca Guardar cambios.");
+  };
+
+  const removeCompilationTrack = (compilationId: string, trackId: string) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      compilations: current.compilations.map((compilation) =>
+        compilation.id === compilationId
+          ? {
+              ...compilation,
+              tracks: compilation.tracks.filter((track) => track.id !== trackId),
+            }
+          : compilation,
+      ),
+      updatedAt: new Date().toISOString(),
+    }));
+    setStatus("Cancion quitada de la compilacion. Toca Guardar cambios.");
   };
 
   const moveCompilation = (compilationId: string, direction: -1 | 1) => {
@@ -1404,6 +1565,67 @@ export function DjCarlosAdminPage({
     } finally {
       setUploadingUpcomingCover(false);
       event.target.value = "";
+    }
+  };
+
+  const handleCompilationCoverFile = async (
+    event: ChangeEvent<HTMLInputElement>,
+    compilationId: string,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setStatus("Selecciona una imagen JPG, PNG o WEBP para la compilacion.");
+      return;
+    }
+    if (file.size > DJ_CARLOS_COVER_MAX_BYTES) {
+      setStatus(`La portada debe pesar menos de ${DJ_CARLOS_COVER_MAX_MB} MB.`);
+      return;
+    }
+
+    setUploadingCompilationCoverId(compilationId);
+    setStatus("Revisando sesion...");
+    try {
+      if (!(await ensureAdminSession())) return;
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/DJCarlosJimenez/assets", {
+        body: formData,
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        setStatus(
+          "Tu sesion vencio. Entra otra vez; el resto del borrador queda guardado.",
+        );
+        redirectToAdminLogin();
+        return;
+      }
+      const coverUrl = typeof data.coverUrl === "string"
+        ? data.coverUrl
+        : typeof data.assetUrl === "string"
+          ? data.assetUrl
+          : "";
+      if (!response.ok || !coverUrl) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "No se pudo subir la portada de la compilacion.",
+        );
+      }
+      updateCompilation(compilationId, "coverUrl", coverUrl);
+      setStatus("Portada de compilacion subida. Toca Guardar cambios.");
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "No se pudo subir la portada de la compilacion.",
+      );
+    } finally {
+      setUploadingCompilationCoverId("");
     }
   };
 
@@ -2159,7 +2381,8 @@ export function DjCarlosAdminPage({
               <strong>Clips privados de hasta 30 segundos</strong>
             </div>
             <small>
-              MP3, M4A o AAC · maximo {DJ_CARLOS_PREVIEW_CLIP_MAX_MB} MB
+              MP3, M4A o AAC · maximo {DJ_CARLOS_PREVIEW_CLIP_MAX_MB} MB · se
+              publican los primeros {DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS} segundos
             </small>
           </div>
 
@@ -2191,7 +2414,9 @@ export function DjCarlosAdminPage({
 
           <p className="djcx-admin-preview-note">
             Cada archivo se guarda de forma privada y la pagina usa un enlace temporal.
-            Subir o reemplazar un clip lo publica inmediatamente.
+            Si el archivo dura mas, la reproduccion se detiene automaticamente a los
+            {` ${DJ_CARLOS_PREVIEW_CLIP_MAX_SECONDS} segundos`}. Subir o reemplazar un
+            clip lo publica inmediatamente.
           </p>
 
           <div className="djcx-admin-preview-list">
@@ -2333,10 +2558,16 @@ export function DjCarlosAdminPage({
       <AdminCompilations
         compilations={config.compilations}
         onAdd={addCompilation}
+        onAddTrack={addCompilationTrack}
+        onCoverFile={handleCompilationCoverFile}
         onMove={moveCompilation}
+        onMoveTrack={moveCompilationTrack}
         onRemove={removeCompilation}
+        onRemoveTrack={removeCompilationTrack}
         onUpdate={updateCompilation}
+        onUpdateTrack={updateCompilationTrack}
         rhythmOptions={rhythmOptions}
+        uploadingCoverId={uploadingCompilationCoverId}
       />
 
       <section className="djcx-admin-panel">
@@ -2455,21 +2686,45 @@ export function DjCarlosAdminPage({
 function AdminCompilations({
   compilations,
   onAdd,
+  onAddTrack,
+  onCoverFile,
   onMove,
+  onMoveTrack,
   onRemove,
+  onRemoveTrack,
   onUpdate,
+  onUpdateTrack,
   rhythmOptions,
+  uploadingCoverId,
 }: {
   compilations: DjCarlosCompilation[];
   onAdd: () => void;
+  onAddTrack: (compilationId: string) => void;
+  onCoverFile: (
+    event: ChangeEvent<HTMLInputElement>,
+    compilationId: string,
+  ) => void;
   onMove: (compilationId: string, direction: -1 | 1) => void;
+  onMoveTrack: (
+    compilationId: string,
+    trackId: string,
+    direction: -1 | 1,
+  ) => void;
   onRemove: (compilationId: string) => void;
+  onRemoveTrack: (compilationId: string, trackId: string) => void;
   onUpdate: (
     compilationId: string,
     field: EditableCompilationField,
     value: string | boolean,
   ) => void;
+  onUpdateTrack: (
+    compilationId: string,
+    trackId: string,
+    field: EditableCompilationTrackField,
+    value: string,
+  ) => void;
   rhythmOptions: string[];
+  uploadingCoverId: string;
 }) {
   return (
     <section className="djcx-admin-panel djcx-admin-compilations">
@@ -2482,8 +2737,8 @@ function AdminCompilations({
         </button>
       </div>
       <p className="djcx-admin-compilation-help">
-        Son independientes de Top Ten. Cada tarjeta puede enlazar una playlist de
-        YouTube o YouTube Music y se puede ordenar, ocultar o quitar.
+        Son independientes de Top Ten. Sube una portada propia y agrega cada
+        sencillo con su enlace y ritmo. El enlace general de playlist es opcional.
       </p>
       <div className="djcx-admin-compilation-list">
         {compilations.map((compilation, index) => (
@@ -2518,7 +2773,7 @@ function AdminCompilations({
                 />
               </label>
               <label>
-                Enlace de la playlist
+                Enlace general de playlist (opcional)
                 <input
                   onChange={(event) =>
                     onUpdate(compilation.id, "link", event.target.value)
@@ -2528,7 +2783,7 @@ function AdminCompilations({
                 />
               </label>
               <label>
-                Ritmo principal
+                Ritmo para la playlist general
                 <select
                   onChange={(event) =>
                     onUpdate(compilation.id, "mood", event.target.value)
@@ -2549,6 +2804,22 @@ function AdminCompilations({
                   value={compilation.coverUrl}
                 />
               </label>
+              <label
+                className={`djcx-file-control djcx-admin-compilation-cover${
+                  uploadingCoverId === compilation.id ? " is-loading" : ""
+                }`}
+              >
+                <ImagePlus size={16} />
+                {uploadingCoverId === compilation.id
+                  ? "Subiendo portada..."
+                  : "Cargar portada propia"}
+                <input
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={uploadingCoverId === compilation.id}
+                  onChange={(event) => onCoverFile(event, compilation.id)}
+                  type="file"
+                />
+              </label>
               <label className="djcx-admin-compilation-description">
                 Descripcion
                 <textarea
@@ -2559,6 +2830,36 @@ function AdminCompilations({
                   value={compilation.description}
                 />
               </label>
+              <div className="djcx-admin-compilation-tracks">
+                <div>
+                  <strong>Sencillos de esta compilacion</strong>
+                  <button
+                    onClick={() => onAddTrack(compilation.id)}
+                    type="button"
+                  >
+                    <Plus size={14} /> Agregar cancion
+                  </button>
+                </div>
+                {compilation.tracks.map((track, trackIndex) => (
+                  <CompilationTrackEditor
+                    compilationId={compilation.id}
+                    index={trackIndex}
+                    key={track.id}
+                    onMove={onMoveTrack}
+                    onRemove={onRemoveTrack}
+                    onUpdate={onUpdateTrack}
+                    rhythmOptions={rhythmOptions}
+                    total={compilation.tracks.length}
+                    track={track}
+                  />
+                ))}
+                {!compilation.tracks.length && (
+                  <p>
+                    Agrega canciones individuales para mezclar cumbia, banda,
+                    pop u otros ritmos dentro de la misma compilacion.
+                  </p>
+                )}
+              </div>
             </div>
             <div className="djcx-admin-compilation-actions">
               <label className="djcx-admin-toggle">
@@ -2593,6 +2894,99 @@ function AdminCompilations({
         )}
       </div>
     </section>
+  );
+}
+
+function CompilationTrackEditor({
+  compilationId,
+  index,
+  onMove,
+  onRemove,
+  onUpdate,
+  rhythmOptions,
+  total,
+  track,
+}: {
+  compilationId: string;
+  index: number;
+  onMove: (
+    compilationId: string,
+    trackId: string,
+    direction: -1 | 1,
+  ) => void;
+  onRemove: (compilationId: string, trackId: string) => void;
+  onUpdate: (
+    compilationId: string,
+    trackId: string,
+    field: EditableCompilationTrackField,
+    value: string,
+  ) => void;
+  rhythmOptions: string[];
+  total: number;
+  track: DjCarlosCompilationTrack;
+}) {
+  return (
+    <article className="djcx-admin-compilation-track">
+      <span>{String(index + 1).padStart(2, "0")}</span>
+      <label>
+        Titulo
+        <input
+          onChange={(event) =>
+            onUpdate(compilationId, track.id, "title", event.target.value)
+          }
+          value={track.title}
+        />
+      </label>
+      <label>
+        Enlace de la cancion
+        <input
+          onChange={(event) =>
+            onUpdate(compilationId, track.id, "link", event.target.value)
+          }
+          placeholder="YouTube o YouTube Music"
+          value={track.link}
+        />
+      </label>
+      <label>
+        Ritmo de esta cancion
+        <select
+          onChange={(event) =>
+            onUpdate(compilationId, track.id, "mood", event.target.value)
+          }
+          value={track.mood}
+        >
+          {rhythmOptions.map((rhythm) => (
+            <option key={rhythm} value={rhythm}>{rhythm}</option>
+          ))}
+        </select>
+      </label>
+      <div>
+        <button
+          aria-label="Mover cancion arriba"
+          disabled={index === 0}
+          onClick={() => onMove(compilationId, track.id, -1)}
+          type="button"
+        >
+          <ArrowUp size={14} />
+        </button>
+        <button
+          aria-label="Mover cancion abajo"
+          disabled={index === total - 1}
+          onClick={() => onMove(compilationId, track.id, 1)}
+          type="button"
+        >
+          <ArrowDown size={14} />
+        </button>
+        <button
+          aria-label="Quitar cancion"
+          className="is-danger"
+          onClick={() => onRemove(compilationId, track.id)}
+          type="button"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </article>
   );
 }
 

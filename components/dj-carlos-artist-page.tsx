@@ -298,6 +298,7 @@ export function DjCarlosArtistPage({
   const [selectedRhythm, setSelectedRhythm] = useState("");
   const [selectedVideoRhythm, setSelectedVideoRhythm] = useState("");
   const [videoQueueActive, setVideoQueueActive] = useState(false);
+  const [activeCompilationId, setActiveCompilationId] = useState("");
   const [videoSortMode, setVideoSortMode] =
     useState<DjCarlosVideoSortMode>("official");
   const [videoPlayCounts, setVideoPlayCounts] = useState(() =>
@@ -421,25 +422,73 @@ export function DjCarlosArtistPage({
   );
   const compilations = useMemo(
     () => config.compilations.filter(
-      (compilation) => compilation.enabled && isPlayableDjCarlosLink(compilation.link),
+      (compilation) =>
+        compilation.enabled &&
+        (
+          isPlayableDjCarlosLink(compilation.link) ||
+          compilation.tracks.some((track) => isPlayableDjCarlosLink(track.link))
+        ),
     ),
     [config.compilations],
   );
-  const compilationPlayerTracks = useMemo<DjCarlosTrack[]>(
-    () => compilations.map((compilation) => ({
-      artist: "DJ Carlos Jimenez Compositor",
-      badge: "Compilacion",
-      coverUrl: compilation.coverUrl || artistLogoUrl,
-      id: `dj-carlos-compilation-${compilation.id}`,
-      link: compilation.link,
-      mood: compilation.mood,
-      platform: detectDjCarlosPlatform(compilation.link),
-      release: compilation.title,
-      section: "top-ten",
-      subtitle: compilation.description || "Lista especial",
-      title: compilation.title,
-    })),
+  const compilationPlaybackTracks = useMemo(
+    () => compilations.flatMap((compilation) => {
+      const playableSingles = compilation.tracks.filter((track) =>
+        isPlayableDjCarlosLink(track.link),
+      );
+      if (playableSingles.length) {
+        return playableSingles.map((track) => ({
+          compilationId: compilation.id,
+          track: {
+            artist: "DJ Carlos Jimenez Compositor",
+            badge: "Compilacion",
+            coverUrl: compilation.coverUrl || artistLogoUrl,
+            id: `dj-carlos-compilation-${compilation.id}-${track.id}`,
+            link: track.link,
+            mood: track.mood,
+            platform: detectDjCarlosPlatform(track.link),
+            release: compilation.title,
+            section: "top-ten" as const,
+            subtitle: `${compilation.title} · ${track.mood}`,
+            title: track.title,
+          },
+        }));
+      }
+      if (!isPlayableDjCarlosLink(compilation.link)) return [];
+      return [{
+        compilationId: compilation.id,
+        track: {
+          artist: "DJ Carlos Jimenez Compositor",
+          badge: "Compilacion",
+          coverUrl: compilation.coverUrl || artistLogoUrl,
+          id: `dj-carlos-compilation-${compilation.id}`,
+          link: compilation.link,
+          mood: compilation.mood,
+          platform: detectDjCarlosPlatform(compilation.link),
+          release: compilation.title,
+          section: "top-ten" as const,
+          subtitle: compilation.description || "Lista especial",
+          title: compilation.title,
+        },
+      }];
+    }),
     [artistLogoUrl, compilations],
+  );
+  const compilationPlayerTracks = useMemo<DjCarlosTrack[]>(
+    () => compilationPlaybackTracks.map((item) => item.track),
+    [compilationPlaybackTracks],
+  );
+  const compilationIdByTrackId = useMemo(
+    () => new Map(
+      compilationPlaybackTracks.map((item) => [item.track.id, item.compilationId]),
+    ),
+    [compilationPlaybackTracks],
+  );
+  const activeCompilationQueue = useMemo(
+    () => compilationPlaybackTracks
+      .filter((item) => item.compilationId === activeCompilationId)
+      .map((item) => item.track),
+    [activeCompilationId, compilationPlaybackTracks],
   );
   const videoRhythms = useMemo(
     () => uniqueDjCarlosRhythms(officialVideos.map((track) => track.mood)),
@@ -503,19 +552,23 @@ export function DjCarlosArtistPage({
     [allAlbumTracks, officialVideos, topTenTracks],
   );
   const playQueue = useMemo(
-    () => videoQueueActive
-      ? orderedOfficialVideos
-      : selectedRhythm
-        ? [
-            ...libraryPlayQueue.filter(
-              (track) =>
-                track.section !== "official-video" &&
-                trackMatchesRhythm(track, selectedRhythm, albums),
-            ),
-            ...officialVideos,
-          ]
-        : basePlayQueue,
+    () => activeCompilationId && activeCompilationQueue.length
+      ? activeCompilationQueue
+      : videoQueueActive
+        ? orderedOfficialVideos
+        : selectedRhythm
+          ? [
+              ...libraryPlayQueue.filter(
+                (track) =>
+                  track.section !== "official-video" &&
+                  trackMatchesRhythm(track, selectedRhythm, albums),
+              ),
+              ...officialVideos,
+            ]
+          : basePlayQueue,
     [
+      activeCompilationId,
+      activeCompilationQueue,
       albums,
       basePlayQueue,
       libraryPlayQueue,
@@ -653,7 +706,7 @@ export function DjCarlosArtistPage({
       notice: "Link de la compilacion listo.",
       text: `Escucha ${compilation.title} de DJ Carlos Jimenez.`,
       title: `${compilation.title} | DJ Carlos Jimenez`,
-      url: compilation.link,
+      url: `/DJCarlosJimenez#compilacion-${compilation.id}`,
     });
 
   const trackSharePath = (track: DjCarlosTrack) => {
@@ -892,8 +945,10 @@ export function DjCarlosArtistPage({
   ]);
 
   const playTrack = (trackId: string) => {
+    const compilationId = compilationIdByTrackId.get(trackId) ?? "";
+    setActiveCompilationId(compilationId);
     setVideoQueueActive(
-      tracks.some(
+      !compilationId && tracks.some(
         (track) => track.id === trackId && track.section === "official-video",
       ),
     );
@@ -904,6 +959,21 @@ export function DjCarlosArtistPage({
     setPlayerPausedByUser(false);
     setActiveId(trackId);
     setPlayerVersion((version) => version + 1);
+  };
+
+  const playCompilation = (
+    compilation: DjCarlosCompilation,
+    compilationTrackId?: string,
+  ) => {
+    const requestedPlayerId = compilationTrackId
+      ? `dj-carlos-compilation-${compilation.id}-${compilationTrackId}`
+      : "";
+    const match = compilationPlaybackTracks.find(
+      (item) =>
+        item.compilationId === compilation.id &&
+        (!requestedPlayerId || item.track.id === requestedPlayerId),
+    );
+    if (match) playTrack(match.track.id);
   };
 
   const playAlbum = () => {
@@ -1338,9 +1408,7 @@ export function DjCarlosArtistPage({
       {!isAlbumDetail && compilations.length > 0 && (
         <CompilationsSection
           compilations={compilations}
-          onPlay={(compilation) =>
-            playTrack(`dj-carlos-compilation-${compilation.id}`)
-          }
+          onPlay={playCompilation}
           onShare={(compilation) => void shareCompilation(compilation)}
         />
       )}
@@ -1919,7 +1987,10 @@ function CompilationsSection({
   onShare,
 }: {
   compilations: DjCarlosCompilation[];
-  onPlay: (compilation: DjCarlosCompilation) => void;
+  onPlay: (
+    compilation: DjCarlosCompilation,
+    compilationTrackId?: string,
+  ) => void;
   onShare: (compilation: DjCarlosCompilation) => void;
 }) {
   return (
@@ -1935,7 +2006,11 @@ function CompilationsSection({
       </div>
       <div className="djcx-compilation-grid">
         {compilations.map((compilation) => (
-          <article className="djcx-compilation-card" key={compilation.id}>
+          <article
+            className="djcx-compilation-card"
+            id={`compilacion-${compilation.id}`}
+            key={compilation.id}
+          >
             <div className="djcx-compilation-art">
               <Image
                 alt={`Portada de ${compilation.title}`}
@@ -1950,7 +2025,31 @@ function CompilationsSection({
               <small>Compilacion</small>
               <h3>{compilation.title}</h3>
               {compilation.description && <p>{compilation.description}</p>}
-              <div>
+              {compilation.tracks.length > 0 && (
+                <details className="djcx-compilation-tracks">
+                  <summary>
+                    Ver canciones ({compilation.tracks.length})
+                  </summary>
+                  <ol>
+                    {compilation.tracks.map((track, index) => (
+                      <li key={track.id}>
+                        <button
+                          disabled={!isPlayableDjCarlosLink(track.link)}
+                          onClick={() => onPlay(compilation, track.id)}
+                          type="button"
+                        >
+                          <Play fill="currentColor" size={12} />
+                          <span>
+                            {index + 1}. {track.title}
+                            <small>{track.mood}</small>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              )}
+              <div className="djcx-compilation-actions">
                 <button onClick={() => onPlay(compilation)} type="button">
                   <Play fill="currentColor" size={15} /> Reproducir lista
                 </button>
@@ -1962,15 +2061,17 @@ function CompilationsSection({
                 >
                   <Share2 size={15} />
                 </button>
-                <a
-                  aria-label={`Abrir ${compilation.title} en la plataforma`}
-                  href={compilation.link}
-                  rel="noreferrer"
-                  target="_blank"
-                  title="Abrir enlace original"
-                >
-                  <ExternalLink size={15} />
-                </a>
+                {isPlayableDjCarlosLink(compilation.link) && (
+                  <a
+                    aria-label={`Abrir ${compilation.title} en la plataforma`}
+                    href={compilation.link}
+                    rel="noreferrer"
+                    target="_blank"
+                    title="Abrir playlist original"
+                  >
+                    <ExternalLink size={15} />
+                  </a>
+                )}
               </div>
             </div>
           </article>
