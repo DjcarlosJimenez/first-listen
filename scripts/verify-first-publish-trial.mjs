@@ -104,6 +104,33 @@ try {
     "The seven-day publication state is invalid.",
   );
 
+  const publicSong = await client.query(
+    "select * from public.get_first_publish_live_song($1)",
+    [songId],
+  );
+  assert(
+    publicSong.rowCount === 1 && publicSong.rows[0].viewer_owns === true,
+    "The public first-publication page cannot resolve the active song.",
+  );
+  const listenerHash = "a".repeat(64);
+  const reaction = await client.query(
+    "select * from public.add_first_publish_reaction($1, 'liked', $2)",
+    [songId, listenerHash],
+  );
+  assert(
+    reaction.rows[0]?.accepted === true && Number(reaction.rows[0]?.liked_count) === 1,
+    "The first quick reaction was not counted.",
+  );
+  const duplicateReaction = await client.query(
+    "select * from public.add_first_publish_reaction($1, 'liked', $2)",
+    [songId, listenerHash],
+  );
+  assert(
+    duplicateReaction.rows[0]?.accepted === false &&
+      Number(duplicateReaction.rows[0]?.liked_count) === 1,
+    "A duplicate device reaction was counted more than once.",
+  );
+
   const retained = await client.query(
     "select * from public.retain_first_publish_trial($1)",
     [songId],
@@ -126,6 +153,13 @@ try {
       final.publication_expires_at === null && final.retained_at,
     "The retained publication still has an expiration.",
   );
+  const funnel = await client.query(
+    "select public.get_first_publish_funnel(30) as report",
+  );
+  assert(
+    Array.isArray(funnel.rows[0]?.report) && funnel.rows[0].report.length === 7,
+    "The first-publication funnel report is unavailable.",
+  );
 
   await client.query("rollback");
   console.log(JSON.stringify({
@@ -135,6 +169,9 @@ try {
       "verified first song published without token charge",
       "seven-day expiration assigned",
       "free retention removed expiration",
+      "public page returned only the active trial song",
+      "quick reactions were limited to one per device",
+      "seven-stage owner funnel is available",
       "all verification data rolled back",
     ],
   }));

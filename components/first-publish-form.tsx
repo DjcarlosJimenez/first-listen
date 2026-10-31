@@ -19,7 +19,11 @@ import {
   type Genre,
   type SongLanguage,
 } from "@/lib/catalog";
-import type { FirstPublishContentKind } from "@/lib/first-publish";
+import {
+  firstPublishFunnelLabels,
+  trackFirstPublishStage,
+  type FirstPublishContentKind,
+} from "@/lib/first-publish";
 import { optionLabel } from "@/lib/i18n";
 
 type MetadataResult = {
@@ -81,6 +85,7 @@ export function FirstPublishForm() {
   const autoCover = useRef("");
   const autoMinutes = useRef("");
   const autoSeconds = useRef("");
+  const trackedLink = useRef("");
   const spanish = locale === "es";
   const totalDuration = useMemo(
     () => Number(durationMinutes || 0) * 60 + Number(durationSeconds || 0),
@@ -129,6 +134,10 @@ export function FirstPublishForm() {
           return;
         }
         setPlatform(data.platform ?? "");
+        if (trackedLink.current !== trimmed) {
+          trackedLink.current = trimmed;
+          trackFirstPublishStage(firstPublishFunnelLabels.linkReady);
+        }
         const nextTitle = String(data.title ?? "").trim();
         const nextArtist = String(data.artistName ?? "").trim();
         const nextCover = String(data.coverImageUrl ?? "").trim();
@@ -203,6 +212,7 @@ export function FirstPublishForm() {
     }
     setSubmitting(true);
     setError("");
+    trackFirstPublishStage(firstPublishFunnelLabels.formSent);
     try {
       const response = await fetch("/api/first-publish/request", {
         body: JSON.stringify({
@@ -225,6 +235,7 @@ export function FirstPublishForm() {
       });
       const data = (await response.json()) as { error?: string; message?: string };
       if (!response.ok) throw new Error(data.error || "Submission failed.");
+      trackFirstPublishStage(firstPublishFunnelLabels.emailSent);
       setSent(true);
     } catch (submitError) {
       setError(

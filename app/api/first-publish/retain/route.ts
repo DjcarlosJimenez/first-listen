@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { friendlyFirstPublishError } from "@/lib/first-publish-server";
+import {
+  cancelFirstPublishReminder,
+  friendlyFirstPublishError,
+} from "@/lib/first-publish-server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
@@ -34,6 +38,33 @@ export async function POST(request: Request) {
   }
 
   const result = Array.isArray(data) ? data[0] : data;
+  try {
+    const admin = createAdminClient();
+    const { data: trial } = await admin
+      .from("first_publish_trials")
+      .select("id,reminder_email_id,reminder_cancelled_at")
+      .eq("song_id", songId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (trial?.reminder_email_id && !trial.reminder_cancelled_at) {
+      const cancelled = await cancelFirstPublishReminder(trial.reminder_email_id);
+      if (cancelled) {
+        await admin
+          .from("first_publish_trials")
+          .update({
+            reminder_cancelled_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", trial.id);
+      }
+    }
+  } catch (reminderError) {
+    console.error("first publication reminder cancellation failed", {
+      message: reminderError instanceof Error
+        ? reminderError.message
+        : "Unknown error",
+    });
+  }
   return NextResponse.json({
     ok: true,
     retainedAt: result?.retained_at ?? null,

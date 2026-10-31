@@ -73,7 +73,16 @@ export async function GET(request: NextRequest) {
       report_scope: scope,
     });
     if (error) throw error;
-    return NextResponse.json({ report: normalizeSiteAnalyticsReport(data) });
+    const report = normalizeSiteAnalyticsReport(data);
+    if (scope === "platform") {
+      const { data: funnel, error: funnelError } = await admin.rpc(
+        "get_first_publish_funnel",
+        { period_days: periodDays },
+      );
+      if (funnelError) throw funnelError;
+      report.funnel = normalizeSiteAnalyticsReport({ funnel }).funnel;
+    }
+    return NextResponse.json({ report });
   } catch (error) {
     console.error("site analytics report failed", error);
     return NextResponse.json(

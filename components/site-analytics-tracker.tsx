@@ -22,6 +22,7 @@ const PLATFORM_PREFIXES = new Set([
   "change-password",
   "discover",
   "explicit-content",
+  "first-publish",
   "forgot-password",
   "guest",
   "guidelines",
@@ -140,8 +141,20 @@ export function SiteAnalyticsTracker() {
       ).trim().replace(/\s+/g, " ").slice(0, 180);
       send("action", label || "Interaccion");
     };
+    const onAnalyticsAction = (event: Event) => {
+      const label = event instanceof CustomEvent
+        && event.detail
+        && typeof event.detail.label === "string"
+        ? event.detail.label.trim().replace(/\s+/g, " ").slice(0, 180)
+        : "";
+      if (label) send("action", label);
+    };
     document.addEventListener("click", onClick, { capture: true });
-    return () => document.removeEventListener("click", onClick, { capture: true });
+    window.addEventListener("first-listen:analytics-action", onAnalyticsAction);
+    return () => {
+      document.removeEventListener("click", onClick, { capture: true });
+      window.removeEventListener("first-listen:analytics-action", onAnalyticsAction);
+    };
   }, [pathname]);
 
   return null;

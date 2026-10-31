@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { BadgeCheck, CheckCircle2, Clock3, LoaderCircle, ShieldCheck } from "lucide-react";
-import type { FirstPublishVerificationType } from "@/lib/first-publish";
+import { BadgeCheck, CheckCircle2, Clock3, Copy, LoaderCircle, Share2, ShieldCheck } from "lucide-react";
+import {
+  firstPublishFunnelLabels,
+  trackFirstPublishStage,
+  type FirstPublishVerificationType,
+} from "@/lib/first-publish";
 
 export function FirstPublishVerify({
   token,
@@ -19,6 +23,11 @@ export function FirstPublishVerify({
   const [songId, setSongId] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [retained, setRetained] = useState(false);
+  const [title, setTitle] = useState("");
+  const [artistName, setArtistName] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [liveUrl, setLiveUrl] = useState("");
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const linkReady = Boolean(token && tokenHash && type);
 
@@ -34,14 +43,23 @@ export function FirstPublishVerify({
       });
       const data = (await response.json()) as {
         error?: string;
+        artistName?: string | null;
+        coverImageUrl?: string | null;
         expiresAt?: string | null;
+        liveUrl?: string | null;
         retained?: boolean;
         songId?: string | null;
+        title?: string | null;
       };
       if (!response.ok || !data.songId) throw new Error(data.error || "No pudimos publicar la canción.");
       setSongId(data.songId);
       setExpiresAt(data.expiresAt ?? "");
       setRetained(Boolean(data.retained));
+      setArtistName(data.artistName ?? "");
+      setCoverImageUrl(data.coverImageUrl ?? "");
+      setLiveUrl(data.liveUrl ?? "");
+      setTitle(data.title ?? "");
+      trackFirstPublishStage(firstPublishFunnelLabels.published);
     } catch (publishError) {
       setError(publishError instanceof Error ? publishError.message : "No pudimos publicar la canción.");
     } finally {
@@ -63,10 +81,42 @@ export function FirstPublishVerify({
       if (!response.ok) throw new Error(data.error || "No pudimos conservar la publicación.");
       setRetained(true);
       setExpiresAt("");
+      trackFirstPublishStage(firstPublishFunnelLabels.retained);
     } catch (retainError) {
       setError(retainError instanceof Error ? retainError.message : "No pudimos conservar la publicación.");
     } finally {
       setRetaining(false);
+    }
+  }
+
+  async function share() {
+    if (!liveUrl) return;
+    trackFirstPublishStage(firstPublishFunnelLabels.shared);
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          text: `Escucha “${title}” de ${artistName} en First Listen.`,
+          title: `${title} · ${artistName}`,
+          url: liveUrl,
+        });
+        setNotice("Publicación lista para compartir.");
+      } else {
+        await navigator.clipboard.writeText(liveUrl);
+        setNotice("Enlace copiado.");
+      }
+    } catch {
+      setNotice("Puedes copiar el enlace y compartirlo desde tu aplicación favorita.");
+    }
+  }
+
+  async function copy() {
+    if (!liveUrl) return;
+    try {
+      await navigator.clipboard.writeText(liveUrl);
+      setNotice("Enlace copiado.");
+      trackFirstPublishStage(firstPublishFunnelLabels.shared);
+    } catch {
+      setNotice("Mantén presionada la dirección del navegador para copiarla.");
     }
   }
 
@@ -82,6 +132,17 @@ export function FirstPublishVerify({
               ? "Tu acceso gratuito quedó activo. Ya puedes administrar esta canción y publicar más desde tu cuenta."
               : `Estará visible en First Listen durante 7 días${expiresAt ? `, hasta ${new Date(expiresAt).toLocaleDateString("es-US")}` : ""}.`}
           </p>
+          {liveUrl && (
+            <div className="first-publish-result-card">
+              <div
+                aria-hidden="true"
+                className="first-publish-result-cover"
+                style={{ backgroundImage: `url("${coverImageUrl}")` }}
+              />
+              <div><span>YA DISPONIBLE</span><strong>{title || "Tu canción"}</strong><small>{artistName}</small></div>
+              <Link href={liveUrl}>Escuchar</Link>
+            </div>
+          )}
           {!retained && (
             <div className="first-publish-retain-box">
               <BadgeCheck size={24} />
@@ -96,9 +157,16 @@ export function FirstPublishVerify({
             </div>
           )}
           {error && <div className="first-publish-error" role="alert">{error}</div>}
+          {notice && <div className="first-publish-share-notice" role="status">{notice}</div>}
+          {liveUrl && (
+            <div className="first-publish-share-actions">
+              <button onClick={share} type="button"><Share2 size={17} /> Compartir publicación</button>
+              <button onClick={copy} type="button"><Copy size={17} /> Copiar enlace</button>
+            </div>
+          )}
           <div className="first-publish-success-actions">
-            <Link className="primary" href={retained ? "/dashboard" : "/guest"}>
-              {retained ? "Administrar mi música" : "Ver First Listen"}
+            <Link className="primary" href={retained ? "/dashboard" : liveUrl || "/guest"}>
+              {retained ? "Administrar mi música" : "Abrir mi publicación"}
             </Link>
             {!retained && <Link href="/dashboard">Entrar a mi cuenta gratuita</Link>}
           </div>

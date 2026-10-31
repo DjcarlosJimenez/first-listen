@@ -5,8 +5,11 @@ import { NextResponse } from "next/server";
 import type { FirstPublishVerificationType } from "@/lib/first-publish";
 import {
   firstPublishHash,
+  firstPublishSiteUrl,
   friendlyFirstPublishError,
+  scheduleFirstPublishReminder,
 } from "@/lib/first-publish-server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type VerifyPayload = {
   token?: string;
@@ -90,10 +93,66 @@ export async function POST(request: Request) {
   }
 
   const result = Array.isArray(data) ? data[0] : data;
+  const songId = result?.published_song_id ?? null;
+  const expiresAt = result?.publication_expires_at ?? null;
+  const retained = Boolean(result?.retained);
+  let song: Record<string, unknown> | null = null;
+
+  if (songId) {
+    const { data: liveRows } = await supabase.rpc("get_first_publish_live_song", {
+      target_song_id: songId,
+    });
+    song = (Array.isArray(liveRows) ? liveRows[0] : liveRows) ?? null;
+  }
+
+  if (songId && expiresAt && !retained) {
+    try {
+      const admin = createAdminClient();
+      const { data: trial } = await admin
+        .from("first_publish_trials")
+        .select("id,email,title,artist_name,reminder_email_id")
+        .eq("song_id", songId)
+        .maybeSingle();
+      if (trial && !trial.reminder_email_id) {
+        const reminder = await scheduleFirstPublishReminder({
+          artistName: String(trial.artist_name),
+          email: String(trial.email),
+          expiresAt: String(expiresAt),
+          songId: String(songId),
+          title: String(trial.title),
+          trialId: String(trial.id),
+        });
+        await admin
+          .from("first_publish_trials")
+          .update({
+            reminder_email_id: reminder.emailId,
+            reminder_scheduled_at: reminder.scheduledAt,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", trial.id)
+          .is("reminder_email_id", null);
+      }
+    } catch (reminderError) {
+      console.error("first publication reminder scheduling failed", {
+        message: reminderError instanceof Error
+          ? reminderError.message
+          : "Unknown error",
+      });
+    }
+  }
+
+  const liveUrl = songId
+    ? `${firstPublishSiteUrl(new URL(request.url).origin)}/first-publish/live/${songId}`
+    : null;
   return NextResponse.json({
-    expiresAt: result?.publication_expires_at ?? null,
+    artistName: song?.artist_name ?? null,
+    coverImageUrl: song?.cover_image_url ?? null,
+    expiresAt,
+    liveUrl,
     ok: true,
-    retained: Boolean(result?.retained),
-    songId: result?.published_song_id ?? null,
+    platform: song?.platform ?? null,
+    retained,
+    songId,
+    title: song?.title ?? null,
   });
 }

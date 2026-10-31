@@ -7,6 +7,7 @@ const root = process.cwd();
 const migrationDefinitions = [
   { version: "20261031010000", name: "first_publish_trial" },
   { version: "20261031013000", name: "first_publish_trial_retain_fix" },
+  { version: "20261031020000", name: "first_publish_growth" },
 ];
 
 function loadEnv(filePath) {
@@ -60,6 +61,17 @@ const healthSql = `
       where table_schema = 'public'
         and table_name = 'songs'
         and column_name = 'first_publish_trial_expires_at'
+    ),
+    'reactions_ready', to_regclass('public.first_publish_reactions') is not null,
+    'live_song_ready', to_regprocedure('public.get_first_publish_live_song(uuid)') is not null,
+    'reaction_rpc_ready', to_regprocedure('public.add_first_publish_reaction(uuid,text,text)') is not null,
+    'funnel_ready', to_regprocedure('public.get_first_publish_funnel(integer)') is not null,
+    'reminder_ready', exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'first_publish_trials'
+        and column_name = 'reminder_email_id'
     )
   ) as health
 `;

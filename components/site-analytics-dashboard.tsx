@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity, ArrowLeft, BarChart3, Disc3, Eye, Globe2, Monitor,
-  MousePointerClick, Music2, Smartphone, UserRoundCheck, Users, Video,
+  MailCheck, MousePointerClick, Music2, Smartphone, UserRoundCheck, Users, Video,
 } from "lucide-react";
 import {
   emptySiteAnalyticsReport,
@@ -79,6 +79,7 @@ export function SiteAnalyticsDashboard({
     [report.devices],
   );
   const maxSeries = Math.max(1, ...report.series.map((item) => item.value));
+  const funnelStart = report.funnel[0]?.visitors ?? 0;
   const title = scope === "artist" ? "DJ Carlos Jimenez" : "First Listen";
   const subtitle = scope === "artist"
     ? "Estadisticas privadas de tu pagina de artista"
@@ -117,6 +118,37 @@ export function SiteAnalyticsDashboard({
       </section>
 
       <section className="artist-analytics-grid">
+        {scope === "platform" && (
+          <article className="artist-analytics-card first-publish-funnel-card">
+            <div className="artist-analytics-card-head">
+              <div><MailCheck size={17} /><span>Conversión de primera publicación</span></div>
+              <small>Personas únicas por paso</small>
+            </div>
+            {report.funnel.length ? (
+              <div className="first-publish-funnel-list">
+                {report.funnel.map((item, index) => {
+                  const previous = index === 0
+                    ? funnelStart
+                    : report.funnel[index - 1]?.visitors ?? 0;
+                  const stepRate = previous > 0
+                    ? Math.round(item.visitors / previous * 100)
+                    : 0;
+                  const totalRate = funnelStart > 0
+                    ? Math.round(item.visitors / funnelStart * 100)
+                    : 0;
+                  return (
+                    <div key={item.key}>
+                      <span>{index + 1}</span>
+                      <div><strong>{item.label}</strong><i><b style={{ width: `${Math.min(100, totalRate)}%` }} /></i></div>
+                      <em>{formatNumber(item.visitors)}</em>
+                      <small>{index === 0 ? "Inicio" : `${stepRate}% del paso anterior`}</small>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <p className="artist-analytics-empty">El recorrido aparecerá cuando llegue la primera publicación.</p>}
+          </article>
+        )}
         <article className="artist-analytics-card artist-analytics-chart-card">
           <div className="artist-analytics-card-head"><div><BarChart3 size={17} /><span>Visitas por periodo</span></div><small>{period === "all" ? "Desde que inicio el contador" : `Ultimos ${periodLabels[period]}`}</small></div>
           {report.series.length ? <div className="artist-analytics-chart" aria-label="Grafica de visitas">{report.series.map((item) => <div key={item.label} title={`${item.label}: ${item.value}`}><span style={{ height: `${Math.max(4, item.value / maxSeries * 100)}%` }} /><small>{item.label}</small></div>)}</div> : <p className="artist-analytics-empty">Las primeras visitas apareceran aqui.</p>}

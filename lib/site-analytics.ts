@@ -13,6 +13,7 @@ export type SiteAnalyticsReport = {
   series: Array<{ label: string; value: number }>;
   sources: Array<{ label: string; value: number }>;
   devices: Array<{ label: string; value: number }>;
+  funnel: Array<{ key: string; label: string; visitors: number }>;
   content: Array<{ kind: string; title: string; views: number }>;
   recent: Array<{
     content_kind: string | null;
@@ -30,6 +31,7 @@ export const emptySiteAnalyticsReport: SiteAnalyticsReport = {
   series: [],
   sources: [],
   devices: [],
+  funnel: [],
   content: [],
   recent: [],
 };
@@ -66,6 +68,14 @@ export function normalizeSiteAnalyticsReport(value: unknown): SiteAnalyticsRepor
     devices: rows(report.devices).map((item) => {
       const row = item as Record<string, unknown>;
       return { label: String(row.label ?? "Otro"), value: number(row.value) };
+    }),
+    funnel: rows(report.funnel).map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        key: String(row.key ?? ""),
+        label: String(row.label ?? ""),
+        visitors: number(row.visitors),
+      };
     }),
     content: rows(report.content).map((item) => {
       const row = item as Record<string, unknown>;

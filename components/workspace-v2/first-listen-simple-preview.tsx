@@ -48,6 +48,12 @@ function matchesStyle(song: WorkspaceV2Song, style: string) {
     .includes(style.toLocaleLowerCase());
 }
 
+function displayStyleLabel(style: string, spanish: boolean) {
+  if (!spanish) return style;
+  if (style.toLocaleLowerCase() === "other") return "Otro";
+  return style;
+}
+
 export function FirstListenSimplePreview({
   locale,
   queue,
@@ -182,6 +188,11 @@ export function FirstListenSimplePreview({
             ? "No necesitas registrarte. Presiona reproducir y nosotros continuamos con la siguiente canción."
             : "No account required. Press play and we will continue with the next song."}
         </p>
+        <div className="first-listen-simple-proof" aria-label={spanish ? "Datos reales de First Listen" : "Real First Listen facts"}>
+          <span><strong>{playableSongs.length}</strong>{spanish ? " canciones listas ahora" : " songs ready now"}</span>
+          <span><strong>1 toque</strong>{spanish ? " para comenzar" : " to start"}</span>
+          <span><strong>0 registro</strong>{spanish ? " para escuchar" : " to listen"}</span>
+        </div>
       </section>
 
       <section className="first-listen-simple-player-card">
@@ -281,7 +292,7 @@ export function FirstListenSimplePreview({
               onClick={() => selectStyle(style)}
               type="button"
             >
-              {style}
+              {displayStyleLabel(style, spanish)}
             </button>
           ))}
         </div>
