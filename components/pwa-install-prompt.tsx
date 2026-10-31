@@ -61,6 +61,7 @@ const DISMISS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const INSTALL_INSTRUCTION_DELAY_MS = 45000;
 const ARTIST_INSTALL_INSTRUCTION_DELAY_MS = 2500;
 const UPDATE_REMINDER_MS = 10 * 60 * 1000;
+const VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const DJ_CARLOS_PATH_PREFIX = "/DJCarlosJimenez";
 const DJ_CARLOS_HOST = "djcarlosjimenez.firstlisten.net";
 const DJ_CARLOS_ICON_URL = "/artist/dj-carlos-jimenez/icon-192.png";
@@ -194,6 +195,21 @@ async function readServiceWorkerVersion() {
   }
 }
 
+async function readLatestAppVersion() {
+  try {
+    const response = await fetch(`/api/app-version?version-check=${Date.now()}`, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { version?: unknown };
+    const version = typeof data.version === "string" ? data.version.trim() : "";
+    return version || null;
+  } catch {
+    return null;
+  }
+}
+
 function isStandaloneMode() {
   if (typeof window === "undefined") return false;
   const navigatorWithStandalone = window.navigator as Navigator & {
@@ -284,7 +300,13 @@ function markShownThisSession(key: string) {
   }
 }
 
-export function PwaInstallProvider({ children }: { children: ReactNode }) {
+export function PwaInstallProvider({
+  children,
+  currentVersion,
+}: {
+  children: ReactNode;
+  currentVersion: string;
+}) {
   const pathname = usePathname();
   const params = useParams();
   const dynamicArtistPage = Boolean(params?.artistSlug);
@@ -308,6 +330,11 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const updateReminderTimerRef = useRef<number | null>(null);
   const artistPromptSuppressed = artistPreviewPage || artistAdminPage ||
     (dynamicArtistPage && !artistInstallBrand);
+  const updatePromptSuppressed =
+    artistPreviewPage ||
+    artistAdminPage ||
+    dynamicArtistPage ||
+    isDjCarlosExperience(pathname);
 
   const registerArtistInstallBrand = useCallback(
     (brand: ArtistInstallBrand | null) => setArtistInstallBrand(brand),
@@ -330,6 +357,19 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     },
     [clearUpdateReminder],
   );
+
+  const checkForAppUpdate = useCallback(async () => {
+    const latestVersion = await readLatestAppVersion();
+    if (
+      !latestVersion ||
+      latestVersion === "development" ||
+      currentVersion === "development" ||
+      latestVersion === currentVersion
+    ) {
+      return;
+    }
+    showUpdateAvailable(latestVersion);
+  }, [currentVersion, showUpdateAvailable]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -430,16 +470,38 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       if (navigator.serviceWorker.controller) notifyUpdateAvailable();
     };
     const onFocus = () => {
+      if (document.hidden) return;
+      void checkForAppUpdate();
       if (updateVersionRef.current && !document.hidden) {
         showUpdateAvailable(updateVersionRef.current);
       }
     };
+
+    const updateUrl = new URL(window.location.href);
+    if (
+      process.env.NODE_ENV === "development" &&
+      updateUrl.searchParams.get("previewAppUpdate") === "1"
+    ) {
+      showUpdateAvailable("preview-update");
+    }
+    if (updateUrl.searchParams.has("app-update")) {
+      updateUrl.searchParams.delete("app-update");
+      window.history.replaceState(window.history.state, "", updateUrl.toString());
+    }
+
+    const initialVersionCheckTimer = window.setTimeout(() => {
+      void checkForAppUpdate();
+    }, 1500);
+    const versionCheckInterval = window.setInterval(() => {
+      if (!document.hidden) void checkForAppUpdate();
+    }, VERSION_CHECK_INTERVAL_MS);
 
     applyCapturedInstallPrompt();
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener(INSTALL_PROMPT_CAPTURED_EVENT, applyCapturedInstallPrompt);
     window.addEventListener("appinstalled", onInstalled);
     window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onFocus);
     document.addEventListener("visibilitychange", onFocus);
     if (serviceWorkerSupported) {
       navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
@@ -450,11 +512,14 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
       window.clearTimeout(installCheckTimer);
+      window.clearTimeout(initialVersionCheckTimer);
+      window.clearInterval(versionCheckInterval);
       clearUpdateReminder();
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener(INSTALL_PROMPT_CAPTURED_EVENT, applyCapturedInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
       if (serviceWorkerSupported) {
         navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
@@ -462,7 +527,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       media.removeEventListener("change", onDisplayModeChange);
       removeUpdateListener?.();
     };
-  }, [clearUpdateReminder, showUpdateAvailable]);
+  }, [checkForAppUpdate, clearUpdateReminder, showUpdateAvailable]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -533,7 +598,34 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const refreshApp = useCallback(() => {
     clearUpdateReminder();
     setRefreshing(true);
-    window.location.reload();
+    void (async () => {
+      try {
+        if ("serviceWorker" in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(
+            registrations.map(async (registration) => {
+              await registration.update().catch(() => undefined);
+              registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+            }),
+          );
+        }
+        if ("caches" in window) {
+          const keys = await window.caches.keys();
+          await Promise.all(
+            keys
+              .filter((key) => key.startsWith("first-listen-pwa-"))
+              .map((key) => window.caches.delete(key)),
+          );
+        }
+      } finally {
+        const updateUrl = new URL(window.location.href);
+        updateUrl.searchParams.set(
+          "app-update",
+          updateVersionRef.current ?? String(Date.now()),
+        );
+        window.location.replace(updateUrl.toString());
+      }
+    })();
   }, [clearUpdateReminder]);
 
   const requestInstall = useCallback(async () => {
@@ -603,7 +695,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
     <PwaInstallContext.Provider value={value}>
       {children}
       <PwaInstallPrompt visible={visible && !artistPromptSuppressed} />
-      <PwaUpdatePrompt visible={installed && updateAvailable && !artistPromptSuppressed} />
+      <PwaUpdatePrompt visible={updateAvailable && !updatePromptSuppressed} />
     </PwaInstallContext.Provider>
   );
 }
@@ -833,27 +925,33 @@ function PwaInstallPrompt({ visible }: { visible: boolean }) {
 }
 
 function PwaUpdatePrompt({ visible }: { visible: boolean }) {
-  const { dismissUpdate, refreshApp, refreshing } = usePwaInstall();
+  const { refreshApp, refreshing } = usePwaInstall();
 
   if (!visible) return null;
 
   return (
-    <aside className="pwa-update-card" aria-live="polite">
-      <div className="pwa-install-icon" aria-hidden="true">
-        <Download size={20} />
-      </div>
-      <div>
-        <strong>🚀 Nueva versión disponible</strong>
-        <span>Actualiza First Listen para obtener mejoras recientes.</span>
-      </div>
-      <div className="pwa-update-actions">
-        <button disabled={refreshing} onClick={refreshApp} type="button">
-          {refreshing ? "Actualizando..." : "Actualizar ahora"}
-        </button>
-        <button onClick={dismissUpdate} type="button">
-          Más tarde
-        </button>
-      </div>
-    </aside>
+    <div className="pwa-update-backdrop">
+      <aside
+        aria-live="assertive"
+        aria-modal="true"
+        className="pwa-update-card"
+        role="alertdialog"
+      >
+        <div className="pwa-install-icon" aria-hidden="true">
+          <Download size={20} />
+        </div>
+        <div>
+          <strong>🚀 First Listen tiene una actualización</strong>
+          <span>
+            Actualiza ahora para continuar con la versión más reciente y evitar errores.
+          </span>
+        </div>
+        <div className="pwa-update-actions">
+          <button disabled={refreshing} onClick={refreshApp} type="button">
+            {refreshing ? "Actualizando..." : "Actualizar First Listen"}
+          </button>
+        </div>
+      </aside>
+    </div>
   );
 }

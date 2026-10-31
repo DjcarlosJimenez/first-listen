@@ -1,4 +1,4 @@
-const CACHE_VERSION = "first-listen-pwa-v11-artist-pages";
+const CACHE_VERSION = "first-listen-pwa-v12-update-guard";
 const OFFLINE_URL = "/offline";
 const APP_SHELL = [
   OFFLINE_URL,
@@ -34,6 +34,12 @@ self.addEventListener("activate", (event) => {
       )
       .then(() => self.clients.claim()),
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("fetch", (event) => {

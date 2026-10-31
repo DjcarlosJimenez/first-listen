@@ -267,6 +267,32 @@
   padding: 14px;
 }
 
+.pwa-update-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  background: rgba(13, 19, 12, 0.76);
+  backdrop-filter: blur(10px);
+}
+
+.pwa-update-backdrop .pwa-update-card {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  z-index: 1;
+  width: min(560px, 100%);
+  background: var(--card);
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.42);
+}
+
+.pwa-update-backdrop .pwa-update-actions button {
+  min-width: 190px;
+}
+
 .pwa-install-card > div:nth-child(2),
 .pwa-update-card > div:nth-child(2) {
   min-width: 0;
@@ -348,7 +374,7 @@
   color: var(--dark);
 }
 
-.pwa-update-actions button:last-child {
+.pwa-update-actions button + button {
   background: color-mix(in srgb, var(--dark) 8%, transparent);
   color: var(--ink);
 }

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { PlatformRuntime } from "@/components/platform-runtime";
 import { PwaInstallProvider } from "@/components/pwa-install-prompt";
 import { SiteAnalyticsTracker } from "@/components/site-analytics-tracker";
+import { getAppVersion } from "@/lib/app-version";
 import {
   defaultPlatformControlConfig,
   mapPlatformControlState,
@@ -105,7 +106,7 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: installPromptCaptureScript }} />
       </head>
       <body>
-        <PwaInstallProvider>
+        <PwaInstallProvider currentVersion={getAppVersion()}>
           <PlatformRuntime initialState={initialState} />
           <SiteAnalyticsTracker />
           {children}
