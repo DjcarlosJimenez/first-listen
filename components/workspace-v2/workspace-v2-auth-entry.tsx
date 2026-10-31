@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/logo";
 import type { ProfilePanelProps } from "@/components/profile-panel";
+import { FirstListenSimplePreview } from "@/components/workspace-v2/first-listen-simple-preview";
 import { WorkspaceV2PreviewErrorBoundary } from "@/components/workspace-v2/workspace-v2-preview-error-boundary";
 import { WorkspaceV2Shell, type WorkspaceV2ViewerMode } from "@/components/workspace-v2/workspace-v2-shell";
 import type { InterfaceLocale } from "@/lib/catalog";
@@ -403,8 +404,10 @@ function buildProfilePanelPayload({
 
 export async function WorkspaceV2AuthEntry({
   loginRedirectPath = "/dashboard",
+  simpleHome = false,
 }: {
   loginRedirectPath?: string;
+  simpleHome?: boolean;
 }) {
   const supabase = await createClient();
   const {
@@ -509,6 +512,18 @@ export async function WorkspaceV2AuthEntry({
     userEmail: user.email,
     userId: user.id,
   });
+
+  if (simpleHome && queue.songs.length > 0) {
+    return (
+      <FirstListenSimplePreview
+        authenticated
+        canAccessAdmin={canAccessAdmin}
+        displayName={profileDisplayName(typedProfile, user.email)}
+        locale={locale}
+        queue={queue}
+      />
+    );
+  }
 
   return (
     <main className="workspace-v2-preview-page">

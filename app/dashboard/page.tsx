@@ -3,5 +3,5 @@ import { WorkspaceV2AuthEntry } from "@/components/workspace-v2/workspace-v2-aut
 export const dynamic = "force-dynamic";
 
 export default function DashboardPage() {
-  return <WorkspaceV2AuthEntry loginRedirectPath="/dashboard" />;
+  return <WorkspaceV2AuthEntry loginRedirectPath="/dashboard" simpleHome />;
 }

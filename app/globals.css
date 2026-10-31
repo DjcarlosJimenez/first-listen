@@ -25246,7 +25246,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   }
 }
 
-/* Simplified public guest experience: /guest */
+/* Simplified First Listen home: /guest and /dashboard */
 .first-listen-simple-preview {
   background:
     radial-gradient(circle at 50% -10%, rgba(185, 255, 47, 0.22), transparent 32%),
@@ -25297,6 +25297,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 .first-listen-simple-player-card,
 .first-listen-simple-styles,
 .first-listen-simple-artist-link,
+.first-listen-simple-member-card,
 .first-listen-simple-footer {
   margin-inline: auto;
   max-width: 760px;
@@ -25609,6 +25610,71 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   text-decoration: none;
 }
 
+.first-listen-simple-member-card {
+  align-items: center;
+  background: #142114;
+  border-radius: 20px;
+  color: #fff;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 16px;
+}
+
+.first-listen-simple-member-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.first-listen-simple-member-copy span {
+  color: #b9ff2f;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.first-listen-simple-member-copy strong {
+  font-size: 18px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.first-listen-simple-member-copy small {
+  color: #c8d0c4;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.first-listen-simple-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.first-listen-simple-member-actions a {
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 6px;
+  min-height: 38px;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.first-listen-simple-member-actions a.primary {
+  background: #b9ff2f;
+  border-color: #b9ff2f;
+  color: #101510;
+}
+
 .first-listen-simple-footer {
   align-items: flex-start;
   color: #65705f;
@@ -25725,6 +25791,19 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   }
 
   .first-listen-simple-artist-link a {
+    justify-content: center;
+  }
+
+  .first-listen-simple-member-card {
+    grid-template-columns: 1fr;
+  }
+
+  .first-listen-simple-member-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .first-listen-simple-member-actions a {
     justify-content: center;
   }
 }

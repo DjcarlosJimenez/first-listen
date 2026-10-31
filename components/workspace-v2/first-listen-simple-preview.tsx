@@ -9,9 +9,12 @@ import {
   LogIn,
   Pause,
   Play,
+  Settings2,
+  ShieldCheck,
   SkipForward,
   Sparkles,
   Upload,
+  UserRound,
 } from "lucide-react";
 import {
   ProviderPlayer,
@@ -57,9 +60,15 @@ function displayStyleLabel(style: string, spanish: boolean) {
 }
 
 export function FirstListenSimplePreview({
+  authenticated = false,
+  canAccessAdmin = false,
+  displayName = "",
   locale,
   queue,
 }: {
+  authenticated?: boolean;
+  canAccessAdmin?: boolean;
+  displayName?: string;
   locale: InterfaceLocale;
   queue: WorkspaceV2Queue;
 }) {
@@ -166,15 +175,28 @@ export function FirstListenSimplePreview({
     <main className="first-listen-simple-preview">
       <header className="first-listen-simple-header">
         <Logo />
-        <Link href="/login?next=/dashboard">
-          <LogIn size={16} />
-          {spanish ? "Entrar" : "Log in"}
-        </Link>
+        {authenticated ? (
+          <Link href="/profile">
+            <UserRound size={16} />
+            {spanish ? "Mi cuenta" : "My account"}
+          </Link>
+        ) : (
+          <Link href="/login?next=/dashboard">
+            <LogIn size={16} />
+            {spanish ? "Entrar" : "Log in"}
+          </Link>
+        )}
       </header>
 
       <section className="first-listen-simple-intro">
         <span className="first-listen-simple-preview-badge">
-          {spanish ? "Escucha gratis · sin registro" : "Listen free · no account required"}
+          {authenticated
+            ? spanish
+              ? "Tu inicio · simple y actualizado"
+              : "Your home · simple and up to date"
+            : spanish
+              ? "Escucha gratis · sin registro"
+              : "Listen free · no account required"}
         </span>
         <span className="eyebrow">
           <Sparkles size={13} />
@@ -193,7 +215,16 @@ export function FirstListenSimplePreview({
         <div className="first-listen-simple-proof" aria-label={spanish ? "Datos reales de First Listen" : "Real First Listen facts"}>
           <span><strong>{playableSongs.length}</strong>{spanish ? " canciones listas ahora" : " songs ready now"}</span>
           <span><strong>1 toque</strong>{spanish ? " para comenzar" : " to start"}</span>
-          <span><strong>0 registro</strong>{spanish ? " para escuchar" : " to listen"}</span>
+          <span>
+            <strong>{authenticated ? (spanish ? "Cuenta lista" : "Account ready") : "0 registro"}</strong>
+            {authenticated
+              ? spanish
+                ? " para escuchar y publicar"
+                : " to listen and publish"
+              : spanish
+                ? " para escuchar"
+                : " to listen"}
+          </span>
         </div>
       </section>
 
@@ -300,23 +331,55 @@ export function FirstListenSimplePreview({
         </div>
       </section>
 
-      <section className="first-listen-simple-artist-link">
-        <div>
-          <span>{spanish ? "¿Eres artista?" : "Are you an artist?"}</span>
-          <strong>
-            {spanish ? "Publica tu música en FirstListen" : "Share your music on FirstListen"}
-          </strong>
-          <small>
-            {spanish
-              ? "Primera canción sin contraseña ni tarjeta"
-              : "First song with no password or card"}
-          </small>
-        </div>
-        <Link href="/first-publish">
-          <Upload size={16} />
-          {spanish ? "Publicar gratis" : "Publish free"}
-        </Link>
-      </section>
+      {authenticated ? (
+        <section className="first-listen-simple-member-card">
+          <div className="first-listen-simple-member-copy">
+            <span>{spanish ? "TU ESPACIO" : "YOUR SPACE"}</span>
+            <strong>
+              {spanish ? `Hola${displayName ? `, ${displayName}` : ""}` : `Hello${displayName ? `, ${displayName}` : ""}`}
+            </strong>
+            <small>
+              {spanish
+                ? "Escucha primero. Publica o abre tus herramientas cuando las necesites."
+                : "Listen first. Publish or open your tools only when you need them."}
+            </small>
+          </div>
+          <div className="first-listen-simple-member-actions">
+            <Link className="primary" href="/submit">
+              <Upload size={16} />
+              {spanish ? "Publicar música" : "Publish music"}
+            </Link>
+            <Link href="/workspace-v2">
+              <Settings2 size={16} />
+              {spanish ? "Herramientas" : "Tools"}
+            </Link>
+            {canAccessAdmin && (
+              <Link href="/owner">
+                <ShieldCheck size={16} />
+                Owner
+              </Link>
+            )}
+          </div>
+        </section>
+      ) : (
+        <section className="first-listen-simple-artist-link">
+          <div>
+            <span>{spanish ? "¿Eres artista?" : "Are you an artist?"}</span>
+            <strong>
+              {spanish ? "Publica tu música en FirstListen" : "Share your music on FirstListen"}
+            </strong>
+            <small>
+              {spanish
+                ? "Primera canción sin contraseña ni tarjeta"
+                : "First song with no password or card"}
+            </small>
+          </div>
+          <Link href="/first-publish">
+            <Upload size={16} />
+            {spanish ? "Publicar gratis" : "Publish free"}
+          </Link>
+        </section>
+      )}
 
       <footer className="first-listen-simple-footer">
         <Headphones size={16} />
