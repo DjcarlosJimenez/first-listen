@@ -24,6 +24,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: https:",
               `connect-src 'self' https://*.supabase.co wss://*.supabase.co${isDevelopment ? " ws:" : ""}`,
               "font-src 'self' data:",
+              "media-src 'self' blob: https://*.supabase.co",
               "frame-src https://www.youtube-nocookie.com https://www.youtube.com https://open.spotify.com https://w.soundcloud.com https://embed.music.apple.com",
               "worker-src 'self'",
               "manifest-src 'self'",

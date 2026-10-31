@@ -1178,6 +1178,11 @@ export function DjCarlosArtistPage({
           >
             {activeTrack && (
               <ProviderPlayer
+                key={
+                  activeTrack.id.startsWith("dj-carlos-compilation-")
+                    ? `${activeTrack.id}:${playerVersion}`
+                    : "dj-carlos-main-player"
+                }
                 artist={activeTrack.artist}
                 autoPlay={autoPlayEnabled && !playerPausedByUser}
                 controlChannel={PLAYER_CHANNEL}
