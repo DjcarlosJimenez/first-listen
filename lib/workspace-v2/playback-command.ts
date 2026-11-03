@@ -1,6 +1,8 @@
 export const WORKSPACE_V2_PLAYBACK_COMMAND_EVENT =
   "first-listen:playback-command";
 
+export const ACTIVE_PLAYBACK_EVENT = "first-listen:active-playback";
+
 export const WORKSPACE_V2_PLAYBACK_COMMAND_CHANNEL = "workspace-v2";
 
 export type WorkspaceV2PlaybackDomCommand = "pause" | "play" | "seek";

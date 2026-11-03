@@ -47,7 +47,10 @@ import {
   type DjCarlosVideoSortMode,
 } from "@/lib/dj-carlos-page";
 import { nextDjCarlosQueueTrackId } from "@/lib/dj-carlos-playback";
-import { dispatchWorkspaceV2PlaybackCommand } from "@/lib/workspace-v2";
+import {
+  ACTIVE_PLAYBACK_EVENT,
+  dispatchWorkspaceV2PlaybackCommand,
+} from "@/lib/workspace-v2";
 
 const PLAYER_CHANNEL = "dj-carlos-jimenez";
 const UPCOMING_FOLLOW_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:upcoming-follow`;
@@ -55,6 +58,7 @@ const UPCOMING_REACTION_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:upcoming-reaction`;
 const VIDEO_VISITOR_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:video-visitor`;
 const VIDEO_PLAY_DAY_KEY = `${DJ_CARLOS_PAGE_STORAGE_KEY}:video-play-day`;
 const ALBUM_PLAYER_TRACK_ID = "dj-carlos-album-main-link";
+const PREVIEW_PLAYER_ID = "dj-carlos-upcoming-preview-player";
 const UPCOMING_REACTIONS: {
   key: DjCarlosUpcomingReactionKey;
   label: string;
@@ -1426,6 +1430,7 @@ export function DjCarlosArtistPage({
           following={followingUpcoming}
           logoUrl={artistLogoUrl}
           onFollow={() => void recordUpcomingFollow()}
+          onPreviewPlaybackStart={pauseCurrent}
           onReact={(reaction) => void recordUpcomingReaction(reaction)}
           release={upcomingRelease}
           selectedReactions={selectedUpcomingReactions}
@@ -1527,6 +1532,7 @@ function UpcomingReleaseCard({
   following,
   logoUrl,
   onFollow,
+  onPreviewPlaybackStart,
   onReact,
   release,
   selectedReactions,
@@ -1534,6 +1540,7 @@ function UpcomingReleaseCard({
   following: boolean;
   logoUrl: string;
   onFollow: () => void;
+  onPreviewPlaybackStart: () => void;
   onReact: (reaction: DjCarlosUpcomingReactionKey) => void;
   release: DjCarlosUpcomingRelease;
   selectedReactions: DjCarlosUpcomingReactionKey[];
@@ -1575,6 +1582,34 @@ function UpcomingReleaseCard({
     };
   }, []);
 
+  useEffect(() => {
+    const pauseForAnotherPlayer = (event: Event) => {
+      const playerId = (
+        event as CustomEvent<{ playerId?: string }>
+      ).detail?.playerId;
+      if (!playerId || playerId === PREVIEW_PLAYER_ID) return;
+      previewAudioRef.current?.pause();
+    };
+
+    window.addEventListener(ACTIVE_PLAYBACK_EVENT, pauseForAnotherPlayer);
+    return () => {
+      window.removeEventListener(
+        ACTIVE_PLAYBACK_EVENT,
+        pauseForAnotherPlayer,
+      );
+    };
+  }, []);
+
+  const handlePreviewPlay = () => {
+    onPreviewPlaybackStart();
+    setPreviewPlaying(true);
+    window.dispatchEvent(
+      new CustomEvent(ACTIVE_PLAYBACK_EVENT, {
+        detail: { playerId: PREVIEW_PLAYER_ID },
+      }),
+    );
+  };
+
   const playPreview = async (
     clip: DjCarlosUpcomingPreviewClip,
     resetAdvanceGuard = true,
@@ -1589,6 +1624,7 @@ function UpcomingReleaseCard({
     audio.load();
     setActivePreviewId(clip.id);
     setPreviewCurrentTime(0);
+    onPreviewPlaybackStart();
     try {
       await audio.play();
       setPreviewPlaying(true);
@@ -1612,6 +1648,7 @@ function UpcomingReleaseCard({
         setPreviewCurrentTime(0);
       }
       advancedPreviewIdRef.current = "";
+      onPreviewPlaybackStart();
       try {
         await audio.play();
         setPreviewPlaying(true);
@@ -1724,7 +1761,7 @@ function UpcomingReleaseCard({
               <audio
                 onEnded={playNextPreview}
                 onPause={() => setPreviewPlaying(false)}
-                onPlay={() => setPreviewPlaying(true)}
+                onPlay={handlePreviewPlay}
                 onTimeUpdate={updatePreviewTime}
                 preload="metadata"
                 ref={previewAudioRef}

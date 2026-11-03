@@ -23,6 +23,7 @@ import { safeCoverUrl } from "@/lib/media";
 import { getProviderEmbed } from "@/lib/player";
 import type { Platform } from "@/lib/types";
 import {
+  ACTIVE_PLAYBACK_EVENT,
   WORKSPACE_V2_PLAYBACK_COMMAND_EVENT,
   type WorkspaceV2PlaybackCommandDetail,
 } from "@/lib/workspace-v2";
@@ -173,7 +174,6 @@ const YOUTUBE_API_SRC = "https://www.youtube.com/iframe_api";
 const SOUNDCLOUD_API_SRC = "https://w.soundcloud.com/player/api.js";
 const SPOTIFY_API_SRC = "https://open.spotify.com/embed/iframe-api/v1";
 const MAX_INITIALIZATION_ATTEMPTS = 3;
-const ACTIVE_PLAYBACK_EVENT = "first-listen:active-playback";
 const USER_CLICK_PLAY_DEDUPE_MS = 850;
 const AUTOPLAY_RETRY_DELAYS_MS = [0, 250, 750, 1500, 2500, 4000, 6000];
 const AUTOPLAY_FALLBACK_DELAY_MS =
