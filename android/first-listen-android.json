@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "appName": "First Listen",
+  "applicationId": "net.firstlisten.app",
+  "origin": "https://www.firstlisten.net",
+  "startUrl": "https://www.firstlisten.net/guest?source=android-app",
+  "scope": "https://www.firstlisten.net/",
+  "manifestUrl": "https://www.firstlisten.net/manifest.webmanifest",
+  "assetLinksUrl": "https://www.firstlisten.net/.well-known/assetlinks.json",
+  "displayMode": "standalone",
+  "fallbackMode": "custom-tabs",
+  "minSdk": 23,
+  "targetSdk": 36,
+  "status": "foundation-ready-awaiting-signing-certificate"
+}
