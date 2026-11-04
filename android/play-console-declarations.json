@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "lastAudited": "2026-11-04",
+  "status": "draft-ready-owner-confirmation-required",
+  "applicationId": "net.firstlisten.app",
+  "privacyPolicyUrl": "https://www.firstlisten.net/privacy",
+  "accountDeletionUrl": "https://www.firstlisten.net/delete-account",
+  "ads": {
+    "containsAds": false,
+    "advertisingSdkPresent": false,
+    "answer": "No"
+  },
+  "appAccess": {
+    "coreGuestExperienceAvailable": true,
+    "authenticatedFeaturesExist": true,
+    "reviewerAccountRequired": true,
+    "credentialsMustBeStoredOutsideRepository": true,
+    "instructionsLanguage": "English",
+    "twoFactorAuthenticationRequiredForReviewer": false
+  },
+  "targetAudience": {
+    "recommendedAgeGroups": [
+      "18 and over"
+    ],
+    "ownerConfirmationRequired": true,
+    "designedForChildren": false,
+    "reason": "The service includes user-submitted music, social activity, and content that may contain explicit language or mature themes. Limiting the initial Android release to adults avoids representing the app as designed for children."
+  },
+  "dataSafety": {
+    "collectsData": true,
+    "sharesDataUnderGooglePlayDefinition": false,
+    "sharingRationale": "Supabase, Vercel, and Resend act as service providers. External music providers receive connection data only when a user chooses or authorizes playback or opens their service. Re-audit this answer if an advertising, attribution, social, or analytics SDK is added.",
+    "encryptedInTransit": true,
+    "accountCreationAvailable": true,
+    "accountDeletionAvailable": true,
+    "independentDeletionUrlAvailable": true,
+    "dataTypes": [
+      {
+        "category": "Personal info",
+        "type": "Name",
+        "collected": true,
+        "shared": false,
+        "optional": true,
+        "purposes": [
+          "App functionality",
+          "Account management"
+        ]
+      },
+      {
+        "category": "Personal info",
+        "type": "Email address",
+        "collected": true,
+        "shared": false,
+        "optional": true,
+        "purposes": [
+          "App functionality",
+          "Account management",
+          "Developer communications",
+          "Fraud prevention, security, and compliance"
+        ]
+      },
+      {
+        "category": "Personal info",
+        "type": "User IDs",
+        "collected": true,
+        "shared": false,
+        "optional": true,
+        "purposes": [
+          "App functionality",
+          "Analytics",
+          "Account management",
+          "Fraud prevention, security, and compliance"
+        ]
+      },
+      {
+        "category": "Photos and videos",
+        "type": "Photos",
+        "collected": true,
+        "shared": false,
+        "optional": true,
+        "purposes": [
+          "App functionality"
+        ]
+      },
+      {
+        "category": "Audio files",
+        "type": "Music and audio files",
+        "collected": true,
+        "shared": false,
+        "optional": true,
+        "purposes": [
+          "App functionality"
+        ],
+        "note": "Only authorized artist-page administrators can upload short preview clips; the main discovery platform uses external music links."
+      },
+      {
+        "category": "App activity",
+        "type": "App interactions",
+        "collected": true,
+        "shared": false,
+        "optional": false,
+        "purposes": [
+          "App functionality",
+          "Analytics",
+          "Fraud prevention, security, and compliance"
+        ]
+      },
+      {
+        "category": "App activity",
+        "type": "Other user-generated content",
+        "collected": true,
+        "shared": false,
+        "optional": true,
+        "purposes": [
+          "App functionality",
+          "Fraud prevention, security, and compliance"
+        ]
+      },
+      {
+        "category": "App activity",
+        "type": "Other actions",
+        "collected": true,
+        "shared": false,
+        "optional": true,
+        "purposes": [
+          "App functionality",
+          "Analytics",
+          "Fraud prevention, security, and compliance"
+        ]
+      },
+      {
+        "category": "Device or other IDs",
+        "type": "Device or other IDs",
+        "collected": true,
+        "shared": false,
+        "optional": false,
+        "purposes": [
+          "App functionality",
+          "Analytics",
+          "Fraud prevention, security, and compliance"
+        ],
+        "note": "First Listen uses random visitor/session identifiers and one-way hashes for analytics and abuse prevention; it does not use an advertising ID."
+      }
+    ],
+    "notCollected": [
+      "Precise location",
+      "Approximate location derived by First Listen",
+      "Financial information",
+      "Health and fitness information",
+      "Contacts",
+      "Messages",
+      "Calendar",
+      "Web browsing history outside First Listen",
+      "Advertising ID"
+    ]
+  },
+  "permissions": {
+    "camera": false,
+    "microphone": false,
+    "location": false,
+    "contacts": false,
+    "notifications": false,
+    "expectedAndroidPermission": "android.permission.INTERNET"
+  },
+  "contentRating": {
+    "questionnaireRequired": true,
+    "userGeneratedContent": true,
+    "explicitMusicPossible": true,
+    "gambling": false,
+    "realMoneyTransactions": false,
+    "answerInPlayConsoleOnly": true
+  }
+}

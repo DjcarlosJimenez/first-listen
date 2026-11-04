@@ -54,6 +54,8 @@
     "play-store:block1:verify": "node scripts/verify-play-store-compliance-block-one.mjs",
     "play-store:block2:verify": "node scripts/verify-play-store-compliance-block-two.mjs",
     "play-store:block2:verify:production": "node scripts/verify-play-store-compliance-block-two.mjs --production",
+    "play-store:block3:verify": "node scripts/verify-play-store-compliance-block-three.mjs",
+    "play-store:block3:verify:production": "node scripts/verify-play-store-compliance-block-three.mjs --production",
     "spanish-playback:dry-run": "node scripts/apply-spanish-playback-terminology.mjs",
     "spanish-playback:apply": "node scripts/apply-spanish-playback-terminology.mjs --apply",
     "priority39d:dry-run": "node scripts/apply-priority39d-resolution-feedback.mjs",

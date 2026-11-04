@@ -9,11 +9,14 @@ oficial, no como una copia desconectada ni como un contenedor de contenido ajeno
 1. **Seguridad y cumplimiento básico — completo.** Eliminación de cuenta dentro y
    fuera de la aplicación, reportes, bloqueos, moderación y reproducción orgánica
    sin recompensas por escuchar.
-2. **Base Android y asociación del dominio — en preparación.** Identidad candidata
+2. **Base Android y asociación del dominio — preparada.** Identidad candidata
    `net.firstlisten.app`, Android 16/API 36, inicio en la experiencia sencilla,
-   endpoint de Digital Asset Links y comprobación automática.
-3. **Inventario de datos y declaraciones — pendiente.** Preparar respuestas
-   exactas para Data safety, audiencia, anuncios, acceso de revisores y contenido.
+   endpoint de Digital Asset Links y comprobación automática. La asociación se
+   completará cuando exista la clave de firma definitiva.
+3. **Inventario de datos y declaraciones — preparado.** Data safety, anuncios,
+   acceso de revisores, permisos y contenido ya están documentados y se pueden
+   verificar automáticamente. Falta que el propietario confirme la audiencia
+   inicial antes de copiar las respuestas a Play Console.
 4. **Paquete firmado — pendiente.** Generar el proyecto Android, crear y respaldar
    la clave, activar Play App Signing y producir el archivo AAB.
 5. **Ficha de Play Store — pendiente.** Nombre, descripción, icono, banner,
