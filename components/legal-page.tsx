@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Home } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { useInterfaceLocale } from "@/lib/use-interface-locale";
 
@@ -25,7 +25,10 @@ export function LegalPage({
     <main className="legal-page">
       <header className="account-header">
         <Logo />
-        <Link href="/signup"><ArrowLeft size={16} /> {spanish ? "Volver al registro" : "Back to signup"}</Link>
+        <div className="owner-header-actions">
+          <Link href="/guest"><Home size={16} /> {spanish ? "Inicio" : "Home"}</Link>
+          <Link href="/signup"><ArrowLeft size={16} /> {spanish ? "Volver al registro" : "Back to signup"}</Link>
+        </div>
       </header>
       <article>
         <span className="eyebrow">{spanish ? "Legal de First Listen" : "First Listen legal"}</span>

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgeCheck,
   Compass,
+  Flag,
   Headphones,
   ListMusic,
   LogIn,
@@ -27,6 +28,7 @@ import {
 } from "@/components/provider-player";
 import { Logo } from "@/components/logo";
 import type { InterfaceLocale } from "@/lib/catalog";
+import { createClient } from "@/lib/supabase/client";
 import type { Platform } from "@/lib/types";
 import {
   buildArtistFairQueue,
@@ -135,6 +137,7 @@ export function FirstListenSimplePreview({
   const [promptReady, setPromptReady] = useState(false);
   const [sessionSeconds, setSessionSeconds] = useState(0);
   const [verifiedListens, setVerifiedListens] = useState(0);
+  const [reportNotice, setReportNotice] = useState("");
   const requestPlaybackRef = useRef<(() => void) | null>(null);
   const pendingPlaybackRef = useRef(false);
   const pausedByUserRef = useRef(false);
@@ -312,6 +315,42 @@ export function FirstListenSimplePreview({
     setActiveIndex(0);
     setPlayerVersion((current) => current + 1);
   }, [activeSong, excludedSongIds, pausedByUser, started]);
+
+  const reportActiveSong = async () => {
+    if (!activeSong) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      window.location.assign(
+        `/login?next=${encodeURIComponent("/dashboard")}`,
+      );
+      return;
+    }
+    if (
+      !window.confirm(
+        spanish
+          ? `¿Enviar “${activeSong.title}” a moderación por posible spam, enlace incorrecto o contenido no permitido?`
+          : `Send “${activeSong.title}” to moderation for possible spam, a broken link, or disallowed content?`,
+      )
+    ) {
+      return;
+    }
+    const { error } = await supabase.rpc("report_song", {
+      reported_song_id: activeSong.id,
+      report_reason: "spam",
+      report_details: "Reported from the simplified First Listen player.",
+    });
+    setReportNotice(
+      error
+        ? error.message
+        : spanish
+          ? "Reporte enviado. El equipo de moderación lo revisará."
+          : "Report sent. The moderation team will review it.",
+    );
+  };
 
   const toggleContinuousPlayback = useCallback(() => {
     if (continuousPlayback) {
@@ -570,7 +609,17 @@ export function FirstListenSimplePreview({
             <ThumbsDown size={16} />
             {spanish ? "No es para mí" : "Not for me"}
           </button>
+          <button onClick={() => void reportActiveSong()} type="button">
+            <Flag size={16} />
+            {spanish ? "Reportar" : "Report"}
+          </button>
         </div>
+
+        {reportNotice && (
+          <p className="first-listen-simple-metrics-note" role="status">
+            {reportNotice}
+          </p>
+        )}
 
         <div className="first-listen-simple-listening-options">
           <button
@@ -668,7 +717,7 @@ export function FirstListenSimplePreview({
             </small>
           </div>
           <div className="first-listen-simple-member-actions">
-            <Link className="primary" href="/submit">
+            <Link className="primary" href="/profile#submitted-songs">
               <Upload size={16} />
               {spanish ? "Administrar música" : "Manage music"}
             </Link>
@@ -705,12 +754,20 @@ export function FirstListenSimplePreview({
       )}
 
       <footer className="first-listen-simple-footer">
-        <Headphones size={16} />
-        <span>
-          {spanish
-            ? "Las escuchas son decisiones reales de cada persona. FirstListen no vende ni intercambia reproducciones."
-            : "Every listen is a real person’s choice. FirstListen does not sell or trade plays."}
-        </span>
+        <div>
+          <Headphones size={16} />
+          <span>
+            {spanish
+              ? "Las escuchas son decisiones reales de cada persona. FirstListen no vende ni intercambia reproducciones."
+              : "Every listen is a real person’s choice. FirstListen does not sell or trade plays."}
+          </span>
+        </div>
+        <nav aria-label={spanish ? "Enlaces legales" : "Legal links"}>
+          <Link href="/privacy">{spanish ? "Privacidad" : "Privacy"}</Link>
+          <Link href="/terms">{spanish ? "Términos" : "Terms"}</Link>
+          <Link href="/guidelines">{spanish ? "Comunidad" : "Community"}</Link>
+          <Link href="/delete-account">{spanish ? "Eliminar cuenta" : "Delete account"}</Link>
+        </nav>
       </footer>
     </main>
   );

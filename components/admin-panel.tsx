@@ -141,6 +141,16 @@ type AdminCommentReport = {
   profiles: { display_name: string } | null;
 };
 
+type AdminProfileReport = {
+  id: string;
+  reported_user_id: string;
+  reason: string;
+  status: string;
+  details: string | null;
+  created_at: string;
+  profiles: { display_name: string } | null;
+};
+
 type SpotlightSlot = {
   slot_number: number;
   song_id: string | null;
@@ -246,6 +256,7 @@ export function AdminPanel({
   users,
   songs,
   reports,
+  profileReports,
   commentReports,
   initialSection = "users",
   listeningSettings,
@@ -263,6 +274,7 @@ export function AdminPanel({
   users: AdminUser[];
   songs: AdminSong[];
   reports: AdminReport[];
+  profileReports: AdminProfileReport[];
   commentReports: AdminCommentReport[];
   initialSection?: AdminSection;
   listeningSettings: {
@@ -958,6 +970,84 @@ export function AdminPanel({
                     </div>
                   </article>
                 ))}
+              </div>
+              <div className="admin-discovery-divider">
+                <span className="eyebrow">Profile safety</span>
+                <h3>Reported user profiles</h3>
+              </div>
+              <div className="admin-table">
+                {profileReports.length ? (
+                  profileReports.map((report) => (
+                    <article key={report.id}>
+                      <div>
+                        <strong>{report.profiles?.display_name ?? "Deleted user"}</strong>
+                        <small>
+                          {report.reason.replaceAll("_", " ")} / {report.status}
+                        </small>
+                      </div>
+                      <span>{report.details || "No details"}</span>
+                      <div className="admin-actions">
+                        {role !== "moderator" && (
+                          <>
+                            <button
+                              onClick={() =>
+                                void runRpc("admin_issue_user_warning", {
+                                  target_user_id: report.reported_user_id,
+                                  warning_reason: `Profile report: ${report.reason.replaceAll("_", " ")}`,
+                                })
+                              }
+                            >
+                              Warn user
+                            </button>
+                            <button
+                              onClick={() =>
+                                void runRpc("admin_enforce_account", {
+                                  target_user_id: report.reported_user_id,
+                                  enforcement: "suspend",
+                                  enforcement_reason: `Profile report: ${report.reason.replaceAll("_", " ")}`,
+                                })
+                              }
+                            >
+                              Suspend
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() =>
+                            void runRpc("admin_resolve_profile_report", {
+                              target_report_id: report.id,
+                              new_status: "resolved",
+                            })
+                          }
+                        >
+                          Resolve
+                        </button>
+                        <button
+                          onClick={() =>
+                            void runRpc("admin_resolve_profile_report", {
+                              target_report_id: report.id,
+                              new_status: "reviewing",
+                            })
+                          }
+                        >
+                          Escalate to Admin
+                        </button>
+                        <button
+                          onClick={() =>
+                            void runRpc("admin_resolve_profile_report", {
+                              target_report_id: report.id,
+                              new_status: "dismissed",
+                            })
+                          }
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div className="empty-state">No profile reports.</div>
+                )}
               </div>
               <div className="admin-discovery-divider">
                 <span className="eyebrow">Comment moderation</span>

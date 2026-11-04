@@ -1,7 +1,7 @@
-import { ProtectedAppPage } from "@/components/protected-app-page";
+import { WorkspaceV2AuthEntry } from "@/components/workspace-v2/workspace-v2-auth-entry";
 
 export const dynamic = "force-dynamic";
 
 export default function ProfilePage() {
-  return <ProtectedAppPage initialView="profile" loginRedirectPath="/profile" />;
+  return <WorkspaceV2AuthEntry loginRedirectPath="/profile" profileOnly />;
 }

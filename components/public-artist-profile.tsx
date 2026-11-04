@@ -13,10 +13,11 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  Ban,
   CirclePlay,
   Cloud,
   Disc3,
-  Gift,
+  Flag,
   Globe2,
   Headphones,
   Heart,
@@ -369,12 +370,12 @@ export function PublicArtistProfile({
   const [activeSongId, setActiveSongId] = useState<string | null>(null);
   const [songSortOrder, setSongSortOrder] = useState("newest");
   const [message, setMessage] = useState("");
-  const [supportPanelOpen, setSupportPanelOpen] = useState(false);
-  const [giftAmount, setGiftAmount] = useState(1);
-  const [pendingGiftAmount, setPendingGiftAmount] = useState<number | null>(
-    null,
-  );
-  const [giftBusy, setGiftBusy] = useState(false);
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState(false);
+  const [safetyBusy, setSafetyBusy] = useState(false);
+  const [reportPanelOpen, setReportPanelOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("spam");
+  const [reportDetails, setReportDetails] = useState("");
   const spanish = locale === "es";
 
   useEffect(() => {
@@ -388,6 +389,28 @@ export function PublicArtistProfile({
     setLocale(next);
     document.documentElement.lang = next;
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadSafetyState = async () => {
+      const supabase = createClient();
+      if (!supabase) return;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!active) return;
+      setViewerId(user?.id ?? null);
+      if (!user || user.id === artist.id) return;
+      const { data } = await supabase.rpc("is_user_blocked", {
+        target_user_id: artist.id,
+      });
+      if (active) setBlocked(Boolean(data));
+    };
+    void loadSafetyState();
+    return () => {
+      active = false;
+    };
+  }, [artist.id]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -441,6 +464,14 @@ export function PublicArtistProfile({
         spanish
           ? "Este es tu perfil público."
           : "This is your public artist profile.",
+      );
+      return;
+    }
+    if (blocked) {
+      setMessage(
+        spanish
+          ? "Desbloquea este perfil antes de seguirlo."
+          : "Unblock this profile before following it.",
       );
       return;
     }
@@ -499,28 +530,8 @@ export function PublicArtistProfile({
     }
   };
 
-  const supportArtist = () => {
-    setSupportPanelOpen((current) => !current);
-    setPendingGiftAmount(null);
-    setMessage("");
-  };
-
-  const prepareGift = (amount: number) => {
-    const normalized = Math.floor(amount);
-    if (!Number.isFinite(normalized) || normalized < 1) {
-      setMessage(
-        spanish
-          ? "El regalo debe ser de al menos 1 token."
-          : "The gift must be at least 1 token.",
-      );
-      return;
-    }
-    setPendingGiftAmount(normalized);
-    setGiftAmount(normalized);
-  };
-
-  const confirmGift = async () => {
-    if (!pendingGiftAmount || giftBusy) return;
+  const toggleBlock = async () => {
+    if (safetyBusy || viewerId === artist.id) return;
     const supabase = createClient();
     if (!supabase) return;
     const {
@@ -530,23 +541,72 @@ export function PublicArtistProfile({
       router.push(`/login?next=/artists/${artist.id}`);
       return;
     }
-    setGiftBusy(true);
-    const { data, error } = await supabase.rpc("gift_artist_tokens", {
-      target_artist_id: artist.id,
-      token_amount: pendingGiftAmount,
+    const nextBlocked = !blocked;
+    if (
+      nextBlocked &&
+      !window.confirm(
+        spanish
+          ? `¿Bloquear a ${artist.name}? Dejarás de seguir este perfil y su contenido se ocultará de tu experiencia.`
+          : `Block ${artist.name}? You will unfollow this profile and its content will be hidden from your experience.`,
+      )
+    ) {
+      return;
+    }
+    setSafetyBusy(true);
+    const { error } = await supabase.rpc("set_user_block", {
+      target_user_id: artist.id,
+      should_block: nextBlocked,
     });
-    setGiftBusy(false);
+    setSafetyBusy(false);
     if (error) {
       setMessage(error.message);
       return;
     }
-    const row = Array.isArray(data) ? data[0] : data;
-    setSupportPanelOpen(false);
-    setPendingGiftAmount(null);
+    if (nextBlocked && following) {
+      setFollowing(false);
+      setFollowerCount((current) => Math.max(0, current - 1));
+    }
+    setBlocked(nextBlocked);
+    setActiveSongId(null);
+    setMessage(
+      nextBlocked
+        ? spanish
+          ? "Perfil bloqueado. Su contenido ya no aparecerá en tu experiencia."
+          : "Profile blocked. Its content will no longer appear in your experience."
+        : spanish
+          ? "Perfil desbloqueado."
+          : "Profile unblocked.",
+    );
+  };
+
+  const submitProfileReport = async () => {
+    if (safetyBusy || viewerId === artist.id) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.push(`/login?next=/artists/${artist.id}`);
+      return;
+    }
+    setSafetyBusy(true);
+    const { error } = await supabase.rpc("report_user_profile", {
+      target_user_id: artist.id,
+      report_reason: reportReason,
+      report_details: reportDetails || null,
+    });
+    setSafetyBusy(false);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setReportPanelOpen(false);
+    setReportDetails("");
     setMessage(
       spanish
-        ? `Regalaste ${row?.gifted_tokens ?? pendingGiftAmount} tokens a ${artist.name}.`
-        : `You gifted ${row?.gifted_tokens ?? pendingGiftAmount} tokens to ${artist.name}.`,
+        ? "Reporte enviado. Moderación revisará este perfil."
+        : "Report sent. Moderation will review this profile.",
     );
   };
 
@@ -614,95 +674,106 @@ export function PublicArtistProfile({
             <Share2 size={16} /> {spanish ? "Compartir artista" : "Share Artist"}
           </button>
           <button
-            data-artist-support-button
-            data-ui-component="supportArtistButton"
-            onClick={supportArtist}
+            className={blocked ? "following" : ""}
+            disabled={safetyBusy || viewerId === artist.id}
+            onClick={() => void toggleBlock()}
             type="button"
           >
-            <Gift size={16} /> {spanish ? "Apoyar artista" : "Support Artist"}
+            <Ban size={16} />
+            {blocked
+              ? spanish
+                ? "Desbloquear"
+                : "Unblock"
+              : spanish
+                ? "Bloquear"
+                : "Block"}
+          </button>
+          <button
+            disabled={safetyBusy || viewerId === artist.id}
+            onClick={() => setReportPanelOpen((current) => !current)}
+            type="button"
+          >
+            <Flag size={16} /> {spanish ? "Reportar perfil" : "Report profile"}
           </button>
         </div>
       </section>
 
       {message && <div className="artist-profile-notice" role="status">{message}</div>}
 
-      {supportPanelOpen && (
-        <section className="artist-token-gift-panel" aria-label="Support artist">
+      {reportPanelOpen && viewerId !== artist.id && (
+        <section className="artist-token-gift-panel" aria-label="Report profile">
           <div>
             <span className="eyebrow">
-              <Gift size={13} /> {spanish ? "Apoyo al artista" : "Artist Support"}
+              <Flag size={13} /> {spanish ? "Seguridad" : "Safety"}
             </span>
-            <h2>{spanish ? "Regalar tokens" : "Gift Tokens"}</h2>
+            <h2>{spanish ? "Reportar este perfil" : "Report this profile"}</h2>
             <p>
               {spanish
-                ? "Solo los tokens ganados pueden regalarse. Los regalos son permanentes y quedan auditados."
-                : "Only earned tokens may be gifted. Gifts are permanent and fully audited."}
+                ? "El reporte será privado y lo revisará el equipo de moderación."
+                : "Your report is private and will be reviewed by moderation."}
             </p>
           </div>
           <div className="artist-token-gift-options">
-            {[1, 5, 10].map((amount) => (
-              <button
-                key={amount}
-                onClick={() => prepareGift(amount)}
-                type="button"
-              >
-                <Gift size={14} /> {spanish ? "Regalar" : "Gift"} {amount}
-              </button>
-            ))}
             <label>
-              {spanish ? "Cantidad personalizada" : "Custom Amount"}
-              <input
-                min={1}
-                onChange={(event) => setGiftAmount(Number(event.target.value))}
-                type="number"
-                value={giftAmount}
+              {spanish ? "Motivo" : "Reason"}
+              <select
+                onChange={(event) => setReportReason(event.target.value)}
+                value={reportReason}
+              >
+                <option value="spam">Spam</option>
+                <option value="harassment">{spanish ? "Acoso" : "Harassment"}</option>
+                <option value="impersonation">{spanish ? "Suplantación" : "Impersonation"}</option>
+                <option value="illegal_content">{spanish ? "Contenido ilegal" : "Illegal content"}</option>
+                <option value="copyright">Copyright</option>
+                <option value="other">{spanish ? "Otro" : "Other"}</option>
+              </select>
+            </label>
+            <label>
+              {spanish ? "Detalles opcionales" : "Optional details"}
+              <textarea
+                maxLength={1000}
+                onChange={(event) => setReportDetails(event.target.value)}
+                value={reportDetails}
               />
             </label>
-            <button onClick={() => prepareGift(giftAmount)} type="button">
-              {spanish ? "Preparar regalo" : "Prepare Gift"}
-            </button>
-          </div>
-          {pendingGiftAmount !== null && (
-            <div className="artist-token-gift-confirmation" role="status">
-              <strong>
-                {spanish
-                  ? "Estas a punto de regalar:"
-                  : "You are about to gift:"}
-              </strong>
-              <span>{pendingGiftAmount} Tokens</span>
-              <small>
-                {spanish ? "a:" : "to:"} {artist.name}.{" "}
-                {spanish
-                  ? "Estos tokens se transferiran permanentemente."
-                  : "These tokens will be permanently transferred."}
-              </small>
+            <div className="artist-token-gift-confirmation">
               <div>
                 <button
-                  disabled={giftBusy}
-                  onClick={() => void confirmGift()}
+                  disabled={safetyBusy}
+                  onClick={() => void submitProfileReport()}
                   type="button"
                 >
-                  {giftBusy
+                  {safetyBusy
                     ? spanish
-                      ? "Enviando..."
-                      : "Sending..."
+                      ? "Enviando…"
+                      : "Sending…"
                     : spanish
-                      ? "Confirmar regalo"
-                      : "Confirm Gift"}
+                      ? "Enviar reporte"
+                      : "Send report"}
                 </button>
                 <button
-                  disabled={giftBusy}
-                  onClick={() => setPendingGiftAmount(null)}
+                  disabled={safetyBusy}
+                  onClick={() => setReportPanelOpen(false)}
                   type="button"
                 >
                   {spanish ? "Cancelar" : "Cancel"}
                 </button>
               </div>
             </div>
-          )}
+          </div>
         </section>
       )}
 
+      {blocked && (
+        <section className="artist-profile-notice" role="status">
+          {spanish
+            ? "Bloqueaste este perfil. Sus canciones y actividad están ocultas hasta que lo desbloquees."
+            : "You blocked this profile. Its songs and activity are hidden until you unblock it."}
+        </section>
+      )}
+
+      {!blocked && (
+        <>
       <section className="artist-community-grid">
         <div
           className="artist-community-panel"
@@ -855,6 +926,8 @@ export function PublicArtistProfile({
           </div>
         )}
       </section>
+        </>
+      )}
     </main>
   );
 }

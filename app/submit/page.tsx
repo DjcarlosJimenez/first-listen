@@ -1,7 +1,7 @@
-import { ProtectedAppPage } from "@/components/protected-app-page";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default function SubmitPage() {
-  return <ProtectedAppPage initialView="submit" />;
+  redirect("/first-publish");
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LegalPage } from "@/components/legal-page";
 
 export default function PrivacyPage() {
@@ -5,32 +6,40 @@ export default function PrivacyPage() {
     <LegalPage
       title="Privacy Policy"
       titleEs="Política de privacidad"
-      updated="June 8, 2026"
+      updated="November 4, 2026"
       childrenEs={
         <>
-          <h2>Datos recopilados</h2>
-          <p>Guardamos datos de cuenta, preferencias de perfil, metadata y enlaces de canciones, reseñas, reportes, créditos y registros de seguridad/auditoría.</p>
-          <h2>Audio</h2>
-          <p>First Listen no sube, aloja ni guarda archivos de audio. La reproducción ocurre en la plataforma musical enlazada.</p>
-          <h2>Uso de datos</h2>
-          <p>Los datos se usan para autenticar usuarios, conectar canciones con oyentes, ofrecer analítica, prevenir abuso y operar moderación.</p>
-          <h2>Acceso</h2>
-          <p>El feedback privado está limitado por políticas de acceso de base de datos. Personal autorizado puede acceder a registros cuando sea necesario por administración, seguridad o moderación.</p>
-          <h2>Contacto y eliminación</h2>
-          <p>Los usuarios pueden solicitar corrección o eliminación de datos de cuenta mediante el administrador, sujeto a requisitos legales y de seguridad.</p>
+          <h2>Quién opera First Listen</h2>
+          <p>First Listen es operado por DJ Carlos Jimenez. Para privacidad, seguridad o derechos de datos, escribe a <a href="mailto:support@firstlisten.net">support@firstlisten.net</a>.</p>
+          <h2>Datos que recopilamos</h2>
+          <p>Podemos guardar correo, nombre de perfil, preferencias, enlaces y metadata musical, actividad de reproducción, reseñas, seguidores, reportes, información técnica básica y registros de seguridad o auditoría.</p>
+          <h2>Cómo usamos los datos</h2>
+          <p>Usamos estos datos para autenticar cuentas, mostrar música, medir actividad real, mantener una rotación justa, ofrecer estadísticas, prevenir fraude, atender reportes y proteger a la comunidad. Las reproducciones no generan pagos, tokens ni prioridad.</p>
+          <h2>Audio y proveedores</h2>
+          <p>First Listen no aloja archivos de audio enviados por usuarios en la plataforma principal. La reproducción ocurre mediante enlaces o reproductores autorizados de servicios externos. Para operar el servicio utilizamos proveedores como Supabase, Vercel y Resend, sujetos a sus propias medidas de seguridad.</p>
+          <h2>Retención y seguridad</h2>
+          <p>Conservamos los datos mientras la cuenta esté activa o sean necesarios para operar el servicio. Después de eliminar una cuenta podemos conservar registros mínimos de seguridad, cumplimiento o resolución de disputas cuando sea legalmente necesario.</p>
+          <h2>Tus controles</h2>
+          <p>Puedes modificar preferencias, reportar contenido, bloquear usuarios y eliminar tu cuenta desde First Listen. La eliminación se inicia en <Link href="/delete-account">Eliminar cuenta</Link> y también está enlazada dentro de tu perfil.</p>
+          <h2>Menores y cambios</h2>
+          <p>First Listen no está dirigido a menores de 13 años. Podemos actualizar esta política cuando cambien las funciones o requisitos legales; publicaremos la fecha de la revisión.</p>
         </>
       }
     >
-      <h2>Data collected</h2>
-      <p>We store account details, profile preferences, song metadata and links, reviews, reports, credits, and security/audit records.</p>
-      <h2>Audio</h2>
-      <p>First Listen does not upload, host, or store audio files. Playback occurs on the linked music platform.</p>
-      <h2>Use of data</h2>
-      <p>Data is used to authenticate users, match reviews, provide analytics, prevent abuse, and operate moderation.</p>
-      <h2>Access</h2>
-      <p>Private feedback is limited by database access policies. Authorized staff may access records when required for administration, security, or moderation.</p>
-      <h2>Contact and deletion</h2>
-      <p>Users may request correction or deletion of account data through the platform administrator, subject to legal and security retention requirements.</p>
+      <h2>Who operates First Listen</h2>
+      <p>First Listen is operated by DJ Carlos Jimenez. For privacy, security, or data-rights questions, contact <a href="mailto:support@firstlisten.net">support@firstlisten.net</a>.</p>
+      <h2>Data we collect</h2>
+      <p>We may store email, profile name, preferences, music links and metadata, playback activity, reviews, follows, reports, basic technical information, and security or audit records.</p>
+      <h2>How we use data</h2>
+      <p>We use this data to authenticate accounts, display music, measure genuine activity, maintain fair rotation, provide analytics, prevent fraud, process reports, and protect the community. Plays do not award payments, tokens, or priority.</p>
+      <h2>Audio and service providers</h2>
+      <p>First Listen does not host user-submitted audio files in the main platform. Playback occurs through links or authorized players from external services. We use providers such as Supabase, Vercel, and Resend to operate the service, subject to their security practices.</p>
+      <h2>Retention and security</h2>
+      <p>We retain data while an account is active or as needed to operate the service. After account deletion, minimal security, compliance, or dispute-resolution records may be retained where legally required.</p>
+      <h2>Your controls</h2>
+      <p>You can change preferences, report content, block users, and delete your account inside First Listen. Start deletion at <Link href="/delete-account">Delete account</Link>, also linked from your profile.</p>
+      <h2>Children and updates</h2>
+      <p>First Listen is not directed to children under 13. We may update this policy when features or legal requirements change and will post the revision date.</p>
     </LegalPage>
   );
 }

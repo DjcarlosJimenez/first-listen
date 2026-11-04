@@ -50,6 +50,163 @@
   --platform-presence-svg-size: 14px;
 }
 
+/* Play Store readiness: account safety and self-service controls. */
+.artist-token-gift-options select,
+.artist-token-gift-options textarea {
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font: inherit;
+  min-height: 42px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.artist-token-gift-options textarea {
+  min-height: 96px;
+}
+
+.profile-safety-card,
+.profile-danger-zone {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 16px;
+}
+
+.profile-safety-card > div:first-child,
+.profile-danger-zone {
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.profile-safety-card > div:first-child {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-safety-card span,
+.profile-danger-zone span,
+.profile-blocked-list span {
+  display: grid;
+  gap: 3px;
+}
+
+.profile-safety-card small,
+.profile-danger-zone small,
+.profile-blocked-list small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.profile-safety-card p {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0;
+}
+
+.profile-blocked-list {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-blocked-list > div {
+  align-items: center;
+  background: var(--control-surface-muted);
+  border-radius: 12px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.profile-blocked-list button,
+.profile-danger-zone a {
+  background: var(--control-surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 900;
+  padding: 9px 11px;
+  text-decoration: none;
+}
+
+.profile-danger-zone {
+  background: color-mix(in srgb, #a61b1b 7%, var(--surface-strong));
+  border-color: color-mix(in srgb, #a61b1b 30%, var(--line));
+}
+
+.account-deletion-page article {
+  max-width: 760px;
+}
+
+.account-deletion-card {
+  background: color-mix(in srgb, #a61b1b 5%, var(--surface-strong));
+  border: 1px solid color-mix(in srgb, #a61b1b 30%, var(--line));
+  border-radius: 20px;
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+  padding: 20px;
+}
+
+.account-deletion-card h2,
+.account-deletion-card p {
+  margin: 0;
+}
+
+.account-delete-button {
+  align-items: center;
+  background: #8f1d1d;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  display: inline-flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 8px;
+  justify-content: center;
+  padding: 13px 16px;
+}
+
+.account-delete-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.first-listen-simple-footer {
+  flex-direction: column;
+}
+
+.first-listen-simple-footer > div,
+.first-listen-simple-footer nav {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.first-listen-simple-footer nav a {
+  color: inherit;
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  .profile-danger-zone {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .profile-danger-zone a {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+}
+
 .sr-only {
   clip: rect(0, 0, 0, 0);
   border: 0;

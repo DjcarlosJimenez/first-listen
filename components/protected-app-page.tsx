@@ -637,6 +637,7 @@ export async function ProtectedAppPage({
     autoplayNextSong: Boolean(networkRow?.autoplay_next_song ?? true),
   };
   const profilePanel: ProfilePanelProps = {
+    blockedUsers: [],
     profile: {
       id: user.id,
       displayName: profile.display_name,

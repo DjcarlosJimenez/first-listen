@@ -1849,8 +1849,8 @@ export function ProviderPlayer({
               </h3>
               <p>
                 {spanish
-                  ? `Este contenido abrirá ${platform} en una nueva pestaña y saldrá temporalmente de First Listen. La actividad externa no suma tiempo ni tokens dentro de First Listen.`
-                  : `This content will open ${platform} in a new tab and temporarily leave First Listen. External activity does not earn time or tokens inside First Listen.`}
+                  ? `Este contenido abrirá ${platform} en una nueva pestaña y saldrá temporalmente de First Listen. La actividad externa no se mide como reproducción dentro de First Listen.`
+                  : `This content will open ${platform} in a new tab and temporarily leave First Listen. External activity is not measured as an in-app First Listen play.`}
               </p>
               <label>
                 <input

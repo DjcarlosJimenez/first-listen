@@ -99,6 +99,7 @@ export async function AdminPageContent({
     { data: songs },
     { data: commentReports },
     { data: reports },
+    { data: profileReports },
     { data: statistics },
     { data: listeningRows },
     { data: spotlightSlots },
@@ -130,6 +131,13 @@ export async function AdminPageContent({
     supabase
       .from("song_reports")
       .select("id, song_id, reason, status, details, created_at, songs(title, artist_name)")
+      .order("created_at", { ascending: false })
+      .limit(250),
+    supabase
+      .from("profile_reports")
+      .select(
+        "id, reported_user_id, reason, status, details, created_at, profiles!profile_reports_reported_user_id_fkey(display_name)",
+      )
       .order("created_at", { ascending: false })
       .limit(250),
     isModerator
@@ -210,6 +218,7 @@ export async function AdminPageContent({
         enabled: Boolean(listeningRows?.enabled ?? true),
       }}
       reports={(reports ?? []) as never}
+      profileReports={(profileReports ?? []) as never}
       commentReports={(commentReports ?? []) as never}
       spotlightSlots={(spotlightSlots ?? []) as never}
       boosts={(boosts ?? []) as never}

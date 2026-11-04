@@ -1,13 +1,7 @@
-import { ProtectedAppPage } from "@/components/protected-app-page";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default function DiscoverGenresPage() {
-  return (
-    <ProtectedAppPage
-      discoveryDestination={{ type: "genres" }}
-      initialView="dashboard"
-      loginRedirectPath="/discover/genres"
-    />
-  );
+  redirect("/dashboard");
 }

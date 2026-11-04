@@ -52,7 +52,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const isSignup = mode === "signup";
   const nextPath = useMemo(() => searchParams.get("next") || "/dashboard", [searchParams]);
   const resetMessage =
-    searchParams.get("message") === "password-reset"
+    searchParams.get("message") === "account-deleted"
+      ? spanish
+        ? "Tu cuenta y sus datos personales fueron eliminados."
+        : "Your account and personal data were deleted."
+      : searchParams.get("message") === "password-reset"
       ? spanish
         ? "Contraseña actualizada. Inicia sesión con tu nueva contraseña."
         : "Password updated. Log in with your new password."
@@ -153,11 +157,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           <p>
             {isSignup
               ? spanish
-                ? "Guarda tu progreso, reclama tokens y sube tu música cuando estés listo."
-                : "Save your progress, claim tokens, and submit music when you are ready."
+                ? "Guarda tu progreso, comparte tu música y descubre nuevos artistas."
+                : "Save your progress, share your music, and discover new artists."
               : spanish
-                ? "Vuelve a tu música, tu Banco de Tiempo, tus tokens y tus herramientas."
-                : "Return to your music, Time Bank, tokens, and tools."}
+                ? "Vuelve a tu música, tu actividad y tus herramientas."
+                : "Return to your music, activity, and tools."}
           </p>
         </div>
 

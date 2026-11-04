@@ -67,6 +67,14 @@ export async function middleware(request: NextRequest) {
   const artistHostResponse = rewriteArtistHostRequest(request);
   if (artistHostResponse) return artistHostResponse;
 
+  const requestedPath = request.nextUrl.pathname;
+  if (requestedPath === "/submit" || requestedPath.startsWith("/submit/")) {
+    return NextResponse.redirect(new URL("/first-publish", request.url), 307);
+  }
+  if (requestedPath === "/review" || requestedPath.startsWith("/review/")) {
+    return NextResponse.redirect(new URL("/dashboard", request.url), 307);
+  }
+
   let response = NextResponse.next({ request });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

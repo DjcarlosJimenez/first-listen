@@ -22,8 +22,8 @@ export default function OfflinePage() {
         <h1>{spanish ? "Estás sin conexión." : "You are offline."}</h1>
         <p>
           {spanish
-            ? "First Listen está instalado y listo para abrirse, pero la reproducción, el inicio de sesión, el Banco de Tiempo y el feedback necesitan internet."
-            : "First Listen is installed and ready to reopen, but music playback, login, Time Bank updates, and feedback submission need an internet connection."}
+            ? "First Listen está instalado y listo para abrirse, pero la reproducción, el inicio de sesión y las funciones de comunidad necesitan internet."
+            : "First Listen is installed and ready to reopen, but music playback, login, and community features need an internet connection."}
         </p>
         <div className="offline-shell-actions">
           <Link href="/">

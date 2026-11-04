@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/logo";
-import type { ProfilePanelProps } from "@/components/profile-panel";
+import { ProfilePanel, type ProfilePanelProps } from "@/components/profile-panel";
 import { FirstListenSimplePreview } from "@/components/workspace-v2/first-listen-simple-preview";
 import { WorkspaceV2PreviewErrorBoundary } from "@/components/workspace-v2/workspace-v2-preview-error-boundary";
 import { WorkspaceV2Shell, type WorkspaceV2ViewerMode } from "@/components/workspace-v2/workspace-v2-shell";
@@ -286,6 +286,7 @@ function profileDisplayName(
 
 function buildProfilePanelPayload({
   activityRows,
+  blockedUserRows,
   connectedPlatformRows,
   impactRows,
   networkRows,
@@ -297,6 +298,7 @@ function buildProfilePanelPayload({
   userId,
 }: {
   activityRows: unknown[] | null;
+  blockedUserRows: unknown[] | null;
   connectedPlatformRows: unknown[] | null;
   impactRows: unknown[] | Record<string, unknown> | null;
   networkRows: unknown[] | Record<string, unknown> | null;
@@ -334,6 +336,13 @@ function buildProfilePanelPayload({
         visibility: row.visibility === "anonymous" ? "anonymous" : "public",
       }),
     ),
+    blockedUsers: (
+      (blockedUserRows ?? []) as Array<Record<string, unknown>>
+    ).map((row) => ({
+      blockedAt: String(row.blocked_at ?? ""),
+      displayName: String(row.display_name ?? "Blocked user"),
+      id: String(row.blocked_user_id ?? ""),
+    })),
     connectedPlatforms: (
       (connectedPlatformRows ?? []) as Array<Record<string, unknown>>
     ).map(
@@ -404,9 +413,11 @@ function buildProfilePanelPayload({
 
 export async function WorkspaceV2AuthEntry({
   loginRedirectPath = "/dashboard",
+  profileOnly = false,
   simpleHome = false,
 }: {
   loginRedirectPath?: string;
+  profileOnly?: boolean;
   simpleHome?: boolean;
 }) {
   const supabase = await createClient();
@@ -417,7 +428,7 @@ export async function WorkspaceV2AuthEntry({
   if (!user) redirect(`/login?next=${encodeURIComponent(loginRedirectPath)}`);
 
   const queueRowsPromise = supabase
-    .rpc("get_workspace_v2_smart_queue", { queue_limit: 100 })
+    .rpc("get_workspace_v2_safe_queue", { queue_limit: 100 })
     .then(async ({ data, error: smartQueueError }) => {
       if (!smartQueueError && data) {
         return {
@@ -453,6 +464,7 @@ export async function WorkspaceV2AuthEntry({
     { data: impactRows },
     { data: networkRows },
     { data: activityRows },
+    { data: blockedUserRows },
     { data: connectedPlatformRows },
     { data: removedSongHistoryRows },
     { data: contentEconomyRows },
@@ -473,6 +485,7 @@ export async function WorkspaceV2AuthEntry({
     supabase.rpc("get_my_recent_community_activity", {
       activity_limit: 12,
     }),
+    supabase.rpc("get_my_blocked_users"),
     supabase
       .from("connected_platform_accounts")
       .select(
@@ -502,6 +515,7 @@ export async function WorkspaceV2AuthEntry({
   const founderOperations = null;
   const profilePanel = buildProfilePanelPayload({
     activityRows,
+    blockedUserRows,
     connectedPlatformRows,
     impactRows,
     networkRows,
@@ -512,6 +526,10 @@ export async function WorkspaceV2AuthEntry({
     userEmail: user.email,
     userId: user.id,
   });
+
+  if (profileOnly) {
+    return <ProfilePanel {...profilePanel} />;
+  }
 
   if (simpleHome && queue.songs.length > 0) {
     return (

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LegalPage } from "@/components/legal-page";
 
 export default function TermsPage() {
@@ -5,32 +6,36 @@ export default function TermsPage() {
     <LegalPage
       title="Terms of Service"
       titleEs="Términos de servicio"
-      updated="June 8, 2026"
+      updated="November 4, 2026"
       childrenEs={
         <>
           <h2>Servicio</h2>
-          <p>First Listen ofrece feedback y analítica para enlaces de música. No aloja, sube ni guarda audio.</p>
+          <p>First Listen permite descubrir y compartir enlaces musicales, seguir artistas y consultar actividad orgánica. No vendemos, garantizamos ni intercambiamos reproducciones, suscriptores o posiciones.</p>
           <h2>Cuentas</h2>
-          <p>Debes proporcionar información correcta, proteger tu contraseña y usar el servicio legalmente.</p>
-          <h2>Contenido enviado</h2>
-          <p>Confirmas que tienes autorización para enviar cada enlace musical y su metadata. Envíos duplicados, ilegales, engañosos o abusivos pueden ser retirados.</p>
-          <h2>Feedback</h2>
-          <p>Las reseñas deben ser honestas y constructivas. Spam, comentarios copiados, manipulación y acoso están prohibidos y pueden causar suspensión.</p>
-          <h2>Disponibilidad</h2>
-          <p>La beta pública se ofrece sin garantía de disponibilidad continua. Podemos limitar cuentas o contenido para proteger usuarios y la plataforma.</p>
+          <p>Debes proporcionar información correcta, proteger tu contraseña y usar una sola identidad legítima. Puedes eliminar tu cuenta en <Link href="/delete-account">Eliminar cuenta</Link>.</p>
+          <h2>Contenido y derechos</h2>
+          <p>Solo puedes enviar contenido o enlaces que tengas derecho a compartir. Conservas tus derechos; autorizas a First Listen a mostrar la metadata y el enlace mientras permanezcan publicados. Reportes de copyright pueden enviarse a <a href="mailto:support@firstlisten.net">support@firstlisten.net</a>.</p>
+          <h2>Conducta prohibida</h2>
+          <p>Está prohibido el spam, acoso, suplantación, automatización engañosa, compra o intercambio de actividad, manipulación de contadores, contenido ilegal y evasión de moderación.</p>
+          <h2>Moderación</h2>
+          <p>Podemos revisar reportes, retirar contenido, limitar funciones o suspender cuentas para proteger usuarios, derechos y funcionamiento. Puedes bloquear perfiles y reportar contenido desde la aplicación.</p>
+          <h2>Disponibilidad y responsabilidad</h2>
+          <p>La plataforma se ofrece según disponibilidad y puede cambiar. No controlamos la disponibilidad de enlaces externos ni prometemos resultados de audiencia.</p>
         </>
       }
     >
       <h2>Service</h2>
-      <p>First Listen provides music-link feedback and analytics. It does not host, upload, or store audio.</p>
+      <p>First Listen lets people discover and share music links, follow artists, and view organic activity. We do not sell, guarantee, or exchange plays, subscribers, or placement.</p>
       <h2>Accounts</h2>
-      <p>You must provide accurate account information, protect your password, and use the service lawfully.</p>
-      <h2>Submitted content</h2>
-      <p>You confirm that you are authorized to submit each music link and associated metadata. Duplicate, illegal, deceptive, or abusive submissions may be removed.</p>
-      <h2>Feedback</h2>
-      <p>Reviews must be honest and constructive. Spam, copied comments, manipulation, and harassment are prohibited and may result in suspended access.</p>
-      <h2>Availability</h2>
-      <p>The public beta is provided without guarantees of uninterrupted availability. Accounts or content may be restricted to protect users and the platform.</p>
+      <p>You must provide accurate information, protect your password, and use one legitimate identity. You may delete your account at <Link href="/delete-account">Delete account</Link>.</p>
+      <h2>Content and rights</h2>
+      <p>You may submit only content or links you have the right to share. You keep your rights and authorize First Listen to display metadata and the link while published. Send copyright reports to <a href="mailto:support@firstlisten.net">support@firstlisten.net</a>.</p>
+      <h2>Prohibited conduct</h2>
+      <p>Spam, harassment, impersonation, deceptive automation, buying or exchanging activity, metric manipulation, illegal content, and moderation evasion are prohibited.</p>
+      <h2>Moderation</h2>
+      <p>We may review reports, remove content, limit features, or suspend accounts to protect users, rights, and service integrity. You can block profiles and report content in the app.</p>
+      <h2>Availability and responsibility</h2>
+      <p>The platform is provided as available and may change. We do not control external-link availability or promise audience results.</p>
     </LegalPage>
   );
 }

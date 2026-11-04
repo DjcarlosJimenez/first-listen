@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Archive,
   BadgeCheck,
+  Ban,
   CalendarDays,
   Clapperboard,
   Cloud,
@@ -142,6 +143,11 @@ export type ProfilePanelProps = {
   activity: CommunityActivity[];
   connectedPlatforms: ConnectedPlatformAccount[];
   removedSongHistory: RemovedSongHistory[];
+  blockedUsers: Array<{
+    id: string;
+    displayName: string;
+    blockedAt: string;
+  }>;
   embedded?: boolean;
   onNavigate?: (view: ProfileNavigationTarget) => void;
 };
@@ -258,6 +264,7 @@ export function ProfilePanel({
   activity,
   connectedPlatforms,
   removedSongHistory,
+  blockedUsers,
   embedded = false,
   onNavigate,
 }: ProfilePanelProps) {
@@ -274,9 +281,9 @@ export function ProfilePanel({
     setExternalRedirectNoticeDisabled,
   ] = useState(profile.externalRedirectNoticeDisabled);
   const [message, setMessage] = useState("");
-  const [tokenBalance, setTokenBalance] = useState(profile.credits);
   const [managedSongs, setManagedSongs] = useState(songs);
   const [removedSongs, setRemovedSongs] = useState(removedSongHistory);
+  const [blockedProfiles, setBlockedProfiles] = useState(blockedUsers);
   const [managingSongId, setManagingSongId] = useState<string | null>(null);
   const [platformEditorSongId, setPlatformEditorSongId] = useState<string | null>(
     null,
@@ -300,6 +307,23 @@ export function ProfilePanel({
   const showToast = (nextMessage: string) => {
     setToast(nextMessage);
     window.setTimeout(() => setToast(""), 3200);
+  };
+
+  const unblockProfile = async (targetUserId: string) => {
+    const supabase = createClient();
+    if (!supabase) return;
+    const { error } = await supabase.rpc("set_user_block", {
+      target_user_id: targetUserId,
+      should_block: false,
+    });
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setBlockedProfiles((current) =>
+      current.filter((profileRow) => profileRow.id !== targetUserId),
+    );
+    showToast(spanish ? "Perfil desbloqueado." : "Profile unblocked.");
   };
 
   const save = async (event: FormEvent) => {
@@ -339,19 +363,11 @@ export function ProfilePanel({
     const confirmation =
       action === "delete"
         ? spanish
-          ? `¿Eliminar "${song.title}" permanentemente? ${
-              song.submission_token_cost > 0
-                ? `Se reembolsarán ${song.submission_token_cost} token${song.submission_token_cost === 1 ? "" : "s"}.`
-                : "No se cobró ningún token por este envío."
-            }`
-          : `Delete "${song.title}" permanently? ${
-              song.submission_token_cost > 0
-                ? `${song.submission_token_cost} token${song.submission_token_cost === 1 ? "" : "s"} will be refunded.`
-                : "No token was charged for this submission."
-            }`
+          ? `¿Eliminar "${song.title}" permanentemente? Esta acción no se puede deshacer.`
+          : `Delete "${song.title}" permanently? This action cannot be undone.`
         : spanish
-          ? `¿Archivar "${song.title}"? Saldrá del descubrimiento y de la lista de canciones por escuchar, pero sus estadísticas seguirán disponibles. No se reembolsarán tokens.`
-          : `Archive "${song.title}"? It will leave discovery and the review queue, while its statistics remain available. No tokens will be refunded.`;
+          ? `¿Archivar "${song.title}"? Saldrá del descubrimiento, pero sus estadísticas seguirán disponibles.`
+          : `Archive "${song.title}"? It will leave discovery while its statistics remain available.`;
     if (!window.confirm(confirmation)) return;
 
     const supabase = createClient();
@@ -370,9 +386,6 @@ export function ProfilePanel({
         setManagedSongs((current) =>
           current.filter((item) => item.song_id !== song.song_id),
         );
-        setTokenBalance(
-          Number(result?.new_credit_balance ?? tokenBalance),
-        );
         setRemovedSongs((current) => [
           {
             history_id: crypto.randomUUID(),
@@ -387,15 +400,7 @@ export function ProfilePanel({
           },
           ...current,
         ]);
-        setMessage(
-          Number(result?.refunded_tokens ?? 0) > 0
-            ? spanish
-              ? `Canción eliminada. Se reembolsaron ${result.refunded_tokens} token${Number(result.refunded_tokens) === 1 ? "" : "s"}.`
-              : `Song deleted. ${result.refunded_tokens} token${Number(result.refunded_tokens) === 1 ? "" : "s"} refunded.`
-            : spanish
-              ? "Canción eliminada."
-              : "Song deleted.",
-        );
+        setMessage(spanish ? "Canción eliminada." : "Song deleted.");
       }
     } else {
       const { error } = await supabase.rpc("archive_my_song", {
@@ -652,22 +657,6 @@ export function ProfilePanel({
           <div className="profile-badges">
             <span><ShieldCheck size={14} /> {roleLabel(profile.role, spanish)}</span>
             {profile.founder && <span><BadgeCheck size={14} /> {spanish ? "Artista fundador" : "Founding Artist"}</span>}
-            <span>
-              {profile.role === "super_admin"
-                ? spanish
-                  ? "Balance de tokens: ilimitado"
-                  : "Token balance: unlimited"
-                : spanish
-                  ? `Balance de tokens: ${tokenBalance}`
-                  : `Token balance: ${tokenBalance}`}
-            </span>
-            {profile.founder && (
-              <span>
-                {spanish
-                  ? `Envíos Founder gratis: ${profile.founderSubmissionsRemaining}`
-                  : `Founder free submissions: ${profile.founderSubmissionsRemaining}`}
-              </span>
-            )}
           </div>
           <div className="impact-profile">
             <div>
@@ -861,6 +850,59 @@ export function ProfilePanel({
             {message && <p className="form-message" role="status">{message}</p>}
             <button className="auth-submit" type="submit"><Save size={15} /> {spanish ? "Guardar perfil" : "Save profile"}</button>
           </form>
+
+          <section className="profile-safety-card" aria-labelledby="blocked-users-heading">
+            <div>
+              <Ban size={18} />
+              <span>
+                <strong id="blocked-users-heading">
+                  {spanish ? "Usuarios bloqueados" : "Blocked users"}
+                </strong>
+                <small>
+                  {spanish
+                    ? "No aparecerán en tu rotación personal."
+                    : "They will not appear in your personal rotation."}
+                </small>
+              </span>
+            </div>
+            {blockedProfiles.length ? (
+              <div className="profile-blocked-list">
+                {blockedProfiles.map((blockedProfile) => (
+                  <div key={blockedProfile.id}>
+                    <span>
+                      <strong>{blockedProfile.displayName}</strong>
+                      <small>{new Date(blockedProfile.blockedAt).toLocaleDateString()}</small>
+                    </span>
+                    <button
+                      onClick={() => void unblockProfile(blockedProfile.id)}
+                      type="button"
+                    >
+                      {spanish ? "Desbloquear" : "Unblock"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>{spanish ? "No has bloqueado perfiles." : "You have not blocked any profiles."}</p>
+            )}
+          </section>
+
+          <section className="profile-danger-zone" aria-labelledby="delete-account-heading">
+            <Trash2 size={18} />
+            <span>
+              <strong id="delete-account-heading">
+                {spanish ? "Eliminar mi cuenta" : "Delete my account"}
+              </strong>
+              <small>
+                {spanish
+                  ? "Elimina permanentemente tu cuenta y tus datos personales."
+                  : "Permanently delete your account and personal data."}
+              </small>
+            </span>
+            <Link href="/delete-account">
+              {spanish ? "Revisar eliminación" : "Review deletion"}
+            </Link>
+          </section>
         </section>
 
         <section className="account-card my-songs" id="submitted-songs">
@@ -876,7 +918,7 @@ export function ProfilePanel({
                   {spanish ? "Enviar tu primera canción" : "Submit your first song"}
                 </button>
               ) : (
-                <Link href="/submit">{spanish ? "Enviar tu primera canción" : "Submit your first song"}</Link>
+                <Link href="/first-publish">{spanish ? "Enviar tu primera canción" : "Submit your first song"}</Link>
               )}
             </div>
           ) : (
@@ -1180,15 +1222,7 @@ export function ProfilePanel({
                     <span className="status-removed">
                       {song.action.replaceAll("_", " ")}
                     </span>
-                    <small>
-                      {song.refunded_tokens > 0
-                        ? spanish
-                          ? `${song.refunded_tokens} token reembolsado${song.refunded_tokens === 1 ? "" : "s"}`
-                          : `${song.refunded_tokens} token refund`
-                        : spanish
-                          ? "Sin reembolso de tokens"
-                          : "No token refund"}
-                    </small>
+                    <small>{new Date(song.created_at).toLocaleDateString()}</small>
                     <a
                       aria-label={spanish ? `Abrir ${song.title}` : `Open ${song.title}`}
                       href={song.music_url}
