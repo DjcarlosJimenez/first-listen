@@ -36615,3 +36615,12 @@ revoke all on function public.gift_artist_tokens(uuid, integer)
   from public, anon, authenticated;
 grant execute on function public.claim_listening_reward() to service_role;
 grant execute on function public.gift_artist_tokens(uuid, integer) to service_role;
+
+-- ============================================================
+-- 20261104020000_spanish_playback_terminology.sql
+-- ============================================================
+
+update public.daily_missions
+set description_es =
+  U&'Completa reproducciones v\00E1lidas de dos canciones Spotlight diferentes hoy.'
+where mission_key = 'review_spotlight_songs';

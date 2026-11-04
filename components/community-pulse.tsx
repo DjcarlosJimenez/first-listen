@@ -138,7 +138,7 @@ export function CommunityPulse({
         {!items.length && (
           <p className="community-pulse-empty">
             {locale === "es"
-              ? "La próxima escucha, review o comentario aparecerá aquí."
+              ? "La próxima reproducción, review o comentario aparecerá aquí."
               : "The next listen, review, or comment will appear here."}
           </p>
         )}

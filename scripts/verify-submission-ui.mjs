@@ -822,7 +822,7 @@ try {
   const spanishOfflineSummary = await waitFor(
     `document.querySelector(".offline-community-summary")?.innerText ?? ""`,
     (value) =>
-      value.includes("escuchas válidas") &&
+      value.includes("reproducciones válidas") &&
       value.includes("Canción más apoyada") &&
       value.includes("Mayor colaborador") &&
       value.includes("Colaborador público") &&
@@ -830,7 +830,7 @@ try {
       value.includes("apoyó"),
   );
   for (const expected of [
-    "escuchas válidas",
+    "reproducciones válidas",
     "Canción más apoyada",
     "Mayor colaborador",
     "Colaborador público",

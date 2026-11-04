@@ -682,7 +682,7 @@ export function ProfilePanel({
             <div>
               <Gauge size={16} />
               <strong>{formatImpactDuration(impact?.average_listening_seconds ?? 0)}</strong>
-              <span>{spanish ? "Duración promedio de escucha" : "Average Listening Duration"}</span>
+              <span>{spanish ? "Duración promedio de reproducción" : "Average Listening Duration"}</span>
             </div>
             <div>
               <CalendarDays size={16} />
@@ -1289,7 +1289,7 @@ export function ProfilePanel({
               ))}
               {!activity.length && (
                 <div className="empty-state">
-                  <p>{spanish ? "Tus escuchas, comentarios y artistas seguidos aparecerán aquí." : "Your listens, reviews, and follows will appear here."}</p>
+                  <p>{spanish ? "Tus reproducciones, comentarios y artistas seguidos aparecerán aquí." : "Your listens, reviews, and follows will appear here."}</p>
                   {onNavigate ? (
                     <button className="text-link-button" onClick={() => onNavigate("dashboard")} type="button">
                       {spanish ? "Apoyar a un creador" : "Support a creator"}

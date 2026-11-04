@@ -105,7 +105,7 @@ for (const glyph of requiredGlyphs) {
 }
 
 const requiredPhrases = [
-  "Escuchas válidas",
+  "Reproducciones verificadas",
   "Canción más apoyada",
   "Mayor colaborador",
   "Colaborador público",
@@ -116,6 +116,19 @@ for (const phrase of requiredPhrases) {
   assert(
     combinedLocalizationText.includes(phrase),
     `Required Spanish phrase is missing: ${phrase}`,
+  );
+}
+
+const deprecatedSpanishPlaybackPhrases = [
+  "Escuchas completas",
+  "Escuchas verificadas",
+  "Las escuchas son",
+  "Tus escuchas",
+];
+for (const phrase of deprecatedSpanishPlaybackPhrases) {
+  assert(
+    !combinedLocalizationText.includes(phrase),
+    `Deprecated Spanish playback phrase is still present: ${phrase}`,
   );
 }
 

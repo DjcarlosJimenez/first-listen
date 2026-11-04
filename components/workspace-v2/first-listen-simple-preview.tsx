@@ -647,7 +647,7 @@ export function FirstListenSimplePreview({
           </div>
           <div>
             <BadgeCheck size={16} />
-            <span>{spanish ? "Escuchas verificadas" : "Verified listens"}</span>
+            <span>{spanish ? "Reproducciones verificadas" : "Verified listens"}</span>
             <strong>{verifiedListens}</strong>
           </div>
         </div>
@@ -758,7 +758,7 @@ export function FirstListenSimplePreview({
           <Headphones size={16} />
           <span>
             {spanish
-              ? "Las escuchas son decisiones reales de cada persona. FirstListen no vende ni intercambia reproducciones."
+              ? "Las reproducciones son decisiones reales de cada persona. FirstListen no vende ni intercambia reproducciones."
               : "Every listen is a real person’s choice. FirstListen does not sell or trade plays."}
           </span>
         </div>

@@ -63,7 +63,7 @@ const helpTopicsEs = [
   {
     icon: BarChart3,
     title: "Entender resultados",
-    body: "Hook Score combina escuchar completa, agregar a playlist, atención y compartir con un amigo. Tus analíticas mantienen separados los resultados de cada canción.",
+    body: "Hook Score combina una reproducción completa, agregar a playlist, atención y compartir con un amigo. Tus analíticas mantienen separados los resultados de cada canción.",
   },
   {
     icon: UserPlus,
@@ -104,7 +104,7 @@ export default function HelpPage() {
         </h1>
         <p>
           {spanish
-            ? "First Listen conecta primeras impresiones honestas con escucha directa, seguidores y canciones guardadas."
+            ? "First Listen conecta primeras impresiones honestas con reproducción directa, seguidores y canciones guardadas."
             : "First Listen connects honest first impressions with direct listening, following, and saving actions."}
         </p>
         <div className="support-contact-strip">

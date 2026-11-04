@@ -556,7 +556,7 @@ function GuestDashboard({
         <article>
           <Coins size={22} />
           <span className="eyebrow">{spanish ? "Tokens" : "Tokens"}</span>
-          <h3>{spanish ? "Convierte tu escucha en oportunidades" : "Turn listening into opportunities"}</h3>
+          <h3>{spanish ? "Convierte tu reproducción en oportunidades" : "Turn listening into opportunities"}</h3>
           <p>{spanish ? "Tu actividad permanece aquí. Regístrate para ganar y reclamar tokens." : "Your activity stays here. Register to earn and claim tokens."}</p>
           <button onClick={() => onGate(spanish ? "Ganar tokens" : "Earn Tokens")} type="button">
             {spanish ? "Ganar tokens" : "Earn Tokens"} <LockKeyhole size={13} />
@@ -1186,7 +1186,7 @@ export function GuestExperience() {
       if (error || !row) {
         setListening((current) => ({
           ...current,
-          warning: error?.message ?? (spanish ? "No pudimos actualizar el tiempo de escucha." : "We could not update listening time."),
+          warning: error?.message ?? (spanish ? "No pudimos actualizar el tiempo de reproducción." : "We could not update listening time."),
         }));
         return;
       }
@@ -1669,7 +1669,7 @@ export function GuestExperience() {
           >
             <section>
               <span className="eyebrow"><Users size={13} /> {spanish ? "Comunidad real" : "Real community"}</span>
-              <h2>{spanish ? "Eres parte de la escucha" : "You are part of the listening community"}</h2>
+              <h2>{spanish ? "Eres parte de la comunidad" : "You are part of the listening community"}</h2>
               <p>
                 {spanish
                   ? "Tus likes, comentarios, artistas seguidos y canciones guardadas aparecen junto a la actividad de todos los oyentes."

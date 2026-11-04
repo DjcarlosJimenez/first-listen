@@ -1586,7 +1586,7 @@ function WorkspaceShellTop({
 
 function workspaceQueueModeLabel(mode: WorkspaceQueueMode, locale: InterfaceLocale) {
   const spanish = locale === "es";
-  if (mode === "review") return spanish ? "Lista de escucha" : "Review queue";
+  if (mode === "review") return spanish ? "Lista de canciones por escuchar" : "Review queue";
   if (mode === "genre") return spanish ? "Genero" : "Genre";
   if (mode === "random") return spanish ? "Aleatorio" : "Random";
   if (mode === "top10") return "Top 10";
@@ -2079,7 +2079,7 @@ function PostReviewDiscovery({
           target="_blank"
         >
           <Disc3 size={15} />{" "}
-          {spanish ? "Escuchar completa en Spotify" : "Listen Full Song on Spotify"}
+          {spanish ? "Escuchar canción completa en Spotify" : "Listen Full Song on Spotify"}
         </a>
         <a
           data-ui-component="openPlatformButton"
@@ -2088,7 +2088,7 @@ function PostReviewDiscovery({
           target="_blank"
         >
           <Youtube size={15} />{" "}
-          {spanish ? "Escuchar completa en YouTube" : "Listen Full Song on YouTube"}
+          {spanish ? "Escuchar canción completa en YouTube" : "Listen Full Song on YouTube"}
         </a>
         <a
           data-ui-component="openPlatformButton"
@@ -2097,7 +2097,7 @@ function PostReviewDiscovery({
           target="_blank"
         >
           <Radio size={15} />{" "}
-          {spanish ? "Escuchar completa en Apple Music" : "Listen Full Song on Apple Music"}
+          {spanish ? "Escuchar canción completa en Apple Music" : "Listen Full Song on Apple Music"}
         </a>
       </div>
       <div className="discovery-actions">
@@ -2299,8 +2299,8 @@ function OfflineCommunitySummary({
               {summary.mostSupportedSongValidListens}{" "}
               {spanish
                 ? summary.mostSupportedSongValidListens === 1
-                  ? "escucha"
-                  : "escuchas"
+                  ? "reproducción"
+                  : "reproducciones"
                 : summary.mostSupportedSongValidListens === 1
                   ? "listen"
                   : "listens"}
@@ -2385,12 +2385,12 @@ function EmptyQueueRetention({
         <div className="panel-heading">
           <div>
             <span className="eyebrow"><Headphones size={13} /> {spanish ? "Apoyo de hoy" : "Today’s Support"}</span>
-            <h3>{spanish ? "Escucha justa y verificable" : "Fair, verifiable listening"}</h3>
+            <h3>{spanish ? "Reproducción justa y verificable" : "Fair, verifiable listening"}</h3>
           </div>
         </div>
         <div className="queue-retention-stats compact">
           <div><strong>{todaySupport.validListens}</strong><span>{spanish ? "Reproducciones que suman" : "Plays that count"}</span></div>
-          <div><strong>{todaySupport.completeListens}</strong><span>{spanish ? "Escuchas completas" : "Complete Listens"}</span></div>
+          <div><strong>{todaySupport.completeListens}</strong><span>{spanish ? "Reproducciones completas" : "Complete Listens"}</span></div>
           <div><strong>{Math.round(todaySupport.averageCompletionRate)}%</strong><span>{spanish ? "Finalización promedio" : "Average Completion Rate"}</span></div>
         </div>
       </section>
@@ -2787,7 +2787,7 @@ function ReviewView({
       if (error || !result) {
         setListeningSession((current) => ({
           ...current,
-          warning: error?.message ?? (locale === "es" ? "No pudimos actualizar el tiempo de escucha." : "We could not update listening time."),
+          warning: error?.message ?? (locale === "es" ? "No pudimos actualizar el tiempo de reproducción." : "We could not update listening time."),
         }));
         return;
       }
@@ -3945,7 +3945,7 @@ function ListeningBankPanel({
           <strong>{status.communityRank}</strong>
           <small>
             {status.communityPoints} {spanish ? "puntos" : "points"} /{" "}
-            {spanish ? "Nivel de escucha" : "Listening level"} {status.levelNumber}:{" "}
+            {spanish ? "Nivel de reproducción" : "Listening level"} {status.levelNumber}:{" "}
             {levelName}
           </small>
         </div>
@@ -4008,7 +4008,7 @@ function ListeningBankPanel({
           <i style={{ width: `${progress}%` }} />
         </div>
         <small>
-          {status.minutesPerCredit} {spanish ? "minutos de escucha" : "listening minutes"} = 1{" "}
+          {status.minutesPerCredit} {spanish ? "minutos de reproducción" : "listening minutes"} = 1{" "}
           {spanish ? "token" : "token"} / {spanish ? "Límite diario" : "Daily cap"}{" "}
           {status.dailyCapMinutes} min
         </small>
@@ -4912,7 +4912,7 @@ function DiscoverySongCard({
       if (error || !row) {
         setListenState((current) => ({
           ...current,
-          warning: error?.message ?? (spanish ? "No pudimos actualizar el tiempo de escucha." : "We could not update listening time."),
+          warning: error?.message ?? (spanish ? "No pudimos actualizar el tiempo de reproducción." : "We could not update listening time."),
         }));
         return;
       }
@@ -8236,13 +8236,13 @@ function DashboardView({
             icon={ShieldCheck}
           />
           <StatCard
-            label={locale === "es" ? "Escucha total" : "Total Listening"}
+            label={locale === "es" ? "Tiempo total reproducido" : "Total Listening"}
             value={formatDuration(latestSummary?.totalListeningSeconds ?? 0)}
             detail={locale === "es" ? "Sesiones verificadas" : "Verified review sessions"}
             icon={Clock3}
           />
           <StatCard
-            label={locale === "es" ? "Escucha promedio" : "Average Listen"}
+            label={locale === "es" ? "Duración promedio de reproducción" : "Average Listen"}
             value={formatDuration(latestSummary?.averageListeningSeconds ?? 0)}
             detail={locale === "es" ? "Por review válida" : "Per qualified review"}
             icon={Headphones}
@@ -9638,7 +9638,7 @@ export function SubmitView({
         <div className="expect-card">
           <span className="eyebrow">{locale === "es" ? "Qué sigue" : "What happens next"}</span>
           {[
-            ["01", locale === "es" ? "Tu enlace entra a la cola de escucha." : "Your link enters the listening queue."],
+            ["01", locale === "es" ? "Tu enlace entra a la cola de reproducción." : "Your link enters the listening queue."],
             ["02", locale === "es" ? "Reviewers ven idioma, género y foco de feedback." : "Reviewers see the song language, genre, and feedback focus."],
             ["03", locale === "es" ? "Los resultados aparecen en tus analíticas privadas." : "Results appear in your private analytics."],
           ].map(([number, text]) => (
