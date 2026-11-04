@@ -1,7 +1,7 @@
-import { GuestExperience } from "@/components/guest-experience";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default function LegacyGuestPage() {
-  return <GuestExperience />;
+  redirect("/guest");
 }
