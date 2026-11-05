@@ -1,0 +1,56 @@
+{
+  "packageId": "net.firstlisten.app",
+  "host": "www.firstlisten.net",
+  "name": "First Listen",
+  "launcherName": "First Listen",
+  "display": "standalone",
+  "themeColor": "#171A18",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#F3F4EE",
+  "enableNotifications": false,
+  "startUrl": "/guest?source=android-app",
+  "iconUrl": "https://www.firstlisten.net/icons/first-listen-512x512.png",
+  "maskableIconUrl": "https://www.firstlisten.net/icons/first-listen-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "first-listen-upload-key.jks",
+    "alias": "firstlisten-upload"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://www.firstlisten.net/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://www.firstlisten.net/",
+  "minSdkVersion": 24,
+  "orientation": "any",
+  "fingerprints": [
+    {
+      "name": "upload",
+      "value": "DD:5E:50:1A:39:10:44:2B:23:78:7E:C3:5D:2C:71:AD:6D:B7:69:D5:46:68:D2:B3:D2:37:0A:2D:DE:05:1F:AB"
+    }
+  ],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "displayOverride": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "appVersion": "1"
+}

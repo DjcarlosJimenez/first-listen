@@ -13,6 +13,8 @@ export default function TermsPage() {
           <p>First Listen permite descubrir y compartir enlaces musicales, seguir artistas y consultar actividad orgánica. No vendemos, garantizamos ni intercambiamos reproducciones, suscriptores o posiciones.</p>
           <h2>Cuentas</h2>
           <p>Debes proporcionar información correcta, proteger tu contraseña y usar una sola identidad legítima. Puedes eliminar tu cuenta en <Link href="/delete-account">Eliminar cuenta</Link>.</p>
+          <h2>Edad para la aplicación Android</h2>
+          <p>La aplicación Android oficial de First Listen está destinada únicamente a personas de 18 años o más. Al usar esa aplicación confirmas que tienes al menos 18 años.</p>
           <h2>Contenido y derechos</h2>
           <p>Solo puedes enviar contenido o enlaces que tengas derecho a compartir. Conservas tus derechos; autorizas a First Listen a mostrar la metadata y el enlace mientras permanezcan publicados. Reportes de copyright pueden enviarse a <a href="mailto:support@firstlisten.net">support@firstlisten.net</a>.</p>
           <h2>Conducta prohibida</h2>
@@ -28,6 +30,8 @@ export default function TermsPage() {
       <p>First Listen lets people discover and share music links, follow artists, and view organic activity. We do not sell, guarantee, or exchange plays, subscribers, or placement.</p>
       <h2>Accounts</h2>
       <p>You must provide accurate information, protect your password, and use one legitimate identity. You may delete your account at <Link href="/delete-account">Delete account</Link>.</p>
+      <h2>Age requirement for the Android application</h2>
+      <p>The official First Listen Android application is intended only for people aged 18 or older. By using that application, you confirm that you are at least 18 years old.</p>
       <h2>Content and rights</h2>
       <p>You may submit only content or links you have the right to share. You keep your rights and authorize First Listen to display metadata and the link while published. Send copyright reports to <a href="mailto:support@firstlisten.net">support@firstlisten.net</a>.</p>
       <h2>Prohibited conduct</h2>

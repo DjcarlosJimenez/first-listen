@@ -34,8 +34,8 @@ assert.equal(declarations.dataSafety.collectsData, true);
 assert.equal(declarations.dataSafety.encryptedInTransit, true);
 assert.equal(declarations.dataSafety.accountDeletionAvailable, true);
 assert.equal(declarations.appAccess.reviewerAccountRequired, true);
-assert.equal(declarations.targetAudience.ownerConfirmationRequired, true);
-assert.deepEqual(declarations.targetAudience.recommendedAgeGroups, ["18 and over"]);
+assert.equal(declarations.targetAudience.ownerConfirmationRequired, false);
+assert.deepEqual(declarations.targetAudience.confirmedAgeGroups, ["18 and over"]);
 assert.equal(declarations.permissions.camera, false);
 assert.equal(declarations.permissions.microphone, false);
 assert.equal(declarations.permissions.location, false);
@@ -82,7 +82,8 @@ const result = {
   ads: "not-present",
   applicationId: declarations.applicationId,
   dataTypes: declaredTypes.size,
-  ownerDecisionRequired: "target-audience",
+  ownerDecisionRequired: false,
+  targetAudience: "18 and over",
   privacy: "aligned",
   status: "passed",
 };

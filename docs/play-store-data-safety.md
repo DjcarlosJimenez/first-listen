@@ -13,8 +13,8 @@ analítica o un SDK nativo.
 - Anuncios: **No**.
 - Acceso de revisores: instrucciones preparadas; falta crear una cuenta de
   revisión cuando exista el AAB.
-- Audiencia: recomendación preparada; falta confirmación del propietario antes
-  de responder en Play Console.
+- Audiencia: confirmada por el propietario el 4 de noviembre de 2026 para
+  personas de 18 años o más.
 
 La versión estructurada está en
 `android/play-console-declarations.json`.
@@ -52,15 +52,12 @@ No se deben guardar esas credenciales en GitHub ni en este documento.
 
 ### Audiencia
 
-Recomendación para el primer lanzamiento: seleccionar solamente **18 and over**.
+Decisión confirmada para el primer lanzamiento: seleccionar solamente
+**18 and over**.
 First Listen no está diseñado para niños y puede mostrar música enviada por
 usuarios con lenguaje explícito o temas maduros. Esta selección reduce el riesgo
 de declarar la aplicación como dirigida a menores y de entrar por error en el
 programa Families.
-
-Esta decisión limita la audiencia del listado de Android, por eso Play Console no
-debe enviarse hasta que el propietario la confirme expresamente. La web puede
-seguir aplicando su política pública independiente.
 
 ### Clasificación de contenido
 
@@ -104,7 +101,7 @@ guardarse únicamente como hash; First Listen no deriva ubicación de esa IP.
 ## Comprobación antes de enviar a revisión
 
 1. Ejecutar `npm run play-store:block3:verify`.
-2. Confirmar la audiencia elegida con el propietario.
+2. Confirmar que Play Console muestre únicamente `18 and over`.
 3. Crear la cuenta de revisor sin guardar credenciales en el repositorio.
 4. Comparar cada respuesta de Play Console con
    `android/play-console-declarations.json`.

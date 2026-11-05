@@ -9,16 +9,16 @@ oficial, no como una copia desconectada ni como un contenedor de contenido ajeno
 1. **Seguridad y cumplimiento básico — completo.** Eliminación de cuenta dentro y
    fuera de la aplicación, reportes, bloqueos, moderación y reproducción orgánica
    sin recompensas por escuchar.
-2. **Base Android y asociación del dominio — preparada.** Identidad candidata
+2. **Base Android y asociación del dominio — completa para la clave de subida.** Identidad
    `net.firstlisten.app`, Android 16/API 36, inicio en la experiencia sencilla,
-   endpoint de Digital Asset Links y comprobación automática. La asociación se
-   completará cuando exista la clave de firma definitiva.
-3. **Inventario de datos y declaraciones — preparado.** Data safety, anuncios,
-   acceso de revisores, permisos y contenido ya están documentados y se pueden
-   verificar automáticamente. Falta que el propietario confirme la audiencia
-   inicial antes de copiar las respuestas a Play Console.
-4. **Paquete firmado — pendiente.** Generar el proyecto Android, crear y respaldar
-   la clave, activar Play App Signing y producir el archivo AAB.
+   endpoint de Digital Asset Links y comprobación automática. La huella de la
+   clave final de Google se agregará después de activar Play App Signing.
+3. **Inventario de datos y declaraciones — completo.** Data safety, anuncios,
+   acceso de revisores, permisos y contenido están documentados. La audiencia
+   Android está confirmada únicamente para personas de 18 años o más.
+4. **Paquete firmado — completo.** AAB versión 1 generado con API 36, firmado y
+   verificado; APK de prueba firmado; clave privada protegida fuera de GitHub y
+   proceso reproducible. Play App Signing se activará al subir el AAB por primera vez.
 5. **Ficha de Play Store — pendiente.** Nombre, descripción, icono, banner,
    capturas reales de teléfono y clasificación de contenido.
 6. **Pruebas cerradas — pendiente.** Subir el AAB y ejecutar el periodo de prueba
@@ -32,13 +32,14 @@ oficial, no como una copia desconectada ni como un contenedor de contenido ajeno
 - Identidad Android candidata: `net.firstlisten.app`
 - Dominio verificado previsto: `https://www.firstlisten.net`
 - Inicio Android: `https://www.firstlisten.net/guest?source=android-app`
-- SDK mínimo: 23
+- SDK mínimo: 24 (Android 7.0)
 - SDK objetivo: 36
 - Asociación: `https://www.firstlisten.net/.well-known/assetlinks.json`
 
 La identidad es todavía reversible porque no se ha subido ningún AAB a Play
-Console. La asociación quedará activa cuando exista la clave de firma definitiva
-y su huella SHA-256 se guarde como `ANDROID_SHA256_FINGERPRINTS` en producción.
+Console. La asociación con la clave de subida ya está configurada. Cuando Google
+genere la clave definitiva de Play App Signing, su huella SHA-256 se agregará a
+`ANDROID_SHA256_FINGERPRINTS` sin retirar la huella de subida.
 
 ## Fuentes oficiales consultadas
 

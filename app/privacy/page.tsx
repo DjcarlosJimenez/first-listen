@@ -30,7 +30,7 @@ export default function PrivacyPage() {
           <h2>Tus controles</h2>
           <p>Puedes modificar preferencias, reportar contenido, bloquear usuarios y eliminar tu cuenta desde First Listen. La eliminación se inicia en <Link href="/delete-account">Eliminar cuenta</Link> y también está enlazada dentro de tu perfil.</p>
           <h2>Menores y cambios</h2>
-          <p>First Listen no está dirigido a menores de 13 años. Podemos actualizar esta política cuando cambien las funciones o requisitos legales; publicaremos la fecha de la revisión.</p>
+          <p>First Listen no está dirigido a menores de 13 años. La aplicación Android oficial está destinada y será distribuida únicamente para personas de 18 años o más, porque puede mostrar música enviada por usuarios con lenguaje explícito o temas maduros. Podemos actualizar esta política cuando cambien las funciones o requisitos legales; publicaremos la fecha de la revisión.</p>
         </>
       }
     >
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
       <h2>Your controls</h2>
       <p>You can change preferences, report content, block users, and delete your account inside First Listen. Start deletion at <Link href="/delete-account">Delete account</Link>, also linked from your profile.</p>
       <h2>Children and updates</h2>
-      <p>First Listen is not directed to children under 13. We may update this policy when features or legal requirements change and will post the revision date.</p>
+      <p>First Listen is not directed to children under 13. The official Android application is intended and will be distributed only to people aged 18 or older because it may display user-submitted music with explicit language or mature themes. We may update this policy when features or legal requirements change and will post the revision date.</p>
     </LegalPage>
   );
 }

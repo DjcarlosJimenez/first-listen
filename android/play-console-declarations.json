@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "lastAudited": "2026-11-04",
-  "status": "draft-ready-owner-confirmation-required",
+  "status": "ready-for-play-console-entry",
   "applicationId": "net.firstlisten.app",
   "privacyPolicyUrl": "https://www.firstlisten.net/privacy",
   "accountDeletionUrl": "https://www.firstlisten.net/delete-account",
@@ -19,10 +19,11 @@
     "twoFactorAuthenticationRequiredForReviewer": false
   },
   "targetAudience": {
-    "recommendedAgeGroups": [
+    "confirmedAgeGroups": [
       "18 and over"
     ],
-    "ownerConfirmationRequired": true,
+    "ownerConfirmationRequired": false,
+    "ownerConfirmedOn": "2026-11-04",
     "designedForChildren": false,
     "reason": "The service includes user-submitted music, social activity, and content that may contain explicit language or mature themes. Limiting the initial Android release to adults avoids representing the app as designed for children."
   },

@@ -38,3 +38,15 @@ next-env.d.ts
 *.err
 
 .vercel
+
+# Android build products and private signing material
+/android/twa/.gradle/
+/android/twa/app/build/
+/android/twa/build/
+/android/twa/local.properties
+/android/twa/app-release-*.apk
+/android/twa/app-release-*.aab
+/android/twa/app-release-*.apks
+/android/twa/*.jks
+/android/twa/*.keystore
+/artifacts/android/

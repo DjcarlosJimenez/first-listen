@@ -9,7 +9,13 @@
   "assetLinksUrl": "https://www.firstlisten.net/.well-known/assetlinks.json",
   "displayMode": "standalone",
   "fallbackMode": "custom-tabs",
-  "minSdk": 23,
+  "minSdk": 24,
   "targetSdk": 36,
-  "status": "foundation-ready-awaiting-signing-certificate"
+  "targetAudience": "18 and over",
+  "versionCode": 1,
+  "versionName": "1",
+  "bundleBytes": 1117056,
+  "bundleSha256": "BB3C2AC1E92FAEA5049EEF153117FFCC528F5A8B54A5F96155DC783E1F784E83",
+  "uploadCertificateSha256": "DD:5E:50:1A:39:10:44:2B:23:78:7E:C3:5D:2C:71:AD:6D:B7:69:D5:46:68:D2:B3:D2:37:0A:2D:DE:05:1F:AB",
+  "status": "signed-bundle-ready-awaiting-play-app-signing"
 }

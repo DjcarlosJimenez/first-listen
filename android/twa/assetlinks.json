@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "net.firstlisten.app",
+        "sha256_cert_fingerprints": ["DD:5E:50:1A:39:10:44:2B:23:78:7E:C3:5D:2C:71:AD:6D:B7:69:D5:46:68:D2:B3:D2:37:0A:2D:DE:05:1F:AB"]
+      }
+    }]

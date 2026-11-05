@@ -29,7 +29,7 @@ const serviceWorker = fs.readFileSync(
 assert.equal(androidConfig.applicationId, "net.firstlisten.app");
 assert.equal(androidConfig.origin, "https://www.firstlisten.net");
 assert.equal(androidConfig.targetSdk, 36);
-assert.equal(androidConfig.minSdk, 23);
+assert.equal(androidConfig.minSdk, 24);
 assert.match(androidConfig.startUrl, /\/guest\?source=android-app$/);
 assert.match(appConfig, /delegate_permission\/common\.handle_all_urls/);
 assert.match(appConfig, /ANDROID_SHA256_FINGERPRINTS/);
