@@ -1,12 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   BadgeCheck,
   Compass,
   Flag,
   Headphones,
+  Home,
   ListMusic,
   LogIn,
   LogOut,
@@ -27,11 +35,16 @@ import {
   ProviderPlayer,
   type ProviderTelemetrySnapshot,
 } from "@/components/provider-player";
+import { LanguageSelector } from "@/components/language-selector";
 import { Logo } from "@/components/logo";
 import { clearBrowserAuthSession } from "@/lib/auth-session-cleanup";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/client";
 import type { Platform } from "@/lib/types";
+import {
+  persistInterfaceLocale,
+  preferredInterfaceLocale,
+} from "@/lib/use-interface-locale";
 import {
   buildArtistFairQueue,
   countQueueArtists,
@@ -97,7 +110,9 @@ export function FirstListenSimplePreview({
   locale: InterfaceLocale;
   queue: WorkspaceV2Queue;
 }) {
-  const spanish = locale === "es";
+  const [interfaceLocale, setInterfaceLocale] =
+    useState<InterfaceLocale>(locale);
+  const spanish = interfaceLocale === "es";
   const playableSongs = useMemo(() => {
     const internal = queue.songs.filter(
       (song) => song.playbackKind === "internal",
@@ -159,6 +174,13 @@ export function FirstListenSimplePreview({
   const nextSong = filteredSongs.length
     ? filteredSongs[(activeIndex + 1) % filteredSongs.length]
     : null;
+  const newTodaySongs = filteredSongs.slice(0, 6);
+
+  useEffect(() => {
+    const nextLocale = preferredInterfaceLocale(locale);
+    setInterfaceLocale(nextLocale);
+    persistInterfaceLocale(nextLocale);
+  }, [locale]);
 
   useEffect(() => {
     const now = Date.now();
@@ -269,6 +291,51 @@ export function FirstListenSimplePreview({
     setActiveIndex(0);
     setPlayerVersion((current) => current + 1);
   };
+
+  const selectDiscoverySong = useCallback((index: number) => {
+    dispatchWorkspaceV2PlaybackCommand("pause", {
+      channel: SIMPLE_PREVIEW_PLAYER_CHANNEL,
+      source: "user-click",
+    });
+    pendingPlaybackRef.current = true;
+    pausedByUserRef.current = false;
+    completedTrackRef.current = "";
+    lastTelemetryRef.current = null;
+    setStarted(true);
+    setShouldAutoStart(true);
+    setPausedByUser(false);
+    setActiveIndex(index);
+    setPlayerVersion((current) => current + 1);
+    window.setTimeout(() => {
+      document
+        .getElementById("first-listen-player")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }, []);
+
+  const handleLocaleChange = useCallback(
+    (nextLocale: InterfaceLocale) => {
+      setInterfaceLocale(nextLocale);
+      persistInterfaceLocale(nextLocale, true);
+      if (!authenticated) return;
+      const supabase = createClient();
+      if (supabase) {
+        void supabase.rpc("set_interface_language", {
+          profile_interface_language: nextLocale,
+        });
+      }
+    },
+    [authenticated],
+  );
+
+  const startFromHero = useCallback(() => {
+    requestPlayback(false);
+    window.setTimeout(() => {
+      document
+        .getElementById("first-listen-player")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }, [requestPlayback]);
 
   const savePromptChoice = useCallback(
     (choice: DiscoveryPromptChoice, snoozeMs: number) => {
@@ -446,10 +513,15 @@ export function FirstListenSimplePreview({
   if (!activeSong) return null;
 
   return (
-    <main className="first-listen-simple-preview">
+    <main className="first-listen-simple-preview" id="top">
       <header className="first-listen-simple-header">
         <Logo />
         <div className="first-listen-simple-header-actions">
+          <LanguageSelector
+            compact
+            locale={interfaceLocale}
+            onChange={handleLocaleChange}
+          />
           {authenticated ? (
             <>
               <Link href="/profile">
@@ -475,46 +547,126 @@ export function FirstListenSimplePreview({
         </div>
       </header>
 
-      <section className="first-listen-simple-intro">
-        <span className="first-listen-simple-preview-badge">
-          {authenticated
-            ? spanish
-              ? "Tu inicio · simple y actualizado"
-              : "Your home · simple and up to date"
-            : spanish
-              ? "Escucha gratis · sin registro"
-              : "Listen free · no account required"}
-        </span>
-        <span className="eyebrow">
-          <Sparkles size={13} />
-          {spanish ? "Música nueva, sin complicaciones" : "New music, made simple"}
-        </span>
-        <h1>
-          {spanish
-            ? "Descubre música nueva. Tú decides."
-            : "Discover new music. You decide."}
-        </h1>
-        <p>
-          {spanish
-            ? "Escucha una canción o activa la reproducción continua. Siempre puedes pausar, saltar o decir que un tema no es para ti."
-            : "Play one song or turn on continuous play. You can always pause, skip, or say a song is not for you."}
-        </p>
+      <section
+        className="first-listen-simple-stage"
+        style={
+          {
+            "--first-listen-active-cover": `url("${activeSong.coverUrl}")`,
+          } as CSSProperties
+        }
+      >
+        <div className="first-listen-simple-stage-copy">
+          <span className="first-listen-simple-preview-badge">
+            {authenticated
+              ? spanish
+                ? "Tu música empieza aquí"
+                : "Your music starts here"
+              : spanish
+                ? "Gratis · sin registro"
+                : "Free · no account required"}
+          </span>
+          <span className="eyebrow">
+            <Sparkles size={14} />
+            {spanish ? "Una canción nueva te espera" : "A new song is waiting"}
+          </span>
+          <h1>
+            {spanish
+              ? "Tu próxima canción favorita puede estar aquí."
+              : "Your next favorite song could be here."}
+          </h1>
+          <p>
+            {spanish
+              ? "Artistas nuevos, decisiones reales y música que tú controlas."
+              : "New artists, real choices, and music you control."}
+          </p>
+          <div className="first-listen-simple-stage-actions">
+            <button className="primary" onClick={startFromHero} type="button">
+              <Play size={18} fill="currentColor" />
+              {spanish ? "Descubrir ahora" : "Discover now"}
+            </button>
+            <a href="#first-listen-new-today">
+              <Compass size={18} />
+              {spanish ? "Ver novedades" : "See what is new"}
+            </a>
+          </div>
+        </div>
+
+        <button
+          aria-label={
+            spanish
+              ? `Reproducir ${activeSong.title}`
+              : `Play ${activeSong.title}`
+          }
+          className="first-listen-simple-stage-cover"
+          onClick={startFromHero}
+          style={{ backgroundImage: `url("${activeSong.coverUrl}")` }}
+          type="button"
+        >
+          <span className="first-listen-simple-stage-cover-play">
+            <Play size={25} fill="currentColor" />
+          </span>
+          <span className="first-listen-simple-stage-cover-copy">
+            <small>{spanish ? "LISTA PARA DESCUBRIR" : "READY TO DISCOVER"}</small>
+            <strong>{activeSong.title}</strong>
+            <span>{activeSong.artist}</span>
+          </span>
+        </button>
+
         <div
           className="first-listen-simple-proof"
           aria-label={spanish ? "Datos reales de First Listen" : "Real First Listen facts"}
         >
           <span>
             <strong>{countQueueArtists(playableSongs)}</strong>
-            {spanish ? " artistas en rotación justa" : " artists in fair rotation"}
+            {spanish ? " artistas" : " artists"}
           </span>
           <span>
             <strong>{spanish ? "Tú eliges" : "Your choice"}</strong>
-            {spanish ? " si continúa" : " to keep playing"}
+            {spanish ? " qué sigue" : " what is next"}
           </span>
           <span>
             <strong>{spanish ? "Apoyo real" : "Real support"}</strong>
             {spanish ? " sin comprar reproducciones" : " without buying plays"}
           </span>
+        </div>
+      </section>
+
+      <section
+        className="first-listen-simple-new-today"
+        id="first-listen-new-today"
+      >
+        <div className="first-listen-simple-section-heading">
+          <div>
+            <span className="eyebrow">
+              <Radio size={13} />
+              {spanish ? "NUEVO EN ROTACIÓN" : "NEW IN ROTATION"}
+            </span>
+            <h2>{spanish ? "Escucha algo distinto hoy" : "Hear something different today"}</h2>
+          </div>
+          <small>{spanish ? "Desliza para explorar" : "Swipe to explore"}</small>
+        </div>
+        <div className="first-listen-simple-new-row">
+          {newTodaySongs.map((song, index) => (
+            <button
+              aria-current={song.id === activeSong.id ? "true" : undefined}
+              className={song.id === activeSong.id ? "active" : ""}
+              key={song.id}
+              onClick={() => selectDiscoverySong(index)}
+              type="button"
+            >
+              <span
+                className="first-listen-simple-new-cover"
+                style={{ backgroundImage: `url("${song.coverUrl}")` }}
+              >
+                <span><Play size={17} fill="currentColor" /></span>
+              </span>
+              <span className="first-listen-simple-new-copy">
+                <small>{displayStyleLabel(songStyle(song, spanish), spanish)}</small>
+                <strong>{song.title}</strong>
+                <span>{song.artist}</span>
+              </span>
+            </button>
+          ))}
         </div>
       </section>
 
@@ -566,7 +718,7 @@ export function FirstListenSimplePreview({
         </button>
       )}
 
-      <section className="first-listen-simple-player-card">
+      <section className="first-listen-simple-player-card" id="first-listen-player">
         <div className="first-listen-simple-song-heading">
           <span>{spanish ? "Ahora suena" : "Now playing"}</span>
           <strong>{activeSong.title}</strong>
@@ -581,7 +733,7 @@ export function FirstListenSimplePreview({
             controlChannel={SIMPLE_PREVIEW_PLAYER_CHANNEL}
             coverUrl={activeSong.coverUrl}
             link={activeSong.link}
-            locale={locale}
+            locale={interfaceLocale}
             onTelemetry={handleTelemetry}
             onTrustedPlaybackRequestReady={(request) => {
               requestPlaybackRef.current = request;
@@ -814,6 +966,28 @@ export function FirstListenSimplePreview({
           <Link href="/delete-account">{spanish ? "Eliminar cuenta" : "Delete account"}</Link>
         </nav>
       </footer>
+
+      <nav
+        aria-label={spanish ? "Navegación principal" : "Main navigation"}
+        className="first-listen-simple-mobile-nav"
+      >
+        <a href="#top">
+          <Home size={19} />
+          <span>{spanish ? "Inicio" : "Home"}</span>
+        </a>
+        <a href="#first-listen-new-today">
+          <Compass size={19} />
+          <span>{spanish ? "Explorar" : "Explore"}</span>
+        </a>
+        <Link className="primary" href="/first-publish">
+          <Upload size={20} />
+          <span>{spanish ? "Publicar" : "Publish"}</span>
+        </Link>
+        <Link href={authenticated ? "/profile" : "/login?next=/dashboard"}>
+          <UserRound size={19} />
+          <span>{spanish ? "Mi cuenta" : "My account"}</span>
+        </Link>
+      </nav>
     </main>
   );
 }

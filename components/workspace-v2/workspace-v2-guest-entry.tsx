@@ -8,6 +8,7 @@ import { WorkspaceV2PreviewErrorBoundary } from "@/components/workspace-v2/works
 import { FirstListenSimplePreview } from "@/components/workspace-v2/first-listen-simple-preview";
 import { WorkspaceV2Shell } from "@/components/workspace-v2/workspace-v2-shell";
 import type { InterfaceLocale } from "@/lib/catalog";
+import { preferredInterfaceLocale } from "@/lib/use-interface-locale";
 import {
   displayPlatform,
   getContentClassification,
@@ -93,9 +94,7 @@ function prioritizeGuestQueueRows(rows: GuestQueueRow[]) {
 }
 
 function storedLocale(): InterfaceLocale {
-  if (typeof window === "undefined") return "es";
-  const stored = window.localStorage.getItem("first-listen-locale");
-  return stored === "es" || stored === "en" ? stored : "es";
+  return preferredInterfaceLocale("es");
 }
 
 function mapGuestIdentity(
