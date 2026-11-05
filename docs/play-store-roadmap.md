@@ -19,8 +19,10 @@ oficial, no como una copia desconectada ni como un contenedor de contenido ajeno
 4. **Paquete firmado — completo.** AAB versión 1 generado con API 36, firmado y
    verificado; APK de prueba firmado; clave privada protegida fuera de GitHub y
    proceso reproducible. Play App Signing se activará al subir el AAB por primera vez.
-5. **Ficha de Play Store — pendiente.** Nombre, descripción, icono, banner,
-   capturas reales de teléfono y clasificación de contenido.
+5. **Ficha de Play Store — preparada para cargar.** Nombre y descripciones en
+   español e inglés, icono, banner 1024 x 500, cuatro capturas reales de
+   teléfono, categoría, contacto, audiencia 18+ y guía de clasificación. Falta
+   introducir estos datos en Play Console cuando se abra la ficha de la app.
 6. **Pruebas cerradas — pendiente.** Subir el AAB y ejecutar el periodo de prueba
    que corresponda a la cuenta de desarrollador.
 7. **Revisión y lanzamiento — pendiente.** Corregir el informe previo, enviar a

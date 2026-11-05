@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "lastAudited": "2026-11-04",
+  "applicationId": "net.firstlisten.app",
+  "defaultLanguage": "es-US",
+  "category": "MUSIC_AND_AUDIO",
+  "contact": {
+    "email": "support@firstlisten.net",
+    "website": "https://www.firstlisten.net/help",
+    "privacyPolicy": "https://www.firstlisten.net/privacy",
+    "accountDeletion": "https://www.firstlisten.net/delete-account"
+  },
+  "audience": {
+    "ageGroups": ["18 and over"],
+    "restrictMinorAccess": true,
+    "designedForChildren": false
+  },
+  "locales": {
+    "es-US": {
+      "appName": "First Listen",
+      "shortDescription": "Descubre música nueva y comparte tus canciones con oyentes reales.",
+      "fullDescription": "First Listen es una comunidad de descubrimiento musical para personas mayores de 18 años.\n\nDESCUBRE MÚSICA NUEVA\nExplora canciones compartidas por artistas y creadores independientes. Tú decides si quieres reproducir, pausar, saltar o indicar que un tema no es para ti.\n\nREPRODUCCIÓN BAJO TU CONTROL\nLa reproducción continua es opcional. Puedes detenerla o cambiar de canción en cualquier momento. Las reproducciones verificadas reflejan actividad real dentro de First Listen; no entregan pagos, premios ni prioridad.\n\nCOMPARTE TU MÚSICA\nSi eres artista, puedes publicar enlaces de plataformas compatibles para que nuevas personas descubran tu trabajo. First Listen no vende reproducciones, no intercambia suscripciones y no promete resultados en plataformas externas.\n\nEXPERIENCIA JUSTA\nLa rotación busca dar oportunidades a distintos artistas. También puedes elegir estilos musicales, reportar contenido y bloquear cuentas cuando sea necesario.\n\nCUENTAS Y PRIVACIDAD\nPuedes escuchar como visitante. Una cuenta permite publicar, guardar preferencias y administrar tu actividad. Puedes solicitar la eliminación de tu cuenta y consultar la política de privacidad desde la aplicación.\n\nEl contenido musical puede incluir lenguaje explícito o temas maduros. First Listen enlaza o integra contenido alojado por servicios externos y exige que cada usuario comparta únicamente material que tenga derecho a publicar."
+    },
+    "en-US": {
+      "appName": "First Listen",
+      "shortDescription": "Discover new music and share your songs with real listeners.",
+      "fullDescription": "First Listen is a music discovery community for people age 18 and over.\n\nDISCOVER NEW MUSIC\nExplore songs shared by independent artists and creators. You decide whether to play, pause, skip, or say a track is not for you.\n\nPLAYBACK UNDER YOUR CONTROL\nContinuous playback is optional. You can stop it or change tracks at any time. Verified plays reflect real activity inside First Listen; they do not provide payments, prizes, or priority.\n\nSHARE YOUR MUSIC\nArtists can publish links from supported platforms so new people can discover their work. First Listen does not sell plays, exchange subscriptions, or promise results on external platforms.\n\nA FAIR EXPERIENCE\nRotation is designed to give different artists an opportunity to be discovered. You can also choose music styles, report content, and block accounts when necessary.\n\nACCOUNTS AND PRIVACY\nYou can listen as a guest. An account lets you publish, save preferences, and manage your activity. Account deletion and the privacy policy are available from inside the app.\n\nMusic may include explicit language or mature themes. First Listen links to or embeds content hosted by external services and requires every user to share only material they have the right to publish."
+    }
+  },
+  "assets": {
+    "icon": "android/play-store/assets/icon-512.png",
+    "featureGraphic": "android/play-store/assets/feature-graphic-1024x500.jpg",
+    "phoneScreenshots": [
+      "android/play-store/assets/screenshots/01-discover-new-music.jpg",
+      "android/play-store/assets/screenshots/02-listen-your-way.jpg",
+      "android/play-store/assets/screenshots/03-choose-your-style.jpg",
+      "android/play-store/assets/screenshots/04-publish-your-song.jpg"
+    ]
+  }
+}

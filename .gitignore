@@ -50,3 +50,6 @@ next-env.d.ts
 /android/twa/*.jks
 /android/twa/*.keystore
 /artifacts/android/
+
+# Temporary Chrome profiles used to capture Play Store screenshots
+/.chrome-play-capture*/
