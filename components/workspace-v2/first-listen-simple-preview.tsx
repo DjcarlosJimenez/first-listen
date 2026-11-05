@@ -9,6 +9,7 @@ import {
   Headphones,
   ListMusic,
   LogIn,
+  LogOut,
   MessageCircleQuestion,
   Pause,
   Play,
@@ -27,6 +28,7 @@ import {
   type ProviderTelemetrySnapshot,
 } from "@/components/provider-player";
 import { Logo } from "@/components/logo";
+import { clearBrowserAuthSession } from "@/lib/auth-session-cleanup";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/client";
 import type { Platform } from "@/lib/types";
@@ -138,6 +140,7 @@ export function FirstListenSimplePreview({
   const [sessionSeconds, setSessionSeconds] = useState(0);
   const [verifiedListens, setVerifiedListens] = useState(0);
   const [reportNotice, setReportNotice] = useState("");
+  const [signingOut, setSigningOut] = useState(false);
   const requestPlaybackRef = useRef<(() => void) | null>(null);
   const pendingPlaybackRef = useRef(false);
   const pausedByUserRef = useRef(false);
@@ -222,6 +225,21 @@ export function FirstListenSimplePreview({
       source: "user-click",
     });
   }, []);
+
+  const handleSignOut = useCallback(async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    pausePlayback();
+    try {
+      const supabase = createClient();
+      if (supabase) await supabase.auth.signOut({ scope: "global" });
+    } catch {
+      // Local cleanup below still guarantees that this browser leaves the account.
+    } finally {
+      clearBrowserAuthSession();
+      window.location.replace("/login?next=/dashboard");
+    }
+  }, [pausePlayback, signingOut]);
 
   const playNext = useCallback(
     (playImmediately = true) => {
@@ -431,17 +449,30 @@ export function FirstListenSimplePreview({
     <main className="first-listen-simple-preview">
       <header className="first-listen-simple-header">
         <Logo />
-        {authenticated ? (
-          <Link href="/profile">
-            <UserRound size={16} />
-            {spanish ? "Mi cuenta" : "My account"}
-          </Link>
-        ) : (
-          <Link href="/login?next=/dashboard">
-            <LogIn size={16} />
-            {spanish ? "Entrar" : "Log in"}
-          </Link>
-        )}
+        <div className="first-listen-simple-header-actions">
+          {authenticated ? (
+            <>
+              <Link href="/profile">
+                <UserRound size={16} />
+                {spanish ? "Mi cuenta" : "My account"}
+              </Link>
+              <button
+                aria-label={spanish ? "Cerrar sesión" : "Sign out"}
+                disabled={signingOut}
+                onClick={() => void handleSignOut()}
+                title={spanish ? "Cerrar sesión" : "Sign out"}
+                type="button"
+              >
+                <LogOut size={17} />
+              </button>
+            </>
+          ) : (
+            <Link href="/login?next=/dashboard">
+              <LogIn size={16} />
+              {spanish ? "Entrar" : "Log in"}
+            </Link>
+          )}
+        </div>
       </header>
 
       <section className="first-listen-simple-intro">
@@ -731,6 +762,20 @@ export function FirstListenSimplePreview({
                 Owner
               </Link>
             )}
+            <button
+              disabled={signingOut}
+              onClick={() => void handleSignOut()}
+              type="button"
+            >
+              <LogOut size={16} />
+              {signingOut
+                ? spanish
+                  ? "Cerrando..."
+                  : "Signing out..."
+                : spanish
+                  ? "Cerrar sesión"
+                  : "Sign out"}
+            </button>
           </div>
         </section>
       ) : (

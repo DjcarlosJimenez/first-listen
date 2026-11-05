@@ -25443,9 +25443,17 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   transform-origin: left center;
 }
 
-.first-listen-simple-header > a {
+.first-listen-simple-header-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.first-listen-simple-header-actions > a,
+.first-listen-simple-header-actions > button {
   align-items: center;
   background: #151a15;
+  border: 1px solid #151a15;
   border-radius: 999px;
   color: #fff;
   display: inline-flex;
@@ -25455,6 +25463,20 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   min-height: 38px;
   padding: 8px 14px;
   text-decoration: none;
+}
+
+.first-listen-simple-header-actions > button {
+  background: #fff;
+  color: #151a15;
+  cursor: pointer;
+  justify-content: center;
+  padding: 8px;
+  width: 38px;
+}
+
+.first-listen-simple-header-actions > button:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .first-listen-simple-intro,
@@ -25967,11 +25989,14 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   justify-content: flex-end;
 }
 
-.first-listen-simple-member-actions a {
+.first-listen-simple-member-actions a,
+.first-listen-simple-member-actions button {
   align-items: center;
+  background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
   color: #fff;
+  cursor: pointer;
   display: inline-flex;
   font-size: 12px;
   font-weight: 900;
@@ -25979,6 +26004,11 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   min-height: 38px;
   padding: 8px 12px;
   text-decoration: none;
+}
+
+.first-listen-simple-member-actions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .first-listen-simple-member-actions a.primary {
@@ -26071,6 +26101,25 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   .first-listen-simple-header {
     margin-inline: -14px;
     padding-inline: 14px;
+  }
+
+  .first-listen-simple-header .logo {
+    transform: scale(0.78);
+  }
+
+  .first-listen-simple-header-actions {
+    gap: 6px;
+  }
+
+  .first-listen-simple-header-actions > a {
+    font-size: 11px;
+    min-height: 36px;
+    padding: 7px 10px;
+  }
+
+  .first-listen-simple-header-actions > button {
+    min-height: 36px;
+    width: 36px;
   }
 
   .first-listen-simple-intro h1 {
