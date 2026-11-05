@@ -116,6 +116,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           },
         })
       : await supabase.auth.signInWithPassword({ email, password });
+
+    if (!isSignup && !result.error && result.data.session) {
+      await supabase.rpc("record_creator_return");
+    }
     setLoading(false);
 
     if (result.error) {

@@ -427,6 +427,11 @@ export async function WorkspaceV2AuthEntry({
 
   if (!user) redirect(`/login?next=${encodeURIComponent(loginRedirectPath)}`);
 
+  // Visiting the authenticated First Listen home is enough to restore an
+  // inactive creator's existing catalog. The RPC is intentionally best-effort
+  // so an older database deployment can still render the page during rollout.
+  await supabase.rpc("record_creator_return");
+
   const queueRowsPromise = supabase
     .rpc("get_workspace_v2_safe_queue", { queue_limit: 100 })
     .then(async ({ data, error: smartQueueError }) => {

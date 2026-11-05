@@ -64,6 +64,8 @@
     "play-store:block5:verify": "node scripts/verify-play-store-listing.mjs",
     "spanish-playback:dry-run": "node scripts/apply-spanish-playback-terminology.mjs",
     "spanish-playback:apply": "node scripts/apply-spanish-playback-terminology.mjs --apply",
+    "creator-return:dry-run": "node scripts/apply-creator-return-reactivation.mjs",
+    "creator-return:apply": "node scripts/apply-creator-return-reactivation.mjs --apply",
     "priority39d:dry-run": "node scripts/apply-priority39d-resolution-feedback.mjs",
     "priority39d:apply": "node scripts/apply-priority39d-resolution-feedback.mjs --apply",
     "moderator-hardening:dry-run": "node scripts/apply-moderator-permission-hardening.mjs",
