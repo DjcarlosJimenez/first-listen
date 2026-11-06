@@ -86,6 +86,8 @@ try {
   client = await connect();
   await client.call("Page.enable");
   await client.call("Runtime.enable");
+  await client.call("Network.enable");
+  await client.call("Network.setBypassServiceWorker", { bypass: true });
   await client.call("Emulation.setLocaleOverride", { locale: "es-MX" });
   await client.call("Page.navigate", { url: baseUrl });
 
@@ -111,10 +113,22 @@ try {
     await writeFile(join(screenshotDirectory, name), result.data, "base64");
   };
 
-  await eventually(
-    () => evaluate("Boolean(document.querySelector('.first-listen-simple-new-row'))"),
-    "The First Listen guest experience did not finish loading.",
-  );
+  try {
+    await eventually(
+      () => evaluate("Boolean(document.querySelector('.first-listen-simple-new-row'))"),
+      "The First Listen guest experience did not finish loading.",
+    );
+  } catch (error) {
+    const loadingDiagnostic = await evaluate(`(() => ({
+      body: document.body?.innerText?.slice(0, 800) || '',
+      title: document.title,
+      url: location.href,
+    }))()`);
+    throw new Error(
+      `The First Listen guest experience did not finish loading: ${JSON.stringify(loadingDiagnostic)}`,
+      { cause: error },
+    );
+  }
 
   await eventually(
     () =>
@@ -131,6 +145,50 @@ try {
       })()`),
     "The publish callout was not above rotation or continuous play was not enabled by default.",
   );
+
+  const styleTarget = await evaluate(`(() => {
+    const buttons = [...document.querySelectorAll('.first-listen-simple-style-row button')];
+    const firstCategory = document.querySelector('.first-listen-simple-new-row button small')?.textContent?.trim().toLowerCase();
+    const button = buttons.slice(1).find((candidate) => candidate.textContent?.trim().toLowerCase() !== firstCategory) ?? buttons[1];
+    button?.scrollIntoView({ block: 'center', inline: 'center' });
+    const rect = button?.getBoundingClientRect();
+    return rect && button?.textContent ? {
+      label: button.textContent.trim(),
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    } : null;
+  })()`);
+  if (!styleTarget) throw new Error("A music style filter was not available.");
+  await client.call("Input.dispatchMouseEvent", {
+    button: "left",
+    clickCount: 1,
+    type: "mousePressed",
+    x: styleTarget.x,
+    y: styleTarget.y,
+  });
+  await client.call("Input.dispatchMouseEvent", {
+    button: "left",
+    clickCount: 1,
+    type: "mouseReleased",
+    x: styleTarget.x,
+    y: styleTarget.y,
+  });
+  await eventually(
+    () =>
+      evaluate(`(() => {
+        const normalize = (value) => value?.trim().toLocaleLowerCase();
+        const cards = [...document.querySelectorAll('.first-listen-simple-new-row button')];
+        const firstTitle = cards[0]?.querySelector('strong')?.textContent?.trim();
+        const activeTitle = document.querySelector('.first-listen-simple-song-heading strong')?.textContent?.trim();
+        const categoriesMatch = cards.length > 0 && cards.every((card) =>
+          normalize(card.querySelector('small')?.textContent) === normalize(${JSON.stringify(styleTarget.label)})
+        );
+        const autoplayRequested = document.querySelector('.first-listen-simple-player-frame iframe')?.src?.includes('autoplay=1');
+        return categoriesMatch && activeTitle === firstTitle && autoplayRequested;
+      })()`),
+    `Selecting ${styleTarget.label} did not replace the covers and start its first fair-rotation song.`,
+  );
+  await evaluate("document.querySelector('.first-listen-simple-style-row button')?.click(); true");
 
   await evaluate(`(() => {
     localStorage.removeItem('first-listen-locale-explicit');
@@ -205,6 +263,59 @@ try {
 
   const desktopSong = await clickRotationCard(1);
 
+  const fullscreenButtonReady = await evaluate(`(() => {
+    const frame = document.querySelector('.first-listen-simple-player-frame');
+    const button = frame?.querySelector('.first-listen-simple-fullscreen-exit');
+    return Boolean(button && button.getAttribute('aria-label'));
+  })()`);
+  if (!fullscreenButtonReady) {
+    throw new Error("The full-screen minimize button was not available inside the player.");
+  }
+
+  const fullscreenRequest = await client.call("Runtime.evaluate", {
+    awaitPromise: true,
+    expression: "document.querySelector('.first-listen-simple-player-frame')?.requestFullscreen()",
+    returnByValue: true,
+    userGesture: true,
+  });
+  const enteredFullscreen =
+    !fullscreenRequest.exceptionDetails &&
+    (await evaluate(
+      "document.fullscreenElement?.classList.contains('first-listen-simple-player-frame')",
+    ));
+
+  if (enteredFullscreen) {
+    await evaluate(
+      "document.querySelector('.first-listen-simple-fullscreen-exit')?.click(); true",
+    );
+    await eventually(
+      () => evaluate("!document.fullscreenElement"),
+      "The custom minimize button did not leave full screen.",
+    );
+  } else {
+    const fallbackExitWorks = await evaluate(`(() => {
+      window.__firstListenExitFullscreenCalled = false;
+      const originalExit = document.exitFullscreen;
+      Object.defineProperty(document, 'exitFullscreen', {
+        configurable: true,
+        value: () => {
+          window.__firstListenExitFullscreenCalled = true;
+          return Promise.resolve();
+        },
+      });
+      document.querySelector('.first-listen-simple-fullscreen-exit')?.click();
+      const worked = window.__firstListenExitFullscreenCalled;
+      Object.defineProperty(document, 'exitFullscreen', {
+        configurable: true,
+        value: originalExit,
+      });
+      return worked;
+    })()`);
+    if (!fallbackExitWorks) {
+      throw new Error("The custom minimize button did not invoke the full-screen exit API.");
+    }
+  }
+
   await evaluate("window.scrollTo(0, 0); true");
   await eventually(
     () =>
@@ -270,6 +381,45 @@ try {
     () => evaluate("Boolean(document.querySelector('.first-listen-simple-new-row'))"),
     "The mobile First Listen experience did not finish loading.",
   );
+  const mobileNavigationState = await evaluate(`(() => {
+    const navigation = document.querySelector('.first-listen-simple-carousel-navigation');
+    const matchingRules = [];
+    for (const sheet of document.styleSheets) {
+      try {
+        for (const rule of sheet.cssRules) {
+          if (rule.cssText?.includes('first-listen-simple-carousel-navigation')) {
+            matchingRules.push(rule.cssText);
+          }
+          if (rule.cssRules) {
+            for (const nestedRule of rule.cssRules) {
+              if (nestedRule.cssText?.includes('first-listen-simple-carousel-navigation')) {
+                matchingRules.push(String(rule.conditionText || 'nested') + ' => ' + nestedRule.cssText);
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+    return {
+      innerWidth: window.innerWidth,
+      navigationDisplay: navigation ? getComputedStyle(navigation).display : 'absent',
+      styleFilters: Boolean(document.querySelector('.first-listen-simple-rotation-styles')),
+      matchingRules,
+    };
+  })()`);
+  if (
+    mobileNavigationState.navigationDisplay !== "none" &&
+    mobileNavigationState.navigationDisplay !== "absent"
+  ) {
+    throw new Error(
+      `Mobile still showed carousel arrows: ${JSON.stringify(mobileNavigationState)}`,
+    );
+  }
+  if (!mobileNavigationState.styleFilters) {
+    throw new Error(
+      `Mobile did not show the relocated style filters: ${JSON.stringify(mobileNavigationState)}`,
+    );
+  }
   const mobileCardCount = await evaluate(
     "document.querySelectorAll('.first-listen-simple-new-row button').length",
   );

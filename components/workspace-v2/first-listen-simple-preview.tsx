@@ -22,6 +22,7 @@ import {
   LogIn,
   LogOut,
   MessageCircleQuestion,
+  Minimize2,
   PanelTopOpen,
   Pause,
   Play,
@@ -324,12 +325,21 @@ export function FirstListenSimplePreview({
   );
 
   const selectStyle = (style: string) => {
-    pendingPlaybackRef.current = started && !pausedByUser;
-    pausedByUserRef.current = pausedByUser;
+    dispatchWorkspaceV2PlaybackCommand("pause", {
+      channel: SIMPLE_PREVIEW_PLAYER_CHANNEL,
+      source: "user-click",
+    });
+    pendingPlaybackRef.current = true;
+    pausedByUserRef.current = false;
     completedTrackRef.current = "";
+    lastTelemetryRef.current = null;
     setSelectedStyle(style);
     setActiveIndex(0);
+    setStarted(true);
+    setShouldAutoStart(true);
+    setPausedByUser(false);
     setPlayerVersion((current) => current + 1);
+    newTodayRowRef.current?.scrollTo({ behavior: "smooth", left: 0 });
   };
 
   const selectDiscoverySong = useCallback((index: number) => {
@@ -390,6 +400,20 @@ export function FirstListenSimplePreview({
       if (frame.requestFullscreen) await frame.requestFullscreen();
       else if (frame.webkitRequestFullscreen) await frame.webkitRequestFullscreen();
       else restorePlayer();
+    } catch {
+      restorePlayer();
+    }
+  }, [restorePlayer]);
+
+  const exitPlayerFullscreen = useCallback(async () => {
+    const fullscreenDocument = document as Document & {
+      webkitExitFullscreen?: () => Promise<void> | void;
+    };
+    try {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else if (fullscreenDocument.webkitExitFullscreen) {
+        await fullscreenDocument.webkitExitFullscreen();
+      }
     } catch {
       restorePlayer();
     }
@@ -750,6 +774,38 @@ export function FirstListenSimplePreview({
             </button>
           </div>
         </div>
+        <section className="first-listen-simple-styles first-listen-simple-rotation-styles">
+          <div>
+            <span className="eyebrow">
+              <Compass size={13} />
+              {spanish ? "Elige tu estilo" : "Choose your style"}
+            </span>
+            <p>
+              {spanish
+                ? "Las portadas cambian al instante y la rotación justa elige qué canción comienza."
+                : "Covers update instantly and fair rotation chooses which song starts."}
+            </p>
+          </div>
+          <div className="first-listen-simple-style-row">
+            <button
+              className={selectedStyle === "all" ? "active" : ""}
+              onClick={() => selectStyle("all")}
+              type="button"
+            >
+              {spanish ? "Para mí" : "For me"}
+            </button>
+            {styles.map((style) => (
+              <button
+                className={selectedStyle === style ? "active" : ""}
+                key={style}
+                onClick={() => selectStyle(style)}
+                type="button"
+              >
+                {displayStyleLabel(style, spanish)}
+              </button>
+            ))}
+          </div>
+        </section>
         <div className="first-listen-simple-new-row" ref={newTodayRowRef}>
           {newTodaySongs.map((song, index) => (
             <button
@@ -890,6 +946,16 @@ export function FirstListenSimplePreview({
             songLoadedAt={new Date().toISOString()}
             title={activeSong.title}
           />
+          <button
+            aria-label={spanish ? "Salir de pantalla completa" : "Exit full screen"}
+            className="first-listen-simple-fullscreen-exit"
+            onClick={() => void exitPlayerFullscreen()}
+            title={spanish ? "Minimizar reproductor" : "Minimize player"}
+            type="button"
+          >
+            <Minimize2 size={22} />
+            <span>{spanish ? "Minimizar" : "Minimize"}</span>
+          </button>
           {!started && (
             <button
               aria-label={spanish ? "Escuchar esta canción" : "Play this song"}
@@ -993,39 +1059,6 @@ export function FirstListenSimplePreview({
         )}
       </section>
       </div>
-
-      <section className="first-listen-simple-styles">
-        <div>
-          <span className="eyebrow">
-            <Compass size={13} />
-            {spanish ? "Elige tu estilo" : "Choose your style"}
-          </span>
-          <p>
-            {spanish
-              ? "Opcional: la rotación da una oportunidad a cada artista antes de repetir otro tema suyo."
-              : "Optional: rotation gives every artist a turn before repeating another song from the same artist."}
-          </p>
-        </div>
-        <div className="first-listen-simple-style-row">
-          <button
-            className={selectedStyle === "all" ? "active" : ""}
-            onClick={() => selectStyle("all")}
-            type="button"
-          >
-            {spanish ? "Para mí" : "For me"}
-          </button>
-          {styles.map((style) => (
-            <button
-              className={selectedStyle === style ? "active" : ""}
-              key={style}
-              onClick={() => selectStyle(style)}
-              type="button"
-            >
-              {displayStyleLabel(style, spanish)}
-            </button>
-          ))}
-        </div>
-      </section>
 
       {authenticated && (
         <section className="first-listen-simple-member-card">
