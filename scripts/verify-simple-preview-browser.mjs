@@ -116,6 +116,22 @@ try {
     "The First Listen guest experience did not finish loading.",
   );
 
+  await eventually(
+    () =>
+      evaluate(`(() => {
+        const publish = document.querySelector('.first-listen-simple-artist-link');
+        const rotation = document.querySelector('.first-listen-simple-new-today');
+        const continuous = document.querySelector('.first-listen-simple-listening-options button');
+        return Boolean(
+          publish &&
+          rotation &&
+          (publish.compareDocumentPosition(rotation) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+          continuous?.getAttribute('aria-pressed') === 'true'
+        );
+      })()`),
+    "The publish callout was not above rotation or continuous play was not enabled by default.",
+  );
+
   await evaluate(`(() => {
     localStorage.removeItem('first-listen-locale-explicit');
     localStorage.setItem('first-listen-locale', 'en');

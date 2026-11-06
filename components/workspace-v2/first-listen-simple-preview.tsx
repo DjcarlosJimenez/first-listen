@@ -152,7 +152,7 @@ export function FirstListenSimplePreview({
   const [playerVersion, setPlayerVersion] = useState(0);
   const [started, setStarted] = useState(false);
   const [shouldAutoStart, setShouldAutoStart] = useState(false);
-  const [continuousPlayback, setContinuousPlayback] = useState(false);
+  const [continuousPlayback, setContinuousPlayback] = useState(true);
   const [pausedByUser, setPausedByUser] = useState(false);
   const [promptVisible, setPromptVisible] = useState(false);
   const [promptReady, setPromptReady] = useState(false);
@@ -698,6 +698,26 @@ export function FirstListenSimplePreview({
         </div>
       </section>
 
+      {!authenticated && (
+        <section className="first-listen-simple-artist-link">
+          <div>
+            <span>{spanish ? "¿Eres artista?" : "Are you an artist?"}</span>
+            <strong>
+              {spanish ? "Publica tu música en FirstListen" : "Share your music on FirstListen"}
+            </strong>
+            <small>
+              {spanish
+                ? "Primera canción sin contraseña ni tarjeta"
+                : "First song with no password or card"}
+            </small>
+          </div>
+          <Link href="/first-publish">
+            <Upload size={16} />
+            {spanish ? "Publicar gratis" : "Publish free"}
+          </Link>
+        </section>
+      )}
+
       <section
         className="first-listen-simple-new-today"
         id="first-listen-new-today"
@@ -1007,7 +1027,7 @@ export function FirstListenSimplePreview({
         </div>
       </section>
 
-      {authenticated ? (
+      {authenticated && (
         <section className="first-listen-simple-member-card">
           <div className="first-listen-simple-member-copy">
             <span>{spanish ? "TU ESPACIO" : "YOUR SPACE"}</span>
@@ -1050,24 +1070,6 @@ export function FirstListenSimplePreview({
                   : "Sign out"}
             </button>
           </div>
-        </section>
-      ) : (
-        <section className="first-listen-simple-artist-link">
-          <div>
-            <span>{spanish ? "¿Eres artista?" : "Are you an artist?"}</span>
-            <strong>
-              {spanish ? "Publica tu música en FirstListen" : "Share your music on FirstListen"}
-            </strong>
-            <small>
-              {spanish
-                ? "Primera canción sin contraseña ni tarjeta"
-                : "First song with no password or card"}
-            </small>
-          </div>
-          <Link href="/first-publish">
-            <Upload size={16} />
-            {spanish ? "Publicar gratis" : "Publish free"}
-          </Link>
         </section>
       )}
 
