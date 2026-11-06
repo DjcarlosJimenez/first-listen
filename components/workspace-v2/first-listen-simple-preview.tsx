@@ -11,7 +11,10 @@ import {
 } from "react";
 import {
   BadgeCheck,
+  ChevronLeft,
+  ChevronRight,
   Compass,
+  Expand,
   Flag,
   Headphones,
   Home,
@@ -19,6 +22,7 @@ import {
   LogIn,
   LogOut,
   MessageCircleQuestion,
+  PanelTopOpen,
   Pause,
   Play,
   Radio,
@@ -156,6 +160,12 @@ export function FirstListenSimplePreview({
   const [verifiedListens, setVerifiedListens] = useState(0);
   const [reportNotice, setReportNotice] = useState("");
   const [signingOut, setSigningOut] = useState(false);
+  const [playerDocked, setPlayerDocked] = useState(false);
+  const [playerPlaceholderHeight, setPlayerPlaceholderHeight] = useState(0);
+  const newTodayRowRef = useRef<HTMLDivElement>(null);
+  const playerSlotRef = useRef<HTMLDivElement>(null);
+  const playerCardRef = useRef<HTMLElement>(null);
+  const playerFrameRef = useRef<HTMLDivElement>(null);
   const requestPlaybackRef = useRef<(() => void) | null>(null);
   const pendingPlaybackRef = useRef(false);
   const pausedByUserRef = useRef(false);
@@ -174,7 +184,7 @@ export function FirstListenSimplePreview({
   const nextSong = filteredSongs.length
     ? filteredSongs[(activeIndex + 1) % filteredSongs.length]
     : null;
-  const newTodaySongs = filteredSongs.slice(0, 6);
+  const newTodaySongs = filteredSongs.slice(0, 12);
 
   useEffect(() => {
     const nextLocale = preferredInterfaceLocale(locale);
@@ -219,6 +229,36 @@ export function FirstListenSimplePreview({
     completedTrackRef.current = "";
     lastTelemetryRef.current = null;
   }, [excludedSongIds, selectedStyle]);
+
+  useEffect(() => {
+    const updateDockedPlayer = () => {
+      const slot = playerSlotRef.current;
+      const card = playerCardRef.current;
+      if (!slot || !card || !started || document.fullscreenElement) {
+        setPlayerDocked(false);
+        return;
+      }
+      const bounds = slot.getBoundingClientRect();
+      const visible = bounds.bottom > 72 && bounds.top < window.innerHeight - 72;
+      const shouldDock = !visible;
+      if (shouldDock) {
+        setPlayerPlaceholderHeight((current) =>
+          current || Math.ceil(card.getBoundingClientRect().height),
+        );
+      }
+      setPlayerDocked(shouldDock);
+    };
+
+    updateDockedPlayer();
+    window.addEventListener("scroll", updateDockedPlayer, { passive: true });
+    window.addEventListener("resize", updateDockedPlayer);
+    document.addEventListener("fullscreenchange", updateDockedPlayer);
+    return () => {
+      window.removeEventListener("scroll", updateDockedPlayer);
+      window.removeEventListener("resize", updateDockedPlayer);
+      document.removeEventListener("fullscreenchange", updateDockedPlayer);
+    };
+  }, [started]);
 
   const requestPlayback = useCallback(
     (continuous = continuousPlayback) => {
@@ -327,6 +367,33 @@ export function FirstListenSimplePreview({
     },
     [authenticated],
   );
+
+  const scrollNewToday = useCallback((direction: -1 | 1) => {
+    const row = newTodayRowRef.current;
+    if (!row) return;
+    row.scrollBy({
+      behavior: "smooth",
+      left: direction * Math.max(320, Math.floor(row.clientWidth * 0.78)),
+    });
+  }, []);
+
+  const restorePlayer = useCallback(() => {
+    playerSlotRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+
+  const openPlayerFullscreen = useCallback(async () => {
+    const frame = playerFrameRef.current as
+      | (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> | void })
+      | null;
+    if (!frame) return;
+    try {
+      if (frame.requestFullscreen) await frame.requestFullscreen();
+      else if (frame.webkitRequestFullscreen) await frame.webkitRequestFullscreen();
+      else restorePlayer();
+    } catch {
+      restorePlayer();
+    }
+  }, [restorePlayer]);
 
   const startFromHero = useCallback(() => {
     requestPlayback(false);
@@ -643,9 +710,27 @@ export function FirstListenSimplePreview({
             </span>
             <h2>{spanish ? "Escucha algo distinto hoy" : "Hear something different today"}</h2>
           </div>
-          <small>{spanish ? "Desliza para explorar" : "Swipe to explore"}</small>
+          <div className="first-listen-simple-carousel-navigation">
+            <small>
+              {spanish ? "Desliza o usa las flechas" : "Swipe or use the arrows"}
+            </small>
+            <button
+              aria-label={spanish ? "Ver canciones anteriores" : "See previous songs"}
+              onClick={() => scrollNewToday(-1)}
+              type="button"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              aria-label={spanish ? "Ver más canciones" : "See more songs"}
+              onClick={() => scrollNewToday(1)}
+              type="button"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
-        <div className="first-listen-simple-new-row">
+        <div className="first-listen-simple-new-row" ref={newTodayRowRef}>
           {newTodaySongs.map((song, index) => (
             <button
               aria-current={song.id === activeSong.id ? "true" : undefined}
@@ -718,14 +803,49 @@ export function FirstListenSimplePreview({
         </button>
       )}
 
-      <section className="first-listen-simple-player-card" id="first-listen-player">
-        <div className="first-listen-simple-song-heading">
-          <span>{spanish ? "Ahora suena" : "Now playing"}</span>
-          <strong>{activeSong.title}</strong>
-          <small>{activeSong.artist}</small>
+      <div
+        className={`first-listen-simple-player-slot${playerDocked ? " is-docked" : ""}`}
+        ref={playerSlotRef}
+        style={
+          playerDocked && playerPlaceholderHeight
+            ? { minHeight: `${playerPlaceholderHeight}px` }
+            : undefined
+        }
+      >
+      <section
+        className={`first-listen-simple-player-card${playerDocked ? " is-docked" : ""}`}
+        id="first-listen-player"
+        ref={playerCardRef}
+      >
+        <div className="first-listen-simple-player-header">
+          <div className="first-listen-simple-song-heading">
+            <span>{spanish ? "Ahora suena" : "Now playing"}</span>
+            <strong>{activeSong.title}</strong>
+            <small>{activeSong.artist}</small>
+          </div>
+          <div className="first-listen-simple-player-window-actions">
+            {playerDocked && (
+              <button
+                aria-label={spanish ? "Abrir reproductor grande" : "Open large player"}
+                onClick={restorePlayer}
+                title={spanish ? "Abrir reproductor grande" : "Open large player"}
+                type="button"
+              >
+                <PanelTopOpen size={17} />
+              </button>
+            )}
+            <button
+              aria-label={spanish ? "Pantalla completa" : "Full screen"}
+              onClick={() => void openPlayerFullscreen()}
+              title={spanish ? "Pantalla completa" : "Full screen"}
+              type="button"
+            >
+              <Expand size={17} />
+            </button>
+          </div>
         </div>
 
-        <div className="first-listen-simple-player-frame">
+        <div className="first-listen-simple-player-frame" ref={playerFrameRef}>
           <ProviderPlayer
             key={`${activeSong.id}:${playerVersion}`}
             artist={activeSong.artist}
@@ -852,6 +972,7 @@ export function FirstListenSimplePreview({
           </div>
         )}
       </section>
+      </div>
 
       <section className="first-listen-simple-styles">
         <div>

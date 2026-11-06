@@ -60,6 +60,27 @@ type GuestExternalDiscoveryRow = GuestQueueRow & {
   recommended_platform?: string | null;
 };
 
+const GUEST_REQUEST_TIMEOUT_MS = 12_000;
+
+function withGuestTimeout<T>(promise: PromiseLike<T>, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new Error(message)),
+      GUEST_REQUEST_TIMEOUT_MS,
+    );
+    Promise.resolve(promise).then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function firstRow<T>(value: T | T[] | null): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
@@ -233,10 +254,15 @@ export function WorkspaceV2GuestEntry({
     async (token: string, nextLocale: InterfaceLocale) => {
       const supabase = createClient();
       if (!supabase) throw new Error("First Listen is not configured.");
-      const { data, error } = await supabase.rpc("get_guest_song_queue", {
-        guest_access_token: token,
-        queue_limit: 200,
-      });
+      const { data, error } = await withGuestTimeout(
+        supabase.rpc("get_guest_song_queue", {
+          guest_access_token: token,
+          queue_limit: 200,
+        }),
+        nextLocale === "es"
+          ? "La música tardó demasiado en responder. Intenta nuevamente."
+          : "The music took too long to respond. Please try again.",
+      );
       if (error) throw error;
       setQueue(
         buildGuestQueue((data ?? []) as GuestQueueRow[], nextLocale),
@@ -274,16 +300,24 @@ export function WorkspaceV2GuestEntry({
         return;
       }
 
-      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      await withGuestTimeout(
+        supabase.auth.signOut({ scope: "local" }),
+        "Guest session cleanup timed out.",
+      ).catch(() => undefined);
       clearBrowserAuthSession({ clearGuest: false });
 
       let token = window.localStorage.getItem("first-listen-guest-token");
       let identity: GuestSession | null = null;
 
       if (token) {
-        const { data, error } = await supabase.rpc("get_guest_identity", {
-          guest_access_token: token,
-        });
+        const { data, error } = await withGuestTimeout(
+          supabase.rpc("get_guest_identity", {
+            guest_access_token: token,
+          }),
+          nextLocale === "es"
+            ? "La sesión de visitante tardó demasiado en responder."
+            : "The guest session took too long to respond.",
+        );
         const row = firstRow(data as Record<string, unknown>[] | Record<string, unknown> | null);
         if (!error && row) {
           identity = {
@@ -297,10 +331,15 @@ export function WorkspaceV2GuestEntry({
       }
 
       if (!identity) {
-        const { data, error } = await supabase.rpc("create_guest_identity", {
-          guest_language: nextLocale,
-          guest_nickname: "",
-        });
+        const { data, error } = await withGuestTimeout(
+          supabase.rpc("create_guest_identity", {
+            guest_language: nextLocale,
+            guest_nickname: "",
+          }),
+          nextLocale === "es"
+            ? "No pudimos abrir el acceso de visitante a tiempo."
+            : "We could not open guest access in time.",
+        );
         const row = firstRow(data as Record<string, unknown>[] | Record<string, unknown> | null);
         if (error || !row) {
           setFatalError(error?.message ?? "Guest access could not be created.");
@@ -317,10 +356,8 @@ export function WorkspaceV2GuestEntry({
       setLocale(identity.locale);
       document.documentElement.lang = identity.locale;
       try {
-        await Promise.all([
-          loadQueue(identity.token, identity.locale),
-          loadExternalDiscovery(),
-        ]);
+        await loadQueue(identity.token, identity.locale);
+        void loadExternalDiscovery().catch(() => undefined);
       } catch (error) {
         setFatalError(
           error instanceof Error ? error.message : "Music could not be loaded.",
@@ -334,7 +371,7 @@ export function WorkspaceV2GuestEntry({
     return () => {
       active = false;
     };
-  }, [loadExternalDiscovery, loadQueue]);
+  }, [experience, loadExternalDiscovery, loadQueue]);
 
   const spanish = locale === "es";
   const guestIdentity = guest

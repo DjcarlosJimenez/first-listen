@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const chromePath = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const baseUrl = process.env.FIRST_LISTEN_TEST_URL || "http://127.0.0.1:3012/guest";
+const screenshotDirectory = process.env.FIRST_LISTEN_SCREENSHOT_DIR;
 const port = 9300 + (process.pid % 500);
 const profileDirectory = await mkdtemp(join(tmpdir(), "first-listen-browser-"));
 const chrome = spawn(
@@ -100,6 +101,16 @@ try {
     return result.result.value;
   };
 
+  const captureScreenshot = async (name) => {
+    if (!screenshotDirectory) return;
+    await mkdir(screenshotDirectory, { recursive: true });
+    const result = await client.call("Page.captureScreenshot", {
+      captureBeyondViewport: false,
+      format: "png",
+    });
+    await writeFile(join(screenshotDirectory, name), result.data, "base64");
+  };
+
   await eventually(
     () => evaluate("Boolean(document.querySelector('.first-listen-simple-new-row'))"),
     "The First Listen guest experience did not finish loading.",
@@ -118,6 +129,20 @@ try {
         "document.querySelector('.first-listen-simple-stage h1')?.textContent?.includes('Tu próxima canción favorita')",
       ),
     "Spanish device detection did not override the stale non-explicit language.",
+  );
+
+  const initialCarouselPosition = await evaluate(
+    "document.querySelector('.first-listen-simple-new-row')?.scrollLeft ?? 0",
+  );
+  await evaluate(
+    "document.querySelector('.first-listen-simple-carousel-navigation button:last-child')?.click(); true",
+  );
+  await eventually(
+    () =>
+      evaluate(
+        `document.querySelector('.first-listen-simple-new-row')?.scrollLeft > ${initialCarouselPosition + 20}`,
+      ),
+    "The desktop rotation arrows did not move the song carousel.",
   );
 
   const clickRotationCard = async (index) => {
@@ -164,6 +189,26 @@ try {
 
   const desktopSong = await clickRotationCard(1);
 
+  await evaluate("window.scrollTo(0, 0); true");
+  await eventually(
+    () =>
+      evaluate(
+        "Boolean(document.querySelector('.first-listen-simple-player-card.is-docked'))",
+      ),
+    "The player did not remain visible in desktop mini-player mode.",
+  );
+  await evaluate(
+    "document.querySelector('.first-listen-simple-player-card.is-docked .first-listen-simple-controls button:nth-child(2)')?.click(); true",
+  );
+  await eventually(
+    () =>
+      evaluate(
+        "document.querySelector('.first-listen-simple-player-card.is-docked .first-listen-simple-controls button:nth-child(2)')?.getAttribute('aria-pressed') === 'true'",
+      ),
+    "Pause did not remain accessible in the desktop mini-player.",
+  );
+  await captureScreenshot("desktop-floating-player.png");
+
   await evaluate(`(() => {
     const selector = document.querySelector('.first-listen-simple-header .language-selector select');
     selector.value = 'en';
@@ -209,7 +254,24 @@ try {
     () => evaluate("Boolean(document.querySelector('.first-listen-simple-new-row'))"),
     "The mobile First Listen experience did not finish loading.",
   );
-  const mobileSong = await clickRotationCard(2);
+  const mobileCardCount = await evaluate(
+    "document.querySelectorAll('.first-listen-simple-new-row button').length",
+  );
+  const mobileSong = await clickRotationCard(Math.min(2, Math.max(0, mobileCardCount - 1)));
+  await evaluate("window.scrollTo(0, 0); true");
+  await eventually(
+    () =>
+      evaluate(`(() => {
+        const player = document.querySelector('.first-listen-simple-player-card.is-docked');
+        const navigation = document.querySelector('.first-listen-simple-mobile-nav');
+        if (!player || !navigation) return false;
+        const playerBounds = player.getBoundingClientRect();
+        const navigationBounds = navigation.getBoundingClientRect();
+        return playerBounds.bottom <= navigationBounds.top + 2;
+      })()`),
+    "The mobile mini-player was missing or overlapped the bottom navigation.",
+  );
+  await captureScreenshot("mobile-floating-player.png");
 
   console.log(
     JSON.stringify(

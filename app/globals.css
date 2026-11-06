@@ -25656,6 +25656,41 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   padding: 14px;
 }
 
+.first-listen-simple-player-slot {
+  margin-inline: auto;
+  max-width: 760px;
+  min-width: 0;
+  width: 100%;
+}
+
+.first-listen-simple-player-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.first-listen-simple-player-window-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.first-listen-simple-player-window-actions button {
+  align-items: center;
+  background: #f1f5ec;
+  border: 1px solid #d6dfce;
+  border-radius: 999px;
+  color: #182017;
+  cursor: pointer;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
 .first-listen-simple-song-heading {
   display: grid;
   gap: 2px;
@@ -26448,6 +26483,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   margin-inline: -18px;
   overflow-x: auto;
   padding: 2px 18px 12px;
+  scroll-behavior: smooth;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
 }
@@ -26536,8 +26572,110 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   font-weight: 700;
 }
 
+.first-listen-simple-carousel-navigation {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 7px;
+}
+
+.first-listen-simple-carousel-navigation small {
+  color: #6b7665;
+  font-size: 11px;
+  font-weight: 800;
+  margin-right: 3px;
+}
+
+.first-listen-simple-carousel-navigation button {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #cdd9c3;
+  border-radius: 999px;
+  color: #23341d;
+  cursor: pointer;
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.first-listen-simple-carousel-navigation button:hover {
+  background: #b9ff2f;
+  border-color: #8dcf16;
+}
+
 .first-listen-simple-player-card {
   scroll-margin-top: 82px;
+}
+
+.first-listen-simple-player-card.is-docked {
+  animation: first-listen-player-dock-in 180ms ease-out;
+  bottom: 18px;
+  box-shadow: 0 24px 70px rgba(8, 19, 9, 0.34);
+  display: grid;
+  gap: 8px 10px;
+  grid-template-areas:
+    "frame header"
+    "frame controls";
+  grid-template-columns: 168px minmax(0, 1fr);
+  margin: 0;
+  padding: 10px;
+  position: fixed;
+  right: 18px;
+  width: min(540px, calc(100vw - 36px));
+  z-index: 60;
+}
+
+.first-listen-simple-player-card.is-docked .first-listen-simple-player-header {
+  grid-area: header;
+}
+
+.first-listen-simple-player-card.is-docked .first-listen-simple-song-heading span {
+  font-size: 8px;
+}
+
+.first-listen-simple-player-card.is-docked .first-listen-simple-song-heading strong {
+  font-size: 16px;
+}
+
+.first-listen-simple-player-card.is-docked .first-listen-simple-song-heading small {
+  font-size: 11px;
+}
+
+.first-listen-simple-player-card.is-docked .first-listen-simple-player-frame {
+  grid-area: frame;
+  height: 100%;
+  min-height: 96px;
+}
+
+.first-listen-simple-player-card.is-docked .first-listen-simple-controls {
+  display: grid;
+  grid-area: controls;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.first-listen-simple-player-card.is-docked .first-listen-simple-controls button {
+  font-size: 10px;
+  min-height: 38px;
+  padding: 6px;
+}
+
+.first-listen-simple-player-card.is-docked .first-listen-simple-controls button:nth-child(n + 4),
+.first-listen-simple-player-card.is-docked .first-listen-simple-listening-options,
+.first-listen-simple-player-card.is-docked .first-listen-simple-metrics-note,
+.first-listen-simple-player-card.is-docked .first-listen-simple-next-song {
+  display: none;
+}
+
+@keyframes first-listen-player-dock-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .first-listen-simple-mobile-nav {
@@ -26547,7 +26685,24 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 @media (min-width: 820px) {
   .first-listen-simple-new-row {
     margin-inline: 0;
-    padding-inline: 0;
+    padding: 2px 2px 14px;
+    scrollbar-color: #9fbe7d #e4ebdc;
+    scrollbar-width: thin;
+  }
+
+  .first-listen-simple-new-row::-webkit-scrollbar {
+    display: block;
+    height: 8px;
+  }
+
+  .first-listen-simple-new-row::-webkit-scrollbar-thumb {
+    background: #9fbe7d;
+    border-radius: 999px;
+  }
+
+  .first-listen-simple-new-row::-webkit-scrollbar-track {
+    background: #e4ebdc;
+    border-radius: 999px;
   }
 }
 
@@ -26601,6 +26756,19 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     right: 8px;
     width: auto;
     z-index: 30;
+  }
+
+  .first-listen-simple-player-card.is-docked {
+    bottom: calc(66px + max(8px, env(safe-area-inset-bottom)));
+    grid-template-columns: 116px minmax(0, 1fr);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    z-index: 55;
+  }
+
+  .first-listen-simple-player-card.is-docked .first-listen-simple-player-frame {
+    min-height: 74px;
   }
 
   .first-listen-simple-mobile-nav a {
@@ -26678,6 +26846,15 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
     gap: 6px;
   }
 
+  .first-listen-simple-carousel-navigation {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .first-listen-simple-carousel-navigation small {
+    margin-right: auto;
+  }
+
   .first-listen-simple-new-row {
     margin-inline: -14px;
     padding-inline: 14px;
@@ -26685,6 +26862,32 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
   .first-listen-simple-new-row > button {
     flex-basis: 162px;
+  }
+
+  .first-listen-simple-player-card.is-docked {
+    gap: 7px;
+    grid-template-areas:
+      "frame header"
+      "controls controls";
+    grid-template-columns: 108px minmax(0, 1fr);
+  }
+
+  .first-listen-simple-player-card.is-docked .first-listen-simple-player-frame {
+    height: 68px;
+    min-height: 68px;
+  }
+
+  .first-listen-simple-player-card.is-docked .first-listen-simple-player-window-actions button {
+    height: 32px;
+    width: 32px;
+  }
+
+  .first-listen-simple-player-card.is-docked .first-listen-simple-controls button {
+    min-height: 36px;
+  }
+
+  .first-listen-simple-player-card.is-docked .first-listen-simple-controls button span {
+    display: none;
   }
 }
 
