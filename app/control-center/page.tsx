@@ -12,8 +12,13 @@ import {
   Music2,
   PanelsTopLeft,
   ShieldCheck,
+  TimerReset,
   UsersRound,
 } from "lucide-react";
+import {
+  CreatorActivityControls,
+  type CreatorActivitySettings,
+} from "@/components/creator-activity-controls";
 import { Logo } from "@/components/logo";
 import {
   hasAdminAccess,
@@ -69,6 +74,15 @@ const managementCards: ManagementCard[] = [
     icon: Music2,
     roles: ["owner", "admin"],
     title: "Música y publicaciones",
+  },
+  {
+    description:
+      "Activa o desactiva el archivado automático y define los días de inactividad permitidos.",
+    eyebrow: "Rotación",
+    href: "/control-center#creator-activity",
+    icon: TimerReset,
+    roles: ["owner", "admin"],
+    title: "Actividad de artistas",
   },
   {
     description:
@@ -172,6 +186,16 @@ export default async function ControlCenterPage() {
   const statistics = (
     Array.isArray(rawStatistics) ? rawStatistics[0] : rawStatistics
   ) as AdminStatistics | null;
+  const creatorActivityResult =
+    managementRole === "moderator"
+      ? { data: null }
+      : await supabase.rpc("admin_get_creator_activity_settings");
+  const creatorActivitySettings =
+    creatorActivityResult.data &&
+    typeof creatorActivityResult.data === "object" &&
+    !Array.isArray(creatorActivityResult.data)
+      ? (creatorActivityResult.data as CreatorActivitySettings)
+      : null;
 
   const visibleCards = managementCards
     .filter((card) => card.roles.includes(managementRole))
@@ -235,6 +259,10 @@ export default async function ControlCenterPage() {
           <small>Reportes abiertos</small>
         </article>
       </section>
+
+      {managementRole !== "moderator" && (
+        <CreatorActivityControls initialSettings={creatorActivitySettings} />
+      )}
 
       <section className="management-hub-directory">
         <div className="management-hub-section-heading">

@@ -50,10 +50,7 @@ import {
   persistInterfaceLocale,
   preferredInterfaceLocale,
 } from "@/lib/use-interface-locale";
-import {
-  buildArtistFairQueue,
-  countQueueArtists,
-} from "@/lib/workspace-v2/artist-fair-queue";
+import { buildArtistFairQueue } from "@/lib/workspace-v2/artist-fair-queue";
 import {
   dispatchWorkspaceV2PlaybackCommand,
   type WorkspaceV2Queue,
@@ -721,10 +718,6 @@ export function FirstListenSimplePreview({
           className="first-listen-simple-proof"
           aria-label={spanish ? "Datos reales de First Listen" : "Real First Listen facts"}
         >
-          <span>
-            <strong>{countQueueArtists(playableSongs)}</strong>
-            {spanish ? " artistas" : " artists"}
-          </span>
           <span>
             <strong>{spanish ? "Tú eliges" : "Your choice"}</strong>
             {spanish ? " qué sigue" : " what is next"}
