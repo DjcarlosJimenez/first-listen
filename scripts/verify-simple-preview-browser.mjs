@@ -378,7 +378,10 @@ try {
     return true;
   })()`);
   await eventually(
-    () => evaluate("Boolean(document.querySelector('.first-listen-simple-new-row'))"),
+    () =>
+      evaluate(
+        "document.querySelectorAll('.first-listen-simple-new-row button').length > 0",
+      ),
     "The mobile First Listen experience did not finish loading.",
   );
   const mobileNavigationState = await evaluate(`(() => {

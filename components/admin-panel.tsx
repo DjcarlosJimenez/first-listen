@@ -562,17 +562,17 @@ export function AdminPanel({
   };
 
   const allSections = [
-    ["users", "Users", Users],
-    ["songs", "Songs", Music2],
-    ["reports", "Reports", Flag],
-    ["credits", "Credits", ShieldCheck],
-    ["listening", "Listening", Headphones],
-    ["economy", "Economy", Link2],
-    ["discovery", "Discovery", Sparkles],
-    ["appearance", "Appearance", Palette],
-    ["announcements", "Announcements", Megaphone],
-    ["health", "Community Health", Activity],
-    ["statistics", "Statistics", BarChart3],
+    ["users", "Usuarios", Users],
+    ["songs", "Música", Music2],
+    ["reports", "Moderación", Flag],
+    ["credits", "Créditos", ShieldCheck],
+    ["listening", "Reproducción", Headphones],
+    ["economy", "Economía", Link2],
+    ["discovery", "Descubrimiento", Sparkles],
+    ["appearance", "Apariencia", Palette],
+    ["announcements", "Comunicaciones", Megaphone],
+    ["health", "Salud", Activity],
+    ["statistics", "Estadísticas", BarChart3],
   ] as const;
   const sections = allSections.filter(([id]) => {
     if (role === "super_admin") return true;
@@ -584,15 +584,15 @@ export function AdminPanel({
     <main className="admin-page">
       <header className="account-header">
         <Logo />
-        <Link href="/dashboard"><ArrowLeft size={16} /> Workspace V2</Link>
+        <Link href="/control-center"><ArrowLeft size={16} /> Centro de control</Link>
       </header>
       <div className="admin-shell">
         <aside className="admin-nav">
           <span className="eyebrow">{role.replace("_", " ")}</span>
-          <h1>Administration</h1>
+          <h1>Administración</h1>
           {isSuper && (
             <Link className="admin-owner-link" href="/owner">
-              <Gauge size={17} /> Owner Control Center
+              <Gauge size={17} /> Control maestro
             </Link>
           )}
           {sections.map(([id, label, Icon]) => (

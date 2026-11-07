@@ -107,17 +107,22 @@ export function FirstListenSimplePreview({
   canAccessAdmin = false,
   displayName = "",
   locale,
+  managementRole = null,
   queue,
 }: {
   authenticated?: boolean;
   canAccessAdmin?: boolean;
   displayName?: string;
   locale: InterfaceLocale;
+  managementRole?: "owner" | "admin" | "moderator" | null;
   queue: WorkspaceV2Queue;
 }) {
   const [interfaceLocale, setInterfaceLocale] =
     useState<InterfaceLocale>(locale);
   const spanish = interfaceLocale === "es";
+  const resolvedManagementRole =
+    managementRole ?? (canAccessAdmin ? "owner" : null);
+  const canManage = Boolean(resolvedManagementRole);
   const playableSongs = useMemo(() => {
     const internal = queue.songs.filter(
       (song) => song.playbackKind === "internal",
@@ -615,6 +620,15 @@ export function FirstListenSimplePreview({
           />
           {authenticated ? (
             <>
+              {canManage && (
+                <Link
+                  className="first-listen-simple-management-link"
+                  href="/control-center"
+                >
+                  <ShieldCheck size={16} />
+                  <span>{spanish ? "Administrar" : "Manage"}</span>
+                </Link>
+              )}
               <Link href="/profile">
                 <UserRound size={16} />
                 {spanish ? "Mi cuenta" : "My account"}
@@ -1082,10 +1096,10 @@ export function FirstListenSimplePreview({
               <UserRound size={16} />
               {spanish ? "Mi actividad" : "My activity"}
             </Link>
-            {canAccessAdmin && (
-              <Link href="/owner">
+            {canManage && (
+              <Link href="/control-center">
                 <ShieldCheck size={16} />
-                Owner
+                {spanish ? "Centro de control" : "Control center"}
               </Link>
             )}
             <button
@@ -1125,7 +1139,7 @@ export function FirstListenSimplePreview({
 
       <nav
         aria-label={spanish ? "Navegación principal" : "Main navigation"}
-        className="first-listen-simple-mobile-nav"
+        className={`first-listen-simple-mobile-nav${canManage ? " has-management" : ""}`}
       >
         <a href="#top">
           <Home size={19} />
@@ -1139,6 +1153,12 @@ export function FirstListenSimplePreview({
           <Upload size={20} />
           <span>{spanish ? "Publicar" : "Publish"}</span>
         </Link>
+        {canManage && (
+          <Link href="/control-center">
+            <ShieldCheck size={19} />
+            <span>{spanish ? "Administrar" : "Manage"}</span>
+          </Link>
+        )}
         <Link href={authenticated ? "/profile" : "/login?next=/dashboard"}>
           <UserRound size={19} />
           <span>{spanish ? "Mi cuenta" : "My account"}</span>

@@ -42,6 +42,25 @@ type AdminSection =
   | "health"
   | "statistics";
 
+const adminSections: AdminSection[] = [
+  "control",
+  "users",
+  "songs",
+  "reports",
+  "credits",
+  "listening",
+  "economy",
+  "discovery",
+  "appearance",
+  "announcements",
+  "health",
+  "statistics",
+];
+
+function isAdminSection(value: unknown): value is AdminSection {
+  return typeof value === "string" && adminSections.includes(value as AdminSection);
+}
+
 export async function AdminPageContent({
   initialSection = "users",
   allowModerator = false,
@@ -82,6 +101,7 @@ export async function AdminPageContent({
       ? initialSection
       : effectiveRole === "admin"
         ? [
+            "users",
             "songs",
             "reports",
             "discovery",
@@ -247,6 +267,20 @@ export async function AdminPageContent({
   );
 }
 
-export default function AdminPage() {
-  return <AdminPageContent />;
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ section?: string | string[] }>;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const requestedSection = Array.isArray(params.section)
+    ? params.section[0]
+    : params.section;
+  return (
+    <AdminPageContent
+      initialSection={
+        isAdminSection(requestedSection) ? requestedSection : "users"
+      }
+    />
+  );
 }

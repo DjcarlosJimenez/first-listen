@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BarChart3, PanelsTopLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft, BarChart3, Gauge, PanelsTopLeft, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/logo";
 import {
   SuperAdminControlCenter,
@@ -128,6 +128,9 @@ export default async function OwnerControlCenterPage() {
       <header className="account-header">
         <Logo />
         <div className="owner-header-actions">
+          <Link href="/control-center">
+            <Gauge size={16} /> Centro de control
+          </Link>
           <Link href="/owner/analytics">
             <BarChart3 size={16} /> Estadisticas
           </Link>
@@ -138,7 +141,7 @@ export default async function OwnerControlCenterPage() {
             <ShieldCheck size={16} /> Admin Panel
           </Link>
           <Link href="/dashboard">
-            <ArrowLeft size={16} /> Workspace V2
+            <ArrowLeft size={16} /> Ver FirstListen
           </Link>
         </div>
       </header>

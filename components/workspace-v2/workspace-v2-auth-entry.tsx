@@ -13,6 +13,11 @@ import {
   isExternalPlatform,
 } from "@/lib/content-economy";
 import { safeCoverUrl } from "@/lib/media";
+import {
+  hasAdminAccess,
+  hasModeratorAccess,
+  hasOwnerAccess,
+} from "@/lib/admin-access";
 import { createClient } from "@/lib/supabase/server";
 import type {
   CommunityActivity,
@@ -109,9 +114,12 @@ function localeFromProfile(profile: WorkspaceV2Profile | null): InterfaceLocale 
   return profile?.interface_language === "en" ? "en" : "es";
 }
 
-function viewerModeFromProfile(profile: WorkspaceV2Profile | null): WorkspaceV2ViewerMode {
-  if (profile?.role === "super_admin") return "founder";
-  if (profile?.role === "admin") return "admin";
+function viewerModeFromProfile(
+  profile: WorkspaceV2Profile | null,
+  email?: string | null,
+): WorkspaceV2ViewerMode {
+  if (hasOwnerAccess(profile, email)) return "founder";
+  if (hasAdminAccess(profile, email)) return "admin";
   return "member";
 }
 
@@ -515,8 +523,15 @@ export async function WorkspaceV2AuthEntry({
   )
     .map(toExternalDiscoveryItem)
     .filter((item): item is WorkspaceV2ExternalDiscoveryItem => Boolean(item));
-  const viewerMode = viewerModeFromProfile(typedProfile);
-  const canAccessAdmin = viewerMode === "founder" || viewerMode === "admin";
+  const viewerMode = viewerModeFromProfile(typedProfile, user.email);
+  const managementRole = hasOwnerAccess(typedProfile, user.email)
+    ? "owner"
+    : hasAdminAccess(typedProfile, user.email)
+      ? "admin"
+      : hasModeratorAccess(typedProfile)
+        ? "moderator"
+        : null;
+  const canAccessAdmin = managementRole === "owner" || managementRole === "admin";
   const founderOperations = null;
   const profilePanel = buildProfilePanelPayload({
     activityRows,
@@ -543,6 +558,7 @@ export async function WorkspaceV2AuthEntry({
         canAccessAdmin={canAccessAdmin}
         displayName={profileDisplayName(typedProfile, user.email)}
         locale={locale}
+        managementRole={managementRole}
         queue={queue}
       />
     );
@@ -554,8 +570,8 @@ export async function WorkspaceV2AuthEntry({
         <Logo />
         <div className="owner-header-actions">
           {canAccessAdmin && (
-            <Link href="/owner">
-              <ShieldCheck size={16} /> Owner Control Center
+            <Link href="/control-center">
+              <ShieldCheck size={16} /> Centro de control
             </Link>
           )}
         </div>
