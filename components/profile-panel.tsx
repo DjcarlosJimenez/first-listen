@@ -29,6 +29,7 @@ import {
   Youtube,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { UserMusicLibrary } from "@/components/user-music-library";
 import {
   compactClassificationLabel,
   allPlatforms,
@@ -1238,6 +1239,8 @@ export function ProfilePanel({
               <p>{spanish ? "No hay canciones quitadas." : "No removed songs."}</p>
             )}
           </details>
+
+          <UserMusicLibrary locale={locale} />
 
           <div className="profile-community-activity-section" id="community-activity">
             <span className="eyebrow">{spanish ? "Actividad reciente de la comunidad" : "Recent Community Activity"}</span>

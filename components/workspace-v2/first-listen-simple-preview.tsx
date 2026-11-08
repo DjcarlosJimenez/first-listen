@@ -43,6 +43,10 @@ import {
 import { FirstPublishForm } from "@/components/first-publish-form";
 import { LanguageSelector } from "@/components/language-selector";
 import { Logo } from "@/components/logo";
+import {
+  SongLibraryActions,
+  UserMusicLibrary,
+} from "@/components/user-music-library";
 import { clearBrowserAuthSession } from "@/lib/auth-session-cleanup";
 import type { InterfaceLocale } from "@/lib/catalog";
 import { createClient } from "@/lib/supabase/client";
@@ -167,6 +171,7 @@ export function FirstListenSimplePreview({
   const [playerDocked, setPlayerDocked] = useState(false);
   const [playerPlaceholderHeight, setPlayerPlaceholderHeight] = useState(0);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [requestedLibrarySongId, setRequestedLibrarySongId] = useState<string | null>(null);
   const newTodayRowRef = useRef<HTMLDivElement>(null);
   const playerSlotRef = useRef<HTMLDivElement>(null);
   const playerCardRef = useRef<HTMLElement>(null);
@@ -258,6 +263,40 @@ export function FirstListenSimplePreview({
     completedTrackRef.current = "";
     lastTelemetryRef.current = null;
   }, [excludedSongIds, selectedStyle]);
+
+  useEffect(() => {
+    if (!requestedLibrarySongId) return;
+    const requestedIndex = filteredSongs.findIndex(
+      (song) => song.id === requestedLibrarySongId,
+    );
+    if (requestedIndex < 0) return;
+    dispatchWorkspaceV2PlaybackCommand("pause", {
+      channel: SIMPLE_PREVIEW_PLAYER_CHANNEL,
+      source: "user-click",
+    });
+    pendingPlaybackRef.current = true;
+    pausedByUserRef.current = false;
+    completedTrackRef.current = "";
+    lastTelemetryRef.current = null;
+    setActiveIndex(requestedIndex);
+    setStarted(true);
+    setShouldAutoStart(true);
+    setPausedByUser(false);
+    setPlayerVersion((current) => current + 1);
+    setRequestedLibrarySongId(null);
+    window.setTimeout(() => {
+      document
+        .getElementById("first-listen-player")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }, [filteredSongs, requestedLibrarySongId]);
+
+  useEffect(() => {
+    const requestedSongId = new URLSearchParams(window.location.search).get("play");
+    if (!requestedSongId || !playableSongs.some((song) => song.id === requestedSongId)) return;
+    setSelectedStyle("all");
+    setRequestedLibrarySongId(requestedSongId);
+  }, [playableSongs]);
 
   useEffect(() => {
     const updateDockedPlayer = () => {
@@ -417,6 +456,11 @@ export function FirstListenSimplePreview({
         .getElementById("first-listen-player")
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
+  }, []);
+
+  const playLibrarySong = useCallback((songId: string) => {
+    setSelectedStyle("all");
+    setRequestedLibrarySongId(songId);
   }, []);
 
   const handleLocaleChange = useCallback(
@@ -785,26 +829,6 @@ export function FirstListenSimplePreview({
         </div>
       </section>
 
-      {!authenticated && (
-        <section className="first-listen-simple-artist-link">
-          <div>
-            <span>{spanish ? "¿Eres artista?" : "Are you an artist?"}</span>
-            <strong>
-              {spanish ? "Comparte el enlace de tu canción" : "Share your song link"}
-            </strong>
-            <small>
-              {spanish
-                ? "No subes archivos · primer enlace gratis y sin tarjeta"
-                : "No file uploads · first link free with no card"}
-            </small>
-          </div>
-          <button onClick={openPublishPanel} type="button">
-            <Upload size={16} />
-            {spanish ? "Compartir enlace" : "Share link"}
-          </button>
-        </section>
-      )}
-
       <section
         className="first-listen-simple-new-today"
         id="first-listen-new-today"
@@ -868,6 +892,23 @@ export function FirstListenSimplePreview({
               </button>
             ))}
           </div>
+        </section>
+        <section className="first-listen-simple-artist-link">
+          <div>
+            <span>{spanish ? "¿Eres artista?" : "Are you an artist?"}</span>
+            <strong>
+              {spanish ? "Comparte el enlace de tu canción" : "Share your song link"}
+            </strong>
+            <small>
+              {spanish
+                ? "No subes archivos · primer enlace gratis y sin tarjeta"
+                : "No file uploads · first link free with no card"}
+            </small>
+          </div>
+          <button onClick={openPublishPanel} type="button">
+            <Upload size={16} />
+            {spanish ? "Compartir enlace" : "Share link"}
+          </button>
         </section>
         <div className="first-listen-simple-new-row" ref={newTodayRowRef}>
           {newTodaySongs.map((song, index) => (
@@ -1067,6 +1108,12 @@ export function FirstListenSimplePreview({
           </button>
         </div>
 
+        <SongLibraryActions
+          authenticated={authenticated}
+          locale={interfaceLocale}
+          song={activeSong}
+        />
+
         {reportNotice && (
           <p className="first-listen-simple-metrics-note" role="status">
             {reportNotice}
@@ -1145,6 +1192,10 @@ export function FirstListenSimplePreview({
               <UserRound size={16} />
               {spanish ? "Mi actividad" : "My activity"}
             </Link>
+            <a href="#my-library">
+              <ListMusic size={16} />
+              {spanish ? "Mi biblioteca" : "My library"}
+            </a>
             {canManage && (
               <Link href="/control-center">
                 <ShieldCheck size={16} />
@@ -1167,6 +1218,14 @@ export function FirstListenSimplePreview({
             </button>
           </div>
         </section>
+      )}
+
+      {authenticated && (
+        <UserMusicLibrary
+          availableSongs={playableSongs}
+          locale={interfaceLocale}
+          onPlaySong={playLibrarySong}
+        />
       )}
 
       <footer className="first-listen-simple-footer">

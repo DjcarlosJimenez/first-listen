@@ -671,6 +671,561 @@ html[data-pwa-standalone="true"] body {
   }
 }
 
+/* Private listener library: likes, named playlists, and opt-in reminders. */
+.first-listen-library-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.first-listen-library-actions > button {
+  align-items: center;
+  background: #25282c;
+  border: 1px solid #3b4046;
+  border-radius: 9px;
+  color: #f2f3f1;
+  display: inline-flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 7px;
+  justify-content: center;
+  min-height: 42px;
+  padding: 8px 14px;
+}
+
+.first-listen-library-actions > button:hover,
+.first-listen-library-actions > button.active {
+  background: rgba(168, 238, 50, 0.12);
+  border-color: rgba(168, 238, 50, 0.58);
+  color: #ccff7b;
+}
+
+.first-listen-library-actions > button small {
+  background: #a8ee32;
+  border-radius: 99px;
+  color: #11150d;
+  font-size: 9px;
+  min-width: 19px;
+  padding: 3px 5px;
+}
+
+.first-listen-library-actions > p {
+  color: #aeb4ba;
+  flex-basis: 100%;
+  font-size: 11px;
+  margin: 0;
+}
+
+.first-listen-library-dialog-backdrop {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.76);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 1200;
+}
+
+.first-listen-library-dialog {
+  background: #17191c;
+  border: 1px solid #3a3f45;
+  border-radius: 18px;
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.62);
+  color: #f4f5f3;
+  max-height: min(720px, 90vh);
+  max-width: 520px;
+  overflow: auto;
+  padding: 24px;
+  position: relative;
+  width: 100%;
+}
+
+.first-listen-library-dialog h3 {
+  font-size: 24px;
+  margin: 6px 42px 8px 0;
+}
+
+.first-listen-library-dialog > p {
+  color: #aeb4ba;
+  line-height: 1.55;
+}
+
+.first-listen-library-dialog-close {
+  align-items: center;
+  background: #272a2e;
+  border: 1px solid #3c4147;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  height: 36px;
+  justify-content: center;
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  width: 36px;
+}
+
+.first-listen-library-dialog-actions,
+.first-listen-library-create {
+  display: flex;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.first-listen-library-dialog-actions a,
+.first-listen-library-create button {
+  align-items: center;
+  border-radius: 10px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 42px;
+  padding: 9px 14px;
+  text-decoration: none;
+}
+
+.first-listen-library-dialog-actions .primary-button,
+.first-listen-library-create button {
+  background: #a8ee32;
+  border: 1px solid #a8ee32;
+  color: #11150d;
+}
+
+.first-listen-library-dialog-actions .ghost-button {
+  background: #25282c;
+  border: 1px solid #3b4046;
+  color: #f2f3f1;
+}
+
+.first-listen-library-local-note {
+  background: rgba(168, 238, 50, 0.08);
+  border: 1px solid rgba(168, 238, 50, 0.3);
+  border-radius: 10px;
+  color: #d8f6a8 !important;
+  font-size: 11px;
+  padding: 10px 12px;
+}
+
+.first-listen-library-playlist-options {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.first-listen-library-playlist-options > button {
+  align-items: center;
+  background: #222529;
+  border: 1px solid #343940;
+  border-radius: 11px;
+  color: #f2f3f1;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 11px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.first-listen-library-playlist-options > button.active {
+  background: rgba(168, 238, 50, 0.1);
+  border-color: #8bd51d;
+}
+
+.first-listen-library-playlist-options span,
+.first-listen-library-playlist-options strong,
+.first-listen-library-playlist-options small {
+  display: block;
+}
+
+.first-listen-library-playlist-options small {
+  color: #aeb4ba;
+  font-size: 10px;
+  margin-top: 3px;
+}
+
+.first-listen-library-create input,
+.first-listen-playlist-manager input,
+.first-listen-playlist-rename input {
+  background: #0f1113;
+  border: 1px solid #3a3f45;
+  border-radius: 10px;
+  color: #f4f5f3;
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+}
+
+.first-listen-user-library {
+  background: #15171a;
+  border: 1px solid #30343a;
+  border-radius: 18px;
+  box-shadow: 0 24px 65px rgba(0, 0, 0, 0.28);
+  color: #f4f5f3;
+  margin-top: 24px;
+  padding: 22px;
+}
+
+.account-page .first-listen-user-library {
+  grid-column: 1 / -1;
+  margin-block: 28px;
+}
+
+.first-listen-user-library-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+
+.first-listen-user-library-heading h2 {
+  color: #f4f5f3;
+  font-size: clamp(25px, 4vw, 38px);
+  margin: 5px 0 7px;
+}
+
+.first-listen-user-library-heading p {
+  color: #aeb4ba;
+  margin: 0;
+  max-width: 720px;
+}
+
+.first-listen-library-preview-badge {
+  background: rgba(168, 238, 50, 0.12);
+  border: 1px solid rgba(168, 238, 50, 0.42);
+  border-radius: 99px;
+  color: #ccff7b;
+  font-size: 9px;
+  font-weight: 950;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.first-listen-library-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 22px 0 16px;
+}
+
+.first-listen-library-tabs button {
+  align-items: center;
+  background: #23262a;
+  border: 1px solid #3a3e44;
+  border-radius: 10px;
+  color: #eef0ed;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 13px;
+}
+
+.first-listen-library-tabs button.active {
+  background: #a8ee32;
+  border-color: #a8ee32;
+  color: #11150d;
+}
+
+.first-listen-library-tabs small {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+  font-size: 9px;
+  min-width: 20px;
+  padding: 3px 5px;
+}
+
+.first-listen-library-song-list,
+.first-listen-playlist-items {
+  display: grid;
+  gap: 8px;
+}
+
+.first-listen-library-song-list article,
+.first-listen-playlist-items article {
+  align-items: center;
+  background: #202327;
+  border: 1px solid #343940;
+  border-radius: 11px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  padding: 9px;
+}
+
+.first-listen-library-song-list img,
+.first-listen-playlist-items img {
+  aspect-ratio: 1;
+  border-radius: 7px;
+  object-fit: cover;
+  width: 48px;
+}
+
+.first-listen-library-song-list article > span,
+.first-listen-playlist-items article > span {
+  min-width: 0;
+}
+
+.first-listen-library-song-list strong,
+.first-listen-library-song-list small,
+.first-listen-playlist-items strong,
+.first-listen-playlist-items small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.first-listen-library-song-list small,
+.first-listen-playlist-items small {
+  color: #aeb4ba;
+  font-size: 10px;
+  margin-top: 3px;
+}
+
+.first-listen-library-song-list button,
+.first-listen-playlist-items button,
+.first-listen-playlist-detail header button,
+.first-listen-playlist-rename button,
+.first-listen-playlist-manager aside form button {
+  align-items: center;
+  background: #2a2e32;
+  border: 1px solid #41464d;
+  border-radius: 8px;
+  color: #f2f3f1;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 900;
+  gap: 5px;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.first-listen-library-song-list button:hover,
+.first-listen-playlist-items button:hover,
+.first-listen-playlist-detail header button:hover {
+  border-color: #8bd51d;
+  color: #ccff7b;
+}
+
+.first-listen-library-empty {
+  background: #202327;
+  border: 1px dashed #41464d;
+  border-radius: 11px;
+  color: #aeb4ba;
+  margin: 0;
+  padding: 22px;
+  text-align: center;
+}
+
+.first-listen-playlist-manager {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(210px, 0.34fr) minmax(0, 1fr);
+}
+
+.first-listen-playlist-manager aside,
+.first-listen-playlist-detail {
+  background: #1d2023;
+  border: 1px solid #343940;
+  border-radius: 13px;
+  padding: 12px;
+}
+
+.first-listen-playlist-manager aside form {
+  display: flex;
+  gap: 7px;
+}
+
+.first-listen-playlist-manager aside > div {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.first-listen-playlist-manager aside > div > button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #eef0ed;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 9px;
+  text-align: left;
+}
+
+.first-listen-playlist-manager aside > div > button.active {
+  background: rgba(168, 238, 50, 0.1);
+  border-color: rgba(168, 238, 50, 0.42);
+}
+
+.first-listen-playlist-manager aside strong,
+.first-listen-playlist-manager aside small {
+  display: block;
+}
+
+.first-listen-playlist-manager aside small {
+  color: #aeb4ba;
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+.first-listen-playlist-detail header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.first-listen-playlist-detail header h3 {
+  color: #f4f5f3;
+  font-size: 22px;
+  margin: 4px 0 0;
+}
+
+.first-listen-playlist-detail header > div:last-child {
+  display: flex;
+  gap: 7px;
+}
+
+.first-listen-playlist-rename {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.first-listen-playlist-items article {
+  grid-template-columns: 24px 42px minmax(0, 1fr) repeat(4, auto);
+}
+
+.first-listen-playlist-items img {
+  width: 42px;
+}
+
+.first-listen-playlist-position {
+  color: #a8ee32;
+  font-size: 11px;
+  font-weight: 950;
+  text-align: center;
+}
+
+.first-listen-playlist-items button:disabled {
+  opacity: 0.28;
+}
+
+.first-listen-reminder-preference {
+  align-items: center;
+  background: #1d2023;
+  border: 1px solid #343940;
+  border-radius: 13px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(220px, 1fr) auto auto auto;
+  margin-top: 18px;
+  padding: 14px;
+}
+
+.first-listen-reminder-preference > svg {
+  color: #a8ee32;
+}
+
+.first-listen-reminder-preference strong,
+.first-listen-reminder-preference small {
+  display: block;
+}
+
+.first-listen-reminder-preference small {
+  color: #aeb4ba;
+  font-size: 10px;
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+.first-listen-reminder-preference label {
+  align-items: center;
+  display: flex;
+  font-size: 11px;
+  font-weight: 900;
+  gap: 6px;
+}
+
+.first-listen-reminder-preference select,
+.first-listen-reminder-preference > button {
+  background: #272a2e;
+  border: 1px solid #41464d;
+  border-radius: 9px;
+  color: #f2f3f1;
+  font-size: 10px;
+  font-weight: 850;
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.first-listen-reminder-preference > button {
+  background: #a8ee32;
+  border-color: #a8ee32;
+  color: #11150d;
+}
+
+.first-listen-reminder-preference > p {
+  color: #ccff7b;
+  font-size: 10px;
+  grid-column: 2 / -1;
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .first-listen-user-library {
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .first-listen-user-library-heading,
+  .first-listen-library-tabs,
+  .first-listen-library-dialog-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .first-listen-library-tabs button {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .first-listen-playlist-manager {
+    grid-template-columns: 1fr;
+  }
+
+  .first-listen-playlist-items article {
+    grid-template-columns: 22px 40px minmax(0, 1fr) repeat(2, auto);
+  }
+
+  .first-listen-playlist-items article button:nth-of-type(2),
+  .first-listen-playlist-items article button:nth-of-type(3) {
+    display: none;
+  }
+
+  .first-listen-reminder-preference {
+    align-items: stretch;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .first-listen-reminder-preference label,
+  .first-listen-reminder-preference select,
+  .first-listen-reminder-preference > button,
+  .first-listen-reminder-preference > p {
+    grid-column: 1 / -1;
+  }
+}
+
 .first-publish-result-card {
   align-items: center;
   background: #f5f8f0;

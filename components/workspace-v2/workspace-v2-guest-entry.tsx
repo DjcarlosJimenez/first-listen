@@ -239,7 +239,7 @@ function buildGuestQueue(rows: GuestQueueRow[], locale: InterfaceLocale): Worksp
 export function WorkspaceV2GuestEntry({
   experience = "workspace",
 }: {
-  experience?: "workspace" | "simple-preview";
+  experience?: "workspace" | "simple-preview" | "library-preview";
 }) {
   const [fatalError, setFatalError] = useState("");
   const [guest, setGuest] = useState<GuestSession | null>(null);
@@ -383,7 +383,7 @@ export function WorkspaceV2GuestEntry({
       <main className="workspace-v2-preview-page">
         <section className="workspace-v2-empty">
           <h2>
-            {experience === "simple-preview"
+            {experience === "simple-preview" || experience === "library-preview"
               ? spanish
                 ? "Preparando música nueva"
                 : "Preparing new music"
@@ -403,7 +403,7 @@ export function WorkspaceV2GuestEntry({
         <section className="workspace-v2-empty">
           <h2>{spanish ? "No pudimos abrir el Workspace" : "We could not open the Workspace"}</h2>
           <p>{fatalError || "Guest access is unavailable."}</p>
-          <Link href={experience === "simple-preview" ? "/guest" : "/workspace-v2/guest"}>
+          <Link href={experience === "simple-preview" || experience === "library-preview" ? "/guest" : "/workspace-v2/guest"}>
             {spanish ? "Intentar de nuevo" : "Try again"}
           </Link>
         </section>
@@ -411,8 +411,15 @@ export function WorkspaceV2GuestEntry({
     );
   }
 
-  if (experience === "simple-preview") {
-    return <FirstListenSimplePreview locale={locale} queue={queue} />;
+  if (experience === "simple-preview" || experience === "library-preview") {
+    return (
+      <FirstListenSimplePreview
+        authenticated={experience === "library-preview"}
+        displayName={experience === "library-preview" ? "Vista local" : ""}
+        locale={locale}
+        queue={queue}
+      />
+    );
   }
 
   return (
