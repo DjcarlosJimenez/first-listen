@@ -4885,15 +4885,15 @@ function WorkspaceV2ContentPanel({
           </span>
           <Send size={19} />
           <span>
-            <strong>{spanish ? "Sube tu musica" : "Submit your music"}</strong>
+            <strong>{spanish ? "Comparte tu enlace" : "Share your link"}</strong>
             <small>
               {viewerMode === "guest"
                 ? spanish
-                  ? "Crea una cuenta gratis para activar envios."
-                  : "Create a free account to activate submissions."
+                  ? "Crea una cuenta gratis para compartir enlaces."
+                  : "Create a free account to share links."
                 : spanish
-                  ? "Usa tus tokens cuando estes listo para compartir."
-                  : "Use your tokens when you are ready to share."}
+                  ? "Pega el enlace original cuando estes listo para compartir."
+                  : "Paste the original link when you are ready to share."}
             </small>
           </span>
         </button>

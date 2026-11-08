@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { BadgeCheck, CheckCircle2, Clock3, Copy, LoaderCircle, Share2, ShieldCheck } from "lucide-react";
+import { BadgeCheck, CheckCircle2, Clock3, Copy, Link2, LoaderCircle, Share2, ShieldCheck } from "lucide-react";
 import {
   firstPublishFunnelLabels,
   trackFirstPublishStage,
@@ -126,12 +126,16 @@ export function FirstPublishVerify({
         <section className="first-publish-success-card published">
           <span className="first-publish-success-icon"><CheckCircle2 size={32} /></span>
           <span className="eyebrow">PUBLICACIÓN COMPLETADA</span>
-          <h1>{retained ? "Tu canción se mantendrá activa" : "Tu canción ya está publicada"}</h1>
+          <h1>{retained ? "Tu enlace se mantendrá activo" : "Tu enlace ya está publicado"}</h1>
           <p>
             {retained
-              ? "Tu acceso gratuito quedó activo. Ya puedes administrar esta canción y publicar más desde tu cuenta."
-              : `Estará visible en First Listen durante 7 días${expiresAt ? `, hasta ${new Date(expiresAt).toLocaleDateString("es-US")}` : ""}.`}
+              ? "Tu acceso gratuito quedó activo y el enlace ya no tiene el vencimiento fijo de 7 días. Permanecerá visible mientras esté activo, tu cuenta siga en regla y cumpla las normas."
+              : `Estará visible en FirstListen durante 7 días${expiresAt ? `, hasta ${new Date(expiresAt).toLocaleDateString("es-US")}` : ""}.`}
           </p>
+          <div className="first-publish-email-help">
+            <Link2 size={18} />
+            <span>FirstListen muestra el enlace original. No recibimos ni almacenamos tu archivo de audio y tú conservas tus derechos.</span>
+          </div>
           {liveUrl && (
             <div className="first-publish-result-card">
               <div
@@ -147,8 +151,8 @@ export function FirstPublishVerify({
             <div className="first-publish-retain-box">
               <BadgeCheck size={24} />
               <div>
-                <strong>Mantén tu canción activa gratis</strong>
-                <span>Sin tarjeta. Conserva la publicación y administra tu música.</span>
+                <strong>Mantén tu enlace activo gratis</strong>
+                <span>Sin tarjeta. Elimina el vencimiento fijo de 7 días y administra tus enlaces.</span>
               </div>
               <button disabled={retaining} onClick={retain} type="button">
                 {retaining ? <LoaderCircle className="spin" size={18} /> : <ShieldCheck size={18} />}
@@ -166,7 +170,7 @@ export function FirstPublishVerify({
           )}
           <div className="first-publish-success-actions">
             <Link className="primary" href={retained ? "/dashboard" : liveUrl || "/guest"}>
-              {retained ? "Administrar mi música" : "Abrir mi publicación"}
+              {retained ? "Administrar mis enlaces" : "Abrir mi publicación"}
             </Link>
             {!retained && <Link href="/dashboard">Entrar a mi cuenta gratuita</Link>}
           </div>
@@ -180,9 +184,9 @@ export function FirstPublishVerify({
       <section className="first-publish-success-card verify">
         <span className="first-publish-success-icon"><ShieldCheck size={30} /></span>
         <span className="eyebrow">CONFIRMACIÓN SEGURA</span>
-        <h1>Confirma y publica</h1>
+        <h1>Confirma y comparte</h1>
         <p>
-          Abrir el correo no publicó nada. Presiona el botón para confirmar tu dirección y colocar tu canción en First Listen durante 7 días.
+          Abrir el correo no publicó nada. Presiona el botón para confirmar tu dirección y compartir el enlace original en FirstListen durante 7 días.
         </p>
         <div className="first-publish-email-help">
           <Clock3 size={18} />
@@ -191,7 +195,7 @@ export function FirstPublishVerify({
         {error && <div className="first-publish-error" role="alert">{error}</div>}
         <button className="first-publish-submit" disabled={!linkReady || publishing} onClick={publish} type="button">
           {publishing ? <LoaderCircle className="spin" size={19} /> : <CheckCircle2 size={19} />}
-          {publishing ? "Publicando..." : "Confirmar correo y publicar"}
+          {publishing ? "Compartiendo..." : "Confirmar correo y compartir"}
         </button>
         {!linkReady && <p className="first-publish-error">El enlace está incompleto. Solicita uno nuevo.</p>}
         <Link href="/first-publish">Solicitar un enlace nuevo</Link>

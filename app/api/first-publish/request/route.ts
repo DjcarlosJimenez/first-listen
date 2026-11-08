@@ -148,7 +148,7 @@ export async function POST(request: Request) {
 
   if (!payload.termsAccepted) {
     return NextResponse.json(
-      { error: "Debes aceptar los términos y la publicación visible por 7 días." },
+      { error: "Debes aceptar los términos, el uso único por correo y la publicación visible por 7 días." },
       { status: 400 },
     );
   }

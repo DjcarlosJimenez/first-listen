@@ -40,6 +40,7 @@ import {
   ProviderPlayer,
   type ProviderTelemetrySnapshot,
 } from "@/components/provider-player";
+import { FirstPublishForm } from "@/components/first-publish-form";
 import { LanguageSelector } from "@/components/language-selector";
 import { Logo } from "@/components/logo";
 import { clearBrowserAuthSession } from "@/lib/auth-session-cleanup";
@@ -165,6 +166,7 @@ export function FirstListenSimplePreview({
   const [signingOut, setSigningOut] = useState(false);
   const [playerDocked, setPlayerDocked] = useState(false);
   const [playerPlaceholderHeight, setPlayerPlaceholderHeight] = useState(0);
+  const [publishOpen, setPublishOpen] = useState(false);
   const newTodayRowRef = useRef<HTMLDivElement>(null);
   const playerSlotRef = useRef<HTMLDivElement>(null);
   const playerCardRef = useRef<HTMLElement>(null);
@@ -181,6 +183,7 @@ export function FirstListenSimplePreview({
   const sessionSecondsRef = useRef(0);
   const listenedSecondsBySongRef = useRef(new Map<string, number>());
   const verifiedSongIdsRef = useRef(new Set<string>());
+  const publishReturnPathRef = useRef("");
   const activeSong =
     filteredSongs[activeIndex % Math.max(1, filteredSongs.length)] ??
     playableSongs[0];
@@ -194,6 +197,29 @@ export function FirstListenSimplePreview({
     setInterfaceLocale(nextLocale);
     persistInterfaceLocale(nextLocale);
   }, [locale]);
+
+  useEffect(() => {
+    const handlePublishHistory = () => {
+      const overlayState = window.history.state as
+        | { firstListenPublishOverlay?: boolean }
+        | null;
+      setPublishOpen(
+        window.location.pathname === "/first-publish" &&
+          overlayState?.firstListenPublishOverlay === true,
+      );
+    };
+    window.addEventListener("popstate", handlePublishHistory);
+    return () => window.removeEventListener("popstate", handlePublishHistory);
+  }, []);
+
+  useEffect(() => {
+    if (!publishOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [publishOpen]);
 
   useEffect(() => {
     const now = Date.now();
@@ -290,6 +316,34 @@ export function FirstListenSimplePreview({
       source: "user-click",
     });
   }, []);
+
+  const openPublishPanel = useCallback(() => {
+    if (publishOpen) return;
+    publishReturnPathRef.current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.pushState(
+      {
+        ...(window.history.state ?? {}),
+        firstListenPublishOverlay: true,
+      },
+      "",
+      "/first-publish?embedded=1",
+    );
+    setPublishOpen(true);
+  }, [publishOpen]);
+
+  const closePublishPanel = useCallback(() => {
+    const returnPath =
+      publishReturnPathRef.current || (authenticated ? "/dashboard" : "/guest");
+    setPublishOpen(false);
+    window.history.replaceState(
+      {
+        ...(window.history.state ?? {}),
+        firstListenPublishOverlay: false,
+      },
+      "",
+      returnPath,
+    );
+  }, [authenticated]);
 
   const handleSignOut = useCallback(async () => {
     if (signingOut) return;
@@ -605,6 +659,8 @@ export function FirstListenSimplePreview({
 
   if (!activeSong) return null;
 
+  const playerFloating = playerDocked || (publishOpen && started);
+
   return (
     <main className="first-listen-simple-preview" id="top">
       <header className="first-listen-simple-header">
@@ -734,18 +790,18 @@ export function FirstListenSimplePreview({
           <div>
             <span>{spanish ? "¿Eres artista?" : "Are you an artist?"}</span>
             <strong>
-              {spanish ? "Publica tu música en FirstListen" : "Share your music on FirstListen"}
+              {spanish ? "Comparte el enlace de tu canción" : "Share your song link"}
             </strong>
             <small>
               {spanish
-                ? "Primera canción sin contraseña ni tarjeta"
-                : "First song with no password or card"}
+                ? "No subes archivos · primer enlace gratis y sin tarjeta"
+                : "No file uploads · first link free with no card"}
             </small>
           </div>
-          <Link href="/first-publish">
+          <button onClick={openPublishPanel} type="button">
             <Upload size={16} />
-            {spanish ? "Publicar gratis" : "Publish free"}
-          </Link>
+            {spanish ? "Compartir enlace" : "Share link"}
+          </button>
         </section>
       )}
 
@@ -887,16 +943,16 @@ export function FirstListenSimplePreview({
       )}
 
       <div
-        className={`first-listen-simple-player-slot${playerDocked ? " is-docked" : ""}`}
+        className={`first-listen-simple-player-slot${playerFloating ? " is-docked" : ""}`}
         ref={playerSlotRef}
         style={
-          playerDocked && playerPlaceholderHeight
+          playerFloating && playerPlaceholderHeight
             ? { minHeight: `${playerPlaceholderHeight}px` }
             : undefined
         }
       >
       <section
-        className={`first-listen-simple-player-card${playerDocked ? " is-docked" : ""}`}
+        className={`first-listen-simple-player-card${playerFloating ? " is-docked" : ""}`}
         id="first-listen-player"
         ref={playerCardRef}
       >
@@ -907,7 +963,7 @@ export function FirstListenSimplePreview({
             <small>{activeSong.artist}</small>
           </div>
           <div className="first-listen-simple-player-window-actions">
-            {playerDocked && (
+            {playerFloating && (
               <button
                 aria-label={spanish ? "Abrir reproductor grande" : "Open large player"}
                 onClick={restorePlayer}
@@ -1083,7 +1139,7 @@ export function FirstListenSimplePreview({
           <div className="first-listen-simple-member-actions">
             <Link className="primary" href="/profile#submitted-songs">
               <Upload size={16} />
-              {spanish ? "Administrar música" : "Manage music"}
+              {spanish ? "Administrar enlaces" : "Manage links"}
             </Link>
             <Link href="/profile">
               <UserRound size={16} />
@@ -1142,10 +1198,10 @@ export function FirstListenSimplePreview({
           <Compass size={19} />
           <span>{spanish ? "Explorar" : "Explore"}</span>
         </a>
-        <Link className="primary" href="/first-publish">
+        <button className="primary" onClick={openPublishPanel} type="button">
           <Upload size={20} />
-          <span>{spanish ? "Publicar" : "Publish"}</span>
-        </Link>
+          <span>{spanish ? "Compartir" : "Share"}</span>
+        </button>
         {canManage && (
           <Link href="/control-center">
             <ShieldCheck size={19} />
@@ -1157,6 +1213,17 @@ export function FirstListenSimplePreview({
           <span>{spanish ? "Mi cuenta" : "My account"}</span>
         </Link>
       </nav>
+
+      {publishOpen && (
+        <div
+          aria-label={spanish ? "Compartir tu enlace" : "Share your link"}
+          aria-modal="true"
+          className="first-listen-publish-layer"
+          role="dialog"
+        >
+          <FirstPublishForm embedded onClose={closePublishPanel} />
+        </div>
+      )}
     </main>
   );
 }

@@ -122,7 +122,7 @@ export function FirstPublishLive({ song }: { song: FirstPublishLiveSong }) {
       const data = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(data.error || "No pudimos conservar la canción.");
       setRetained(true);
-      setNotice("Tu canción quedó activa sin fecha de vencimiento.");
+      setNotice("Tu enlace quedó activo sin el vencimiento fijo de 7 días.");
       trackFirstPublishStage(firstPublishFunnelLabels.retained);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "No pudimos conservar la canción.");
@@ -139,7 +139,7 @@ export function FirstPublishLive({ song }: { song: FirstPublishLiveSong }) {
     <main className="first-publish-live-page">
       <header className="first-publish-live-header">
         <Link href="/guest">FIRST <span>LISTEN</span></Link>
-        <Link href="/first-publish">Publicar mi canción</Link>
+        <Link href="/first-publish">Compartir otro enlace</Link>
       </header>
 
       <section className="first-publish-live-card">
@@ -211,8 +211,8 @@ export function FirstPublishLive({ song }: { song: FirstPublishLiveSong }) {
         <section className="first-publish-owner-panel">
           <div>
             <span className="eyebrow"><CheckCircle2 size={14} /> TU PUBLICACIÓN</span>
-            <h2>{retained ? "Tu canción se mantendrá activa" : "Tu canción está activa por 7 días"}</h2>
-            <p>{retained ? "Ya no tiene fecha de vencimiento." : `Visible hasta ${expiration}. Consérvala gratis y administra tus próximas publicaciones.`}</p>
+            <h2>{retained ? "Tu enlace se mantendrá activo" : "Tu enlace está activo por 7 días"}</h2>
+            <p>{retained ? "Ya no tiene el vencimiento fijo de 7 días. Permanecerá visible mientras esté activo, tu cuenta siga en regla y cumpla las normas." : `Visible hasta ${expiration}. Consérvalo gratis y administra tus próximas publicaciones.`}</p>
           </div>
           {!retained ? (
             <button disabled={retaining} onClick={retain} type="button">

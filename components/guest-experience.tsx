@@ -365,9 +365,9 @@ function GuestSidebar({
             </button>
           );
         })}
-        <button onClick={() => onGate(spanish ? "Subir canción" : "Upload Song")} type="button">
+        <button onClick={() => onGate(spanish ? "Compartir enlace" : "Share Link")} type="button">
           <Upload size={19} />
-          <span>{spanish ? "Enviar canción" : "Submit Song"}</span>
+          <span>{spanish ? "Compartir enlace" : "Share Link"}</span>
           <LockKeyhole className="nav-lock" size={14} />
         </button>
       </nav>

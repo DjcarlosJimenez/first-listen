@@ -915,10 +915,10 @@ export function ProfilePanel({
               <p>{spanish ? "Todavía no has enviado canciones." : "No songs submitted yet."}</p>
               {onNavigate ? (
                 <button className="text-link-button" onClick={() => onNavigate("submit")} type="button">
-                  {spanish ? "Enviar tu primera canción" : "Submit your first song"}
+                  {spanish ? "Compartir tu primer enlace" : "Share your first link"}
                 </button>
               ) : (
-                <Link href="/first-publish">{spanish ? "Enviar tu primera canción" : "Submit your first song"}</Link>
+                <Link href="/first-publish">{spanish ? "Compartir tu primer enlace" : "Share your first link"}</Link>
               )}
             </div>
           ) : (
