@@ -6,7 +6,7 @@ export default function PrivacyPage() {
     <LegalPage
       title="Privacy Policy"
       titleEs="Política de privacidad"
-      updated="November 4, 2026"
+      updated="November 8, 2026"
       childrenEs={
         <>
           <h2>Quién opera First Listen</h2>
@@ -21,6 +21,8 @@ export default function PrivacyPage() {
           <p>Registramos páginas visitadas, botones utilizados, decisiones de reproducción, duración, fuente de visita y tipo general de dispositivo para operar el reproductor, ofrecer estadísticas privadas y mantener una rotación justa. Usamos identificadores aleatorios de visitante y sesión que se guardan como resúmenes irreversibles (hashes) en el servidor. En funciones protegidas contra abuso, una dirección IP puede procesarse temporalmente y guardarse solamente como hash irreversible; no guardamos la dirección IP original en esas tablas.</p>
           <h2>Cómo usamos los datos</h2>
           <p>Usamos los datos para autenticar cuentas, mostrar música, completar publicaciones solicitadas, medir actividad real, mantener una rotación justa, ofrecer estadísticas, prevenir fraude, enviar correos transaccionales, atender reportes y proteger a la comunidad. Las reproducciones no generan pagos, tokens ni prioridad.</p>
+          <h2>Comunicaciones y tus preferencias</h2>
+          <p>First Listen puede mostrar avisos dentro de la aplicación sobre música nueva. Los correos de novedades o recordatorios de actividad son opcionales y requieren tu consentimiento independiente. Para un mismo evento elegimos un solo canal: no enviamos correo y notificación de aplicación por el mismo aviso. Respetamos las preferencias de género, los horarios silenciosos configurados y un límite de un contacto externo cada 14 días como máximo. Los miembros activos reciben las novedades dentro de la aplicación; el correo se reserva para quienes hayan aceptado recibirlo y lleven tiempo sin entrar. Puedes cambiar estas preferencias o cancelar los correos en cualquier momento. Las notificaciones push del sistema todavía no están activas en la versión Android actual.</p>
           <h2>Reproductores externos y proveedores</h2>
           <p>La plataforma principal reproduce música mediante enlaces o reproductores autorizados de YouTube, YouTube Music, Spotify, SoundCloud, Apple Music u otros servicios que el usuario elija. Al abrir o reproducir contenido, esos servicios pueden recibir datos normales de conexión y aplicar sus propias políticas. Para operar First Listen utilizamos proveedores como Supabase, Vercel y Resend como encargados del servicio.</p>
           <h2>Venta, anuncios y seguridad</h2>
@@ -46,6 +48,8 @@ export default function PrivacyPage() {
       <p>We record pages visited, buttons used, playback choices, duration, visit source, and general device type to operate the player, provide private analytics, and maintain fair rotation. We use random visitor and session identifiers that are stored as one-way hashes on the server. For abuse-protected features, an IP address may be processed temporarily and stored only as a one-way hash; the original IP address is not stored in those tables.</p>
       <h2>How we use data</h2>
       <p>We use data to authenticate accounts, display music, complete requested submissions, measure genuine activity, maintain fair rotation, provide analytics, prevent fraud, send transactional email, process reports, and protect the community. Plays do not award payments, tokens, or priority.</p>
+      <h2>Communications and your preferences</h2>
+      <p>First Listen may show in-app notices about new music. Music-update emails and activity reminders are optional and require separate consent. For the same event, we select only one channel: we do not send both email and an app notification for the same notice. We honor configured genre preferences and quiet hours and limit external contact to no more than once every 14 days. Active members receive updates inside the app; email is reserved for members who opted in and have been away. You may change these preferences or unsubscribe from email at any time. System push notifications are not yet active in the current Android version.</p>
       <h2>External players and service providers</h2>
       <p>The main platform plays music through links or authorized players from YouTube, YouTube Music, Spotify, SoundCloud, Apple Music, or other services selected by the user. When content is opened or played, those services may receive standard connection data and apply their own policies. We use providers such as Supabase, Vercel, and Resend as service processors to operate First Listen.</p>
       <h2>Sale, advertising, and security</h2>

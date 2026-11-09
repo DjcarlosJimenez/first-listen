@@ -10,9 +10,12 @@ import {
   Check,
   Heart,
   ListMusic,
+  Mail,
+  Moon,
   Pencil,
   Play,
   Plus,
+  Smartphone,
   Trash2,
   X,
 } from "lucide-react";
@@ -24,6 +27,31 @@ import type { WorkspaceV2Song } from "@/lib/workspace-v2";
 const LOCAL_PLAYLISTS_KEY = "first-listen-local-playlists-v1";
 const LOCAL_LIKES_KEY = "first-listen-liked-song-snapshots-v1";
 const LOCAL_REMINDER_KEY = "first-listen-inactive-reminder-preference-v1";
+const LOCAL_COMMUNICATIONS_KEY = "first-listen-communication-preferences-v1";
+
+type CommunicationPreferences = {
+  digestDays: number;
+  emailMusicDigest: boolean;
+  inAppMusicUpdates: boolean;
+  preferredGenres: string[];
+  quietEndHour: number;
+  quietStartHour: number;
+  reminderDays: number;
+  remindersEnabled: boolean;
+  timeZone: string;
+};
+
+const DEFAULT_COMMUNICATION_PREFERENCES: CommunicationPreferences = {
+  digestDays: 14,
+  emailMusicDigest: false,
+  inAppMusicUpdates: true,
+  preferredGenres: [],
+  quietEndHour: 9,
+  quietStartHour: 21,
+  reminderDays: 30,
+  remindersEnabled: false,
+  timeZone: "America/Chicago",
+};
 
 function libraryImageLoader({ src }: { src: string }) {
   return src;
@@ -32,6 +60,25 @@ function libraryImageLoader({ src }: { src: string }) {
 function isLocalPreviewHost() {
   if (typeof window === "undefined") return false;
   return ["localhost", "127.0.0.1"].includes(window.location.hostname);
+}
+
+function readLocalCommunicationPreferences() {
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(LOCAL_COMMUNICATIONS_KEY) ?? "null",
+    ) as Partial<CommunicationPreferences> | null;
+    if (stored) return { ...DEFAULT_COMMUNICATION_PREFERENCES, ...stored };
+    const legacy = JSON.parse(
+      window.localStorage.getItem(LOCAL_REMINDER_KEY) ?? "null",
+    ) as { enabled?: boolean; days?: number } | null;
+    return {
+      ...DEFAULT_COMMUNICATION_PREFERENCES,
+      reminderDays: Number(legacy?.days ?? 30),
+      remindersEnabled: Boolean(legacy?.enabled),
+    };
+  } catch {
+    return DEFAULT_COMMUNICATION_PREFERENCES;
+  }
 }
 
 export type LibrarySong = {
@@ -522,12 +569,43 @@ export function UserMusicLibrary({
   const [localDraft, setLocalDraft] = useState(false);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [reminderDays, setReminderDays] = useState(30);
+  const [inAppMusicUpdates, setInAppMusicUpdates] = useState(true);
+  const [emailMusicDigest, setEmailMusicDigest] = useState(false);
+  const [digestDays, setDigestDays] = useState(14);
+  const [quietStartHour, setQuietStartHour] = useState(21);
+  const [quietEndHour, setQuietEndHour] = useState(9);
+  const [timeZone, setTimeZone] = useState("America/Chicago");
+  const [preferredGenres, setPreferredGenres] = useState<string[]>([]);
   const [reminderMessage, setReminderMessage] = useState("");
+  const [savingPreferences, setSavingPreferences] = useState(false);
 
   const availableById = useMemo(
     () => new Map(availableSongs.map((song) => [song.id, toLibrarySong(song)])),
     [availableSongs],
   );
+  const availableGenres = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          availableSongs
+            .map((song) => String(song.genre ?? song.subcategory ?? song.category ?? "").trim())
+            .filter(Boolean),
+        ),
+      ).slice(0, 12),
+    [availableSongs],
+  );
+
+  const applyCommunicationPreferences = useCallback((preferences: CommunicationPreferences) => {
+    setInAppMusicUpdates(preferences.inAppMusicUpdates);
+    setEmailMusicDigest(preferences.emailMusicDigest);
+    setDigestDays(preferences.digestDays);
+    setRemindersEnabled(preferences.remindersEnabled);
+    setReminderDays(preferences.reminderDays);
+    setQuietStartHour(preferences.quietStartHour);
+    setQuietEndHour(preferences.quietEndHour);
+    setTimeZone(preferences.timeZone);
+    setPreferredGenres(preferences.preferredGenres);
+  }, []);
 
   const loadLibrary = useCallback(async () => {
     if (isLocalPreviewHost()) {
@@ -537,15 +615,7 @@ export function UserMusicLibrary({
       setPlaylistItems(local.items);
       setLikedSongs(localLikes);
       setLocalDraft(true);
-      try {
-        const reminder = JSON.parse(window.localStorage.getItem(LOCAL_REMINDER_KEY) ?? "null") as
-          | { enabled?: boolean; days?: number }
-          | null;
-        setRemindersEnabled(Boolean(reminder?.enabled));
-        setReminderDays(Number(reminder?.days ?? 30));
-      } catch {
-        // Keep safe defaults.
-      }
+      applyCommunicationPreferences(readLocalCommunicationPreferences());
       return;
     }
     const supabase = createClient();
@@ -553,7 +623,7 @@ export function UserMusicLibrary({
       const [remoteLibrary, likesResponse, preferencesResponse] = await Promise.all([
         loadRemoteLibrary().catch(() => null),
         supabase.rpc("get_my_liked_songs"),
-        supabase.rpc("get_my_notification_preferences"),
+        supabase.rpc("get_my_communication_preferences"),
       ]);
       if (remoteLibrary && !likesResponse.error) {
         setPlaylists(remoteLibrary.playlists);
@@ -564,8 +634,19 @@ export function UserMusicLibrary({
         setLocalDraft(false);
         const preference = firstRow(preferencesResponse.data) as Record<string, unknown> | null;
         if (preference) {
-          setRemindersEnabled(Boolean(preference.inactive_community_reminders));
-          setReminderDays(Number(preference.reminder_interval_days ?? 30));
+          applyCommunicationPreferences({
+            digestDays: Number(preference.digest_interval_days ?? 14),
+            emailMusicDigest: Boolean(preference.email_music_digest_enabled),
+            inAppMusicUpdates: Boolean(preference.in_app_music_updates_enabled ?? true),
+            preferredGenres: Array.isArray(preference.preferred_genres)
+              ? preference.preferred_genres.map(String)
+              : [],
+            quietEndHour: Number(preference.quiet_hours_end ?? 9),
+            quietStartHour: Number(preference.quiet_hours_start ?? 21),
+            reminderDays: Number(preference.reminder_interval_days ?? 30),
+            remindersEnabled: Boolean(preference.inactive_community_reminders),
+            timeZone: String(preference.time_zone ?? "America/Chicago"),
+          });
         }
         return;
       }
@@ -577,16 +658,8 @@ export function UserMusicLibrary({
     setPlaylistItems(local.items);
     setLikedSongs(localLikes);
     setLocalDraft(true);
-    try {
-      const reminder = JSON.parse(window.localStorage.getItem(LOCAL_REMINDER_KEY) ?? "null") as
-        | { enabled?: boolean; days?: number }
-        | null;
-      setRemindersEnabled(Boolean(reminder?.enabled));
-      setReminderDays(Number(reminder?.days ?? 30));
-    } catch {
-      // Keep safe defaults.
-    }
-  }, [availableById]);
+    applyCommunicationPreferences(readLocalCommunicationPreferences());
+  }, [applyCommunicationPreferences, availableById]);
 
   useEffect(() => {
     void loadLibrary();
@@ -716,23 +789,54 @@ export function UserMusicLibrary({
     await loadLibrary();
   };
 
-  const saveReminderPreference = async () => {
+  const saveCommunicationPreferences = async () => {
+    setSavingPreferences(true);
+    setReminderMessage("");
+    const preferences: CommunicationPreferences = {
+      digestDays,
+      emailMusicDigest,
+      inAppMusicUpdates,
+      preferredGenres,
+      quietEndHour,
+      quietStartHour,
+      reminderDays,
+      remindersEnabled: emailMusicDigest && remindersEnabled,
+      timeZone,
+    };
     const supabase = createClient();
     if (supabase && !localDraft && !isLocalPreviewHost()) {
-      const { error } = await supabase.rpc("update_inactive_reminder_preference", {
-        reminders_enabled: remindersEnabled,
-        interval_days: reminderDays,
+      const { error } = await supabase.rpc("update_my_communication_preferences", {
+        digest_days: digestDays,
+        email_digest_enabled: emailMusicDigest,
+        genres: preferredGenres,
+        in_app_enabled: inAppMusicUpdates,
+        inactivity_days: reminderDays,
+        inactivity_reminders_enabled: emailMusicDigest && remindersEnabled,
+        push_updates_enabled: false,
+        quiet_end_hour: quietEndHour,
+        quiet_start_hour: quietStartHour,
+        user_time_zone: timeZone,
       });
       if (!error) {
-        setReminderMessage(spanish ? "Preferencia guardada. Aún no se enviarán correos." : "Preference saved. Emails are not enabled yet.");
+        setReminderMessage(
+          spanish
+            ? "Preferencias guardadas. FirstListen usará un solo canal y respetará tus límites."
+            : "Preferences saved. FirstListen will use one channel and respect your limits.",
+        );
+        setSavingPreferences(false);
         return;
       }
     }
     window.localStorage.setItem(
-      LOCAL_REMINDER_KEY,
-      JSON.stringify({ days: reminderDays, enabled: remindersEnabled }),
+      LOCAL_COMMUNICATIONS_KEY,
+      JSON.stringify(preferences),
     );
-    setReminderMessage(spanish ? "Preferencia guardada en esta vista local." : "Preference saved in this local preview.");
+    setReminderMessage(
+      spanish
+        ? "Preferencias guardadas en esta vista local. No se enviará ningún mensaje."
+        : "Preferences saved in this local preview. No message will be sent.",
+    );
+    setSavingPreferences(false);
   };
 
   const songCards = (songs: LibrarySong[]) => (
@@ -924,40 +1028,148 @@ export function UserMusicLibrary({
         </div>
       )}
 
-      <div className="first-listen-reminder-preference">
-        <Bell size={19} />
-        <span>
-          <strong>{spanish ? "Recordatorio de comunidad" : "Community reminder"}</strong>
-          <small>
-            {spanish
-              ? "Opcional: avísame por correo si llevo tiempo sin participar. No se enviará nada durante esta revisión local."
-              : "Optional: email me if I have been inactive. Nothing will be sent during this local review."}
-          </small>
-        </span>
-        <label>
+      <section className="first-listen-communication-preferences">
+        <header>
+          <Bell size={21} />
+          <span>
+            <strong>{spanish ? "Avisos sin exceso" : "Useful, limited updates"}</strong>
+            <small>
+              {spanish
+                ? "Tú eliges. FirstListen usa un solo canal por evento y nunca envía correo y push por la misma novedad."
+                : "You choose. FirstListen uses one channel per event and never sends both email and push for the same update."}
+            </small>
+          </span>
+          <em>{spanish ? "Máximo 1 contacto externo cada 14 días" : "At most 1 external contact every 14 days"}</em>
+        </header>
+
+        <div className="first-listen-communication-channels">
+          <label>
+            <Bell size={18} />
+            <span>
+              <strong>{spanish ? "Dentro de FirstListen" : "Inside FirstListen"}</strong>
+              <small>{spanish ? "Recomendado: aparece solo cuando entras." : "Recommended: shown only when you visit."}</small>
+            </span>
+            <input
+              checked={inAppMusicUpdates}
+              onChange={(event) => setInAppMusicUpdates(event.target.checked)}
+              type="checkbox"
+            />
+          </label>
+          <label>
+            <Mail size={18} />
+            <span>
+              <strong>{spanish ? "Resumen ocasional por correo" : "Occasional email digest"}</strong>
+              <small>{spanish ? "Desactivado hasta que tú lo autorices." : "Off until you explicitly allow it."}</small>
+            </span>
+            <input
+              checked={emailMusicDigest}
+              onChange={(event) => {
+                setEmailMusicDigest(event.target.checked);
+                if (!event.target.checked) setRemindersEnabled(false);
+              }}
+              type="checkbox"
+            />
+          </label>
+          <div className="disabled" aria-disabled="true">
+            <Smartphone size={18} />
+            <span>
+              <strong>{spanish ? "Notificaciones de la aplicación" : "App notifications"}</strong>
+              <small>{spanish ? "Aún no disponibles. Se solicitará permiso en una versión futura verificada." : "Not available yet. Permission will be requested in a future reviewed release."}</small>
+            </span>
+            <small>{spanish ? "Próximamente" : "Coming later"}</small>
+          </div>
+        </div>
+
+        <div className="first-listen-communication-settings">
+          <label>
+            {spanish ? "Frecuencia del correo" : "Email frequency"}
+            <select
+              disabled={!emailMusicDigest}
+              onChange={(event) => setDigestDays(Number(event.target.value))}
+              value={digestDays}
+            >
+              <option value={14}>{spanish ? "Como máximo cada 14 días" : "At most every 14 days"}</option>
+              <option value={30}>{spanish ? "Como máximo cada 30 días" : "At most every 30 days"}</option>
+            </select>
+          </label>
+          <label>
+            {spanish ? "Zona horaria" : "Time zone"}
+            <input
+              onChange={(event) => setTimeZone(event.target.value)}
+              placeholder="America/Chicago"
+              value={timeZone}
+            />
+          </label>
+          <label>
+            <Moon size={15} /> {spanish ? "Horario silencioso" : "Quiet hours"}
+            <span className="first-listen-quiet-hours">
+              <select onChange={(event) => setQuietStartHour(Number(event.target.value))} value={quietStartHour}>
+                {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00</option>)}
+              </select>
+              <span>–</span>
+              <select onChange={(event) => setQuietEndHour(Number(event.target.value))} value={quietEndHour}>
+                {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00</option>)}
+              </select>
+            </span>
+          </label>
+        </div>
+
+        <div className="first-listen-communication-genres">
+          <strong>{spanish ? "Estilos que te interesan" : "Styles you care about"}</strong>
+          <small>{spanish ? "Opcional. Si no eliges, se usa una mezcla justa." : "Optional. If empty, a fair mix is used."}</small>
+          <div>
+            {availableGenres.map((genre) => {
+              const active = preferredGenres.includes(genre);
+              return (
+                <button
+                  className={active ? "active" : ""}
+                  key={genre}
+                  onClick={() => setPreferredGenres((current) =>
+                    active ? current.filter((value) => value !== genre) : [...current, genre].slice(0, 12),
+                  )}
+                  type="button"
+                >
+                  {active && <Check size={13} />} {genre}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <label className="first-listen-inactivity-reminder">
           <input
-            checked={remindersEnabled}
+            checked={emailMusicDigest && remindersEnabled}
+            disabled={!emailMusicDigest}
             onChange={(event) => setRemindersEnabled(event.target.checked)}
             type="checkbox"
           />
-          {spanish ? "Permitir" : "Allow"}
+          <span>
+            <strong>{spanish ? "Recordarme si dejo de participar" : "Remind me if I become inactive"}</strong>
+            <small>{spanish ? "Solo por correo y respetando el límite general." : "Email only, under the same overall limit."}</small>
+          </span>
+          <select
+            disabled={!emailMusicDigest || !remindersEnabled}
+            onChange={(event) => setReminderDays(Number(event.target.value))}
+            value={reminderDays}
+          >
+            <option value={30}>{spanish ? "Después de 30 días" : "After 30 days"}</option>
+            <option value={60}>{spanish ? "Después de 60 días" : "After 60 days"}</option>
+            <option value={90}>{spanish ? "Después de 90 días" : "After 90 days"}</option>
+          </select>
         </label>
-        <select
-          aria-label={spanish ? "Frecuencia del recordatorio" : "Reminder frequency"}
-          disabled={!remindersEnabled}
-          onChange={(event) => setReminderDays(Number(event.target.value))}
-          value={reminderDays}
-        >
-          <option value={14}>{spanish ? "Después de 14 días" : "After 14 days"}</option>
-          <option value={30}>{spanish ? "Después de 30 días" : "After 30 days"}</option>
-          <option value={60}>{spanish ? "Después de 60 días" : "After 60 days"}</option>
-          <option value={90}>{spanish ? "Después de 90 días" : "After 90 days"}</option>
-        </select>
-        <button onClick={() => void saveReminderPreference()} type="button">
-          {spanish ? "Guardar preferencia" : "Save preference"}
-        </button>
+
+        <footer>
+          <small>
+            {spanish
+              ? "Los usuarios activos reciben avisos dentro de FirstListen. El correo se reserva para quienes lo autoricen y lleven tiempo sin entrar."
+              : "Active users receive in-app updates. Email is reserved for people who opted in and have been away."}
+          </small>
+          <button disabled={savingPreferences} onClick={() => void saveCommunicationPreferences()} type="button">
+            {savingPreferences ? (spanish ? "Guardando…" : "Saving…") : (spanish ? "Guardar preferencias" : "Save preferences")}
+          </button>
+        </footer>
         {reminderMessage && <p role="status">{reminderMessage}</p>}
-      </div>
+      </section>
     </section>
   );
 }

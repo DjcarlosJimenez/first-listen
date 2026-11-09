@@ -85,6 +85,9 @@
     "first-publish:verify": "node scripts/verify-first-publish-trial.mjs",
     "user-library:dry-run": "node scripts/apply-user-music-library.mjs",
     "user-library:apply": "node scripts/apply-user-music-library.mjs --apply",
+    "communications:dry-run": "node scripts/apply-conservative-communications.mjs",
+    "communications:apply": "node scripts/apply-conservative-communications.mjs --apply",
+    "communications:verify": "node scripts/verify-conservative-communications.mjs",
     "db:verify": "node scripts/verify-database.mjs"
   },
   "dependencies": {

@@ -21,6 +21,7 @@ import {
   ListMusic,
   LogIn,
   LogOut,
+  Mic2,
   MessageCircleQuestion,
   Minimize2,
   PanelTopOpen,
@@ -65,6 +66,7 @@ import {
 const SIMPLE_PREVIEW_PLAYER_CHANNEL = "first-listen-simple-preview";
 const DISCOVERY_PROMPT_KEY = "first-listen-discovery-prompt-v1";
 const DISCOVERY_NOT_FOR_ME_KEY = "first-listen-not-for-me-v1";
+const COMMUNICATION_PREFERENCES_KEY = "first-listen-communication-preferences-v1";
 const NOT_FOR_ME_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
 type DiscoveryPromptChoice = "yes" | "not-now" | "later";
@@ -164,6 +166,7 @@ export function FirstListenSimplePreview({
   const [pausedByUser, setPausedByUser] = useState(false);
   const [promptVisible, setPromptVisible] = useState(false);
   const [promptReady, setPromptReady] = useState(false);
+  const [inAppUpdatesEnabled, setInAppUpdatesEnabled] = useState<boolean | null>(null);
   const [sessionSeconds, setSessionSeconds] = useState(0);
   const [verifiedListens, setVerifiedListens] = useState(0);
   const [reportNotice, setReportNotice] = useState("");
@@ -257,6 +260,43 @@ export function FirstListenSimplePreview({
       setPromptReady(true);
     }
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const resolvePreference = async () => {
+      try {
+        const local = JSON.parse(
+          window.localStorage.getItem(COMMUNICATION_PREFERENCES_KEY) ?? "null",
+        ) as { inAppMusicUpdates?: boolean } | null;
+        if (typeof local?.inAppMusicUpdates === "boolean") {
+          if (active) setInAppUpdatesEnabled(local.inAppMusicUpdates);
+          return;
+        }
+      } catch {
+        // Remote preference or the safe default below still applies.
+      }
+      if (!authenticated) {
+        if (active) setInAppUpdatesEnabled(true);
+        return;
+      }
+      const supabase = createClient();
+      if (!supabase) {
+        if (active) setInAppUpdatesEnabled(true);
+        return;
+      }
+      const { data, error } = await supabase.rpc("get_my_communication_preferences");
+      const row = Array.isArray(data) ? data[0] : data;
+      if (active) {
+        setInAppUpdatesEnabled(
+          error ? true : Boolean(row?.in_app_music_updates_enabled ?? true),
+        );
+      }
+    };
+    void resolvePreference();
+    return () => {
+      active = false;
+    };
+  }, [authenticated]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -542,9 +582,17 @@ export function FirstListenSimplePreview({
       } catch {
         // Playback remains available when browser storage is unavailable.
       }
+      if (authenticated) {
+        const supabase = createClient();
+        if (supabase) {
+          void supabase.rpc("record_music_update_prompt_seen", {
+            prompt_choice: choice,
+          });
+        }
+      }
       setPromptVisible(false);
     },
-    [],
+    [authenticated],
   );
 
   const acceptDiscovery = useCallback(() => {
@@ -710,6 +758,14 @@ export function FirstListenSimplePreview({
       <header className="first-listen-simple-header">
         <Logo />
         <div className="first-listen-simple-header-actions">
+          <Link
+            className="first-listen-simple-artists-link"
+            href="/paginas-de-artistas"
+            title={spanish ? "Visita las páginas de nuestros artistas" : "Visit our artist pages"}
+          >
+            <Mic2 size={16} />
+            <span>{spanish ? "Artistas" : "Artists"}</span>
+          </Link>
           <LanguageSelector
             compact
             locale={interfaceLocale}
@@ -935,7 +991,7 @@ export function FirstListenSimplePreview({
         </div>
       </section>
 
-      {promptReady && promptVisible && (
+      {promptReady && inAppUpdatesEnabled === true && promptVisible && (
         <section className="first-listen-simple-discovery-prompt">
           <div className="first-listen-simple-discovery-prompt-icon">
             <Radio size={22} />
@@ -972,7 +1028,7 @@ export function FirstListenSimplePreview({
         </section>
       )}
 
-      {promptReady && !promptVisible && !started && (
+      {promptReady && inAppUpdatesEnabled === true && !promptVisible && !started && (
         <button
           className="first-listen-simple-reopen-prompt"
           onClick={() => setPromptVisible(true)}

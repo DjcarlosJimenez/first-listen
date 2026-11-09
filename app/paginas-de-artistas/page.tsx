@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight, MessageCircle, Music2 } from "lucide-react";
+import { ArrowLeft, MessageCircle, Music2 } from "lucide-react";
+import {
+  ArtistDirectoryBrowser,
+  type ArtistDirectoryEntry,
+} from "@/components/artist-directory-browser";
 import { Logo } from "@/components/logo";
 import { normalizeArtistSiteConfig } from "@/lib/artist-sites";
 import { createClient } from "@/lib/supabase/server";
@@ -25,6 +28,45 @@ export default async function ArtistPagesDirectory() {
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
+  const artists: ArtistDirectoryEntry[] = [
+    {
+      description: "Página oficial · Música, álbumes y videos",
+      href: "/DJCarlosJimenez",
+      id: "dj-carlos-jimenez",
+      imageUrl: "/artist/dj-carlos-jimenez/icon-192.png",
+      name: "DJ Carlos Jimenez",
+      searchText: "cumbia sonidera compositor",
+    },
+    ...(sites ?? [])
+      .filter((site) => site.slug.toLocaleLowerCase("en-US") !== "djcarlosjimenez")
+      .map((site) => {
+        const config = normalizeArtistSiteConfig(site.config);
+        return {
+          accentColor: config.accentColor,
+          description:
+            config.tagline ||
+            (config.albums.length
+              ? `${config.albums.length} álbumes disponibles`
+              : "Página oficial en First Listen"),
+          href: `/${site.slug}`,
+          id: site.id,
+          imageUrl: config.logoUrl,
+          name: site.name,
+          searchText: [
+            config.tagline,
+            ...config.albums.flatMap((album) => [
+              album.title,
+              album.rhythm,
+              ...album.tracks.map((track) => track.rhythm),
+            ]),
+            ...config.videos.map((video) => video.rhythm),
+          ]
+            .filter(Boolean)
+            .join(" "),
+        } satisfies ArtistDirectoryEntry;
+      }),
+  ];
+
   return (
     <main className="artist-directory">
       <header className="artist-directory-header">
@@ -32,30 +74,11 @@ export default async function ArtistPagesDirectory() {
         <Link href="/"><ArrowLeft size={16} /> First Listen</Link>
       </header>
       <div className="artist-directory-heading">
-        <span className="eyebrow">PAGINAS OFICIALES</span>
-        <h1>Artistas en First Listen</h1>
+        <span className="eyebrow">DIRECTORIO OFICIAL</span>
+        <h1>Conoce a nuestros artistas</h1>
+        <p>Encuentra rápidamente su página, música, álbumes y videos oficiales.</p>
       </div>
-      <div className="artist-directory-grid">
-        <Link className="artist-directory-card" href="/DJCarlosJimenez">
-          <Image alt="Logo de DJ Carlos Jimenez" height={88} src="/artist/dj-carlos-jimenez/icon-192.png" width={88} />
-          <span><strong>DJ Carlos Jimenez</strong><small>Pagina de ejemplo</small></span>
-          <ArrowUpRight size={18} />
-        </Link>
-        {(sites ?? []).map((site) => {
-          const config = normalizeArtistSiteConfig(site.config);
-          return (
-            <Link className="artist-directory-card" href={`/${site.slug}`} key={site.id}>
-              {config.logoUrl ? (
-                <Image alt="" height={88} src={config.logoUrl} unoptimized width={88} />
-              ) : (
-                <span aria-hidden="true" className="artist-directory-initial">{site.name.slice(0, 1)}</span>
-              )}
-              <span><strong>{site.name}</strong><small>{config.tagline || `${config.albums.length} albumes`}</small></span>
-              <ArrowUpRight size={18} />
-            </Link>
-          );
-        })}
-      </div>
+      <ArtistDirectoryBrowser artists={artists} />
       <div className="artist-directory-contact">
         <Music2 size={20} />
         <div><strong>Tu musica merece su propio espacio.</strong><span>Paginas creadas y publicadas por First Listen.</span></div>
