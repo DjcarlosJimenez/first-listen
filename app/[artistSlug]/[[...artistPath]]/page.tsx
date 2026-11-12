@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { ArtistSiteEditor } from "@/components/artist-site-editor";
 import { ArtistSitePage } from "@/components/artist-site-page";
+import { ArtistLinkHubPage } from "@/components/artist-link-hub";
 import { normalizeArtistSiteConfig } from "@/lib/artist-sites";
 import { hasOwnerAccess } from "@/lib/admin-access";
 import {
@@ -96,6 +97,7 @@ export default async function PublicArtistSlugRoute({
   }
 
   const isAdminRoute = artistPath.length === 1 && artistPath[0] === "admin";
+  const isListenRoute = artistPath.length === 1 && artistPath[0] === "escucha";
   if (isAdminRoute) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -113,6 +115,8 @@ export default async function PublicArtistSlugRoute({
   let albumSlug: string | undefined;
   if (artistPath.length === 1 && artistPath[0] === "admin") {
     canonicalPath += "/admin";
+  } else if (isListenRoute) {
+    canonicalPath += "/escucha";
   } else if (artistPath.length === 2 && artistPath[0] === "album") {
     const album = config.albums.find((item) =>
       item.slug.toLowerCase() === artistPath[1].toLowerCase(),
@@ -146,6 +150,19 @@ export default async function PublicArtistSlugRoute({
       (assignment?.owner_user_id !== user.id && !hasOwnerAccess(profile, user.email))
     ) notFound();
     return <ArtistSiteEditor site={{ ...site, config }} />;
+  }
+
+  if (isListenRoute) {
+    return (
+      <ArtistLinkHubPage
+        accentColor={config.accentColor}
+        artistLogoUrl={config.logoUrl}
+        artistName={site.name}
+        artistPortraitUrl={config.portraitUrl}
+        artistUrl={`/${site.slug}`}
+        links={config.platformLinks}
+      />
+    );
   }
 
   return <ArtistSitePage albumSlug={albumSlug} config={config} site={site} />;

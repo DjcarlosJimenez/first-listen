@@ -3,6 +3,11 @@ import {
   isPlayableDjCarlosLink,
   slugifyDjCarlosAlbumTitle,
 } from "@/lib/dj-carlos-page";
+import {
+  emptyArtistPlatformLinks,
+  normalizeArtistPlatformLinks,
+  type ArtistPlatformLinks,
+} from "@/lib/artist-link-hub";
 
 export type ArtistSiteTrack = {
   id: string;
@@ -27,6 +32,7 @@ export type ArtistSiteConfig = {
   logoUrl: string;
   portraitUrl: string;
   accentColor: string;
+  platformLinks: ArtistPlatformLinks;
   albums: ArtistSiteAlbum[];
   topTenIds: string[];
   videos: ArtistSiteTrack[];
@@ -94,6 +100,7 @@ export function emptyArtistSiteConfig(): ArtistSiteConfig {
     logoUrl: "",
     portraitUrl: "",
     accentColor: "#FFD565",
+    platformLinks: emptyArtistPlatformLinks(),
     albums: [],
     topTenIds: [],
     videos: [],
@@ -178,6 +185,7 @@ export function normalizeArtistSiteConfig(value: unknown): ArtistSiteConfig {
     logoUrl: cleanImageUrl(source.logoUrl),
     portraitUrl: cleanImageUrl(source.portraitUrl),
     accentColor: /^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : "#FFD565",
+    platformLinks: normalizeArtistPlatformLinks(source.platformLinks),
     albums,
     topTenIds,
     videos,

@@ -39,6 +39,10 @@ import {
 } from "lucide-react";
 import { PwaInstallButton } from "@/components/pwa-install-prompt";
 import {
+  validateArtistPlatformLinks,
+  type ArtistPlatformLinkKey,
+} from "@/lib/artist-link-hub";
+import {
   DJ_CARLOS_DEFAULT_RHYTHM,
   DJ_CARLOS_PAGE_STORAGE_KEY,
   DJ_CARLOS_PREVIEW_CLIP_MAX_MB,
@@ -608,6 +612,34 @@ export function DjCarlosAdminPage({
       updatedAt: new Date().toISOString(),
     }));
     setStatus("Identidad visual actualizada. Toca Guardar cambios.");
+  };
+
+  const updatePlatformLink = (field: ArtistPlatformLinkKey, value: string) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      platformLinks: { ...current.platformLinks, [field]: value },
+      updatedAt: new Date().toISOString(),
+    }));
+    setStatus("Enlaces actualizados. Toca Guardar cambios.");
+  };
+
+  const addCustomPlatformLink = () => {
+    if (config.platformLinks.custom.length >= 8) return;
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      platformLinks: {
+        ...current.platformLinks,
+        custom: [...current.platformLinks.custom, {
+          id: crypto.randomUUID(),
+          label: "",
+          url: "",
+        }],
+      },
+      updatedAt: new Date().toISOString(),
+    }));
+    setStatus("Plataforma agregada. Completa el nombre y el enlace HTTPS.");
   };
 
   const updatePortraitVisible = (showPortrait: boolean) => {
@@ -1792,6 +1824,12 @@ export function DjCarlosAdminPage({
       }
     }
 
+    const platformError = validateArtistPlatformLinks(sourceConfig.platformLinks);
+    if (platformError) {
+      setStatus(platformError);
+      return false;
+    }
+
     const nextConfig = normalizeDjCarlosPageConfig(
       { ...sourceConfig, updatedAt: new Date().toISOString() },
       sourceConfig,
@@ -2041,6 +2079,99 @@ export function DjCarlosAdminPage({
               />
             </label>
           </div>
+        </div>
+      </section>
+
+      <section className="djcx-admin-panel djcx-admin-links-panel">
+        <div className="djcx-admin-panel-heading">
+          <span>
+            <ExternalLink size={15} /> Escucha mi música
+          </span>
+          <strong>Enlaces que aparecen en /DJCarlosJimenez/escucha</strong>
+        </div>
+        <p className="djcx-admin-panel-note">
+          Solo se muestran las plataformas que tengan un enlace válido. La página del artista y FirstListen aparecen automáticamente.
+        </p>
+        <div className="djcx-admin-form-grid">
+          <label>YouTube Music
+            <input onChange={(event) => updatePlatformLink("youtubeMusic", event.target.value)} placeholder="https://music.youtube.com/..." value={config.platformLinks.youtubeMusic} />
+          </label>
+          <label>Apple Music
+            <input onChange={(event) => updatePlatformLink("appleMusic", event.target.value)} placeholder="https://music.apple.com/..." value={config.platformLinks.appleMusic} />
+          </label>
+          <label>Spotify
+            <input onChange={(event) => updatePlatformLink("spotify", event.target.value)} placeholder="https://open.spotify.com/..." value={config.platformLinks.spotify} />
+          </label>
+          <label>Facebook
+            <input onChange={(event) => updatePlatformLink("facebook", event.target.value)} placeholder="https://www.facebook.com/..." value={config.platformLinks.facebook} />
+          </label>
+          <label className="djcx-admin-wide">Sitio web personal
+            <input onChange={(event) => updatePlatformLink("website", event.target.value)} placeholder="https://..." value={config.platformLinks.website} />
+          </label>
+        </div>
+        <div className="djcx-admin-custom-links">
+          <div className="djcx-admin-subheading">
+            <h3>Plataformas adicionales</h3>
+            <button disabled={config.platformLinks.custom.length >= 8} onClick={addCustomPlatformLink} type="button"><Plus size={15} /> Agregar</button>
+          </div>
+          {config.platformLinks.custom.map((link) => (
+            <div className="djcx-admin-custom-link" key={link.id}>
+              <label>Nombre
+                <input
+                  maxLength={60}
+                  onChange={(event) => {
+                    hasLocalChangesRef.current = true;
+                    setConfig((current) => ({
+                      ...current,
+                      platformLinks: {
+                        ...current.platformLinks,
+                        custom: current.platformLinks.custom.map((item) => item.id === link.id ? { ...item, label: event.target.value } : item),
+                      },
+                      updatedAt: new Date().toISOString(),
+                    }));
+                    setStatus("Enlace adicional actualizado. Toca Guardar cambios.");
+                  }}
+                  placeholder="Bandcamp"
+                  value={link.label}
+                />
+              </label>
+              <label>Enlace HTTPS
+                <input
+                  onChange={(event) => {
+                    hasLocalChangesRef.current = true;
+                    setConfig((current) => ({
+                      ...current,
+                      platformLinks: {
+                        ...current.platformLinks,
+                        custom: current.platformLinks.custom.map((item) => item.id === link.id ? { ...item, url: event.target.value } : item),
+                      },
+                      updatedAt: new Date().toISOString(),
+                    }));
+                    setStatus("Enlace adicional actualizado. Toca Guardar cambios.");
+                  }}
+                  placeholder="https://..."
+                  value={link.url}
+                />
+              </label>
+              <button
+                aria-label={`Quitar ${link.label || "plataforma"}`}
+                className="djcx-admin-danger"
+                onClick={() => {
+                  hasLocalChangesRef.current = true;
+                  setConfig((current) => ({
+                    ...current,
+                    platformLinks: {
+                      ...current.platformLinks,
+                      custom: current.platformLinks.custom.filter((item) => item.id !== link.id),
+                    },
+                    updatedAt: new Date().toISOString(),
+                  }));
+                  setStatus("Plataforma quitada. Toca Guardar cambios.");
+                }}
+                type="button"
+              ><Trash2 size={16} /></button>
+            </div>
+          ))}
         </div>
       </section>
 

@@ -10,6 +10,10 @@ import {
   type ArtistSiteConfig,
   type ArtistSiteTrack,
 } from "@/lib/artist-sites";
+import {
+  validateArtistPlatformLinks,
+  type ArtistPlatformLinkKey,
+} from "@/lib/artist-link-hub";
 import { isPlayableDjCarlosLink } from "@/lib/dj-carlos-page";
 import { createClient } from "@/lib/supabase/client";
 
@@ -21,7 +25,7 @@ type EditorSite = {
   config: unknown;
 };
 
-type EditorTab = "identity" | "albums" | "top-ten" | "videos" | "upcoming";
+type EditorTab = "identity" | "links" | "albums" | "top-ten" | "videos" | "upcoming";
 
 function move<T>(items: T[], index: number, direction: -1 | 1) {
   const nextIndex = index + direction;
@@ -49,6 +53,8 @@ function newAlbum(index: number): ArtistSiteAlbum {
 }
 
 function validateLinks(config: ArtistSiteConfig) {
+  const platformError = validateArtistPlatformLinks(config.platformLinks);
+  if (platformError) return platformError;
   const images = [
     ["logo", config.logoUrl],
     ["foto", config.portraitUrl],
@@ -111,6 +117,13 @@ export function ArtistSiteEditor({ site }: { site: EditorSite }) {
     setConfig(next);
     revisionRef.current += 1;
     setMessage("Cambios sin guardar.");
+  };
+
+  const updatePlatformLink = (field: ArtistPlatformLinkKey, value: string) => {
+    change({
+      ...config,
+      platformLinks: { ...config.platformLinks, [field]: value },
+    });
   };
 
   const updateAlbum = (albumId: string, update: Partial<ArtistSiteAlbum>) => {
@@ -268,6 +281,7 @@ export function ArtistSiteEditor({ site }: { site: EditorSite }) {
       <nav aria-label="Secciones del editor" className="artist-site-editor-tabs">
         {([
           ["identity", "Identidad"],
+          ["links", "Enlaces"],
           ["albums", "Albumes"],
           ["top-ten", "Top Ten"],
           ["videos", "Videos"],
@@ -316,6 +330,97 @@ export function ArtistSiteEditor({ site }: { site: EditorSite }) {
               {config.portraitUrl && <button className="artist-site-editor-secondary" onClick={() => change({ ...config, portraitUrl: "" })} type="button">Quitar foto</button>}
             </div>
           </div>
+        </section>
+      )}
+
+      {tab === "links" && (
+        <section className="artist-site-editor-section">
+          <div className="artist-site-editor-section-head">
+            <div>
+              <h2>Escucha mi música</h2>
+              <p>Solo aparecen en tu página los enlaces que completes.</p>
+            </div>
+            <button
+              disabled={config.platformLinks.custom.length >= 8}
+              onClick={() => change({
+                ...config,
+                platformLinks: {
+                  ...config.platformLinks,
+                  custom: [...config.platformLinks.custom, {
+                    id: crypto.randomUUID(),
+                    label: "",
+                    url: "",
+                  }],
+                },
+              })}
+              type="button"
+            ><Plus size={16} /> Agregar plataforma</button>
+          </div>
+          <div className="artist-site-editor-fields artist-site-editor-link-fields">
+            <label>YouTube Music
+              <input onChange={(event) => updatePlatformLink("youtubeMusic", event.target.value)} placeholder="https://music.youtube.com/..." type="url" value={config.platformLinks.youtubeMusic} />
+            </label>
+            <label>Apple Music
+              <input onChange={(event) => updatePlatformLink("appleMusic", event.target.value)} placeholder="https://music.apple.com/..." type="url" value={config.platformLinks.appleMusic} />
+            </label>
+            <label>Spotify
+              <input onChange={(event) => updatePlatformLink("spotify", event.target.value)} placeholder="https://open.spotify.com/..." type="url" value={config.platformLinks.spotify} />
+            </label>
+            <label>Facebook
+              <input onChange={(event) => updatePlatformLink("facebook", event.target.value)} placeholder="https://www.facebook.com/..." type="url" value={config.platformLinks.facebook} />
+            </label>
+            <label>Sitio web personal
+              <input onChange={(event) => updatePlatformLink("website", event.target.value)} placeholder="https://..." type="url" value={config.platformLinks.website} />
+            </label>
+          </div>
+          {config.platformLinks.custom.length > 0 && (
+            <div className="artist-site-editor-custom-links">
+              <h3>Plataformas adicionales</h3>
+              {config.platformLinks.custom.map((link) => (
+                <div key={link.id}>
+                  <label>Nombre
+                    <input
+                      maxLength={60}
+                      onChange={(event) => change({
+                        ...config,
+                        platformLinks: {
+                          ...config.platformLinks,
+                          custom: config.platformLinks.custom.map((item) => item.id === link.id ? { ...item, label: event.target.value } : item),
+                        },
+                      })}
+                      placeholder="Bandcamp"
+                      value={link.label}
+                    />
+                  </label>
+                  <label>Enlace HTTPS
+                    <input
+                      onChange={(event) => change({
+                        ...config,
+                        platformLinks: {
+                          ...config.platformLinks,
+                          custom: config.platformLinks.custom.map((item) => item.id === link.id ? { ...item, url: event.target.value } : item),
+                        },
+                      })}
+                      placeholder="https://..."
+                      type="url"
+                      value={link.url}
+                    />
+                  </label>
+                  <button
+                    aria-label={`Quitar ${link.label || "enlace"}`}
+                    onClick={() => change({
+                      ...config,
+                      platformLinks: {
+                        ...config.platformLinks,
+                        custom: config.platformLinks.custom.filter((item) => item.id !== link.id),
+                      },
+                    })}
+                    type="button"
+                  ><Trash2 size={16} /></button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 

@@ -27357,6 +27357,454 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   }
 }
 
+/* DJ Carlos: modern digital stage visual system */
+.djcx-page {
+  --djcx-black: #03060c;
+  --djcx-panel: #0a101b;
+  --djcx-gold: #27d8ff;
+  --djcx-gold-strong: #74ebff;
+  --djcx-cream: #f4f8ff;
+  --djcx-muted: #98a8bd;
+  --djcx-accent: #a38bff;
+  background:
+    radial-gradient(circle at 6% 8%, rgba(39, 216, 255, 0.16), transparent 28rem),
+    radial-gradient(circle at 92% 18%, rgba(139, 92, 246, 0.2), transparent 30rem),
+    linear-gradient(180deg, #03060c 0%, #070b13 52%, #04070d 100%);
+  color: var(--djcx-cream);
+  font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+  font-feature-settings: "kern" 1, "ss01" 1;
+}
+
+.djcx-page :is(
+  .djcx-hero-copy h1,
+  .djcx-album-panel h2,
+  .djcx-upcoming-copy h2,
+  .djcx-section-heading h2,
+  .djcx-compilation-copy h3
+) {
+  font-family: "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif;
+  font-weight: 820;
+  letter-spacing: -0.04em;
+}
+
+.djcx-page .djcx-player-strip {
+  background: rgba(3, 6, 12, 0.9);
+  border-color: rgba(46, 232, 255, 0.18);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(139, 92, 246, 0.12);
+}
+
+.djcx-page :is(.djcx-now-logo, .djcx-player-frame) {
+  border-color: rgba(46, 232, 255, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.08), 0 14px 38px rgba(0, 0, 0, 0.28);
+}
+
+.djcx-page :is(
+  .djcx-now-playing span,
+  .djcx-eyebrow,
+  .djcx-section-heading span,
+  .djcx-album-panel span,
+  .djcx-taste-bar > span
+) {
+  color: #72eaff;
+  letter-spacing: 0.09em;
+}
+
+.djcx-page .djcx-player-paused span {
+  background: rgba(5, 10, 18, 0.86);
+  border-color: rgba(46, 232, 255, 0.44);
+  box-shadow: 0 0 28px rgba(46, 232, 255, 0.16);
+}
+
+.djcx-page :is(
+  .djcx-player-controls button,
+  .djcx-player-controls a,
+  .djcx-hero-actions a,
+  .djcx-hero-actions button,
+  .djcx-album-panel button,
+  .djcx-section-heading button,
+  .djcx-top-ten-actions button,
+  .djcx-upcoming-engagement button,
+  .djcx-upcoming-reactions button,
+  .djcx-editor-actions button
+) {
+  border-color: rgba(46, 232, 255, 0.2);
+  border-radius: 12px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.djcx-page :is(
+  .djcx-player-controls button,
+  .djcx-player-controls a,
+  .djcx-hero-actions a,
+  .djcx-hero-actions button
+):hover {
+  border-color: rgba(46, 232, 255, 0.58);
+  box-shadow: 0 0 24px rgba(46, 232, 255, 0.11);
+  transform: translateY(-1px);
+}
+
+.djcx-page .djcx-player-controls .djcx-play-button,
+.djcx-page .djcx-hero-actions button:first-child,
+.djcx-page .djcx-album-panel button,
+.djcx-page .djcx-top-ten-actions button:first-child,
+.djcx-page .djcx-editor-actions button:first-child,
+.djcx-page .djcx-upcoming-engagement > button,
+.djcx-page .djcx-compilation-actions button:first-child,
+.djcx-page .djcx-install-button {
+  background: linear-gradient(135deg, #2ee8ff 0%, #6a9cff 48%, #9a72ff 100%);
+  border-color: rgba(177, 238, 255, 0.68);
+  box-shadow: 0 10px 30px rgba(74, 139, 255, 0.2);
+  color: #02050b;
+}
+
+.djcx-page .djcx-hero-copy h1 {
+  background: linear-gradient(105deg, #ffffff 12%, #b7f4ff 58%, #b69bff 100%);
+  background-clip: text;
+  letter-spacing: -0.065em;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.djcx-page .djcx-hero-copy p {
+  color: #b9c6d8;
+}
+
+.djcx-page .djcx-hero-actions a[href="/DJCarlosJimenez/escucha"] {
+  background: linear-gradient(135deg, rgba(46, 232, 255, 0.13), rgba(139, 92, 246, 0.16));
+  border-color: rgba(46, 232, 255, 0.44);
+  color: #dffaff;
+}
+
+.djcx-page .djcx-portrait-stage {
+  background: linear-gradient(145deg, rgba(46, 232, 255, 0.13), rgba(139, 92, 246, 0.14)), #050913;
+  border-color: rgba(78, 224, 255, 0.58);
+  border-radius: 20px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.44), 0 0 34px rgba(91, 101, 255, 0.16);
+}
+
+.djcx-page .djcx-taste-bar button {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(142, 168, 200, 0.2);
+  border-radius: 999px;
+  color: #dce6f3;
+}
+
+.djcx-page .djcx-taste-bar button:hover {
+  border-color: rgba(46, 232, 255, 0.56);
+}
+
+.djcx-page .djcx-taste-bar button.is-active {
+  background: linear-gradient(135deg, #2ee8ff, #8e72ff);
+  border-color: rgba(185, 242, 255, 0.72);
+  box-shadow: 0 8px 24px rgba(46, 155, 255, 0.18);
+  color: #02050b;
+}
+
+.djcx-page :is(
+  .djcx-album-panel,
+  .djcx-quick-stats,
+  .djcx-album-card,
+  .djcx-track-row,
+  .djcx-video-card,
+  .djcx-install-panel,
+  .djcx-upcoming-card,
+  .djcx-editor,
+  .djcx-compilation-card,
+  .djcx-top-ten-summary,
+  .djcx-video-toolbar
+) {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045), transparent 52%),
+    linear-gradient(135deg, rgba(13, 20, 33, 0.96), rgba(6, 10, 18, 0.97));
+  border-color: rgba(69, 210, 255, 0.16);
+  border-radius: 18px;
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.2);
+}
+
+.djcx-page :is(.djcx-album-card, .djcx-track-row, .djcx-video-card, .djcx-compilation-card) {
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.djcx-page :is(.djcx-album-card, .djcx-track-row, .djcx-video-card, .djcx-compilation-card):hover {
+  border-color: rgba(46, 232, 255, 0.4);
+  box-shadow: 0 18px 48px rgba(3, 8, 20, 0.44), 0 0 28px rgba(91, 101, 255, 0.09);
+  transform: translateY(-2px);
+}
+
+.djcx-page .djcx-album-card-shell.is-active .djcx-album-card {
+  border-color: rgba(46, 232, 255, 0.68);
+  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.22), 0 0 30px rgba(46, 232, 255, 0.1);
+}
+
+.djcx-page .djcx-upcoming-card::before {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(46, 232, 255, 0.15), transparent 28%),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.08), transparent 56%);
+}
+
+.djcx-page :is(
+  .djcx-upcoming-art,
+  .djcx-upcoming-tracks li.has-preview,
+  .djcx-upcoming-tracks li.has-preview button,
+  .djcx-track-play,
+  .djcx-track-tools button,
+  .djcx-album-share,
+  .djcx-video-actions button,
+  .djcx-compilation-copy button,
+  .djcx-compilation-copy a,
+  .djcx-top-ten-summary > span
+) {
+  border-color: rgba(46, 232, 255, 0.2);
+}
+
+.djcx-page .djcx-track-play,
+.djcx-page .djcx-video-card-main > span svg,
+.djcx-page .djcx-video-toolbar button:hover,
+.djcx-page .djcx-video-toolbar button.is-active {
+  background: linear-gradient(135deg, #2ee8ff, #8d73ff);
+  border-color: rgba(116, 235, 255, 0.64);
+  color: #02050b;
+}
+
+.djcx-page .djcx-track-badge {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(163, 139, 255, 0.32);
+  color: #c8b9ff;
+}
+
+.djcx-page .djcx-share-notice {
+  background: rgba(46, 232, 255, 0.08);
+  border-color: rgba(46, 232, 255, 0.25);
+  color: #d8faff;
+}
+
+.djcx-page .djcx-footer {
+  border-color: rgba(46, 232, 255, 0.12);
+}
+
+/* Artist link hub: electric platform identity */
+.artist-link-page {
+  --artist-link-violet: #9778ff;
+  background:
+    radial-gradient(circle at 6% 2%, color-mix(in srgb, var(--artist-link-accent) 20%, transparent), transparent 29rem),
+    radial-gradient(circle at 92% 18%, rgba(151, 120, 255, 0.22), transparent 31rem),
+    linear-gradient(180deg, #03060d 0%, #070b14 50%, #04070d 100%);
+  color: #f5f8ff;
+  font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+}
+
+.artist-link-page-topbar,
+.artist-link-page-hero,
+.artist-link-hub,
+.artist-link-page-footer {
+  width: min(100%, 1120px);
+}
+
+.artist-link-page-topbar {
+  border-color: color-mix(in srgb, var(--artist-link-accent) 18%, transparent);
+  color: #dce8f5;
+  letter-spacing: 0.11em;
+}
+
+.artist-link-page-topbar a {
+  color: #dce8f5;
+}
+
+.artist-link-page-hero {
+  background:
+    linear-gradient(120deg, rgba(46, 232, 255, 0.07), transparent 43%),
+    linear-gradient(300deg, rgba(151, 120, 255, 0.12), transparent 46%),
+    rgba(5, 10, 18, 0.72);
+  border: 1px solid rgba(97, 217, 255, 0.14);
+  border-radius: 30px;
+  box-shadow: 0 34px 100px rgba(0, 0, 0, 0.34);
+  grid-template-columns: minmax(0, 0.86fr) minmax(420px, 1.14fr);
+  margin-top: 26px;
+  min-height: 390px;
+  overflow: hidden;
+  padding: 54px 58px;
+  position: relative;
+}
+
+.artist-link-page-hero::after {
+  background: linear-gradient(90deg, var(--artist-link-accent), var(--artist-link-violet));
+  content: "";
+  height: 2px;
+  inset: auto 58px 0;
+  opacity: 0.72;
+  position: absolute;
+}
+
+.artist-link-page-copy > span,
+.artist-link-hub-heading > span {
+  color: var(--artist-link-accent);
+  letter-spacing: 0.14em;
+}
+
+.artist-link-page-copy h1 {
+  background: linear-gradient(105deg, #ffffff 14%, #baf5ff 62%, #bca8ff 100%);
+  background-clip: text;
+  font-family: "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif;
+  font-size: clamp(3.2rem, 6.6vw, 6.2rem);
+  font-weight: 850;
+  letter-spacing: -0.07em;
+  line-height: 0.88;
+  margin: 18px 0 17px;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.artist-link-page-copy p {
+  color: #b9c8d9;
+  line-height: 1.45;
+  max-width: 430px;
+}
+
+.artist-link-page-identity {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  min-height: 270px;
+}
+
+.artist-link-page-logo {
+  aspect-ratio: 1.45;
+  grid-column: 1;
+  position: relative;
+  width: 100%;
+}
+
+.artist-link-page-portrait {
+  aspect-ratio: 0.82;
+  background: linear-gradient(145deg, rgba(46, 232, 255, 0.12), rgba(151, 120, 255, 0.13)), #07101b;
+  border: 1px solid rgba(87, 226, 255, 0.62);
+  border-radius: 24px;
+  bottom: auto;
+  box-shadow: 0 26px 68px rgba(0, 0, 0, 0.46), 0 0 32px rgba(108, 98, 255, 0.14);
+  grid-column: 2;
+  overflow: hidden;
+  position: relative;
+  right: auto;
+  width: 132px;
+}
+
+.artist-link-hub {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 48%),
+    linear-gradient(135deg, rgba(10, 17, 29, 0.98), rgba(5, 9, 16, 0.99));
+  border-color: color-mix(in srgb, var(--artist-link-accent) 22%, #202a3a);
+  border-radius: 28px;
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.4);
+  margin-top: 28px;
+}
+
+.artist-link-hub-heading h2 {
+  color: #f8fbff;
+  font-family: "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+
+.artist-link-hub-heading p {
+  color: #98a8ba;
+}
+
+.artist-link-hub-grid > a {
+  --platform-color: var(--artist-link-accent);
+  background: linear-gradient(135deg, rgba(17, 25, 39, 0.96), rgba(9, 14, 24, 0.98));
+  border-color: rgba(145, 172, 205, 0.17);
+  border-radius: 18px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+  color: #f4f8ff;
+}
+
+.artist-link-hub-grid > a[data-platform="youtube-music"] { --platform-color: #ff174d; }
+.artist-link-hub-grid > a[data-platform="apple-music"] { --platform-color: #fb5c74; }
+.artist-link-hub-grid > a[data-platform="spotify"] { --platform-color: #1ed760; }
+.artist-link-hub-grid > a[data-platform="facebook"] { --platform-color: #3b82f6; }
+.artist-link-hub-grid > a[data-platform="firstlisten"] { --platform-color: #a7ff2a; }
+.artist-link-hub-grid > a[data-platform="artist"] { --platform-color: #2ee8ff; }
+.artist-link-hub-grid > a[data-platform="website"],
+.artist-link-hub-grid > a[data-platform="custom"] { --platform-color: #a78bfa; }
+
+.artist-link-hub-grid > a:hover,
+.artist-link-hub-grid > a:focus-visible {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--platform-color) 10%, #111827), #080d17 68%);
+  border-color: color-mix(in srgb, var(--platform-color) 68%, transparent);
+  box-shadow: 0 16px 42px color-mix(in srgb, var(--platform-color) 12%, transparent);
+}
+
+.artist-link-hub-grid > a > span {
+  background: color-mix(in srgb, var(--platform-color) 12%, #03060c);
+  border: 1px solid color-mix(in srgb, var(--platform-color) 28%, transparent);
+  color: var(--platform-color);
+}
+
+.artist-link-hub-grid > a strong {
+  font-size: 0.98rem;
+  font-weight: 760;
+  letter-spacing: -0.015em;
+}
+
+.artist-link-page-footer {
+  color: #78889d;
+}
+
+@media (max-width: 900px) {
+  .artist-link-page-hero {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 44px 38px;
+    text-align: left;
+  }
+
+  .artist-link-page-copy p {
+    max-width: 100%;
+  }
+
+  .artist-link-page-identity {
+    grid-template-columns: minmax(0, 1fr) 112px;
+    margin-inline: auto;
+    max-width: 610px;
+    min-height: 225px;
+    width: 100%;
+  }
+
+  .artist-link-page-portrait {
+    width: 112px;
+  }
+}
+
+@media (max-width: 620px) {
+  .artist-link-page-hero {
+    border-radius: 22px;
+    margin-top: 16px;
+    padding: 34px 22px 30px;
+  }
+
+  .artist-link-page-hero::after {
+    inset-inline: 22px;
+  }
+
+  .artist-link-page-copy h1 {
+    font-size: clamp(3rem, 16vw, 4.5rem);
+  }
+
+  .artist-link-page-identity {
+    gap: 14px;
+    grid-template-columns: minmax(0, 1fr) 86px;
+    min-height: 165px;
+  }
+
+  .artist-link-page-portrait {
+    border-radius: 17px;
+    width: 86px;
+  }
+
+  .artist-link-hub {
+    margin-top: 18px;
+  }
+}
+
 /* Visual discovery refresh: local-first review for the simplified home. */
 .first-listen-simple-stage,
 .first-listen-simple-new-today {
@@ -30493,6 +30941,668 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 
   .artist-directory-contact a {
     justify-content: center;
+    width: 100%;
+  }
+}
+/* Artist platform link hub */
+.artist-link-page {
+  --artist-link-accent: #ffd95e;
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 15% 0%, color-mix(in srgb, var(--artist-link-accent) 18%, transparent), transparent 34rem),
+    radial-gradient(circle at 90% 22%, rgba(92, 45, 150, 0.2), transparent 30rem),
+    #050505;
+  color: #fff7df;
+  padding: 0 22px 54px;
+}
+
+.artist-link-page-topbar,
+.artist-link-page-hero,
+.artist-link-hub,
+.artist-link-page-footer {
+  width: min(100%, 1040px);
+  margin-inline: auto;
+}
+
+.artist-link-page-topbar {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 217, 94, 0.18);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.artist-link-page-topbar a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #fff7df;
+  text-decoration: none;
+}
+
+.artist-link-page-topbar a:last-child {
+  justify-self: end;
+}
+
+.artist-link-page-topbar > span {
+  color: var(--artist-link-accent);
+}
+
+.artist-link-page-hero {
+  min-height: 340px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.8fr);
+  align-items: center;
+  gap: 42px;
+  padding: 46px 38px;
+}
+
+.artist-link-page-copy > span,
+.artist-link-hub-heading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--artist-link-accent);
+  font-size: 0.74rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+}
+
+.artist-link-page-copy h1 {
+  margin: 12px 0 10px;
+  max-width: 620px;
+  font-size: clamp(2.5rem, 7vw, 5.4rem);
+  line-height: 0.94;
+  letter-spacing: -0.055em;
+}
+
+.artist-link-page-copy p {
+  margin: 0;
+  color: #c9c2ad;
+  font-size: clamp(1rem, 2vw, 1.3rem);
+}
+
+.artist-link-page-identity {
+  position: relative;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.artist-link-page-logo {
+  position: relative;
+  width: min(100%, 330px);
+  aspect-ratio: 1.35;
+}
+
+.artist-link-page-logo img {
+  object-fit: contain;
+}
+
+.artist-link-page-portrait {
+  position: absolute;
+  right: 0;
+  bottom: 4px;
+  width: 130px;
+  aspect-ratio: 0.82;
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, var(--artist-link-accent) 70%, #fff);
+  border-radius: 22px;
+  background: #111;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.48);
+}
+
+.artist-link-page-portrait img {
+  object-fit: cover;
+}
+
+.artist-link-hub {
+  scroll-margin-top: 24px;
+  padding: clamp(24px, 5vw, 46px);
+  border: 1px solid color-mix(in srgb, var(--artist-link-accent) 32%, #252525);
+  border-radius: 30px;
+  background: linear-gradient(145deg, rgba(26, 26, 24, 0.98), rgba(8, 8, 8, 0.98));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+}
+
+.artist-link-hub-heading {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.artist-link-hub-heading h2 {
+  margin: 9px 0 7px;
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  letter-spacing: -0.04em;
+}
+
+.artist-link-hub-heading p {
+  margin: 0;
+  color: #aaa38f;
+}
+
+.artist-link-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.artist-link-hub-grid > a {
+  min-height: 86px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 15px;
+  border: 1px solid #343432;
+  border-radius: 17px;
+  background: #171715;
+  color: #fff;
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.artist-link-hub-grid > a:hover,
+.artist-link-hub-grid > a:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--artist-link-accent);
+  background: #20201d;
+  outline: none;
+}
+
+.artist-link-hub-grid > a > span {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #050505;
+  color: var(--artist-link-accent);
+}
+
+.artist-link-hub-grid > a > span svg,
+.artist-link-hub-grid > a > span img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.artist-link-hub-grid > a strong {
+  font-size: 0.95rem;
+}
+
+.artist-link-hub-external {
+  color: #77746b;
+}
+
+.artist-link-page-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 27px 8px 0;
+  color: #8f8a7e;
+  font-size: 0.82rem;
+}
+
+.artist-link-page-footer a {
+  color: var(--artist-link-accent);
+  font-weight: 900;
+}
+
+.artist-site-editor-link-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.artist-site-editor-custom-links,
+.djcx-admin-custom-links {
+  margin-top: 24px;
+}
+
+.artist-site-editor-custom-links > div,
+.djcx-admin-custom-link {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.artist-site-editor-custom-links label,
+.djcx-admin-custom-link label {
+  display: grid;
+  gap: 7px;
+}
+
+.djcx-admin-panel-note {
+  margin: 0 0 18px;
+  color: var(--djcx-muted);
+}
+
+.djcx-admin-subheading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.djcx-admin-subheading h3 {
+  margin: 0;
+}
+
+@media (max-width: 820px) {
+  .artist-link-page-hero {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding-inline: 8px;
+    text-align: center;
+  }
+
+  .artist-link-page-identity {
+    min-height: 230px;
+  }
+
+  .artist-link-page-logo {
+    width: min(78vw, 310px);
+  }
+
+  .artist-link-page-portrait {
+    right: max(4%, calc(50% - 190px));
+    width: 104px;
+  }
+
+  .artist-link-hub-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .artist-link-page {
+    padding-inline: 14px;
+  }
+
+  .artist-link-page-topbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .artist-link-page-topbar > span {
+    display: none;
+  }
+
+  .artist-link-page-hero {
+    min-height: 0;
+    padding-top: 38px;
+  }
+
+  .artist-link-hub {
+    padding: 23px 15px;
+    border-radius: 23px;
+  }
+
+  .artist-link-hub-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .artist-link-hub-grid > a {
+    min-height: 74px;
+  }
+
+  .artist-link-page-footer,
+  .artist-site-editor-custom-links > div,
+  .djcx-admin-custom-link,
+  .artist-site-editor-link-fields {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+}
+
+/* Final cascade for the modern artist link page */
+body .artist-link-page {
+  --artist-link-violet: #9778ff;
+  background:
+    radial-gradient(circle at 6% 2%, color-mix(in srgb, var(--artist-link-accent) 20%, transparent), transparent 29rem),
+    radial-gradient(circle at 92% 18%, rgba(151, 120, 255, 0.22), transparent 31rem),
+    linear-gradient(180deg, #03060d 0%, #070b14 50%, #04070d 100%);
+  color: #f5f8ff;
+  font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+}
+
+body .artist-link-page :is(
+  .artist-link-page-topbar,
+  .artist-link-page-hero,
+  .artist-link-hub,
+  .artist-link-page-footer
+) {
+  width: min(100%, 1120px);
+}
+
+body .artist-link-page-topbar {
+  border-color: color-mix(in srgb, var(--artist-link-accent) 18%, transparent);
+  letter-spacing: 0.11em;
+}
+
+body .artist-link-page-topbar a {
+  color: #dce8f5;
+}
+
+body .artist-link-page-hero {
+  background:
+    linear-gradient(120deg, rgba(46, 232, 255, 0.07), transparent 43%),
+    linear-gradient(300deg, rgba(151, 120, 255, 0.12), transparent 46%),
+    rgba(5, 10, 18, 0.72);
+  border: 1px solid rgba(97, 217, 255, 0.14);
+  border-radius: 30px;
+  box-shadow: 0 34px 100px rgba(0, 0, 0, 0.34);
+  gap: 42px;
+  grid-template-columns: minmax(0, 0.86fr) minmax(420px, 1.14fr);
+  margin-top: 26px;
+  min-height: 390px;
+  overflow: hidden;
+  padding: 54px 58px;
+  position: relative;
+  text-align: left;
+}
+
+body .artist-link-page-hero::after {
+  background: linear-gradient(90deg, var(--artist-link-accent), var(--artist-link-violet));
+  bottom: 0;
+  content: "";
+  height: 2px;
+  left: 58px;
+  opacity: 0.72;
+  position: absolute;
+  right: 58px;
+}
+
+body .artist-link-page-copy > span,
+body .artist-link-hub-heading > span {
+  color: var(--artist-link-accent);
+  letter-spacing: 0.14em;
+}
+
+body .artist-link-page-copy h1 {
+  background: linear-gradient(105deg, #ffffff 14%, #baf5ff 62%, #bca8ff 100%);
+  background-clip: text;
+  font-family: "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif;
+  font-size: clamp(3.2rem, 6.6vw, 6.2rem);
+  font-weight: 850;
+  letter-spacing: -0.07em;
+  line-height: 0.88;
+  margin: 18px 0 17px;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+body .artist-link-page-copy p {
+  color: #b9c8d9;
+  line-height: 1.45;
+  max-width: 430px;
+}
+
+body .artist-link-page-identity {
+  align-items: center;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  justify-items: center;
+  min-height: 270px;
+}
+
+body .artist-link-page-logo {
+  aspect-ratio: 1.45;
+  grid-column: 1;
+  position: relative;
+  width: 100%;
+}
+
+body .artist-link-page-portrait {
+  aspect-ratio: 0.82;
+  background: linear-gradient(145deg, rgba(46, 232, 255, 0.12), rgba(151, 120, 255, 0.13)), #07101b;
+  border: 1px solid rgba(87, 226, 255, 0.62);
+  border-radius: 24px;
+  bottom: auto;
+  box-shadow: 0 26px 68px rgba(0, 0, 0, 0.46), 0 0 32px rgba(108, 98, 255, 0.14);
+  grid-column: 2;
+  overflow: hidden;
+  position: relative;
+  right: auto;
+  width: 132px;
+}
+
+body .artist-link-hub {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 48%),
+    linear-gradient(135deg, rgba(10, 17, 29, 0.98), rgba(5, 9, 16, 0.99));
+  border-color: color-mix(in srgb, var(--artist-link-accent) 22%, #202a3a);
+  border-radius: 28px;
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.4);
+  margin-top: 28px;
+}
+
+body .artist-link-hub-heading h2 {
+  color: #f8fbff;
+  font-family: "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+
+body .artist-link-hub-heading p {
+  color: #98a8ba;
+}
+
+body .artist-link-hub-grid > a {
+  --platform-color: var(--artist-link-accent);
+  background: linear-gradient(135deg, rgba(17, 25, 39, 0.96), rgba(9, 14, 24, 0.98));
+  border-color: rgba(145, 172, 205, 0.17);
+  border-radius: 18px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+  color: #f4f8ff;
+}
+
+body .artist-link-hub-grid > a[data-platform="youtube-music"] { --platform-color: #ff174d; }
+body .artist-link-hub-grid > a[data-platform="apple-music"] { --platform-color: #fb5c74; }
+body .artist-link-hub-grid > a[data-platform="spotify"] { --platform-color: #1ed760; }
+body .artist-link-hub-grid > a[data-platform="facebook"] { --platform-color: #3b82f6; }
+body .artist-link-hub-grid > a[data-platform="firstlisten"] { --platform-color: #a7ff2a; }
+body .artist-link-hub-grid > a[data-platform="artist"] { --platform-color: #2ee8ff; }
+body .artist-link-hub-grid > a[data-platform="website"],
+body .artist-link-hub-grid > a[data-platform="custom"] { --platform-color: #a78bfa; }
+
+body .artist-link-hub-grid > a:hover,
+body .artist-link-hub-grid > a:focus-visible {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--platform-color) 10%, #111827), #080d17 68%);
+  border-color: color-mix(in srgb, var(--platform-color) 68%, transparent);
+  box-shadow: 0 16px 42px color-mix(in srgb, var(--platform-color) 12%, transparent);
+}
+
+body .artist-link-hub-grid > a > span {
+  background: color-mix(in srgb, var(--platform-color) 12%, #03060c);
+  border: 1px solid color-mix(in srgb, var(--platform-color) 28%, transparent);
+  color: var(--platform-color);
+}
+
+body .artist-link-hub-grid > a strong {
+  font-size: 0.98rem;
+  font-weight: 760;
+  letter-spacing: -0.015em;
+}
+
+body .artist-link-page-footer {
+  color: #78889d;
+}
+
+@media (max-width: 900px) {
+  body .artist-link-page-hero {
+    gap: 24px;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 44px 38px;
+    text-align: left;
+  }
+
+  body .artist-link-page-copy p {
+    max-width: 100%;
+  }
+
+  body .artist-link-page-identity {
+    grid-template-columns: minmax(0, 1fr) 112px;
+    margin-inline: auto;
+    max-width: 610px;
+    min-height: 225px;
+    width: 100%;
+  }
+
+  body .artist-link-page-portrait {
+    width: 112px;
+  }
+}
+
+@media (max-width: 620px) {
+  body .artist-link-page-hero {
+    border-radius: 22px;
+    margin-top: 16px;
+    padding: 34px 22px 30px;
+  }
+
+  body .artist-link-page-hero::after {
+    left: 22px;
+    right: 22px;
+  }
+
+  body .artist-link-page-copy h1 {
+    font-size: clamp(3rem, 16vw, 4.5rem);
+  }
+
+  body .artist-link-page-identity {
+    gap: 14px;
+    grid-template-columns: minmax(0, 1fr) 86px;
+    min-height: 165px;
+  }
+
+  body .artist-link-page-portrait {
+    border-radius: 17px;
+    width: 86px;
+  }
+
+  body .artist-link-hub {
+    margin-top: 18px;
+  }
+}
+
+/* DJ Carlos install prompt aligned with the digital artist theme */
+body .pwa-install-card.djcx-pwa-install-card {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045), transparent 52%),
+    linear-gradient(135deg, rgba(12, 20, 34, 0.98), rgba(5, 9, 17, 0.99));
+  border-color: rgba(46, 232, 255, 0.3);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.56), 0 0 34px rgba(91, 101, 255, 0.12);
+  grid-template-columns: auto minmax(0, 1fr);
+  width: min(620px, calc(100vw - 36px));
+}
+
+body .pwa-install-card.djcx-pwa-install-card .pwa-install-icon {
+  background: #050913;
+  border-color: rgba(46, 232, 255, 0.48);
+}
+
+body .pwa-install-card.djcx-pwa-install-card strong {
+  color: #f5f8ff;
+}
+
+body .pwa-install-card.djcx-pwa-install-card span {
+  color: #a8b6c8;
+}
+
+body .pwa-install-card.djcx-pwa-install-card .pwa-install-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+}
+
+body .pwa-install-card.djcx-pwa-install-card .pwa-install-actions button:first-child {
+  background: linear-gradient(135deg, #2ee8ff, #8f72ff);
+  border-color: rgba(116, 235, 255, 0.58);
+  color: #02050b;
+}
+
+body .pwa-install-card.djcx-pwa-install-card .pwa-install-actions .pwa-install-secondary {
+  background: rgba(255, 255, 255, 0.07);
+  color: #dbe5f2;
+}
+
+@media (max-width: 520px) {
+  body .artist-link-page :is(
+    .artist-link-page-topbar,
+    .artist-link-page-hero,
+    .artist-link-hub,
+    .artist-link-page-footer
+  ) {
+    box-sizing: border-box;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  body .artist-link-hub-heading h2 {
+    max-width: 100%;
+    font-size: clamp(1.7rem, 8vw, 2.25rem);
+    line-height: 1;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+    white-space: normal;
+  }
+
+  body .artist-link-page-identity {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  body .artist-link-page-logo {
+    grid-column: 1;
+    grid-row: 1;
+    margin-inline: auto;
+    width: min(100%, 300px);
+  }
+
+  body .artist-link-page-portrait {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: center;
+    width: 94px;
+  }
+
+  body .pwa-install-card.djcx-pwa-install-card {
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 8px 10px;
+    padding: 11px 12px;
+    width: min(420px, calc(100vw - 20px));
+  }
+
+  body .pwa-install-card.djcx-pwa-install-card .pwa-install-icon {
+    height: 38px;
+    width: 38px;
+  }
+
+  body .pwa-install-card.djcx-pwa-install-card span {
+    display: -webkit-box;
+    font-size: 0.78rem;
+    line-height: 1.25;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  body .pwa-install-card.djcx-pwa-install-card .pwa-install-actions {
+    display: grid;
+    gap: 7px;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    width: 100%;
+  }
+
+  body .pwa-install-card.djcx-pwa-install-card .pwa-install-actions button {
+    min-height: 42px;
+    padding-inline: 10px;
     width: 100%;
   }
 }

@@ -1,3 +1,8 @@
+import {
+  normalizeArtistPlatformLinks,
+  type ArtistPlatformLinks,
+} from "@/lib/artist-link-hub";
+
 export const DJ_CARLOS_LOGO_URL = "/artist/dj-carlos-jimenez/logo.png";
 export const DJ_CARLOS_PORTRAIT_URL =
   "/artist/dj-carlos-jimenez/portrait.png";
@@ -120,6 +125,7 @@ export type DjCarlosPageConfig = {
   albums: DjCarlosAlbum[];
   compilations: DjCarlosCompilation[];
   identity: DjCarlosIdentity;
+  platformLinks: ArtistPlatformLinks;
   rhythms: string[];
   tracks: DjCarlosTrack[];
   upcomingRelease: DjCarlosUpcomingRelease;
@@ -499,6 +505,14 @@ export const defaultDjCarlosPageConfig: DjCarlosPageConfig = {
     logoUrl: DJ_CARLOS_LOGO_URL,
     portraitUrl: DJ_CARLOS_PORTRAIT_URL,
     showPortrait: true,
+  },
+  platformLinks: {
+    youtubeMusic: "https://music.youtube.com/channel/UCzGw0GsXvnvHgCp5dOUIJIw?si=XyP3IMubJnDFlS2r",
+    appleMusic: "https://music.apple.com/us/artist/dj-carlos-jimenez-compositor/1761938673?ls",
+    spotify: "https://open.spotify.com/artist/6I8mij2fpadReXuHJqw2tL?si=9vq19pajRhKRsm0a5prmKw&utm_source=copy-link",
+    facebook: "https://www.facebook.com/share/1N9cxnLB98/",
+    website: "",
+    custom: [],
   },
   rhythms: [...DJ_CARLOS_DEFAULT_RHYTHMS],
   tracks: defaultDjCarlosTracks,
@@ -992,6 +1006,10 @@ export function normalizeDjCarlosPageConfig(
     albums,
     compilations: cleanCompilations(config.compilations, fallback.compilations),
     identity: cleanIdentity(config.identity, fallback.identity),
+    platformLinks: normalizeArtistPlatformLinks(
+      config.platformLinks,
+      fallback.platformLinks,
+    ),
     rhythms,
     tracks: tracks.length ? tracks : fallback.tracks,
     upcomingRelease: cleanUpcomingRelease(

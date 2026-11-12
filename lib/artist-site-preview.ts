@@ -1,4 +1,5 @@
 import type { ArtistSiteConfig } from "@/lib/artist-sites";
+import { emptyArtistPlatformLinks } from "@/lib/artist-link-hub";
 
 export const preview: ArtistSiteConfig = {
   channelUrl: "",
@@ -6,6 +7,7 @@ export const preview: ArtistSiteConfig = {
   logoUrl: "/artist/dj-carlos-jimenez/logo.png",
   portraitUrl: "/artist/dj-carlos-jimenez/portrait.png",
   accentColor: "#ffd565",
+  platformLinks: emptyArtistPlatformLinks(),
   albums: [
     {
       id: "album-demo-1",

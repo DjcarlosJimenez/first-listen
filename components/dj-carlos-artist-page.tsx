@@ -8,6 +8,7 @@ import {
   Disc3,
   ExternalLink,
   Heart,
+  Headphones,
   Link2,
   ListMusic,
   MessageCircle,
@@ -1311,6 +1312,12 @@ export function DjCarlosArtistPage({
               <Share2 size={17} />
               {isAlbumDetail ? "Compartir album" : "Compartir pagina"}
             </button>
+            {!isAlbumDetail && (
+              <Link href="/DJCarlosJimenez/escucha">
+                <Headphones size={17} />
+                Escucha mi música
+              </Link>
+            )}
           </div>
         </div>
 
