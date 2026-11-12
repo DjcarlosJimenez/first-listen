@@ -3,7 +3,10 @@ import {
   type ArtistPlatformLinks,
 } from "@/lib/artist-link-hub";
 
-export const DJ_CARLOS_LOGO_URL = "/artist/dj-carlos-jimenez/logo.png";
+const DJ_CARLOS_LEGACY_LOGO_URL =
+  "/artist/dj-carlos-jimenez/logo.png";
+export const DJ_CARLOS_LOGO_URL =
+  `${DJ_CARLOS_LEGACY_LOGO_URL}?v=blue-20261111`;
 export const DJ_CARLOS_PORTRAIT_URL =
   "/artist/dj-carlos-jimenez/portrait.png";
 export const DJ_CARLOS_PAGE_STORAGE_KEY =
@@ -796,9 +799,16 @@ function cleanIdentity(
 ): DjCarlosIdentity {
   const identity =
     value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const logoUrl = cleanDjCarlosImageUrl(identity.logoUrl, fallback.logoUrl);
 
   return {
-    logoUrl: cleanDjCarlosImageUrl(identity.logoUrl, fallback.logoUrl),
+    // The original bundled logo used this stable path. Give the replacement a
+    // versioned URL so installed PWAs and long-lived browser caches cannot keep
+    // showing the old artwork. Custom administrator uploads remain untouched.
+    logoUrl:
+      logoUrl === DJ_CARLOS_LEGACY_LOGO_URL
+        ? DJ_CARLOS_LOGO_URL
+        : logoUrl,
     portraitUrl: cleanDjCarlosImageUrl(
       identity.portraitUrl,
       fallback.portraitUrl,
