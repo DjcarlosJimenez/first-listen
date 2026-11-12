@@ -52,7 +52,10 @@ export async function generateMetadata({
   const site = await findArtistSite(artistSlug);
   if (!site) return {};
   const config = normalizeArtistSiteConfig(site.config);
-  const canonicalPath = `/${site.slug}${artistPath.length ? `/${artistPath.map(encodeURIComponent).join("/")}` : ""}`;
+  const metadataPath = artistPath.length === 1 && artistPath[0] === "escucha"
+    ? ["enlaces"]
+    : artistPath;
+  const canonicalPath = `/${site.slug}${metadataPath.length ? `/${metadataPath.map(encodeURIComponent).join("/")}` : ""}`;
   const pwaIconPath = `/${site.slug}/pwa-icon`;
   return {
     title: `${site.name} | First Listen`,
@@ -97,7 +100,8 @@ export default async function PublicArtistSlugRoute({
   }
 
   const isAdminRoute = artistPath.length === 1 && artistPath[0] === "admin";
-  const isListenRoute = artistPath.length === 1 && artistPath[0] === "escucha";
+  const isLegacyListenRoute = artistPath.length === 1 && artistPath[0] === "escucha";
+  const isLinksRoute = artistPath.length === 1 && artistPath[0] === "enlaces";
   if (isAdminRoute) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -111,12 +115,16 @@ export default async function PublicArtistSlugRoute({
   if (!site) notFound();
   const config = normalizeArtistSiteConfig(site.config);
 
+  if (isLegacyListenRoute) {
+    permanentRedirect(`/${site.slug}/enlaces${serializeSearchParams(await searchParams)}`);
+  }
+
   let canonicalPath = `/${site.slug}`;
   let albumSlug: string | undefined;
   if (artistPath.length === 1 && artistPath[0] === "admin") {
     canonicalPath += "/admin";
-  } else if (isListenRoute) {
-    canonicalPath += "/escucha";
+  } else if (isLinksRoute) {
+    canonicalPath += "/enlaces";
   } else if (artistPath.length === 2 && artistPath[0] === "album") {
     const album = config.albums.find((item) =>
       item.slug.toLowerCase() === artistPath[1].toLowerCase(),
@@ -152,7 +160,7 @@ export default async function PublicArtistSlugRoute({
     return <ArtistSiteEditor site={{ ...site, config }} />;
   }
 
-  if (isListenRoute) {
+  if (isLinksRoute) {
     return (
       <ArtistLinkHubPage
         accentColor={config.accentColor}

@@ -1313,9 +1313,9 @@ export function DjCarlosArtistPage({
               {isAlbumDetail ? "Compartir album" : "Compartir pagina"}
             </button>
             {!isAlbumDetail && (
-              <Link href="/DJCarlosJimenez/escucha">
+              <Link href="/DJCarlosJimenez/enlaces">
                 <Headphones size={17} />
-                Escucha mi música
+                Enlaces oficiales
               </Link>
             )}
           </div>

@@ -33,7 +33,7 @@ export default async function ArtistPagesDirectory() {
       description: "Página oficial · Música, álbumes y videos",
       href: "/DJCarlosJimenez",
       id: "dj-carlos-jimenez",
-      imageUrl: "/artist/dj-carlos-jimenez/icon-192.png",
+      imageUrl: "/artist/dj-carlos-jimenez/icon-192.png?v=blue-20261112",
       name: "DJ Carlos Jimenez",
       searchText: "cumbia sonidera compositor",
     },

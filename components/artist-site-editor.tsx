@@ -126,6 +126,15 @@ export function ArtistSiteEditor({ site }: { site: EditorSite }) {
     });
   };
 
+  const updateFacebookPresentation = (
+    update: Partial<Pick<ArtistSiteConfig["platformLinks"], "facebookCommunityMessage" | "facebookVerified">>,
+  ) => {
+    change({
+      ...config,
+      platformLinks: { ...config.platformLinks, ...update },
+    });
+  };
+
   const updateAlbum = (albumId: string, update: Partial<ArtistSiteAlbum>) => {
     change({
       ...config,
@@ -337,7 +346,7 @@ export function ArtistSiteEditor({ site }: { site: EditorSite }) {
         <section className="artist-site-editor-section">
           <div className="artist-site-editor-section-head">
             <div>
-              <h2>Escucha mi música</h2>
+              <h2>Enlaces oficiales</h2>
               <p>Solo aparecen en tu página los enlaces que completes.</p>
             </div>
             <button
@@ -357,6 +366,9 @@ export function ArtistSiteEditor({ site }: { site: EditorSite }) {
             ><Plus size={16} /> Agregar plataforma</button>
           </div>
           <div className="artist-site-editor-fields artist-site-editor-link-fields">
+            <label>YouTube
+              <input onChange={(event) => updatePlatformLink("youtube", event.target.value)} placeholder="https://youtube.com/@canal" type="url" value={config.platformLinks.youtube} />
+            </label>
             <label>YouTube Music
               <input onChange={(event) => updatePlatformLink("youtubeMusic", event.target.value)} placeholder="https://music.youtube.com/..." type="url" value={config.platformLinks.youtubeMusic} />
             </label>
@@ -366,8 +378,39 @@ export function ArtistSiteEditor({ site }: { site: EditorSite }) {
             <label>Spotify
               <input onChange={(event) => updatePlatformLink("spotify", event.target.value)} placeholder="https://open.spotify.com/..." type="url" value={config.platformLinks.spotify} />
             </label>
+            <label>Amazon Music
+              <input onChange={(event) => updatePlatformLink("amazonMusic", event.target.value)} placeholder="https://music.amazon.com/..." type="url" value={config.platformLinks.amazonMusic} />
+            </label>
+            <label>TikTok
+              <input onChange={(event) => updatePlatformLink("tiktok", event.target.value)} placeholder="https://www.tiktok.com/@canal" type="url" value={config.platformLinks.tiktok} />
+            </label>
+            <label>Instagram
+              <input onChange={(event) => updatePlatformLink("instagram", event.target.value)} placeholder="https://www.instagram.com/usuario" type="url" value={config.platformLinks.instagram} />
+            </label>
+            <label>Lemon8
+              <input onChange={(event) => updatePlatformLink("lemon8", event.target.value)} placeholder="https://v.lemon8-app.com/..." type="url" value={config.platformLinks.lemon8} />
+            </label>
+            <label>Clapper
+              <input onChange={(event) => updatePlatformLink("clapper", event.target.value)} placeholder="https://clapperapp.com/usuario" type="url" value={config.platformLinks.clapper} />
+            </label>
             <label>Facebook
               <input onChange={(event) => updatePlatformLink("facebook", event.target.value)} placeholder="https://www.facebook.com/..." type="url" value={config.platformLinks.facebook} />
+            </label>
+            <label className="artist-site-editor-wide">Mensaje de comunidad en Facebook
+              <input
+                maxLength={120}
+                onChange={(event) => updateFacebookPresentation({ facebookCommunityMessage: event.target.value })}
+                placeholder="Únete a mi comunidad oficial."
+                value={config.platformLinks.facebookCommunityMessage}
+              />
+            </label>
+            <label className="artist-site-editor-checkbox artist-site-editor-wide">
+              <input
+                checked={config.platformLinks.facebookVerified}
+                onChange={(event) => updateFacebookPresentation({ facebookVerified: event.target.checked })}
+                type="checkbox"
+              />
+              Mostrar verificación de la página de Facebook
             </label>
             <label>Sitio web personal
               <input onChange={(event) => updatePlatformLink("website", event.target.value)} placeholder="https://..." type="url" value={config.platformLinks.website} />

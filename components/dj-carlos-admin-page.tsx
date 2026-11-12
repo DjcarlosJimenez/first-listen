@@ -624,6 +624,18 @@ export function DjCarlosAdminPage({
     setStatus("Enlaces actualizados. Toca Guardar cambios.");
   };
 
+  const updateFacebookPresentation = (
+    update: Partial<Pick<DjCarlosPageConfig["platformLinks"], "facebookCommunityMessage" | "facebookVerified">>,
+  ) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => ({
+      ...current,
+      platformLinks: { ...current.platformLinks, ...update },
+      updatedAt: new Date().toISOString(),
+    }));
+    setStatus("Presentación de Facebook actualizada. Toca Guardar cambios.");
+  };
+
   const addCustomPlatformLink = () => {
     if (config.platformLinks.custom.length >= 8) return;
     hasLocalChangesRef.current = true;
@@ -2085,14 +2097,17 @@ export function DjCarlosAdminPage({
       <section className="djcx-admin-panel djcx-admin-links-panel">
         <div className="djcx-admin-panel-heading">
           <span>
-            <ExternalLink size={15} /> Escucha mi música
+            <ExternalLink size={15} /> Enlaces oficiales
           </span>
-          <strong>Enlaces que aparecen en /DJCarlosJimenez/escucha</strong>
+          <strong>Enlaces que aparecen en /DJCarlosJimenez/enlaces</strong>
         </div>
         <p className="djcx-admin-panel-note">
           Solo se muestran las plataformas que tengan un enlace válido. La página del artista y FirstListen aparecen automáticamente.
         </p>
         <div className="djcx-admin-form-grid">
+          <label>YouTube
+            <input onChange={(event) => updatePlatformLink("youtube", event.target.value)} placeholder="https://youtube.com/@canal" value={config.platformLinks.youtube} />
+          </label>
           <label>YouTube Music
             <input onChange={(event) => updatePlatformLink("youtubeMusic", event.target.value)} placeholder="https://music.youtube.com/..." value={config.platformLinks.youtubeMusic} />
           </label>
@@ -2102,8 +2117,39 @@ export function DjCarlosAdminPage({
           <label>Spotify
             <input onChange={(event) => updatePlatformLink("spotify", event.target.value)} placeholder="https://open.spotify.com/..." value={config.platformLinks.spotify} />
           </label>
+          <label>Amazon Music
+            <input onChange={(event) => updatePlatformLink("amazonMusic", event.target.value)} placeholder="https://music.amazon.com/..." value={config.platformLinks.amazonMusic} />
+          </label>
+          <label>TikTok
+            <input onChange={(event) => updatePlatformLink("tiktok", event.target.value)} placeholder="https://www.tiktok.com/@canal" value={config.platformLinks.tiktok} />
+          </label>
+          <label>Instagram
+            <input onChange={(event) => updatePlatformLink("instagram", event.target.value)} placeholder="https://www.instagram.com/usuario" value={config.platformLinks.instagram} />
+          </label>
+          <label>Lemon8
+            <input onChange={(event) => updatePlatformLink("lemon8", event.target.value)} placeholder="https://v.lemon8-app.com/..." value={config.platformLinks.lemon8} />
+          </label>
+          <label>Clapper
+            <input onChange={(event) => updatePlatformLink("clapper", event.target.value)} placeholder="https://clapperapp.com/usuario" value={config.platformLinks.clapper} />
+          </label>
           <label>Facebook
             <input onChange={(event) => updatePlatformLink("facebook", event.target.value)} placeholder="https://www.facebook.com/..." value={config.platformLinks.facebook} />
+          </label>
+          <label className="djcx-admin-wide">Mensaje de comunidad en Facebook
+            <input
+              maxLength={120}
+              onChange={(event) => updateFacebookPresentation({ facebookCommunityMessage: event.target.value })}
+              placeholder="Únete a mis más de 47 mil seguidores."
+              value={config.platformLinks.facebookCommunityMessage}
+            />
+          </label>
+          <label className="djcx-admin-checkbox djcx-admin-wide">
+            <input
+              checked={config.platformLinks.facebookVerified}
+              onChange={(event) => updateFacebookPresentation({ facebookVerified: event.target.checked })}
+              type="checkbox"
+            />
+            Mostrar que la página de Facebook está verificada por Meta
           </label>
           <label className="djcx-admin-wide">Sitio web personal
             <input onChange={(event) => updatePlatformLink("website", event.target.value)} placeholder="https://..." value={config.platformLinks.website} />

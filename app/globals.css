@@ -27469,7 +27469,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: #b9c6d8;
 }
 
-.djcx-page .djcx-hero-actions a[href="/DJCarlosJimenez/escucha"] {
+.djcx-page .djcx-hero-actions a[href="/DJCarlosJimenez/enlaces"] {
   background: linear-gradient(135deg, rgba(46, 232, 255, 0.13), rgba(139, 92, 246, 0.16));
   border-color: rgba(46, 232, 255, 0.44);
   color: #dffaff;
@@ -27719,8 +27719,11 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 }
 
 .artist-link-hub-grid > a[data-platform="youtube-music"] { --platform-color: #ff174d; }
+.artist-link-hub-grid > a[data-platform="youtube"] { --platform-color: #ff0033; }
 .artist-link-hub-grid > a[data-platform="apple-music"] { --platform-color: #fb5c74; }
 .artist-link-hub-grid > a[data-platform="spotify"] { --platform-color: #1ed760; }
+.artist-link-hub-grid > a[data-platform="amazon-music"] { --platform-color: #25d1da; }
+.artist-link-hub-grid > a[data-platform="tiktok"] { --platform-color: #ff4f8b; }
 .artist-link-hub-grid > a[data-platform="facebook"] { --platform-color: #3b82f6; }
 .artist-link-hub-grid > a[data-platform="firstlisten"] { --platform-color: #a7ff2a; }
 .artist-link-hub-grid > a[data-platform="artist"] { --platform-color: #2ee8ff; }
@@ -27734,7 +27737,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   box-shadow: 0 16px 42px color-mix(in srgb, var(--platform-color) 12%, transparent);
 }
 
-.artist-link-hub-grid > a > span {
+.artist-link-hub-grid > a > .artist-link-card-icon {
   background: color-mix(in srgb, var(--platform-color) 12%, #03060c);
   border: 1px solid color-mix(in srgb, var(--platform-color) 28%, transparent);
   color: var(--platform-color);
@@ -31115,7 +31118,7 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   outline: none;
 }
 
-.artist-link-hub-grid > a > span {
+.artist-link-hub-grid > a > .artist-link-card-icon {
   width: 48px;
   height: 48px;
   display: grid;
@@ -31125,8 +31128,8 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   color: var(--artist-link-accent);
 }
 
-.artist-link-hub-grid > a > span svg,
-.artist-link-hub-grid > a > span img {
+.artist-link-hub-grid > a > .artist-link-card-icon svg,
+.artist-link-hub-grid > a > .artist-link-card-icon img {
   width: 28px;
   height: 28px;
   object-fit: contain;
@@ -31263,6 +31266,9 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
 /* Final cascade for the modern artist link page */
 body .artist-link-page {
   --artist-link-violet: #9778ff;
+  box-sizing: border-box;
+  overflow-x: clip;
+  width: 100%;
   background:
     radial-gradient(circle at 6% 2%, color-mix(in srgb, var(--artist-link-accent) 20%, transparent), transparent 29rem),
     radial-gradient(circle at 92% 18%, rgba(151, 120, 255, 0.22), transparent 31rem),
@@ -31404,8 +31410,14 @@ body .artist-link-hub-grid > a {
 }
 
 body .artist-link-hub-grid > a[data-platform="youtube-music"] { --platform-color: #ff174d; }
+body .artist-link-hub-grid > a[data-platform="youtube"] { --platform-color: #ff0033; }
 body .artist-link-hub-grid > a[data-platform="apple-music"] { --platform-color: #fb5c74; }
 body .artist-link-hub-grid > a[data-platform="spotify"] { --platform-color: #1ed760; }
+body .artist-link-hub-grid > a[data-platform="amazon-music"] { --platform-color: #25d1da; }
+body .artist-link-hub-grid > a[data-platform="tiktok"] { --platform-color: #ff4f8b; }
+body .artist-link-hub-grid > a[data-platform="instagram"] { --platform-color: #e9599e; }
+body .artist-link-hub-grid > a[data-platform="lemon8"] { --platform-color: #ffd84d; }
+body .artist-link-hub-grid > a[data-platform="clapper"] { --platform-color: #ff6b61; }
 body .artist-link-hub-grid > a[data-platform="facebook"] { --platform-color: #3b82f6; }
 body .artist-link-hub-grid > a[data-platform="firstlisten"] { --platform-color: #a7ff2a; }
 body .artist-link-hub-grid > a[data-platform="artist"] { --platform-color: #2ee8ff; }
@@ -31419,7 +31431,7 @@ body .artist-link-hub-grid > a:focus-visible {
   box-shadow: 0 16px 42px color-mix(in srgb, var(--platform-color) 12%, transparent);
 }
 
-body .artist-link-hub-grid > a > span {
+body .artist-link-hub-grid > a > .artist-link-card-icon {
   background: color-mix(in srgb, var(--platform-color) 12%, #03060c);
   border: 1px solid color-mix(in srgb, var(--platform-color) 28%, transparent);
   color: var(--platform-color);
@@ -31429,6 +31441,120 @@ body .artist-link-hub-grid > a strong {
   font-size: 0.98rem;
   font-weight: 760;
   letter-spacing: -0.015em;
+}
+
+body .artist-link-hub-sections {
+  display: grid;
+  gap: 30px;
+}
+
+body .artist-link-group {
+  display: grid;
+  gap: 16px;
+  padding-top: 28px;
+  border-top: 1px solid rgba(145, 172, 205, 0.13);
+}
+
+body .artist-link-group:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+body .artist-link-group > header {
+  display: grid;
+  gap: 5px;
+}
+
+body .artist-link-group > header > span {
+  color: var(--artist-link-accent);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+}
+
+body .artist-link-group > header h3 {
+  margin: 0;
+  color: #f7fbff;
+  font-family: "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif;
+  font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+  letter-spacing: -0.025em;
+}
+
+body .artist-link-group > header p {
+  margin: 0;
+  color: #8fa0b5;
+  font-size: 0.9rem;
+}
+
+body .artist-link-hub-grid-featured {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body .artist-link-hub-grid > a.artist-link-card-featured {
+  min-height: 106px;
+  padding: 18px 20px;
+}
+
+body .artist-link-card-copy {
+  display: grid;
+  min-width: 0;
+  width: auto;
+  height: auto;
+  gap: 5px;
+  place-items: initial;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+}
+
+body .artist-link-card-copy > strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+body .artist-link-card-copy > small {
+  overflow: hidden;
+  color: #9aabc0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+
+body .artist-link-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #6fb3ff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+body .artist-link-monogram {
+  font-size: 0.86rem;
+  font-weight: 950;
+  letter-spacing: -0.08em;
+}
+
+.djcx-admin-checkbox,
+.artist-site-editor-checkbox {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 10px;
+}
+
+.djcx-admin-checkbox input,
+.artist-site-editor-checkbox input {
+  width: 18px !important;
+  height: 18px !important;
+  margin: 0;
+}
+
+.artist-site-editor-wide {
+  grid-column: 1 / -1;
 }
 
 body .artist-link-page-footer {
@@ -31490,6 +31616,24 @@ body .artist-link-page-footer {
   body .artist-link-hub {
     margin-top: 18px;
   }
+
+  body .artist-link-hub-sections {
+    gap: 25px;
+  }
+
+  body .artist-link-group {
+    gap: 13px;
+    padding-top: 23px;
+  }
+
+  body .artist-link-hub-grid > a.artist-link-card-featured {
+    min-height: 96px;
+    padding: 15px;
+  }
+
+  body .artist-link-card-copy > small {
+    white-space: normal;
+  }
 }
 
 /* DJ Carlos install prompt aligned with the digital artist theme */
@@ -31533,6 +31677,12 @@ body .pwa-install-card.djcx-pwa-install-card .pwa-install-actions .pwa-install-s
 }
 
 @media (max-width: 520px) {
+  body .artist-link-page *,
+  body .artist-link-page *::before,
+  body .artist-link-page *::after {
+    box-sizing: border-box;
+  }
+
   body .artist-link-page :is(
     .artist-link-page-topbar,
     .artist-link-page-hero,
@@ -31544,6 +31694,26 @@ body .pwa-install-card.djcx-pwa-install-card .pwa-install-actions .pwa-install-s
     width: 100%;
   }
 
+  body .artist-link-page-topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  body .artist-link-page-topbar a {
+    min-width: 0;
+    font-size: 0.68rem;
+  }
+
+  body .artist-link-page-topbar a:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body .artist-link-page-topbar a:last-child {
+    display: none;
+  }
+
   body .artist-link-hub-heading h2 {
     max-width: 100%;
     font-size: clamp(1.7rem, 8vw, 2.25rem);
@@ -31551,6 +31721,22 @@ body .pwa-install-card.djcx-pwa-install-card .pwa-install-actions .pwa-install-s
     overflow-wrap: anywhere;
     text-wrap: balance;
     white-space: normal;
+  }
+
+  body .artist-link-hub-heading p,
+  body .artist-link-group > header p {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  body .artist-link-hub-grid > a {
+    grid-template-columns: 48px minmax(0, 1fr);
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  body .artist-link-hub-external {
+    display: none;
   }
 
   body .artist-link-page-identity {

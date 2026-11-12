@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import type { InterfaceLocale } from "@/lib/catalog";
 
 const DJ_CARLOS_PAGE_PATH = "/DJCarlosJimenez";
-const DJ_CARLOS_LOGO_URL = "/artist/dj-carlos-jimenez/icon-192.png";
+const DJ_CARLOS_LOGO_URL = "/artist/dj-carlos-jimenez/icon-192.png?v=blue-20261112";
 const ARTIST_PAGES_WHATSAPP_URL =
   "https://wa.me/16127017420?text=Hola%2C%20quiero%20informacion%20sobre%20una%20pagina%20de%20artista%20en%20First%20Listen";
 const ARTIST_NOTICE_KEY = "first-listen-artist-page-notice:dj-carlos-sonidero-2027";

@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 import { DJ_CARLOS_LOGO_URL } from "@/lib/dj-carlos-page";
 
-const DJ_CARLOS_ICON_192_URL = "/artist/dj-carlos-jimenez/icon-192.png";
-const DJ_CARLOS_ICON_512_URL = "/artist/dj-carlos-jimenez/icon-512.png";
+const DJ_CARLOS_ICON_192_URL = "/artist/dj-carlos-jimenez/icon-192.png?v=blue-20261112";
+const DJ_CARLOS_ICON_512_URL = "/artist/dj-carlos-jimenez/icon-512.png?v=blue-20261112";
 
 export function createDjCarlosManifest({
   rootScope = false,
@@ -67,7 +67,7 @@ export function createDjCarlosManifest({
     scope,
     short_name: "DJ Carlos",
     start_url: startUrl,
-    theme_color: "#f6c84f",
+    theme_color: "#2ee8ff",
   };
 }
 

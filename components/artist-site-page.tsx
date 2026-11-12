@@ -283,7 +283,7 @@ export function ArtistSitePage({
             {(album ? selectedAlbumSongs.length > 0 : albumSongs.length > 0) && <button onClick={() => selectTrack((album ? selectedAlbumSongs : albumSongs)[0].id, "album")} type="button"><Disc3 size={17} /> Reproducir album</button>}
             {videoTracks.length > 0 && <button onClick={() => selectTrack(videoTracks[0].id, "videos")} type="button"><Video size={17} /> Videos oficiales</button>}
             {config.channelUrl && <a href={config.channelUrl} rel="noreferrer" target="_blank"><ExternalLink size={17} /> Canal oficial</a>}
-            {!album && <Link href={`${rootPath}/escucha`}><Headphones size={17} /> Escucha mi música</Link>}
+            {!album && <Link href={`${rootPath}/enlaces`}><Headphones size={17} /> Enlaces oficiales</Link>}
             <button aria-label="Compartir" onClick={() => void share(pagePath, site.name)} title="Compartir" type="button"><Share2 size={17} /></button>
           </div>
         </div>

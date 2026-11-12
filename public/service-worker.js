@@ -1,4 +1,4 @@
-const CACHE_VERSION = "first-listen-pwa-v13-blue-chrome";
+const CACHE_VERSION = "first-listen-pwa-v14-dj-carlos-links";
 const BRAND_VERSION = "blue-chrome-20261112";
 const OFFLINE_URL = "/offline";
 const APP_SHELL = [
@@ -12,8 +12,8 @@ const APP_SHELL = [
   `/icons/first-listen-maskable-512x512.png?v=${BRAND_VERSION}`,
   `/brand/first-listen-wordmark.png?v=${BRAND_VERSION}`,
   `/brand/first-listen-emblem.png?v=${BRAND_VERSION}`,
-  "/artist/dj-carlos-jimenez/icon-192.png",
-  "/artist/dj-carlos-jimenez/icon-512.png",
+  "/artist/dj-carlos-jimenez/icon-192.png?v=blue-20261112",
+  "/artist/dj-carlos-jimenez/icon-512.png?v=blue-20261112",
   "/artist/dj-carlos-jimenez/logo.png",
 ];
 
