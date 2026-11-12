@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
 import { createDjCarlosManifest } from "@/lib/dj-carlos-manifest";
 import { findPublicArtistPageByHost } from "@/lib/public-artist-pages";
+import { firstListenBrandAsset } from "@/lib/first-listen-brand";
 
 export const dynamic = "force-dynamic";
 
@@ -22,24 +23,37 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     scope: "/",
     display: "standalone",
     display_override: ["standalone", "minimal-ui", "browser"],
-    background_color: "#f3f4ee",
-    theme_color: "#171a18",
+    background_color: "#030812",
+    theme_color: "#030812",
     orientation: "any",
     categories: ["music", "entertainment", "social"],
     icons: [
       {
-        src: "/icons/first-listen-180x180.png",
+        src: firstListenBrandAsset("/icons/first-listen-180x180.png"),
         sizes: "180x180",
         type: "image/png",
+        purpose: "any",
       },
       {
-        src: "/icons/first-listen-192x192.png",
+        src: firstListenBrandAsset("/icons/first-listen-192x192.png"),
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: firstListenBrandAsset("/icons/first-listen-512x512.png"),
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: firstListenBrandAsset("/icons/first-listen-maskable-192x192.png"),
         sizes: "192x192",
         type: "image/png",
         purpose: "maskable",
       },
       {
-        src: "/icons/first-listen-512x512.png",
+        src: firstListenBrandAsset("/icons/first-listen-maskable-512x512.png"),
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
@@ -47,7 +61,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     ],
     screenshots: [
       {
-        src: "/icons/first-listen-512x512.png",
+        src: firstListenBrandAsset("/icons/first-listen-512x512.png"),
         sizes: "512x512",
         type: "image/png",
         form_factor: "narrow",

@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -60,11 +59,6 @@ export function ArtistDirectoryBrowser({
               className="artist-directory-card"
               href={artist.href}
               key={artist.id}
-              style={
-                {
-                  "--artist-directory-accent": artist.accentColor || "#a8ee32",
-                } as CSSProperties
-              }
             >
               {artist.imageUrl ? (
                 <Image

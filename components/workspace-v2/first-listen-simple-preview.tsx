@@ -43,7 +43,7 @@ import {
 } from "@/components/provider-player";
 import { FirstPublishForm } from "@/components/first-publish-form";
 import { LanguageSelector } from "@/components/language-selector";
-import { Logo } from "@/components/logo";
+import { FirstListenLogo } from "@/components/first-listen-logo";
 import {
   SongLibraryActions,
   UserMusicLibrary,
@@ -756,7 +756,7 @@ export function FirstListenSimplePreview({
   return (
     <main className="first-listen-simple-preview" id="top">
       <header className="first-listen-simple-header">
-        <Logo />
+        <FirstListenLogo />
         <div className="first-listen-simple-header-actions">
           <Link
             className="first-listen-simple-artists-link"

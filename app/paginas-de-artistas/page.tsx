@@ -5,7 +5,7 @@ import {
   ArtistDirectoryBrowser,
   type ArtistDirectoryEntry,
 } from "@/components/artist-directory-browser";
-import { Logo } from "@/components/logo";
+import { FirstListenLogo } from "@/components/first-listen-logo";
 import { normalizeArtistSiteConfig } from "@/lib/artist-sites";
 import { createClient } from "@/lib/supabase/server";
 
@@ -70,7 +70,7 @@ export default async function ArtistPagesDirectory() {
   return (
     <main className="artist-directory">
       <header className="artist-directory-header">
-        <Logo />
+        <FirstListenLogo />
         <Link href="/"><ArrowLeft size={16} /> First Listen</Link>
       </header>
       <div className="artist-directory-heading">

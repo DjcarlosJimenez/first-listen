@@ -1,12 +1,17 @@
-const CACHE_VERSION = "first-listen-pwa-v12-update-guard";
+const CACHE_VERSION = "first-listen-pwa-v13-blue-chrome";
+const BRAND_VERSION = "blue-chrome-20261112";
 const OFFLINE_URL = "/offline";
 const APP_SHELL = [
   OFFLINE_URL,
-  "/manifest.webmanifest",
+  `/manifest.webmanifest?v=${BRAND_VERSION}`,
   "/DJCarlosJimenez/manifest.webmanifest",
-  "/icons/first-listen-180x180.png",
-  "/icons/first-listen-192x192.png",
-  "/icons/first-listen-512x512.png",
+  `/icons/first-listen-180x180.png?v=${BRAND_VERSION}`,
+  `/icons/first-listen-192x192.png?v=${BRAND_VERSION}`,
+  `/icons/first-listen-512x512.png?v=${BRAND_VERSION}`,
+  `/icons/first-listen-maskable-192x192.png?v=${BRAND_VERSION}`,
+  `/icons/first-listen-maskable-512x512.png?v=${BRAND_VERSION}`,
+  `/brand/first-listen-wordmark.png?v=${BRAND_VERSION}`,
+  `/brand/first-listen-emblem.png?v=${BRAND_VERSION}`,
   "/artist/dj-carlos-jimenez/icon-192.png",
   "/artist/dj-carlos-jimenez/icon-512.png",
   "/artist/dj-carlos-jimenez/logo.png",
