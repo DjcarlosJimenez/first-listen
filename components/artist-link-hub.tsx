@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft,
+  ArrowUpRight,
   BadgeCheck,
   Clapperboard,
   ExternalLink,
@@ -22,6 +23,7 @@ import type { CSSProperties, ReactNode } from "react";
 import type { ArtistPlatformLinks } from "@/lib/artist-link-hub";
 
 type HubLink = {
+  actionLabel: string;
   brand: string;
   description?: string;
   href: string;
@@ -55,7 +57,10 @@ function PlatformCard({ featured = false, item }: { featured?: boolean; item: Hu
         </strong>
         {item.description && <small>{item.description}</small>}
       </span>
-      <ExternalLink aria-hidden="true" className="artist-link-hub-external" size={16} />
+      <span className="artist-link-card-action">
+        <span className="artist-link-card-action-label">{item.actionLabel}</span>
+        <ArrowUpRight aria-hidden="true" size={17} />
+      </span>
     </a>
   );
 }
@@ -101,9 +106,13 @@ export function ArtistLinkHub({
   artistUrl: string;
   links: ArtistPlatformLinks;
 }) {
+  const facebookCommunityMessage = links.facebookCommunityMessage?.trim();
   const facebookItems: HubLink[] = links.facebook ? [{
+    actionLabel: "Visitar página",
     brand: "facebook",
-    description: links.facebookCommunityMessage || "Sígueme y forma parte de mi comunidad oficial.",
+    description: facebookCommunityMessage === "Únete a mis más de 47 mil seguidores."
+      ? "Únete a mis más de 47 mil seguidores y contando."
+      : facebookCommunityMessage || "Únete a mis más de 47 mil seguidores y contando.",
     href: links.facebook,
     icon: <SiFacebook aria-hidden="true" />,
     label: "Facebook",
@@ -111,24 +120,28 @@ export function ArtistLinkHub({
   }] : [];
   const musicCandidates: Array<HubLink | null> = [
     links.youtubeMusic ? {
+      actionLabel: "Escuchar",
       brand: "youtube-music",
       href: links.youtubeMusic,
       icon: <SiYoutubemusic aria-hidden="true" />,
       label: "YouTube Music",
     } : null,
     links.appleMusic ? {
+      actionLabel: "Escuchar",
       brand: "apple-music",
       href: links.appleMusic,
       icon: <SiApplemusic aria-hidden="true" />,
       label: "Apple Music",
     } : null,
     links.spotify ? {
+      actionLabel: "Escuchar",
       brand: "spotify",
       href: links.spotify,
       icon: <SiSpotify aria-hidden="true" />,
       label: "Spotify",
     } : null,
     links.amazonMusic ? {
+      actionLabel: "Escuchar",
       brand: "amazon-music",
       href: links.amazonMusic,
       icon: <FaAmazon aria-hidden="true" />,
@@ -138,15 +151,17 @@ export function ArtistLinkHub({
   const musicItems = musicCandidates.filter(isHubLink);
   const officialItems: HubLink[] = [
     {
+      actionLabel: "Abrir página",
       brand: "artist",
       description: "Álbumes, videos, adelantos exclusivos y nuevos proyectos.",
       href: artistUrl,
       icon: artistLogoUrl ? (
-        <Image alt="" height={30} src={artistLogoUrl} unoptimized width={30} />
+        <Image alt="" height={140} src={artistLogoUrl} unoptimized width={210} />
       ) : <Globe2 aria-hidden="true" />,
       label: "Página oficial",
     },
     ...(links.website ? [{
+      actionLabel: "Visitar sitio",
       brand: "website",
       description: "Visita mi sitio web personal.",
       href: links.website,
@@ -156,30 +171,35 @@ export function ArtistLinkHub({
   ];
   const socialCandidates: Array<HubLink | null> = [
     links.youtube ? {
+      actionLabel: "Ver perfil",
       brand: "youtube",
       href: links.youtube,
       icon: <SiYoutube aria-hidden="true" />,
       label: "YouTube",
     } : null,
     links.tiktok ? {
+      actionLabel: "Ver perfil",
       brand: "tiktok",
       href: links.tiktok,
       icon: <SiTiktok aria-hidden="true" />,
       label: "TikTok",
     } : null,
     links.instagram ? {
+      actionLabel: "Ver perfil",
       brand: "instagram",
       href: links.instagram,
       icon: <SiInstagram aria-hidden="true" />,
       label: "Instagram",
     } : null,
     links.lemon8 ? {
+      actionLabel: "Ver perfil",
       brand: "lemon8",
       href: links.lemon8,
       icon: <b className="artist-link-monogram" aria-hidden="true">L8</b>,
       label: "Lemon8",
     } : null,
     links.clapper ? {
+      actionLabel: "Ver perfil",
       brand: "clapper",
       href: links.clapper,
       icon: <Clapperboard aria-hidden="true" />,
@@ -188,16 +208,18 @@ export function ArtistLinkHub({
   ];
   const socialItems = socialCandidates.filter(isHubLink);
   const customItems: HubLink[] = links.custom.map((link) => ({
+      actionLabel: "Abrir",
       brand: "custom",
       href: link.url,
       icon: <ExternalLink aria-hidden="true" />,
       label: link.label,
     }));
   const firstListenItems: HubLink[] = [{
+    actionLabel: "Explorar",
     brand: "firstlisten",
     description: "Descubre música nueva, escucha artistas independientes y comparte tus enlaces musicales.",
     href: "https://www.firstlisten.net",
-    icon: <Image alt="" height={30} src="/brand/first-listen-icon.svg" width={30} />,
+    icon: <Image alt="" height={180} priority src="/brand/first-listen-link-logo.png" unoptimized width={540} />,
     label: "FirstListen",
   }];
   const style = accentColor
@@ -282,11 +304,11 @@ export function ArtistLinkHubPage({
         <span>FIRST LISTEN</span>
         <Link href="/paginas-de-artistas">Artistas</Link>
       </header>
-      <section className="artist-link-page-hero">
+      <section className={`artist-link-page-hero${artistLogoUrl ? " artist-link-page-hero-branded" : ""}`}>
         <div className="artist-link-page-copy">
           <span><Headphones size={15} /> CENTRO OFICIAL DE ENLACES</span>
-          <h1>{artistName}</h1>
-          <p>Música, comunidad y plataformas oficiales en un solo lugar.</p>
+          <h1 className={artistLogoUrl ? "artist-link-page-title-sr-only" : undefined}>{artistName}</h1>
+          <p>{artistLogoUrl ? "Mis enlaces oficiales" : "Música, comunidad y plataformas oficiales en un solo lugar."}</p>
         </div>
         <div className="artist-link-page-identity" aria-hidden="true">
           {artistLogoUrl && (
@@ -299,6 +321,7 @@ export function ArtistLinkHubPage({
               <Image alt="" fill priority sizes="(max-width: 720px) 34vw, 150px" src={artistPortraitUrl} unoptimized />
             </div>
           )}
+          <p className="artist-link-page-mobile-title">Mis enlaces oficiales</p>
         </div>
       </section>
       <ArtistLinkHub

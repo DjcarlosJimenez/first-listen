@@ -1,5 +1,5 @@
-const CACHE_VERSION = "first-listen-pwa-v14-dj-carlos-links";
-const BRAND_VERSION = "blue-chrome-20261112";
+const CACHE_VERSION = "first-listen-pwa-v15-official-mark";
+const BRAND_VERSION = "official-mark-20261113";
 const OFFLINE_URL = "/offline";
 const APP_SHELL = [
   OFFLINE_URL,
@@ -10,8 +10,8 @@ const APP_SHELL = [
   `/icons/first-listen-512x512.png?v=${BRAND_VERSION}`,
   `/icons/first-listen-maskable-192x192.png?v=${BRAND_VERSION}`,
   `/icons/first-listen-maskable-512x512.png?v=${BRAND_VERSION}`,
-  `/brand/first-listen-wordmark.png?v=${BRAND_VERSION}`,
-  `/brand/first-listen-emblem.png?v=${BRAND_VERSION}`,
+  `/brand/first-listen-link-logo.png?v=${BRAND_VERSION}`,
+  `/brand/first-listen-mark.png?v=${BRAND_VERSION}`,
   "/artist/dj-carlos-jimenez/icon-192.png?v=blue-20261112",
   "/artist/dj-carlos-jimenez/icon-512.png?v=blue-20261112",
   "/artist/dj-carlos-jimenez/logo.png",
@@ -81,6 +81,7 @@ self.addEventListener("fetch", (event) => {
 
   if (
     url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/brand/") ||
     url.pathname.startsWith("/artist/dj-carlos-jimenez/") ||
     url.pathname === "/manifest.webmanifest" ||
     url.pathname.endsWith("/manifest.webmanifest") ||

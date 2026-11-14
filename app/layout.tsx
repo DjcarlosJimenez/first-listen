@@ -3,6 +3,7 @@ import { PlatformRuntime } from "@/components/platform-runtime";
 import { PwaInstallProvider } from "@/components/pwa-install-prompt";
 import { SiteAnalyticsTracker } from "@/components/site-analytics-tracker";
 import { getAppVersion } from "@/lib/app-version";
+import { firstListenBrandAsset } from "@/lib/first-listen-brand";
 import {
   defaultPlatformControlConfig,
   mapPlatformControlState,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/platform-control";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
+import "./artist-link-brand-overrides.css";
 import "./unified.css";
 
 const installPromptCaptureScript = `
@@ -29,7 +31,7 @@ export const metadata: Metadata = {
   title: "First Listen - Real Listeners. Real Viewers. Real Reactions.",
   description:
     "Get your first listens, views, reactions, and engagement from real people before spending money on promotion.",
-  manifest: "/manifest.webmanifest",
+  manifest: firstListenBrandAsset("/manifest.webmanifest"),
   applicationName: "First Listen",
   appleWebApp: {
     capable: true,
@@ -44,26 +46,26 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon.ico" },
+      { url: firstListenBrandAsset("/favicon.ico") },
       {
-        url: "/icons/first-listen-16x16.png",
+        url: firstListenBrandAsset("/icons/first-listen-16x16.png"),
         sizes: "16x16",
         type: "image/png",
       },
       {
-        url: "/icons/first-listen-32x32.png",
+        url: firstListenBrandAsset("/icons/first-listen-32x32.png"),
         sizes: "32x32",
         type: "image/png",
       },
       {
-        url: "/icons/first-listen-48x48.png",
+        url: firstListenBrandAsset("/icons/first-listen-48x48.png"),
         sizes: "48x48",
         type: "image/png",
       },
     ],
     apple: [
       {
-        url: "/icons/first-listen-180x180.png",
+        url: firstListenBrandAsset("/icons/first-listen-180x180.png"),
         sizes: "180x180",
         type: "image/png",
       },
@@ -72,7 +74,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#171a18",
+  themeColor: "#030812",
   colorScheme: "light dark",
 };
 

@@ -15,6 +15,7 @@ import {
 import { useParams, usePathname } from "next/navigation";
 import { Download, Share2, Smartphone } from "lucide-react";
 import type { InterfaceLocale } from "@/lib/catalog";
+import { firstListenBrandAsset } from "@/lib/first-listen-brand";
 import { useInterfaceLocale } from "@/lib/use-interface-locale";
 
 type BeforeInstallPromptEvent = Event & {
@@ -65,6 +66,9 @@ const VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const DJ_CARLOS_PATH_PREFIX = "/DJCarlosJimenez";
 const DJ_CARLOS_HOST = "djcarlosjimenez.firstlisten.net";
 const DJ_CARLOS_ICON_URL = "/artist/dj-carlos-jimenez/icon-192.png";
+const FIRST_LISTEN_ICON_URL = firstListenBrandAsset(
+  "/icons/first-listen-192x192.png",
+);
 const INSTALL_PROMPT_CAPTURED_EVENT = "first-listen:install-prompt-captured";
 
 export type ArtistInstallBrand = {
@@ -163,7 +167,7 @@ function installPromptBrandFor(
   return {
     actionLabel: spanish ? "Instalar" : "Install",
     cardClassName: "pwa-install-card",
-    iconUrl: null,
+    iconUrl: FIRST_LISTEN_ICON_URL,
     iosInstruction: (
       <>
         {spanish ? "En iPhone o iPad, toca Compartir" : "On iPhone or iPad, tap Share"}{" "}

@@ -520,7 +520,7 @@ export const defaultDjCarlosPageConfig: DjCarlosPageConfig = {
     lemon8: "https://v.lemon8-app.com/al/OgkMTdNeyQ",
     clapper: "https://clapperapp.com/carlosjimenezcompositor?is_invite=1&r=XoEp1k0YJW&c=in&m=co",
     facebook: "https://www.facebook.com/share/1N9cxnLB98/",
-    facebookCommunityMessage: "Únete a mis más de 47 mil seguidores.",
+    facebookCommunityMessage: "Únete a mis más de 47 mil seguidores y contando.",
     facebookVerified: true,
     website: "",
     custom: [],

@@ -3,37 +3,48 @@ import path from "node:path";
 import sharp from "sharp";
 
 const root = process.cwd();
-const wideSource = "C:/Users/Dj Carlos Jimenez/Downloads/First Listen_ Futuristic Audio Emblem.png";
-const squareSource = "C:/Users/Dj Carlos Jimenez/Downloads/First Listen Neon Chrome Emblem.png";
 const brandDir = path.join(root, "public", "brand");
 const iconDir = path.join(root, "public", "icons");
 const appDir = path.join(root, "app");
+const androidDir = path.join(root, "android");
+const fullLogoSource = path.join(brandDir, "first-listen-link-logo.png");
+const markSource = path.join(brandDir, "first-listen-mark.png");
 const background = { r: 3, g: 8, b: 18, alpha: 1 };
 
 await Promise.all([mkdir(brandDir, { recursive: true }), mkdir(iconDir, { recursive: true })]);
 
-await sharp(wideSource)
-  .extract({ left: 0, top: 215, width: 1752, height: 440 })
+await sharp(fullLogoSource)
   .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 8 })
   .resize({ width: 920, withoutEnlargement: true })
   .png({ compressionLevel: 9, palette: false })
   .toFile(path.join(brandDir, "first-listen-wordmark.png"));
 
-await sharp(wideSource)
+await sharp(fullLogoSource)
   .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 8 })
   .resize({ width: 1400, withoutEnlargement: true })
   .png({ compressionLevel: 9, palette: false })
   .toFile(path.join(brandDir, "first-listen-hero-logo.png"));
 
-await sharp(squareSource)
-  .resize({ width: 1024, height: 1024, fit: "contain" })
+await sharp(markSource)
+  .resize({
+    width: 1024,
+    height: 1024,
+    fit: "contain",
+    background: { r: 0, g: 0, b: 0, alpha: 0 },
+  })
   .png({ compressionLevel: 9, palette: false })
   .toFile(path.join(brandDir, "first-listen-emblem.png"));
 
 async function renderIcon(size, output, inset = 0) {
   const innerSize = Math.max(1, size - inset * 2);
-  const emblem = await sharp(squareSource)
-    .resize({ width: innerSize, height: innerSize, fit: "contain" })
+  const emblem = await sharp(markSource)
+    .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 8 })
+    .resize({
+      width: innerSize,
+      height: innerSize,
+      fit: "contain",
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
     .png()
     .toBuffer();
 
@@ -51,16 +62,50 @@ async function renderIcon(size, output, inset = 0) {
 }
 
 for (const size of [16, 32, 48, 180, 192, 512]) {
-  await renderIcon(size, path.join(iconDir, `first-listen-${size}x${size}.png`));
+  await renderIcon(
+    size,
+    path.join(iconDir, `first-listen-${size}x${size}.png`),
+    Math.max(1, Math.round(size * 0.06)),
+  );
 }
 
-await renderIcon(192, path.join(iconDir, "first-listen-maskable-192x192.png"), 18);
-await renderIcon(512, path.join(iconDir, "first-listen-maskable-512x512.png"), 48);
-await renderIcon(512, path.join(appDir, "icon.png"));
-await renderIcon(180, path.join(appDir, "apple-icon.png"));
+await renderIcon(192, path.join(iconDir, "first-listen-maskable-192x192.png"), 34);
+await renderIcon(512, path.join(iconDir, "first-listen-maskable-512x512.png"), 92);
+await renderIcon(512, path.join(appDir, "icon.png"), 31);
+await renderIcon(180, path.join(appDir, "apple-icon.png"), 11);
+await renderIcon(512, path.join(androidDir, "twa", "store_icon.png"), 31);
+await renderIcon(512, path.join(androidDir, "play-store", "assets", "icon-512.png"), 31);
 
-const faviconPng = await sharp(squareSource)
-  .resize({ width: 32, height: 32, fit: "contain", background })
+const androidLauncherSizes = {
+  "mipmap-mdpi": { launcher: 48, maskable: 82 },
+  "mipmap-hdpi": { launcher: 72, maskable: 123 },
+  "mipmap-xhdpi": { launcher: 96, maskable: 164 },
+  "mipmap-xxhdpi": { launcher: 144, maskable: 246 },
+  "mipmap-xxxhdpi": { launcher: 192, maskable: 328 },
+};
+
+for (const [density, sizes] of Object.entries(androidLauncherSizes)) {
+  const densityDir = path.join(androidDir, "twa", "app", "src", "main", "res", density);
+  await mkdir(densityDir, { recursive: true });
+  await renderIcon(
+    sizes.launcher,
+    path.join(densityDir, "ic_launcher.png"),
+    Math.max(1, Math.round(sizes.launcher * 0.06)),
+  );
+  await renderIcon(
+    sizes.maskable,
+    path.join(densityDir, "ic_maskable.png"),
+    Math.max(1, Math.round(sizes.maskable * 0.04)),
+  );
+}
+
+const faviconPng = await sharp(markSource)
+  .resize({
+    width: 32,
+    height: 32,
+    fit: "contain",
+    background: { r: 0, g: 0, b: 0, alpha: 0 },
+  })
   .flatten({ background })
   .png({ compressionLevel: 9 })
   .toBuffer();
