@@ -23463,6 +23463,204 @@ html[data-ranking-card-density="expanded"] [data-platform-module="organic_rankin
   margin-top: 16px;
 }
 
+.djcx-admin-primary-playback {
+  margin-top: 16px;
+}
+
+.djcx-admin-primary-grid,
+.djcx-admin-primary-summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.djcx-admin-primary-grid label {
+  color: var(--djcx-muted);
+  display: grid;
+  font-size: 11px;
+  font-weight: 950;
+  gap: 6px;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+.djcx-admin-primary-grid select,
+.djcx-admin-primary-editor-heading select {
+  background: #070707;
+  border: 1px solid rgba(246, 200, 79, 0.24);
+  border-radius: 8px;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  min-height: 42px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.djcx-admin-primary-summary {
+  margin-top: 14px;
+}
+
+.djcx-admin-primary-summary > div {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.djcx-admin-primary-summary span {
+  color: var(--djcx-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.djcx-admin-primary-summary strong {
+  color: #fff;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.djcx-admin-primary-note,
+.djcx-admin-primary-warning {
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+}
+
+.djcx-admin-primary-note {
+  background: rgba(46, 232, 255, 0.07);
+  border: 1px solid rgba(46, 232, 255, 0.18);
+  color: var(--djcx-muted);
+}
+
+.djcx-admin-primary-warning {
+  background: rgba(255, 164, 69, 0.09);
+  border: 1px solid rgba(255, 164, 69, 0.24);
+  color: #ffd8ad;
+}
+
+.djcx-admin-primary-editor {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.djcx-admin-primary-editor-heading {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 0.45fr);
+}
+
+.djcx-admin-primary-editor-heading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.djcx-admin-primary-editor-heading strong {
+  color: #fff;
+  font-size: 14px;
+}
+
+.djcx-admin-primary-editor-heading span {
+  color: var(--djcx-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.djcx-admin-primary-queue {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.djcx-admin-primary-queue article {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 34px minmax(0, 1fr) repeat(3, 34px);
+  min-width: 0;
+  padding: 8px;
+}
+
+.djcx-admin-primary-queue article > span {
+  color: var(--djcx-gold);
+  font-size: 12px;
+  font-weight: 950;
+  text-align: center;
+}
+
+.djcx-admin-primary-queue article > div {
+  display: grid;
+  min-width: 0;
+}
+
+.djcx-admin-primary-queue article strong,
+.djcx-admin-primary-queue article small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.djcx-admin-primary-queue article strong {
+  color: #fff;
+  font-size: 13px;
+}
+
+.djcx-admin-primary-queue article small {
+  color: var(--djcx-muted);
+  font-size: 10px;
+}
+
+.djcx-admin-primary-queue button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  width: 34px;
+}
+
+.djcx-admin-primary-queue button:disabled {
+  cursor: not-allowed;
+  opacity: 0.32;
+}
+
+@media (max-width: 760px) {
+  .djcx-admin-primary-grid,
+  .djcx-admin-primary-summary,
+  .djcx-admin-primary-editor-heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .djcx-admin-primary-queue article {
+    grid-template-columns: 30px minmax(0, 1fr) repeat(3, 32px);
+  }
+
+  .djcx-admin-primary-queue button {
+    height: 32px;
+    width: 32px;
+  }
+}
+
 .djcx-admin-album-list {
   display: grid;
   gap: 10px;

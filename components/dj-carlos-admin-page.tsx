@@ -64,6 +64,7 @@ import {
   type DjCarlosCompilation,
   type DjCarlosCompilationTrack,
   type DjCarlosPageConfig,
+  type DjCarlosPrimaryPlaybackMode,
   type DjCarlosTrack,
   type DjCarlosTrackSection,
   type DjCarlosUpcomingPreviewClip,
@@ -95,6 +96,14 @@ type EditableCompilationField =
   | "title";
 
 type EditableCompilationTrackField = "link" | "mood" | "title";
+
+const primaryPlaybackModeLabels: Record<DjCarlosPrimaryPlaybackMode, string> = {
+  album: "Album completo",
+  "album-selection": "Parte de un album",
+  "top-ten": "Top Ten",
+  compilation: "Lista o compilacion",
+  custom: "Lista personalizada",
+};
 
 type AlbumImportResponse = {
   album?: Partial<DjCarlosAlbum>;
@@ -431,6 +440,109 @@ export function DjCarlosAdminPage({
     () => config.tracks.filter((track) => track.section === "top-ten"),
     [config.tracks],
   );
+  const primaryPlayback = config.primaryPlayback;
+  const primaryPlaybackAlbum = useMemo(
+    () =>
+      albums.find((album) => album.id === primaryPlayback.sourceId) ??
+      albums[0] ??
+      config.album,
+    [albums, config.album, primaryPlayback.sourceId],
+  );
+  const primaryPlaybackAlbumTracks = useMemo(
+    () =>
+      config.tracks.filter(
+        (track) =>
+          track.section === "album" &&
+          track.albumId === primaryPlaybackAlbum.id,
+      ),
+    [config.tracks, primaryPlaybackAlbum.id],
+  );
+  const primaryPlaybackCompilation = useMemo(
+    () =>
+      config.compilations.find(
+        (compilation) => compilation.id === primaryPlayback.sourceId,
+      ) ?? config.compilations[0] ?? null,
+    [config.compilations, primaryPlayback.sourceId],
+  );
+  const primaryCustomCandidates = useMemo(
+    () =>
+      config.tracks.filter(
+        (track) => track.section === "album" || track.section === "top-ten",
+      ),
+    [config.tracks],
+  );
+  const primarySelectedTracks = useMemo(() => {
+    const candidates =
+      primaryPlayback.mode === "album-selection"
+        ? primaryPlaybackAlbumTracks
+        : primaryCustomCandidates;
+    return primaryPlayback.trackIds
+      .map((trackId) => candidates.find((track) => track.id === trackId))
+      .filter((track): track is DjCarlosTrack => Boolean(track));
+  }, [
+    primaryCustomCandidates,
+    primaryPlayback.mode,
+    primaryPlayback.trackIds,
+    primaryPlaybackAlbumTracks,
+  ]);
+  const primaryAvailableTracks = useMemo(() => {
+    const candidates =
+      primaryPlayback.mode === "album-selection"
+        ? primaryPlaybackAlbumTracks
+        : primaryCustomCandidates;
+    const selectedIds = new Set(primaryPlayback.trackIds);
+    return candidates.filter((track) => !selectedIds.has(track.id));
+  }, [
+    primaryCustomCandidates,
+    primaryPlayback.mode,
+    primaryPlayback.trackIds,
+    primaryPlaybackAlbumTracks,
+  ]);
+  const primaryStartOptions = useMemo(() => {
+    if (primaryPlayback.mode === "compilation") {
+      return (primaryPlaybackCompilation?.tracks ?? []).map((track) => ({
+        id: track.id,
+        title: track.title,
+      }));
+    }
+    if (primaryPlayback.mode === "top-ten") {
+      return topTenTracks.map((track) => ({ id: track.id, title: track.title }));
+    }
+    if (
+      primaryPlayback.mode === "album-selection" ||
+      primaryPlayback.mode === "custom"
+    ) {
+      return primarySelectedTracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+      }));
+    }
+    return primaryPlaybackAlbumTracks.map((track) => ({
+      id: track.id,
+      title: track.title,
+    }));
+  }, [
+    primaryPlayback.mode,
+    primaryPlaybackAlbumTracks,
+    primaryPlaybackCompilation,
+    primarySelectedTracks,
+    topTenTracks,
+  ]);
+  const primaryPlaybackSourceLabel =
+    primaryPlayback.mode === "compilation"
+      ? primaryPlaybackCompilation?.title ?? "Sin compilacion"
+      : primaryPlayback.mode === "top-ten"
+        ? "Top Ten"
+        : primaryPlayback.mode === "custom"
+          ? "Lista personalizada"
+          : primaryPlaybackAlbum.title;
+  const primaryPlaybackStartLabel =
+    primaryStartOptions.find(
+      (track) => track.id === primaryPlayback.startTrackId,
+    )?.title ??
+    (primaryPlayback.mode === "album"
+      ? "Inicio normal del album"
+      : "Primera cancion de la lista");
   const videoTracks = useMemo(
     () => config.tracks.filter((track) => track.section === "official-video"),
     [config.tracks],
@@ -1140,14 +1252,229 @@ export function DjCarlosAdminPage({
   const removeCompilation = (compilationId: string) => {
     if (!window.confirm("Quitar esta compilacion de la pagina?")) return;
     hasLocalChangesRef.current = true;
+    setConfig((current) => {
+      const compilations = current.compilations.filter(
+        (compilation) => compilation.id !== compilationId,
+      );
+      const primaryPlayback =
+        current.primaryPlayback.mode === "compilation" &&
+        current.primaryPlayback.sourceId === compilationId
+          ? {
+              mode: "album" as const,
+              sourceId: albumsForConfig(current)[0]?.id ?? "",
+              startTrackId: "",
+              trackIds: [],
+            }
+          : current.primaryPlayback;
+      return {
+        ...current,
+        compilations,
+        primaryPlayback,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    setStatus("Compilacion quitada. Toca Guardar cambios.");
+  };
+
+  const setPrimaryPlaybackMode = (mode: DjCarlosPrimaryPlaybackMode) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => {
+      const currentAlbums = albumsForConfig(current);
+      const sourceAlbum =
+        currentAlbums.find(
+          (album) => album.id === current.primaryPlayback.sourceId,
+        ) ?? currentAlbums[0];
+      const sourceAlbumTracks = current.tracks.filter(
+        (track) =>
+          track.section === "album" && track.albumId === sourceAlbum?.id,
+      );
+      const firstTopTenTrack = current.tracks.find(
+        (track) => track.section === "top-ten",
+      );
+      const firstCustomTrack =
+        firstTopTenTrack ??
+        current.tracks.find((track) => track.section === "album");
+      const sourceCompilation =
+        current.compilations.find(
+          (compilation) =>
+            compilation.id === current.primaryPlayback.sourceId,
+        ) ?? current.compilations[0];
+
+      if (mode === "album") {
+        return {
+          ...current,
+          primaryPlayback: {
+            mode,
+            sourceId: sourceAlbum?.id ?? "",
+            startTrackId: "",
+            trackIds: [],
+          },
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
+      if (mode === "album-selection") {
+        const firstTrackId = sourceAlbumTracks[0]?.id ?? "";
+        return {
+          ...current,
+          primaryPlayback: {
+            mode,
+            sourceId: sourceAlbum?.id ?? "",
+            startTrackId: firstTrackId,
+            trackIds: firstTrackId ? [firstTrackId] : [],
+          },
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
+      if (mode === "top-ten") {
+        return {
+          ...current,
+          primaryPlayback: {
+            mode,
+            sourceId: "",
+            startTrackId: firstTopTenTrack?.id ?? "",
+            trackIds: [],
+          },
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
+      if (mode === "compilation") {
+        return {
+          ...current,
+          primaryPlayback: {
+            mode,
+            sourceId: sourceCompilation?.id ?? "",
+            startTrackId: sourceCompilation?.tracks[0]?.id ?? "",
+            trackIds: [],
+          },
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
+      const firstTrackId = firstCustomTrack?.id ?? "";
+      return {
+        ...current,
+        primaryPlayback: {
+          mode,
+          sourceId: "",
+          startTrackId: firstTrackId,
+          trackIds: firstTrackId ? [firstTrackId] : [],
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    setStatus("Fuente principal actualizada. Toca Guardar cambios.");
+  };
+
+  const setPrimaryPlaybackSource = (sourceId: string) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => {
+      if (current.primaryPlayback.mode === "compilation") {
+        const compilation = current.compilations.find(
+          (item) => item.id === sourceId,
+        );
+        return {
+          ...current,
+          primaryPlayback: {
+            ...current.primaryPlayback,
+            sourceId,
+            startTrackId: compilation?.tracks[0]?.id ?? "",
+            trackIds: [],
+          },
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
+      const sourceTracks = current.tracks.filter(
+        (track) => track.section === "album" && track.albumId === sourceId,
+      );
+      const isSelection = current.primaryPlayback.mode === "album-selection";
+      const firstTrackId = isSelection ? sourceTracks[0]?.id ?? "" : "";
+      return {
+        ...current,
+        primaryPlayback: {
+          ...current.primaryPlayback,
+          sourceId,
+          startTrackId: firstTrackId,
+          trackIds: firstTrackId ? [firstTrackId] : [],
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    setStatus("Origen de la reproduccion actualizado. Toca Guardar cambios.");
+  };
+
+  const setPrimaryPlaybackStart = (startTrackId: string) => {
+    hasLocalChangesRef.current = true;
     setConfig((current) => ({
       ...current,
-      compilations: current.compilations.filter(
-        (compilation) => compilation.id !== compilationId,
-      ),
+      primaryPlayback: {
+        ...current.primaryPlayback,
+        startTrackId,
+      },
       updatedAt: new Date().toISOString(),
     }));
-    setStatus("Compilacion quitada. Toca Guardar cambios.");
+    setStatus("Cancion inicial actualizada. Toca Guardar cambios.");
+  };
+
+  const addPrimaryPlaybackTrack = (trackId: string) => {
+    if (!trackId) return;
+    hasLocalChangesRef.current = true;
+    setConfig((current) => {
+      if (current.primaryPlayback.trackIds.includes(trackId)) return current;
+      const trackIds = [...current.primaryPlayback.trackIds, trackId];
+      return {
+        ...current,
+        primaryPlayback: {
+          ...current.primaryPlayback,
+          startTrackId: current.primaryPlayback.startTrackId || trackId,
+          trackIds,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    setStatus("Cancion agregada a la reproduccion principal.");
+  };
+
+  const movePrimaryPlaybackTrack = (trackId: string, direction: -1 | 1) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => {
+      const trackIds = [...current.primaryPlayback.trackIds];
+      const index = trackIds.indexOf(trackId);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= trackIds.length) return current;
+      [trackIds[index], trackIds[target]] = [trackIds[target], trackIds[index]];
+      return {
+        ...current,
+        primaryPlayback: { ...current.primaryPlayback, trackIds },
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    setStatus("Orden de reproduccion actualizado. Toca Guardar cambios.");
+  };
+
+  const removePrimaryPlaybackTrack = (trackId: string) => {
+    hasLocalChangesRef.current = true;
+    setConfig((current) => {
+      const trackIds = current.primaryPlayback.trackIds.filter(
+        (item) => item !== trackId,
+      );
+      return {
+        ...current,
+        primaryPlayback: {
+          ...current.primaryPlayback,
+          startTrackId:
+            current.primaryPlayback.startTrackId === trackId
+              ? trackIds[0] ?? ""
+              : current.primaryPlayback.startTrackId,
+          trackIds,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    setStatus("Cancion quitada de la reproduccion principal.");
   };
 
   const addAlbum = () => {
@@ -1200,7 +1527,7 @@ export function DjCarlosAdminPage({
       const nextAlbums = albumsForConfig(current).filter(
         (album) => album.id !== albumId,
       );
-      return syncAlbums(
+      const nextConfig = syncAlbums(
         {
           ...current,
           tracks: current.tracks.filter(
@@ -1209,6 +1536,19 @@ export function DjCarlosAdminPage({
         },
         nextAlbums,
       );
+      if (
+        (nextConfig.primaryPlayback.mode === "album" ||
+          nextConfig.primaryPlayback.mode === "album-selection") &&
+        nextConfig.primaryPlayback.sourceId === albumId
+      ) {
+        nextConfig.primaryPlayback = {
+          mode: "album",
+          sourceId: nextAlbums[0]?.id ?? "",
+          startTrackId: "",
+          trackIds: [],
+        };
+      }
+      return nextConfig;
     });
     setStatus("Album quitado. Toca Guardar cambios para publicarlo.");
   };
@@ -2260,6 +2600,201 @@ export function DjCarlosAdminPage({
         </div>
       </section>
 
+      <section className="djcx-admin-panel djcx-admin-primary-playback">
+        <div className="djcx-admin-panel-heading">
+          <span>
+            <Play size={15} /> Reproduccion principal
+          </span>
+          <strong>Tu decides que empieza a sonar al abrir tu pagina</strong>
+        </div>
+
+        <div className="djcx-admin-primary-grid">
+          <label>
+            Fuente principal
+            <select
+              onChange={(event) =>
+                setPrimaryPlaybackMode(
+                  event.target.value as DjCarlosPrimaryPlaybackMode,
+                )
+              }
+              value={primaryPlayback.mode}
+            >
+              {Object.entries(primaryPlaybackModeLabels).map(([mode, label]) => (
+                <option key={mode} value={mode}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {(primaryPlayback.mode === "album" ||
+            primaryPlayback.mode === "album-selection") && (
+            <label>
+              Album
+              <select
+                onChange={(event) => setPrimaryPlaybackSource(event.target.value)}
+                value={primaryPlaybackAlbum.id}
+              >
+                {albums.map((album) => (
+                  <option key={album.id} value={album.id}>
+                    {album.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {primaryPlayback.mode === "compilation" && (
+            <label>
+              Lista o compilacion
+              <select
+                disabled={!config.compilations.length}
+                onChange={(event) => setPrimaryPlaybackSource(event.target.value)}
+                value={primaryPlaybackCompilation?.id ?? ""}
+              >
+                {!config.compilations.length && (
+                  <option value="">Primero crea una compilacion</option>
+                )}
+                {config.compilations.map((compilation) => (
+                  <option key={compilation.id} value={compilation.id}>
+                    {compilation.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <label>
+            Cancion inicial
+            <select
+              disabled={!primaryStartOptions.length}
+              onChange={(event) => setPrimaryPlaybackStart(event.target.value)}
+              value={primaryPlayback.startTrackId}
+            >
+              <option value="">
+                {primaryPlayback.mode === "album"
+                  ? "Inicio normal del album completo"
+                  : "Primera cancion de la lista"}
+              </option>
+              {primaryStartOptions.map((track) => (
+                <option key={track.id} value={track.id}>
+                  {track.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="djcx-admin-primary-summary">
+          <div>
+            <span>Configuracion activa</span>
+            <strong>{primaryPlaybackModeLabels[primaryPlayback.mode]}</strong>
+          </div>
+          <div>
+            <span>Origen</span>
+            <strong>{primaryPlaybackSourceLabel}</strong>
+          </div>
+          <div>
+            <span>Empieza con</span>
+            <strong>{primaryPlaybackStartLabel}</strong>
+          </div>
+        </div>
+
+        {primaryPlayback.mode === "album" && (
+          <p className="djcx-admin-primary-note">
+            Sin elegir una cancion inicial se usa el enlace completo del album. Si
+            eliges una, la reproduccion comienza en esa cancion y continua con el
+            orden importado del album.
+          </p>
+        )}
+
+        {primaryPlayback.mode === "top-ten" && !topTenTracks.length && (
+          <p className="djcx-admin-primary-warning">
+            Tu Top Ten aun no tiene canciones. Agregalas antes de guardar esta opcion.
+          </p>
+        )}
+
+        {primaryPlayback.mode === "compilation" &&
+          !config.compilations.length && (
+            <p className="djcx-admin-primary-warning">
+              Primero crea una lista en la seccion Listas y compilaciones.
+            </p>
+          )}
+
+        {(primaryPlayback.mode === "album-selection" ||
+          primaryPlayback.mode === "custom") && (
+          <div className="djcx-admin-primary-editor">
+            <div className="djcx-admin-primary-editor-heading">
+              <div>
+                <strong>Orden de canciones</strong>
+                <span>
+                  La primera se reproduce primero; puedes moverlas o elegir otra
+                  cancion inicial.
+                </span>
+              </div>
+              <select
+                aria-label="Agregar cancion a la reproduccion principal"
+                disabled={!primaryAvailableTracks.length}
+                onChange={(event) => addPrimaryPlaybackTrack(event.target.value)}
+                value=""
+              >
+                <option value="">
+                  {primaryAvailableTracks.length
+                    ? "+ Agregar cancion"
+                    : "No hay mas canciones"}
+                </option>
+                {primaryAvailableTracks.map((track) => (
+                  <option key={track.id} value={track.id}>
+                    {track.title} / {track.release || track.subtitle}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {primarySelectedTracks.length ? (
+              <div className="djcx-admin-primary-queue">
+                {primarySelectedTracks.map((track, index) => (
+                  <article key={track.id}>
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <div>
+                      <strong>{track.title}</strong>
+                      <small>{track.release || track.subtitle}</small>
+                    </div>
+                    <button
+                      aria-label={`Mover ${track.title} arriba`}
+                      disabled={index === 0}
+                      onClick={() => movePrimaryPlaybackTrack(track.id, -1)}
+                      type="button"
+                    >
+                      <ArrowUp size={14} />
+                    </button>
+                    <button
+                      aria-label={`Mover ${track.title} abajo`}
+                      disabled={index === primarySelectedTracks.length - 1}
+                      onClick={() => movePrimaryPlaybackTrack(track.id, 1)}
+                      type="button"
+                    >
+                      <ArrowDown size={14} />
+                    </button>
+                    <button
+                      aria-label={`Quitar ${track.title}`}
+                      onClick={() => removePrimaryPlaybackTrack(track.id)}
+                      type="button"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="djcx-admin-primary-warning">
+                Agrega por lo menos una cancion para usar esta modalidad.
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+
       <section className="djcx-admin-panel djcx-admin-albums-panel">
         <div className="djcx-admin-panel-heading">
           <span>
@@ -2298,7 +2833,12 @@ export function DjCarlosAdminPage({
                   <strong>{album.title}</strong>
                   <small>
                     {album.mood} / {albumTrackCounts.get(album.id) ?? 0} canciones
-                    {index === 0 ? " / principal" : ""}
+                    {index === 0 ? " / destacado" : ""}
+                    {(primaryPlayback.mode === "album" ||
+                      primaryPlayback.mode === "album-selection") &&
+                    primaryPlayback.sourceId === album.id
+                      ? " / reproduccion principal"
+                      : ""}
                   </small>
                 </div>
               </button>

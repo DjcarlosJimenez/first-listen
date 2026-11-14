@@ -146,16 +146,109 @@ function selectedAlbumForConfig(
   );
 }
 
-function firstTrackIdForAlbum(config: DjCarlosPageConfig, albumSlug?: string) {
-  const album = selectedAlbumForConfig(config, albumSlug);
-  if (isPlayableDjCarlosLink(album.link)) return ALBUM_PLAYER_TRACK_ID;
-  return (
-    config.tracks.find(
-      (track) => track.section === "album" && track.albumId === album.id,
-    )?.id ??
-    config.tracks[0]?.id ??
-    ""
+function albumPlayerTrackId(albumId: string) {
+  return `${ALBUM_PLAYER_TRACK_ID}-${albumId}`;
+}
+
+function compilationPlayerTrackId(compilationId: string, trackId?: string) {
+  return trackId
+    ? `dj-carlos-compilation-${compilationId}-${trackId}`
+    : `dj-carlos-compilation-${compilationId}`;
+}
+
+function firstTrackIdForPlayback(
+  config: DjCarlosPageConfig,
+  albumSlug?: string,
+) {
+  if (albumSlug) {
+    const album = selectedAlbumForConfig(config, albumSlug);
+    if (isPlayableDjCarlosLink(album.link)) return albumPlayerTrackId(album.id);
+    return (
+      config.tracks.find(
+        (track) => track.section === "album" && track.albumId === album.id,
+      )?.id ??
+      config.tracks[0]?.id ??
+      ""
+    );
+  }
+
+  const playback = config.primaryPlayback;
+  if (playback.mode === "compilation") {
+    const compilation = config.compilations.find(
+      (item) => item.id === playback.sourceId,
+    );
+    if (compilation) {
+      const requestedTrack = compilation.tracks.find(
+        (track) =>
+          track.id === playback.startTrackId &&
+          isPlayableDjCarlosLink(track.link),
+      );
+      if (requestedTrack) {
+        return compilationPlayerTrackId(compilation.id, requestedTrack.id);
+      }
+      const firstTrack = compilation.tracks.find((track) =>
+        isPlayableDjCarlosLink(track.link),
+      );
+      if (firstTrack) {
+        return compilationPlayerTrackId(compilation.id, firstTrack.id);
+      }
+      if (isPlayableDjCarlosLink(compilation.link)) {
+        return compilationPlayerTrackId(compilation.id);
+      }
+    }
+  }
+
+  if (playback.mode === "top-ten") {
+    const queue = config.tracks.filter((track) => track.section === "top-ten");
+    return (
+      queue.find((track) => track.id === playback.startTrackId)?.id ??
+      queue[0]?.id ??
+      config.tracks[0]?.id ??
+      ""
+    );
+  }
+
+  if (playback.mode === "custom") {
+    return (
+      playback.trackIds.find((trackId) =>
+        config.tracks.some((track) => track.id === trackId),
+      ) ??
+      config.tracks[0]?.id ??
+      ""
+    );
+  }
+
+  const sourceAlbum =
+    albumsForConfig(config).find((item) => item.id === playback.sourceId) ??
+    selectedAlbumForConfig(config);
+  const sourceTracks = config.tracks.filter(
+    (track) => track.section === "album" && track.albumId === sourceAlbum.id,
   );
+  if (playback.mode === "album-selection") {
+    return (
+      playback.trackIds.find((trackId) =>
+        sourceTracks.some((track) => track.id === trackId),
+      ) ??
+      sourceTracks[0]?.id ??
+      config.tracks[0]?.id ??
+      ""
+    );
+  }
+  const requestedTrack = sourceTracks.find(
+    (track) => track.id === playback.startTrackId,
+  );
+  if (requestedTrack) return requestedTrack.id;
+  if (isPlayableDjCarlosLink(sourceAlbum.link)) {
+    return albumPlayerTrackId(sourceAlbum.id);
+  }
+  return sourceTracks[0]?.id ?? config.tracks[0]?.id ?? "";
+}
+
+function rotatePlaybackQueue(queue: DjCarlosTrack[], startTrackId: string) {
+  if (!startTrackId || queue.length < 2) return queue;
+  const index = queue.findIndex((track) => track.id === startTrackId);
+  if (index <= 0) return queue;
+  return [...queue.slice(index), ...queue.slice(0, index)];
 }
 
 function absoluteShareUrl(url: string) {
@@ -287,6 +380,7 @@ export function DjCarlosArtistPage({
   const autoPlayEnabledRef = useRef(true);
   const playerPausedByUserRef = useRef(false);
   const deepLinkTrackAppliedRef = useRef<string | null>(null);
+  const loadedLocalConfigUpdatedAtRef = useRef("");
   const countedVideoPlayRef = useRef(new Set<string>());
   const pendingVideoPlayRef = useRef(new Set<string>());
   const shareNoticeTimerRef = useRef<number | null>(null);
@@ -294,7 +388,10 @@ export function DjCarlosArtistPage({
     normalizeDjCarlosPageConfig(initialConfig),
   );
   const [activeId, setActiveId] = useState(() =>
-    firstTrackIdForAlbum(initialConfig, initialAlbumSlug),
+    firstTrackIdForPlayback(
+      normalizeDjCarlosPageConfig(initialConfig),
+      initialAlbumSlug,
+    ),
   );
   const [autoPlayEnabled, setAutoPlayEnabled] = useState(true);
   const [playerPausedByUser, setPlayerPausedByUser] = useState(false);
@@ -305,7 +402,12 @@ export function DjCarlosArtistPage({
   const [selectedRhythm, setSelectedRhythm] = useState("");
   const [selectedVideoRhythm, setSelectedVideoRhythm] = useState("");
   const [videoQueueActive, setVideoQueueActive] = useState(false);
-  const [activeCompilationId, setActiveCompilationId] = useState("");
+  const [activeCompilationId, setActiveCompilationId] = useState(() => {
+    const normalized = normalizeDjCarlosPageConfig(initialConfig);
+    return !initialAlbumSlug && normalized.primaryPlayback.mode === "compilation"
+      ? normalized.primaryPlayback.sourceId
+      : "";
+  });
   const [videoSortMode, setVideoSortMode] =
     useState<DjCarlosVideoSortMode>("official");
   const [videoPlayCounts, setVideoPlayCounts] = useState(() =>
@@ -343,14 +445,26 @@ export function DjCarlosArtistPage({
             !findAlbumBySlug(initialConfig, initialAlbumSlug) &&
             findAlbumBySlug(nextConfig, initialAlbumSlug),
         );
+        const localConfigChanged =
+          loadedLocalConfigUpdatedAtRef.current !== nextConfig.updatedAt;
+        loadedLocalConfigUpdatedAtRef.current = nextConfig.updatedAt;
         setUsingLocalDraft(true);
         setConfig(nextConfig);
         setActiveId(
           (current) =>
-            routeNeedsLocalAlbum
-              ? firstTrackIdForAlbum(nextConfig, initialAlbumSlug)
-              : current || firstTrackIdForAlbum(nextConfig, initialAlbumSlug),
+            routeNeedsLocalAlbum || localConfigChanged
+              ? firstTrackIdForPlayback(nextConfig, initialAlbumSlug)
+              : current || firstTrackIdForPlayback(nextConfig, initialAlbumSlug),
         );
+        if (!initialAlbumSlug && localConfigChanged) {
+          setActiveCompilationId(
+            nextConfig.primaryPlayback.mode === "compilation"
+              ? nextConfig.primaryPlayback.sourceId
+              : "",
+          );
+          setVideoQueueActive(false);
+          setSelectedRhythm("");
+        }
       } catch {
         window.localStorage.removeItem(DJ_CARLOS_PAGE_STORAGE_KEY);
         setUsingLocalDraft(false);
@@ -446,11 +560,12 @@ export function DjCarlosArtistPage({
       if (playableSingles.length) {
         return playableSingles.map((track) => ({
           compilationId: compilation.id,
+          sourceTrackId: track.id,
           track: {
             artist: "DJ Carlos Jimenez Compositor",
             badge: "Compilacion",
             coverUrl: compilation.coverUrl || artistLogoUrl,
-            id: `dj-carlos-compilation-${compilation.id}-${track.id}`,
+            id: compilationPlayerTrackId(compilation.id, track.id),
             link: track.link,
             mood: track.mood,
             platform: detectDjCarlosPlatform(track.link),
@@ -464,11 +579,12 @@ export function DjCarlosArtistPage({
       if (!isPlayableDjCarlosLink(compilation.link)) return [];
       return [{
         compilationId: compilation.id,
+        sourceTrackId: "",
         track: {
           artist: "DJ Carlos Jimenez Compositor",
           badge: "Compilacion",
           coverUrl: compilation.coverUrl || artistLogoUrl,
-          id: `dj-carlos-compilation-${compilation.id}`,
+          id: compilationPlayerTrackId(compilation.id),
           link: compilation.link,
           mood: compilation.mood,
           platform: detectDjCarlosPlatform(compilation.link),
@@ -534,22 +650,42 @@ export function DjCarlosArtistPage({
     () => new Set(albumsForConfig(initialConfig).map((item) => item.slug)),
     [initialConfig],
   );
-  const albumPlayerTrack = useMemo<DjCarlosTrack | null>(() => {
-    if (!isPlayableDjCarlosLink(album.link)) return null;
-    return {
-      artist: "DJ Carlos Jimenez Compositor",
-      badge: album.badge,
-      coverUrl: album.coverUrl || artistLogoUrl,
-      id: ALBUM_PLAYER_TRACK_ID,
-      link: album.link,
-      mood: album.mood,
-      platform: detectDjCarlosPlatform(album.link),
-      release: album.title,
-      section: "album",
-      subtitle: album.subtitle,
-      title: album.title,
-    };
-  }, [album, artistLogoUrl]);
+  const albumPlayerTracks = useMemo<DjCarlosTrack[]>(
+    () => albums
+      .filter((item) => isPlayableDjCarlosLink(item.link))
+      .map((item) => ({
+        artist: "DJ Carlos Jimenez Compositor",
+        badge: item.badge,
+        coverUrl: item.coverUrl || artistLogoUrl,
+        id: albumPlayerTrackId(item.id),
+        link: item.link,
+        mood: item.mood,
+        platform: detectDjCarlosPlatform(item.link),
+        release: item.title,
+        section: "album" as const,
+        subtitle: item.subtitle,
+        title: item.title,
+      })),
+    [albums, artistLogoUrl],
+  );
+  const albumPlayerTrackByAlbumId = useMemo(
+    () => new Map(
+      albums.map((item) => [
+        item.id,
+        albumPlayerTracks.find(
+          (track) => track.id === albumPlayerTrackId(item.id),
+        ) ?? null,
+      ]),
+    ),
+    [albumPlayerTracks, albums],
+  );
+  const albumIdByPlayerTrackId = useMemo(
+    () => new Map(
+      albums.map((item) => [albumPlayerTrackId(item.id), item.id]),
+    ),
+    [albums],
+  );
+  const albumPlayerTrack = albumPlayerTrackByAlbumId.get(album.id) ?? null;
   const basePlayQueue = useMemo(
     () => [...albumTracks, ...topTenTracks, ...officialVideos],
     [albumTracks, officialVideos, topTenTracks],
@@ -558,6 +694,63 @@ export function DjCarlosArtistPage({
     () => [...allAlbumTracks, ...topTenTracks, ...officialVideos],
     [allAlbumTracks, officialVideos, topTenTracks],
   );
+  const primaryPlayQueue = useMemo(() => {
+    const playback = config.primaryPlayback;
+    if (playback.mode === "compilation") {
+      const queue = compilationPlaybackTracks
+        .filter((item) => item.compilationId === playback.sourceId)
+        .map((item) => item.track);
+      const startTrackId = compilationPlaybackTracks.find(
+        (item) =>
+          item.compilationId === playback.sourceId &&
+          item.sourceTrackId === playback.startTrackId,
+      )?.track.id ?? "";
+      return rotatePlaybackQueue(queue, startTrackId);
+    }
+
+    if (playback.mode === "top-ten") {
+      return rotatePlaybackQueue(topTenTracks, playback.startTrackId);
+    }
+
+    if (playback.mode === "custom") {
+      const queue = playback.trackIds
+        .map((trackId) => tracks.find((track) => track.id === trackId))
+        .filter((track): track is DjCarlosTrack => Boolean(track));
+      return rotatePlaybackQueue(queue, playback.startTrackId);
+    }
+
+    const sourceAlbum =
+      albums.find((item) => item.id === playback.sourceId) ?? album;
+    const sourceTracks = tracks.filter(
+      (track) =>
+        track.section === "album" && track.albumId === sourceAlbum.id,
+    );
+    if (playback.mode === "album-selection") {
+      const queue = playback.trackIds
+        .map((trackId) => sourceTracks.find((track) => track.id === trackId))
+        .filter((track): track is DjCarlosTrack => Boolean(track));
+      return rotatePlaybackQueue(queue, playback.startTrackId);
+    }
+
+    if (playback.startTrackId) {
+      return rotatePlaybackQueue(sourceTracks, playback.startTrackId);
+    }
+    const providerAlbumTrack = albumPlayerTrackByAlbumId.get(sourceAlbum.id);
+    return providerAlbumTrack ? [providerAlbumTrack] : sourceTracks;
+  }, [
+    album,
+    albumPlayerTrackByAlbumId,
+    albums,
+    compilationPlaybackTracks,
+    config.primaryPlayback,
+    topTenTracks,
+    tracks,
+  ]);
+  const defaultPlayQueue = isAlbumDetail
+    ? basePlayQueue
+    : primaryPlayQueue.length
+      ? primaryPlayQueue
+      : basePlayQueue;
   const playQueue = useMemo(
     () => activeCompilationId && activeCompilationQueue.length
       ? activeCompilationQueue
@@ -572,12 +765,12 @@ export function DjCarlosArtistPage({
               ),
               ...officialVideos,
             ]
-          : basePlayQueue,
+          : defaultPlayQueue,
     [
       activeCompilationId,
       activeCompilationQueue,
       albums,
-      basePlayQueue,
+      defaultPlayQueue,
       libraryPlayQueue,
       officialVideos,
       orderedOfficialVideos,
@@ -586,15 +779,15 @@ export function DjCarlosArtistPage({
     ],
   );
   const activeTrack = useMemo(() => {
-    if (albumPlayerTrack?.id === activeId) return albumPlayerTrack;
     return (
+      albumPlayerTracks.find((track) => track.id === activeId) ??
       compilationPlayerTracks.find((track) => track.id === activeId) ??
       tracks.find((track) => track.id === activeId) ??
       playQueue[0] ??
       tracks[0] ??
       null
     );
-  }, [activeId, albumPlayerTrack, compilationPlayerTracks, playQueue, tracks]);
+  }, [activeId, albumPlayerTracks, compilationPlayerTracks, playQueue, tracks]);
   const moodFilters = useMemo(() => {
     const usedRhythms = mergeDjCarlosRhythms(
       albums.map((item) => item.mood),
@@ -745,7 +938,11 @@ export function DjCarlosArtistPage({
 
   const shareActiveTrack = () => {
     if (!activeTrack) return Promise.resolve();
-    if (activeTrack.id === albumPlayerTrack?.id) return shareAlbum(album);
+    const activeAlbumId = albumIdByPlayerTrackId.get(activeTrack.id);
+    const activeAlbum = activeAlbumId
+      ? albums.find((item) => item.id === activeAlbumId)
+      : null;
+    if (activeAlbum) return shareAlbum(activeAlbum);
     return shareTrack(activeTrack);
   };
 
@@ -898,7 +1095,7 @@ export function DjCarlosArtistPage({
       }
       const hasTrack =
         tracks.some((track) => track.id === requestedTrackId) ||
-        albumPlayerTrack?.id === requestedTrackId;
+        albumPlayerTracks.some((track) => track.id === requestedTrackId);
       if (!hasTrack) return;
 
       deepLinkTrackAppliedRef.current = requestedTrackId;
@@ -917,7 +1114,7 @@ export function DjCarlosArtistPage({
     } catch {
       // Deep links are optional; the page still plays the normal queue.
     }
-  }, [albumPlayerTrack?.id, tracks]);
+  }, [albumPlayerTracks, tracks]);
 
   useEffect(() => {
     const compilationQueueActive = Boolean(
@@ -932,9 +1129,9 @@ export function DjCarlosArtistPage({
     ) {
       return;
     }
-    if (activeTrack?.id === albumPlayerTrack?.id) return;
-
     const activeTrackId = activeTrack?.id ?? null;
+    if (activeTrackId && albumIdByPlayerTrackId.has(activeTrackId)) return;
+
     const nextTrackId = nextDjCarlosQueueTrackId(activeTrackId, playQueue);
     if (!nextTrackId) return;
 
@@ -959,7 +1156,7 @@ export function DjCarlosArtistPage({
     activeCompilationId,
     activeCompilationQueue.length,
     activeTrack?.id,
-    albumPlayerTrack?.id,
+    albumIdByPlayerTrackId,
     autoPlayEnabled,
     playQueue,
     playerPausedByUser,
@@ -1000,7 +1197,7 @@ export function DjCarlosArtistPage({
     compilationTrackId?: string,
   ) => {
     const requestedPlayerId = compilationTrackId
-      ? `dj-carlos-compilation-${compilation.id}-${compilationTrackId}`
+      ? compilationPlayerTrackId(compilation.id, compilationTrackId)
       : "";
     const match = compilationPlaybackTracks.find(
       (item) =>

@@ -123,12 +123,27 @@ export type DjCarlosIdentity = {
   showPortrait: boolean;
 };
 
+export type DjCarlosPrimaryPlaybackMode =
+  | "album"
+  | "album-selection"
+  | "top-ten"
+  | "compilation"
+  | "custom";
+
+export type DjCarlosPrimaryPlayback = {
+  mode: DjCarlosPrimaryPlaybackMode;
+  sourceId: string;
+  startTrackId: string;
+  trackIds: string[];
+};
+
 export type DjCarlosPageConfig = {
   album: DjCarlosAlbum;
   albums: DjCarlosAlbum[];
   compilations: DjCarlosCompilation[];
   identity: DjCarlosIdentity;
   platformLinks: ArtistPlatformLinks;
+  primaryPlayback: DjCarlosPrimaryPlayback;
   rhythms: string[];
   tracks: DjCarlosTrack[];
   upcomingRelease: DjCarlosUpcomingRelease;
@@ -525,6 +540,12 @@ export const defaultDjCarlosPageConfig: DjCarlosPageConfig = {
     website: "",
     custom: [],
   },
+  primaryPlayback: {
+    mode: "album",
+    sourceId: defaultDjCarlosAlbum.id,
+    startTrackId: "",
+    trackIds: [],
+  },
   rhythms: [...DJ_CARLOS_DEFAULT_RHYTHMS],
   tracks: defaultDjCarlosTracks,
   upcomingRelease: {
@@ -907,6 +928,137 @@ function cleanCompilations(
   }, []).slice(0, 24);
 }
 
+function cleanPrimaryPlayback(
+  value: unknown,
+  fallback: DjCarlosPrimaryPlayback | undefined,
+  albums: DjCarlosAlbum[],
+  compilations: DjCarlosCompilation[],
+  tracks: DjCarlosTrack[],
+): DjCarlosPrimaryPlayback {
+  const firstAlbum = albums[0];
+  const defaultPlayback: DjCarlosPrimaryPlayback = {
+    mode: "album",
+    sourceId: firstAlbum?.id ?? "",
+    startTrackId: "",
+    trackIds: [],
+  };
+  const safeFallback = fallback ?? defaultPlayback;
+  const playback =
+    value && typeof value === "object"
+      ? value as Record<string, unknown>
+      : safeFallback as unknown as Record<string, unknown>;
+  const requestedMode =
+    typeof playback.mode === "string" ? playback.mode : safeFallback.mode;
+  const mode: DjCarlosPrimaryPlaybackMode = (
+    requestedMode === "album" ||
+    requestedMode === "album-selection" ||
+    requestedMode === "top-ten" ||
+    requestedMode === "compilation" ||
+    requestedMode === "custom"
+  )
+    ? requestedMode
+    : "album";
+  const requestedSourceId =
+    typeof playback.sourceId === "string" ? playback.sourceId.trim() : "";
+  const fallbackSourceId = safeFallback.sourceId?.trim() ?? "";
+  const rawTrackIds = Array.isArray(playback.trackIds)
+    ? playback.trackIds
+    : safeFallback.trackIds;
+  const requestedTrackIds = Array.from(new Set(
+    rawTrackIds
+      .map((trackId) => typeof trackId === "string" ? trackId.trim() : "")
+      .filter(Boolean),
+  ));
+  const requestedStartTrackId =
+    typeof playback.startTrackId === "string"
+      ? playback.startTrackId.trim()
+      : "";
+
+  if (mode === "compilation") {
+    const source =
+      compilations.find((item) => item.id === requestedSourceId) ??
+      compilations.find((item) => item.id === fallbackSourceId) ??
+      compilations[0];
+    if (!source) return defaultPlayback;
+    const sourceTrackIds = new Set(source.tracks.map((track) => track.id));
+    return {
+      mode,
+      sourceId: source.id,
+      startTrackId: sourceTrackIds.has(requestedStartTrackId)
+        ? requestedStartTrackId
+        : "",
+      trackIds: [],
+    };
+  }
+
+  if (mode === "top-ten") {
+    const topTenIds = new Set(
+      tracks
+        .filter((track) => track.section === "top-ten")
+        .map((track) => track.id),
+    );
+    return {
+      mode,
+      sourceId: "",
+      startTrackId: topTenIds.has(requestedStartTrackId)
+        ? requestedStartTrackId
+        : "",
+      trackIds: [],
+    };
+  }
+
+  if (mode === "custom") {
+    const eligibleIds = new Set(
+      tracks
+        .filter((track) => track.section === "album" || track.section === "top-ten")
+        .map((track) => track.id),
+    );
+    const trackIds = requestedTrackIds.filter((trackId) => eligibleIds.has(trackId));
+    return {
+      mode,
+      sourceId: "",
+      startTrackId: trackIds.includes(requestedStartTrackId)
+        ? requestedStartTrackId
+        : "",
+      trackIds,
+    };
+  }
+
+  const source =
+    albums.find((item) => item.id === requestedSourceId) ??
+    albums.find((item) => item.id === fallbackSourceId) ??
+    firstAlbum;
+  const sourceId = source?.id ?? "";
+  const sourceTrackIds = new Set(
+    tracks
+      .filter(
+        (track) => track.section === "album" && track.albumId === sourceId,
+      )
+      .map((track) => track.id),
+  );
+
+  if (mode === "album-selection") {
+    const trackIds = requestedTrackIds.filter((trackId) => sourceTrackIds.has(trackId));
+    return {
+      mode,
+      sourceId,
+      startTrackId: trackIds.includes(requestedStartTrackId)
+        ? requestedStartTrackId
+        : "",
+      trackIds,
+    };
+  }
+
+  return {
+    mode: "album",
+    sourceId,
+    startTrackId: sourceTrackIds.has(requestedStartTrackId)
+      ? requestedStartTrackId
+      : "",
+    trackIds: [],
+  };
+}
+
 function uniqueAlbumSlug(baseSlug: string, usedSlugs: Set<string>) {
   let slug = baseSlug;
   let index = 2;
@@ -1009,6 +1161,11 @@ export function normalizeDjCarlosPageConfig(
     const album = albums.find((item) => item.id === albumId) ?? primaryAlbum;
     return cleanTrack(track, album.coverUrl, albumId, album.mood);
   });
+  const safeTracks = tracks.length ? tracks : fallback.tracks;
+  const compilations = cleanCompilations(
+    config.compilations,
+    fallback.compilations,
+  );
   const incomingRhythms = Array.isArray(config.rhythms)
     ? config.rhythms
     : fallback.rhythms;
@@ -1016,20 +1173,27 @@ export function normalizeDjCarlosPageConfig(
     fallback.rhythms,
     incomingRhythms,
     albums.map((album) => album.mood),
-    tracks.map((track) => track.mood),
+    safeTracks.map((track) => track.mood),
   );
 
   return {
     album: primaryAlbum,
     albums,
-    compilations: cleanCompilations(config.compilations, fallback.compilations),
+    compilations,
     identity: cleanIdentity(config.identity, fallback.identity),
     platformLinks: normalizeArtistPlatformLinks(
       config.platformLinks,
       fallback.platformLinks,
     ),
+    primaryPlayback: cleanPrimaryPlayback(
+      config.primaryPlayback,
+      fallback.primaryPlayback,
+      albums,
+      compilations,
+      safeTracks,
+    ),
     rhythms,
-    tracks: tracks.length ? tracks : fallback.tracks,
+    tracks: safeTracks,
     upcomingRelease: cleanUpcomingRelease(
       config.upcomingRelease,
       fallback.upcomingRelease,
